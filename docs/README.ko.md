@@ -68,7 +68,7 @@ DataEase는 사용자가 신속하게 데이터를 분석하고 비즈니스 통
 
 ## 라이선스
 
-Copyright (c) 2014-2024 [FIT2CLOUD](https://fit2cloud.com/), All rights reserved.
+Copyright (c) 2014-2026 [FIT2CLOUD](https://fit2cloud.com/), All rights reserved.
 
 GNU 일반 공중 사용 허가서 버전 3 (GPLv3)에 따라 허가 ("라이선스");라이센스를 준수하는 경우를 제외하고이 파일을 사용할 수 없습니다.라이센스의 사본을 받을 수 있습니다
 

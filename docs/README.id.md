@@ -67,7 +67,7 @@ Jika Anda menemukan masalah keamanan, silakan hubungi kami melalui: wei@fit2clou
 
 ## Lisensi
 
-Hak cipta (c) 2014-2024 FIT2CLOUD, Hak cipta dilindungi undang-undang.
+Hak cipta (c) 2014-2026 FIT2CLOUD, Hak cipta dilindungi undang-undang.
 
 Dilisensikan di bawah Lisensi Publik Umum GNU versi 3 (GPLv3) ("Lisensi"); Anda tidak boleh menggunakan file ini kecuali dalam ketentuan Lisensi. Anda dapat mendapatkan salinan Lisensi di
 

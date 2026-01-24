@@ -67,7 +67,7 @@ Eğer herhangi bir güvenlik sorunu keşfedin, lütfen bize wei@fit2cloud.com ü
 
 ## Lisans
 
-Copyright (c) 2014-2024 [FIT2CLOUD](https://fit2cloud.com/), Tüm hakları saklıdır.
+Copyright (c) 2014-2026 [FIT2CLOUD](https://fit2cloud.com/), Tüm hakları saklıdır.
 
 GNU Genel Kamu Lisansı sürüm 3 (GPLv3) (aşağıda "Lisans" olarak adlandırılır) altında lisanslanmıştır; bu dosyayı Lisans'a uygunlukla kullanmadıkça kullanamazsınız. Lisansın bir kopyasını aşağıdaki adresten edinebilirsiniz
 

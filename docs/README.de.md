@@ -67,7 +67,7 @@ Wenn Sie irgendwelche Sicherheitsbedenken entdecken, kontaktieren Sie uns bitte 
 
 ## Lizenz
 
-Copyright (c) 2014-2024 [FIT2CLOUD](https://fit2cloud.com/), Alle Rechte vorbehalten.
+Copyright (c) 2014-2026 [FIT2CLOUD](https://fit2cloud.com/), Alle Rechte vorbehalten.
 
 Unterliegt der GNU General Public License Version 3 (GPLv3) (die „Lizenz“); Sie dürfen diese Datei nicht verwenden, es sei denn, Sie stimmen der Lizenz zu. Sie können eine Kopie der Lizenz unter folgender Adresse einsehen:
 

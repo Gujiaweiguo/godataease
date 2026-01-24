@@ -47,7 +47,7 @@ DataEase é uma ferramenta de BI de código aberto projetada para ajudar os usu�
 ```
 # Prepare um servidor Linux com pelo menos 2 CPUs e 4GB de RAM e execute o seguinte script de instalação com um clique como usuário root:
 
-curl - sSL https://dataease.oss-cn-hangzhou.aliyuncs.com/quick_start_v2.sh | bash
+curl -sSL https://dataease.oss-cn-hangzhou.aliyuncs.com/quick_start_v2.sh | bash
 
 # Nome de utilizador: admin
 # Senha: DataEase@123456
@@ -68,7 +68,7 @@ Se você descobrir algum problema de segurança, entre em contato conosco atrav�
 
 ## Licença
 
-Copyright (c) 2014- 2024 [FIT2CLOUD](https://fit2cloud.com/), Todos os direitos reservados.
+Copyright (c) 2014-2026 [FIT2CLOUD](https://fit2cloud.com/), Todos os direitos reservados.
 
 Licenciado sob a Licença Pública Geral GNU versão 3 (GPLv3) (a "Licença"); você não pode usar este arquivo exceto em conformidade com a Licença. Você pode obter uma cópia da Licença em
 

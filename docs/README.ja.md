@@ -68,7 +68,7 @@ curl -sSL https://dataease.oss-cn-hangzhou.aliyuncs.com/quick_start_v2.sh | bash
 
 ## ライセンス
 
-Copyright (c) 2014-2024 [FIT2CLOUD](https://fit2cloud.com/), All rights reserved.
+Copyright (c) 2014-2026 [FIT2CLOUD](https://fit2cloud.com/), All rights reserved.
 
 The GNU General Public License version 3 (GPLv3) に基づいてライセンスされています。ライセンスに従わない限り、このファイルを使用することはできません。ライセンスのコピーは以下のリンクから入手できます：
 
