@@ -1,0 +1,19 @@
+version: "3"
+services:
+  dataease-mysql:
+    image: registry.cn-qingdao.aliyuncs.com/dataease/mysql:8.4.5
+    container_name: dataease-mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "dataease", "-pDataEase123456", "--protocol", "tcp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    env_file:
+      - ./dataease2.0/conf/mysql.env
+    volumes:
+      - ./dataease2.0/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./dataease2.0/bin/mysql:/docker-entrypoint-initdb.d/
+      - ./dataease2.0/data/mysql:/var/lib/mysql
+    networks:
+      - dataease-network
+

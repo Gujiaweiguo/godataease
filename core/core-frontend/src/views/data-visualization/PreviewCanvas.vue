@@ -10,6 +10,8 @@ import { Base64 } from 'js-base64'
 import { getOuterParamsInfo } from '@/api/visualization/outerParams'
 import { ElMessage } from 'element-plus-secondary'
 import { useEmbedded } from '@/store/modules/embedded'
+import { embeddedInitIframeApi } from '@/api/embedded'
+import { resolveEmbeddedOrigin } from '@/utils/embedded'
 import { useI18n } from '@/hooks/web/useI18n'
 import { XpackComponent } from '@/components/plugin'
 import { propTypes } from '@/utils/propTypes'
@@ -196,7 +198,21 @@ watch(
 let p = null
 let p1 = null
 const XpackLoaded = () => p(true)
-const initIframe = () => p1(true)
+const initIframe = async () => {
+  try {
+    if (embeddedStore.getToken) {
+      const initResult = await embeddedInitIframeApi({
+        token: embeddedStore.getToken,
+        origin: resolveEmbeddedOrigin()
+      })
+      if (Array.isArray(initResult?.data)) {
+        embeddedStore.setAllowedOrigins(initResult.data)
+      }
+    }
+  } finally {
+    p1(true)
+  }
+}
 onMounted(async () => {
   useEmitt({
     name: 'canvasDownload',

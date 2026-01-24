@@ -68,9 +68,11 @@ import '@antv/s2/dist/style.min.css'
 import AppElement from './App.vue'
 import { setupStore } from '@/store'
 import { useEmbedded } from '@/store/modules/embedded'
+import { embeddedInitIframeApi } from '@/api/embedded'
 import { setupElementPlus, setupElementPlusIcons } from '@/plugins/element-plus'
 import { setupRouter } from '@/router/embedded'
 import { useCache } from '@/hooks/web/useCache'
+import { resolveEmbeddedOrigin } from '@/utils/embedded'
 
 const setupAll = async (
   dom: string,
@@ -109,6 +111,12 @@ const setupAll = async (
   embeddedStore.setPid(pid)
   embeddedStore.setResourceId(resourceId)
   embeddedStore.setDfId(dfId)
+  if (token) {
+    const initResult = await embeddedInitIframeApi({ token, origin: resolveEmbeddedOrigin() })
+    if (Array.isArray(initResult?.data)) {
+      embeddedStore.setAllowedOrigins(initResult.data)
+    }
+  }
   const i18 = await import('@/plugins/vue-i18n')
   await i18.setupI18n(app)
   setupRouter(app)
@@ -157,6 +165,10 @@ class DataEaseBi {
     | 'ScreenPanel'
     | 'DashboardPanel'
     | 'DataFilling'
+    | 'Dataset'
+    | 'Datasource'
+    | 'DatasetEditor'
+    | 'TemplateManage'
   dvId: string
   busiFlag: 'dashboard' | 'dataV'
   outerParams: string

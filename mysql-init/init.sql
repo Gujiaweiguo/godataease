@@ -1,0 +1,7 @@
+-- 创建数据库并初始化
+CREATE DATABASE IF NOT EXISTS dataease10 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 创建用户并授权
+CREATE USER IF NOT EXISTS 'dataease'@'%' IDENTIFIED BY '123456';
+GRANT ALL PRIVILEGES ON dataease10.* TO 'dataease'@'%';
+FLUSH PRIVILEGES;

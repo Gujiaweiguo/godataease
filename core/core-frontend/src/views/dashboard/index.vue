@@ -20,6 +20,8 @@ import { check, compareStorage } from '@/utils/CrossPermission'
 import { useCache } from '@/hooks/web/useCache'
 import { cloneDeep } from 'lodash-es'
 import { useEmbedded } from '@/store/modules/embedded'
+import { embeddedInitIframeApi } from '@/api/embedded'
+import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { watermarkFind } from '@/api/watermark'
@@ -182,6 +184,20 @@ const initLocalCanvasData = callBack => {
   )
 }
 onMounted(async () => {
+  if (embeddedStore.getToken) {
+    try {
+      const initResult = await embeddedInitIframeApi({
+        token: embeddedStore.getToken,
+        origin: resolveEmbeddedOrigin()
+      })
+      if (Array.isArray(initResult?.data)) {
+        embeddedStore.setAllowedOrigins(initResult.data)
+      }
+    } catch (error) {
+      console.error('Embedded iframe initialization failed', error)
+      return
+    }
+  }
   document.body.style.overflow = 'hidden'
   dvMainStore.setCurComponent({ component: null, index: null })
   dvMainStore.setHiddenListStatus(false)
@@ -273,6 +289,15 @@ onMounted(async () => {
 
 // 目标校验： 需要校验targetSourceId 是否是当前可视化资源ID
 const winMsgHandle = event => {
+  if (
+    !isAllowedEmbeddedMessageOrigin(
+      event.origin,
+      embeddedStore.getAllowedOrigins,
+      Boolean(embeddedStore.getToken)
+    )
+  ) {
+    return
+  }
   const msgInfo = event.data
   if (msgInfo?.targetSourceId === dvInfo.value.id + '')
     if (msgInfo.type === 'webParams') {

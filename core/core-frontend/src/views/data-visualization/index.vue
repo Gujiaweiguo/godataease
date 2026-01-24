@@ -29,6 +29,8 @@ import CanvasCore from '@/components/data-visualization/canvas/CanvasCore.vue'
 import { listenGlobalKeyDown, releaseAttachKey } from '@/utils/DeShortcutKey'
 import { adaptCurThemeCommonStyle } from '@/utils/canvasStyle'
 import { useEmbedded } from '@/store/modules/embedded'
+import { embeddedInitIframeApi } from '@/api/embedded'
+import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
 import { changeComponentSizeWithScale } from '@/utils/changeComponentsSizeWithScale'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { check, compareStorage } from '@/utils/CrossPermission'
@@ -359,6 +361,15 @@ const checkPer = async resourceId => {
 }
 // 目标校验： 需要校验targetSourceId 是否是当前可视化资源ID
 const winMsgHandle = event => {
+  if (
+    !isAllowedEmbeddedMessageOrigin(
+      event.origin,
+      embeddedStore.getAllowedOrigins,
+      Boolean(embeddedStore.getToken)
+    )
+  ) {
+    return
+  }
   const msgInfo = event.data
   if (msgInfo?.targetSourceId === dvInfo.value.id + '')
     if (msgInfo.type === 'webParams') {
@@ -377,6 +388,20 @@ const newWindowFromDiv = ref(false)
 let p = null
 const XpackLoaded = () => p(true)
 onMounted(async () => {
+  if (embeddedStore.getToken) {
+    try {
+      const initResult = await embeddedInitIframeApi({
+        token: embeddedStore.getToken,
+        origin: resolveEmbeddedOrigin()
+      })
+      if (Array.isArray(initResult?.data)) {
+        embeddedStore.setAllowedOrigins(initResult.data)
+      }
+    } catch (error) {
+      console.error('Embedded iframe initialization failed', error)
+      return
+    }
+  }
   document.body.style.overflow = 'hidden'
   dvMainStore.setCurComponent({ component: null, index: null })
   snapshotStore.initSnapShot()

@@ -26,7 +26,7 @@ public class WhitelistUtils {
             "/login/localLogin",
             "/apisix/check",
             "/dekey",
-            "/symmetricKey",
+            "/metricKey",
             "/index.html",
             "/model",
             "/xpackModel",
@@ -47,7 +47,9 @@ public class WhitelistUtils {
             "/setting/authentication/status",
             "/sysParameter/ui",
             "/sysParameter/defaultLogin",
-            "/embedded/initIframe",
+            "/embedded",
+            "/api/embedded",
+            "/de2api/embedded",
             "/sysParameter/i18nOptions",
             "/login/modifyInvalidPwd",
             "/");
@@ -66,9 +68,13 @@ public class WhitelistUtils {
         if (StringUtils.startsWith(requestURI, AuthConstant.DE_OIDCAPI_PREFIX)) {
             requestURI = requestURI.replaceFirst(AuthConstant.DE_OIDCAPI_PREFIX, "");
         }
-        return WHITE_PATH.contains(requestURI)
+        if (StringUtils.startsWith(requestURI, "/api")) {
+            requestURI = requestURI.replaceFirst("/api", "");
+        }
+        boolean isWhitePath = WHITE_PATH.contains(requestURI)
                 || StringUtils.endsWithAny(requestURI, ".gif",".ico", "js", ".css", "svg", "png", "jpg", "js.map", ".otf", ".ttf", ".woff2")
                 || StringUtils.startsWithAny(requestURI, "data:image")
+                || StringUtils.startsWithAny(requestURI, "/embedded/")
                 || StringUtils.startsWithAny(requestURI, "/login/platformLogin/")
                 || StringUtils.startsWithAny(requestURI, "/static-resource/")
                 || StringUtils.startsWithAny(requestURI, "/appearance/image/")
@@ -90,6 +96,7 @@ public class WhitelistUtils {
                 || StringUtils.startsWithAny(requestURI, "/communicate/image/")
                 || StringUtils.startsWithAny(requestURI, "/saml/")
                 || StringUtils.startsWithAny(requestURI, "/communicate/down/");
+        return isWhitePath;
     }
 
     public static String getBaseApiUrl(String redirect_uri) {

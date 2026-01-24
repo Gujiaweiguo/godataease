@@ -11,8 +11,10 @@ import UserViewEnlarge from '@/components/visualization/UserViewEnlarge.vue'
 import CanvasOptBar from '@/components/visualization/CanvasOptBar.vue'
 import { isDashboard, isMainCanvas, refreshOtherComponent } from '@/utils/canvasUtils'
 import { activeWatermarkCheckUser } from '@/components/watermark/watermark'
+import { useEmbedded } from '@/store/modules/embedded'
 import router from '@/router'
 import { XpackComponent } from '@/components/plugin'
+import { isAllowedEmbeddedMessageOrigin } from '@/utils/embedded'
 import PopArea from '@/custom-component/pop-area/Component.vue'
 import CanvasFilterBtn from '@/custom-component/canvas-filter-btn/Component.vue'
 import { useEmitt } from '@/hooks/web/useEmitt'
@@ -25,6 +27,7 @@ import { isMobile } from '@/utils/utils'
 import { useI18n } from '@/hooks/web/useI18n'
 const dvMainStore = dvMainStoreWithOut()
 const { pcMatrixCount, curComponent, mobileInPc, canvasState, inMobile } = storeToRefs(dvMainStore)
+const embeddedStore = useEmbedded()
 const openHandler = ref(null)
 const customDatasetParamsRef = ref(null)
 const emits = defineEmits(['onResetLayout'])
@@ -402,6 +405,15 @@ const initWatermark = (waterDomId = 'preview-canvas-main') => {
 
 // 目标校验： 需要校验targetSourceId 是否是当前可视化资源ID
 const winMsgHandle = event => {
+  if (
+    !isAllowedEmbeddedMessageOrigin(
+      event.origin,
+      embeddedStore.getAllowedOrigins,
+      Boolean(embeddedStore.getToken)
+    )
+  ) {
+    return
+  }
   const msgInfo = event.data
   console.info('Received Message: ' + JSON.stringify(msgInfo))
   if (msgInfo?.targetSourceId === dvInfo.value.id + '' && isMainCanvas(canvasId.value))

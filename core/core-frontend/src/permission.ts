@@ -26,7 +26,12 @@ const { loadStart, loadDone } = usePageLoading()
 
 const whiteList = ['/login', '/de-link', '/chart-view', '/admin-login', '/401'] // 不重定向白名单
 const embeddedWindowWhiteList = ['/dvCanvas', '/dashboard', '/preview', '/dataset-embedded-form']
-const embeddedRouteWhiteList = ['/dataset-embedded', '/dataset-form', '/dataset-embedded-form']
+const embeddedRouteWhiteList = [
+  '/dataset-embedded',
+  '/dataset-form',
+  '/dataset-embedded-form',
+  '/datasource-embedded'
+]
 router.beforeEach(async (to, from, next) => {
   if (['/chart-view'].includes(to.path) || to.path.startsWith('/de-link/')) {
     open()

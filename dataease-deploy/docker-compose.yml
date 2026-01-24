@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  dataease:
+    image: registry.cn-qingdao.aliyuncs.com/dataease/dataease:v2.10.18
+    container_name: dataease
+    stop_signal: SIGTERM
+    stop_grace_period: 15s
+    ports:
+      - 80:8100
+    volumes:
+      - ./dataease2.0/conf:/opt/apps/config
+      - ./dataease2.0/logs:/opt/dataease2.0/logs
+      - ./dataease2.0/data/static-resource:/opt/dataease2.0/data/static-resource
+      - ./dataease2.0/cache:/opt/dataease2.0/cache
+      - ./dataease2.0/data/geo:/opt/dataease2.0/data/geo
+      - ./dataease2.0/data/appearance:/opt/dataease2.0/data/appearance
+      - ./dataease2.0/data/exportData:/opt/dataease2.0/data/exportData
+      - ./dataease2.0/data/plugin:/opt/dataease2.0/data/plugin
+      - ./dataease2.0/data/font:/opt/dataease2.0/data/font
+      - ./dataease2.0/data/i18n:/opt/dataease2.0/data/i18n

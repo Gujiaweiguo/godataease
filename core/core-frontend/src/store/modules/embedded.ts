@@ -23,6 +23,7 @@ interface AppState {
   datasetId: string
   datasetCopyId: string
   datasetPid: string
+  allowedOrigins: string[]
   tokenInfo?: Map<string, object>
 }
 
@@ -50,6 +51,7 @@ export const userStore = defineStore('embedded', {
       datasetId: '',
       datasetCopyId: '',
       datasetPid: '',
+      allowedOrigins: [],
       tokenInfo: new Map()
     }
   },
@@ -105,6 +107,9 @@ export const userStore = defineStore('embedded', {
     getTokenInfo(): Map<string, object> {
       return this.tokenInfo
     },
+    getAllowedOrigins(): string[] {
+      return this.allowedOrigins
+    },
     getIframeData(): any {
       return {
         embeddedToken: this.token,
@@ -138,6 +143,9 @@ export const userStore = defineStore('embedded', {
     },
     setDatasetCopyId(datasetCopyId: string) {
       this.datasetCopyId = datasetCopyId
+    },
+    setAllowedOrigins(allowedOrigins: string[]) {
+      this.allowedOrigins = allowedOrigins
     },
     setOuterUrl(outerUrl: string) {
       this.outerUrl = outerUrl
@@ -214,6 +222,7 @@ export const userStore = defineStore('embedded', {
       this.setDatasetId('')
       this.setDatasetCopyId('')
       this.setdatasetPid('')
+      this.setAllowedOrigins([])
     }
   }
 })

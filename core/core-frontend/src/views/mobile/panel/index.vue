@@ -7,8 +7,12 @@ import { XpackComponent } from '@/components/plugin'
 import DePreviewMobile from './MobileInPc.vue'
 import { findComponentById, mobileViewStyleSwitch } from '@/utils/canvasUtils'
 import { deepCopy } from '@/utils/utils'
+import { embeddedInitIframeApi } from '@/api/embedded'
+import { useEmbedded } from '@/store/modules/embedded'
+import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
 const panelInit = ref(false)
 const dvMainStore = dvMainStoreWithOut()
+const embeddedStore = useEmbedded()
 
 const checkItemPosition = component => {
   component.x = 1
@@ -20,6 +24,15 @@ const checkItemPosition = component => {
 }
 
 const hanedleMessage = event => {
+  if (
+    !isAllowedEmbeddedMessageOrigin(
+      event.origin,
+      embeddedStore.getAllowedOrigins,
+      Boolean(embeddedStore.getToken)
+    )
+  ) {
+    return
+  }
   if (event.data.type === 'panelInit') {
     const { componentData, canvasStyleData, dvInfo, canvasViewInfo, isEmbedded } = event.data.value
     componentData.forEach(ele => {
@@ -160,7 +173,20 @@ const hanedleMessage = event => {
   }
 }
 
-const initIframe = () => {
+const initIframe = async () => {
+  if (embeddedStore.getToken) {
+    try {
+      const initResult = await embeddedInitIframeApi({
+        token: embeddedStore.getToken,
+        origin: resolveEmbeddedOrigin()
+      })
+      if (Array.isArray(initResult?.data)) {
+        embeddedStore.setAllowedOrigins(initResult.data)
+      }
+    } catch (error) {
+      console.error('Embedded iframe initialization failed', error)
+    }
+  }
   panelInit.value = false
   setTimeout(() => {
     panelInit.value = true

@@ -12,6 +12,7 @@ import { useI18n } from '@/hooks/web/useI18n'
 import { XpackComponent } from '@/components/plugin'
 import EmptyBackground from '../../components/empty-background/src/EmptyBackground.vue'
 import exeRequest from '@/config/axios'
+import { isAllowedEmbeddedMessageOrigin } from '@/utils/embedded'
 const { wsCache } = useCache()
 const interactiveStore = interactiveStoreWithOut()
 const embeddedStore = useEmbedded()
@@ -36,6 +37,15 @@ const embeddedParams = embeddedParamsDiv?.chartId ? embeddedParamsDiv : embedded
 
 // 目标校验： 需要校验targetSourceId 是否是当前可视化资源ID
 const winMsgHandle = event => {
+  if (
+    !isAllowedEmbeddedMessageOrigin(
+      event.origin,
+      embeddedStore.getAllowedOrigins,
+      Boolean(embeddedStore.getToken)
+    )
+  ) {
+    return
+  }
   const msgInfo = event.data
 
   // 校验targetSourceId

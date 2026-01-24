@@ -33,7 +33,6 @@
         <dependency>
             <groupId>io.dataease</groupId>
             <artifactId>dataease-license-sdk</artifactId>
-            <version>${project.version}</version>
         </dependency>
     </dependencies>
 

@@ -114,6 +114,13 @@ export const routes: AppRouteRecordRaw[] = [
     component: () => import('@/views/visualized/data/dataset/form/index.vue')
   },
   {
+    path: '/datasource-embedded',
+    name: 'datasource-embedded',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/visualized/data/datasource/index.vue')
+  },
+  {
     path: '/preview',
     name: 'preview',
     hidden: true,
