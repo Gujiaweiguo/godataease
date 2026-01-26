@@ -23,11 +23,69 @@ import java.util.Objects;
 
 public class TokenFilter implements Filter {
     private static final String headName = "DE-GATEWAY-FLAG";
+    private static final String TEMP_LOGIN_URI = "/api/auth/tempLogin";
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         String method = request.getMethod();
+
+        if (StringUtils.equalsAny(method, "GET", "POST", "OPTIONS", "DELETE")) {
+            HttpServletResponse res = (HttpServletResponse) servletResponse;
+            res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            return;
+        }
+
+        if (StringUtils.equalsIgnoreCase("OPTIONS", method)) {
+            String origin = request.getHeader("Origin");
+            if (StringUtils.isBlank(origin)) {
+                HttpServletResponse res = (HttpServletResponse) servletResponse;
+                res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+                return;
+            }
+            HttpServletResponse res = (HttpServletResponse) servletResponse;
+            res.setHeader("Access-Control-Allow-Origin", origin);
+            res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE");
+            res.setHeader("Access-Control-Allow-Headers", "Content-Type, token, link_token");
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+            filterChain.doFilter(servletRequest, servletResponse);
+            return;
+        }
+
+        String requestURI = request.getRequestURI();
+
+        boolean match = false;
+        boolean isTempLogin = requestURI != null && requestURI.contains(TEMP_LOGIN_URI);
+
+        if (isTempLogin || !match) {
+            HttpServletResponse res = (HttpServletResponse) servletResponse;
+            ResultMessage resultMessage = new ResultMessage(e.getCode(), e.getMessage());
+            ResponseEntity<ResultMessage> entity = new ResponseEntity<>(resultMessage, HttpStatus.UNAUTHORIZED);
+            sendResponseEntity(res, entity);
+            LogUtil.error(e.getMessage(), e);
+            return;
+        }
+
+        if (match) {
+            filterChain.doFilter(servletRequest, servletResponse);
+            return;
+        }
+
+        if (StringUtils.equalsIgnoreCase("OPTIONS", method)) {
+            String origin = request.getHeader("Origin");
+            if (StringUtils.isBlank(origin)) {
+                HttpServletResponse res = (HttpServletResponse) servletResponse;
+                res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+                return;
+            }
+            HttpServletResponse res = (HttpServletResponse) servletResponse;
+            res.setHeader("Access-Control-Allow-Origin", origin);
+            res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE");
+            res.setHeader("Access-Control-Allow-Headers", "Content-Type, token, link_token");
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+            filterChain.doFilter(servletRequest, servletResponse);
+            return;
+        }
         if (!StringUtils.equalsAny(method, "GET", "POST", "OPTIONS", "DELETE")) {
             HttpServletResponse res = (HttpServletResponse) servletResponse;
             res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);

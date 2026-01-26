@@ -8,6 +8,8 @@ import io.dataease.api.dataset.union.DatasetGroupInfoDTO;
 import io.dataease.api.dataset.vo.DataSetBarVO;
 import io.dataease.constant.LogOT;
 import io.dataease.constant.LogST;
+import io.dataease.dataset.dto.OrgPermissionConfig;
+import io.dataease.dataset.manage.AutoOrgFilterService;
 import io.dataease.dataset.manage.DatasetGroupManage;
 import io.dataease.exportCenter.manage.ExportCenterDownLoadManage;
 import io.dataease.exportCenter.manage.ExportCenterManage;
@@ -34,6 +36,8 @@ public class DatasetTreeServer implements DatasetTreeApi {
     private ExportCenterManage exportCenterManage;
     @Resource
     private ExportCenterDownLoadManage exportCenterDownLoadManage;
+    @Resource
+    private AutoOrgFilterService autoOrgFilterService;
 
 
     @DeLog(id = "#p0.id", ot = LogOT.MODIFY, st = LogST.DATASET)
@@ -113,6 +117,14 @@ public class DatasetTreeServer implements DatasetTreeApi {
         } else {
             exportCenterManage.addTask(request.getId(), "dataset", request);
         }
+    }
+
+    public OrgPermissionConfig getOrgPermissionConfig(Long id) {
+        return autoOrgFilterService.getOrgPermissionConfigForApi(id);
+    }
+
+    public void saveOrgPermissionConfig(Long id, OrgPermissionConfig config) {
+        autoOrgFilterService.saveOrgPermissionConfig(id, config);
     }
 
 }

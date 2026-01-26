@@ -37,6 +37,8 @@ public class PermissionManage {
     private ColumnPermissionsApi columnPermissionsApi = null;
     @Resource
     private DatasetTableFieldManage datasetTableFieldManage;
+    @Resource
+    private AutoOrgFilterService autoOrgFilterService;
 
     private RowPermissionsApi getRowPermissionsApi() {
 
@@ -135,9 +137,17 @@ public class PermissionManage {
     }
 
     public List<DataSetRowPermissionsTreeDTO> getRowPermissionsTree(Long datasetId, Long user) {
-        // 获取当前数据集下，当前用户、角色、组织所有的行权限（非白名单，非禁用）
         List<DataSetRowPermissionsTreeDTO> records = rowPermissionsTree(datasetId, user);
-        // 构建权限tree中的field，如果field不存在，置为null
+
+        DataSetRowPermissionsTreeDTO autoOrgFilter = autoOrgFilterService.getAutoOrgFilter(datasetId, user);
+
+        if (autoOrgFilter != null) {
+            if (CollectionUtils.isEmpty(records)) {
+                records = new ArrayList<>();
+            }
+            records.add(autoOrgFilter);
+        }
+
         if (ObjectUtils.isNotEmpty(datasetId)) {
             for (DataSetRowPermissionsTreeDTO record : records) {
                 getField(record.getTree());

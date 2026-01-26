@@ -245,11 +245,27 @@ public class DatasetDataManage {
                 DEException.throwException(Translator.get("i18n_not_full"));
             }
             sql = Utils.replaceSchemaAlias(sql, dsMap);
+        } else {
+            sql = Utils.replaceSchemaAlias(sql, dsMap);
         }
         List<DataSetRowPermissionsTreeDTO> rowPermissionsTree = new ArrayList<>();
+        String whereFilter = null;
         TokenUserBO user = AuthUtils.getUser();
         if (user != null && checkPermission) {
             rowPermissionsTree = permissionManage.getRowPermissionsTree(datasetGroupInfoDTO.getId(), user.getUserId());
+        }
+        // Inject row permission filter into dataset queries
+        if (user != null && !AuthUtils.isSysAdmin(user.getUserId()) && checkPermission && ObjectUtils.isNotEmpty(rowPermissionsTree)) {
+            try {
+                RowPermissionFilter rowPermissionFilter = new RowPermissionFilter();
+                whereFilter = rowPermissionFilter.buildWhereFilter(datasetGroupInfoDTO.getId());
+                if (ObjectUtils.isNotEmpty(whereFilter) && !whereFilter.equals("null") && !whereFilter.equals("()")) {
+                    logger.info("Applying row permission filter for dataset {}: {}", datasetGroupInfoDTO.getId());
+                    sqlMap.put("rowPermissionFilter", whereFilter);
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to apply row permission filter for dataset {}: {}", datasetGroupInfoDTO.getId(), e);
+            }
         }
         Provider provider;
         if (crossDs) {

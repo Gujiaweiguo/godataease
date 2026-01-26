@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMenu } from 'element-plus-secondary'
 import { getCSSVariable } from '@/utils/color'
 import { useRoute, useRouter } from 'vue-router_2'
@@ -7,6 +7,8 @@ import { isExternal } from '@/utils/validate'
 import { useCache } from '@/hooks/web/useCache'
 import MenuItem from './MenuItem.vue'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
+import { menuTreeApi } from '@/api/auth'
+
 const appearanceStore = useAppearanceStoreWithOut()
 const tempColor = computed(() => {
   return {
@@ -22,8 +24,22 @@ defineProps({
 const route = useRoute()
 const { wsCache } = useCache('localStorage')
 const { push } = useRouter()
-const menuList = computed(() => route.matched[0]?.children || [])
+
+// Load menu data from API
+const menuList = ref<any[]>([])
 const path = computed(() => route.matched[0]?.path)
+
+// Fetch menu data on component mount
+onMounted(async () => {
+  try {
+    const response = await menuTreeApi()
+    menuList.value = response.data || []
+  } catch (error) {
+    console.error('Failed to load menu:', error)
+    // Fallback to static routes if API fails
+    menuList.value = route.matched[0]?.children || []
+  }
+})
 
 const activeIndex = computed(() => {
   const arr = route.path.split('/')

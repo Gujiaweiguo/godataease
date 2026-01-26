@@ -96,6 +96,8 @@ public class CoreDatasetGroup implements Serializable {
      */
     private Boolean isCross;
 
+    private String orgPermissionConfig;
+
     public Long getId() {
         return id;
     }
@@ -224,6 +226,14 @@ public class CoreDatasetGroup implements Serializable {
         this.isCross = isCross;
     }
 
+    public String getOrgPermissionConfig() {
+        return orgPermissionConfig;
+    }
+
+    public void setOrgPermissionConfig(String orgPermissionConfig) {
+        this.orgPermissionConfig = orgPermissionConfig;
+    }
+
     @Override
     public String toString() {
         return "CoreDatasetGroup{" +
@@ -243,6 +253,7 @@ public class CoreDatasetGroup implements Serializable {
         ", lastUpdateTime = " + lastUpdateTime +
         ", unionSql = " + unionSql +
         ", isCross = " + isCross +
+        ", orgPermissionConfig = " + orgPermissionConfig +
         "}";
     }
 }

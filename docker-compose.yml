@@ -37,6 +37,8 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: 123456
       SPRING_PROFILES_ACTIVE: standalone
+      SPRING_FLYWAY_ENABLED: false
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
     volumes:
       - dataease-data:/opt/dataease2.0
       - dataease-logs:/opt/dataease2.0/logs

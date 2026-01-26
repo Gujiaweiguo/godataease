@@ -123,11 +123,13 @@ router.beforeEach(async (to, from, next) => {
       }
 
       let roleRouters = (await getRoleRouters()) || []
+      console.log('Role routers from API:', roleRouters)
       if (isDesktop) {
         roleRouters = roleRouters.filter(item => item.name !== 'system')
       }
       const routers: any[] = roleRouters as AppCustomRouteRecordRaw[]
       routers.forEach(item => (item['top'] = true))
+      console.log('Routers with top=true:', routers)
       await permissionStore.generateRoutes(routers as AppCustomRouteRecordRaw[])
 
       permissionStore.getAddRouters.forEach(route => {

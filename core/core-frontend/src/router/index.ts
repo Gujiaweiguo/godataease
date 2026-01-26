@@ -170,6 +170,39 @@ export const routes: AppRouteRecordRaw[] = [
     hidden: true,
     meta: {},
     component: () => import('@/views/template/indexInject.vue')
+  },
+  {
+    path: '/system',
+    name: 'system',
+    redirect: '/system/user',
+    component: () => import('@/layout/index.vue'),
+    meta: {},
+    children: [
+      {
+        path: 'user',
+        name: 'system-user',
+        component: () => import('@/views/system/user/index.vue'),
+        meta: { title: '用户管理' }
+      },
+      {
+        path: 'role',
+        name: 'system-role',
+        component: () => import('@/views/system/role/index.vue'),
+        meta: { title: '角色管理' }
+      },
+      {
+        path: 'org',
+        name: 'system-org',
+        component: () => import('@/views/system/org/index.vue'),
+        meta: { title: '组织管理' }
+      },
+      {
+        path: 'permission',
+        name: 'system-permission',
+        component: () => import('@/views/system/permission/index.vue'),
+        meta: { title: '权限管理' }
+      }
+    ]
   }
 ]
 
