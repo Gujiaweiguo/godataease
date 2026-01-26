@@ -24,3 +24,19 @@ DataEase currently lacks comprehensive user management, organization management,
   - `core/core-frontend/src/views/system/` - New UI pages
   - `core/core-backend/src/main/resources/db/migration/` - Database schema changes
 - Security: Significantly improves data security and access control
+
+## Approval Decision
+**Decision**: Approved for MVP implementation
+
+**MVP Scope**:
+- Row-level permissions only
+- Basic permission configuration API
+- Minimal UI for row permission configuration (existing XpackComponent integration)
+- Basic integration tests and performance baseline
+
+**Implementation Status**: Completed 2026-01-25
+- Database migration: V2.10.21__data_perm_row.sql ✓
+- Backend entities, services, controllers: DataPermRow, DataPermRowService, RowPermissionController ✓
+- Row permission filter: RowPermissionFilter.java ✓
+- Frontend integration: Existing XpackComponent + dataset.ts APIs ✓
+- Compilation verified: Maven compile success ✓
