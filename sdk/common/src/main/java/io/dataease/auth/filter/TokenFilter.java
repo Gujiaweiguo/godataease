@@ -30,12 +30,6 @@ public class TokenFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         String method = request.getMethod();
 
-        if (StringUtils.equalsAny(method, "GET", "POST", "OPTIONS", "DELETE")) {
-            HttpServletResponse res = (HttpServletResponse) servletResponse;
-            res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-            return;
-        }
-
         if (StringUtils.equalsIgnoreCase("OPTIONS", method)) {
             String origin = request.getHeader("Origin");
             if (StringUtils.isBlank(origin)) {
@@ -52,55 +46,12 @@ public class TokenFilter implements Filter {
             return;
         }
 
-        String requestURI = request.getRequestURI();
-
-        boolean match = false;
-        boolean isTempLogin = requestURI != null && requestURI.contains(TEMP_LOGIN_URI);
-
-        if (isTempLogin || !match) {
-            HttpServletResponse res = (HttpServletResponse) servletResponse;
-            ResultMessage resultMessage = new ResultMessage(e.getCode(), e.getMessage());
-            ResponseEntity<ResultMessage> entity = new ResponseEntity<>(resultMessage, HttpStatus.UNAUTHORIZED);
-            sendResponseEntity(res, entity);
-            LogUtil.error(e.getMessage(), e);
-            return;
-        }
-
-        if (match) {
-            filterChain.doFilter(servletRequest, servletResponse);
-            return;
-        }
-
-        if (StringUtils.equalsIgnoreCase("OPTIONS", method)) {
-            String origin = request.getHeader("Origin");
-            if (StringUtils.isBlank(origin)) {
-                HttpServletResponse res = (HttpServletResponse) servletResponse;
-                res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-                return;
-            }
-            HttpServletResponse res = (HttpServletResponse) servletResponse;
-            res.setHeader("Access-Control-Allow-Origin", origin);
-            res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE");
-            res.setHeader("Access-Control-Allow-Headers", "Content-Type, token, link_token");
-            res.setHeader("Access-Control-Allow-Credentials", "true");
-            filterChain.doFilter(servletRequest, servletResponse);
-            return;
-        }
-        if (!StringUtils.equalsAny(method, "GET", "POST", "OPTIONS", "DELETE")) {
+        if (!StringUtils.equalsAny(method, "GET", "POST", "PUT", "DELETE", "PATCH")) {
             HttpServletResponse res = (HttpServletResponse) servletResponse;
             res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             return;
         }
-        if (StringUtils.equalsIgnoreCase("OPTIONS", method)) {
-            String origin = request.getHeader("Origin");
-            if (StringUtils.isBlank(origin)) {
-                HttpServletResponse res = (HttpServletResponse) servletResponse;
-                res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-                return;
-            }
-            filterChain.doFilter(servletRequest, servletResponse);
-            return;
-        }
+
         String requestURI = request.getRequestURI();
 
         boolean match = false;
@@ -108,52 +59,55 @@ public class TokenFilter implements Filter {
             match = WhitelistUtils.match(requestURI);
         } catch (DEException e) {
             HttpServletResponse res = (HttpServletResponse) servletResponse;
-            ResultMessage resultMessage = new ResultMessage(e.getCode(), e.getMessage());
+            ResultMessage resultMessage = new ResultMessage(HttpStatus.UNAUTHORIZED.value(), e.getMessage());
             ResponseEntity<ResultMessage> entity = new ResponseEntity<>(resultMessage, HttpStatus.UNAUTHORIZED);
             sendResponseEntity(res, entity);
             LogUtil.error(e.getMessage(), e);
             return;
         }
-        if (match) {
-            filterChain.doFilter(servletRequest, servletResponse);
-            return;
-        }
-        try {
-            if (ModelUtils.isDesktop()) {
-                UserUtils.setDesktopUser();
+
+        boolean isTempLogin = requestURI != null && requestURI.contains(TEMP_LOGIN_URI);
+
+        if (isTempLogin || match) {
+            try {
+                if (ModelUtils.isDesktop()) {
+                    UserUtils.setDesktopUser();
+                    filterChain.doFilter(servletRequest, servletResponse);
+                    return;
+                }
+                String executeVersion = null;
+                if (StringUtils.isNotBlank(executeVersion = VersionUtil.getRandomVersion())) {
+                    Objects.requireNonNull(ServletUtils.response()).addHeader(AuthConstant.DE_EXECUTE_VERSION, executeVersion);
+                }
+                String linkToken = ServletUtils.getHead(AuthConstant.LINK_TOKEN_KEY);
+                if (StringUtils.isNotBlank(linkToken)) {
+                    TokenUserBO tokenUserBO = TokenUtils.validateLinkToken(linkToken);
+                    UserUtils.setUserInfo(tokenUserBO);
+                    filterChain.doFilter(servletRequest, servletResponse);
+                    return;
+                }
+                String token = ServletUtils.getToken();
+                TokenUserBO userBO = TokenUtils.validate(token);
+                UserUtils.setUserInfo(userBO);
                 filterChain.doFilter(servletRequest, servletResponse);
-                return;
+            } catch (Exception e) {
+                if (!LicenseUtil.licenseValid()) {
+                    HttpServletResponse res = (HttpServletResponse) servletResponse;
+                    ResultMessage resultMessage = new ResultMessage(HttpStatus.UNAUTHORIZED.value(), e.getMessage());
+                    HttpHeaders headers = new HttpHeaders();
+                    String msg = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8).replace("+", "%20");
+                    headers.add(headName, msg);
+                    ResponseEntity<ResultMessage> entity = new ResponseEntity<>(resultMessage, headers, HttpStatus.UNAUTHORIZED);
+                    sendResponseEntity(res, entity);
+                    LogUtil.error(e.getMessage(), e);
+                } else {
+                    throw e;
+                }
+            } finally {
+                UserUtils.removeUser();
             }
-            String executeVersion = null;
-            if (StringUtils.isNotBlank(executeVersion = VersionUtil.getRandomVersion())) {
-                Objects.requireNonNull(ServletUtils.response()).addHeader(AuthConstant.DE_EXECUTE_VERSION, executeVersion);
-            }
-            String linkToken = ServletUtils.getHead(AuthConstant.LINK_TOKEN_KEY);
-            if (StringUtils.isNotBlank(linkToken)) {
-                TokenUserBO tokenUserBO = TokenUtils.validateLinkToken(linkToken);
-                UserUtils.setUserInfo(tokenUserBO);
-                filterChain.doFilter(servletRequest, servletResponse);
-                return;
-            }
-            String token = ServletUtils.getToken();
-            TokenUserBO userBO = TokenUtils.validate(token);
-            UserUtils.setUserInfo(userBO);
+        } else {
             filterChain.doFilter(servletRequest, servletResponse);
-        } catch (Exception e) {
-            if (!LicenseUtil.licenseValid()) {
-                HttpServletResponse res = (HttpServletResponse) servletResponse;
-                ResultMessage resultMessage = new ResultMessage(HttpStatus.UNAUTHORIZED.value(), e.getMessage());
-                HttpHeaders headers = new HttpHeaders();
-                String msg = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8).replace("+", "%20");
-                headers.add(headName, msg);
-                ResponseEntity<ResultMessage> entity = new ResponseEntity<>(resultMessage, headers, HttpStatus.UNAUTHORIZED);
-                sendResponseEntity(res, entity);
-                LogUtil.error(e.getMessage(), e);
-            } else {
-                throw e;
-            }
-        } finally {
-            UserUtils.removeUser();
         }
     }
 
