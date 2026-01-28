@@ -25,7 +25,7 @@ COPY staticResource/ /opt/dataease2.0/data/static-resource/
 WORKDIR /opt/apps
 
 # 复制主应用JAR
-COPY core/core-backend/target/CoreApplication.jar /opt/apps/app.jar
+COPY core/core-backend/target/core-backend-2.10.19.jar /opt/apps/app.jar
 
 # 环境变量
 ENV JAVA_APP_JAR=/opt/apps/app.jar
