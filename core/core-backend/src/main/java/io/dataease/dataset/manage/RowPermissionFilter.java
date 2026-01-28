@@ -7,6 +7,7 @@ import io.dataease.system.dao.auto.mapper.DataPermRowMapper;
 import io.dataease.system.dao.auto.mapper.DataPermColumnMapper;
 import io.dataease.system.entity.DataPermRow;
 import io.dataease.system.entity.DataPermColumn;
+import io.dataease.engine.utils.SQLUtils;
 import io.dataease.utils.AuthUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +57,7 @@ public class RowPermissionFilter {
         }
 
         Set<String> excludedColumns = new HashSet<>();
-        Set<String> maskedColumns = new HashMap<>();
+        Map<String, String> maskedColumns = new HashMap<>();
 
         for (DataPermColumn colPerm : columnPermissions) {
             if (colPerm.getStatus() != 1) {
@@ -75,7 +76,7 @@ public class RowPermissionFilter {
             return "*";
         }
 
-        return buildSelectClause(excludedColumns, maskedColumns.keySet());
+        return buildSelectClause(datasetId, excludedColumns, maskedColumns);
     }
 
     public String buildWhereFilter(Long datasetId, Set<String> selectColumns) {
@@ -260,7 +261,7 @@ public class RowPermissionFilter {
         return "`" + fieldId + "` IN (" + String.join(", ", quotedValues) + ")";
     }
 
-    private String buildSelectClause(Set<String> excludedColumns, Set<String> maskedColumns) {
+    private String buildSelectClause(Long datasetId, Set<String> excludedColumns, Map<String, String> maskedColumns) {
         if (excludedColumns.isEmpty() && maskedColumns.isEmpty()) {
             return "*";
         }
@@ -270,12 +271,12 @@ public class RowPermissionFilter {
         }
 
         List<String> selectParts = new ArrayList<>();
-        for (String maskedCol : maskedColumns) {
+        for (String maskedCol : maskedColumns.keySet()) {
             selectParts.add(buildMaskedColumnExpression(maskedCol));
         }
 
         if (!excludedColumns.isEmpty()) {
-            List<String> allColumns = dataPermColumnMapper.listAllColumnNamesByDatasetId();
+            List<String> allColumns = dataPermColumnMapper.listAllColumnNamesByDatasetId(datasetId);
             for (String col : allColumns) {
                 if (!excludedColumns.contains(col) && !maskedColumns.containsKey(col)) {
                     selectParts.add("`" + col + "`");
@@ -292,6 +293,10 @@ public class RowPermissionFilter {
 
     private String buildMaskedColumnExpression(String columnName) {
         String column = "`" + columnName + "`";
-        return "CASE " + column;
+        return "CASE " + column + " WHEN " + column + " IS NULL THEN NULL ELSE '******' END AS " + column;
+    }
+
+    private String escapeSql(String value) {
+        return SQLUtils.transKeyword(value);
     }
 }

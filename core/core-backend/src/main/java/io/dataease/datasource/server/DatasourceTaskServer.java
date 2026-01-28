@@ -113,11 +113,11 @@ public class DatasourceTaskServer {
             UpdateWrapper<CoreDatasourceTask> updateWrapper = new UpdateWrapper<>();
             updateWrapper.eq("id", coreDatasourceTask.getId());
             CoreDatasourceTask datasourceTask = new CoreDatasourceTask();
-            if (dataSetTaskDTOS.get(0).getNextExecTime() == null || dataSetTaskDTOS.get(0).getNextExecTime() <= 0) {
+            if (dataSetTaskDTOS.get(0).getLastExecTime() == null || dataSetTaskDTOS.get(0).getLastExecTime() <= 0) {
                 datasourceTask.setTaskStatus(TaskStatus.Stopped.name());
                 datasourceTaskMapper.update(datasourceTask, updateWrapper);
             }
-            if (dataSetTaskDTOS.get(0).getNextExecTime() != null && dataSetTaskDTOS.get(0).getNextExecTime() > coreDatasourceTask.getEndTime()) {
+            if (dataSetTaskDTOS.get(0).getLastExecTime() != null && dataSetTaskDTOS.get(0).getLastExecTime() > coreDatasourceTask.getEndTime()) {
                 datasourceTask.setTaskStatus(TaskStatus.Stopped.name());
                 datasourceTaskMapper.update(datasourceTask, updateWrapper);
             }
@@ -178,7 +178,7 @@ public class DatasourceTaskServer {
                 if (CollectionUtils.isEmpty(dataSetTaskDTOS)) {
                     return;
                 }
-                if (dataSetTaskDTOS.get(0).getNextExecTime() == null || dataSetTaskDTOS.get(0).getNextExecTime() <= 0) {
+                if (dataSetTaskDTOS.get(0).getLastExecTime() == null || dataSetTaskDTOS.get(0).getLastExecTime() <= 0) {
                     record.setTaskStatus(TaskStatus.Stopped.name());
                 } else {
                     record.setTaskStatus(TaskStatus.WaitingForExecution.name());

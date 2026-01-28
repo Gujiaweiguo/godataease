@@ -97,7 +97,10 @@ public class DataPermColumnServiceImpl implements IDataPermColumnService {
         if (status == null) {
             return mapper.listByDatasetId(datasetId);
         }
-        return mapper.listByDatasetIdAndStatus(datasetId, status);
+        List<DataPermColumn> allColumns = mapper.listByDatasetId(datasetId);
+        return allColumns.stream()
+            .filter(col -> col.getStatus().equals(status))
+            .collect(java.util.stream.Collectors.toList());
     }
 
     @Override

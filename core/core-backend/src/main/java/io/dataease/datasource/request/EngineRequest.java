@@ -22,6 +22,14 @@ public class EngineRequest {
     private boolean previewData = false;
     private boolean totalPageFlag;
 
+    public CoreDeEngine getEngine() {
+        return engine;
+    }
+
+    public void setEngine(CoreDeEngine engine) {
+        this.engine = engine;
+    }
+
     public EngineRequest() {
     }
 
