@@ -23,7 +23,6 @@ import java.util.Objects;
 
 public class TokenFilter implements Filter {
     private static final String headName = "DE-GATEWAY-FLAG";
-    private static final String TEMP_LOGIN_URI = "/api/auth/tempLogin";
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
@@ -66,9 +65,7 @@ public class TokenFilter implements Filter {
             return;
         }
 
-        boolean isTempLogin = requestURI != null && requestURI.contains(TEMP_LOGIN_URI);
-
-        if (isTempLogin || match) {
+        if (match) {
             try {
                 if (ModelUtils.isDesktop()) {
                     UserUtils.setDesktopUser();
