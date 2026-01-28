@@ -24,7 +24,9 @@ interface AppState {
   datasetCopyId: string
   datasetPid: string
   allowedOrigins: string[]
-  tokenInfo?: Map<string, object>
+  embedReady: boolean
+  params: Record<string, any>
+  tokenInfo: Map<string, object>
 }
 
 export const userStore = defineStore('embedded', {
@@ -52,6 +54,8 @@ export const userStore = defineStore('embedded', {
       datasetCopyId: '',
       datasetPid: '',
       allowedOrigins: [],
+      embedReady: false,
+      params: {},
       tokenInfo: new Map()
     }
   },
@@ -121,8 +125,15 @@ export const userStore = defineStore('embedded', {
         chartId: this.chartId,
         pid: this.pid,
         resourceId: this.resourceId,
-        dfId: this.dfId
+        dfId: this.dfId,
+        tokenInfo: this.tokenInfo
       }
+    },
+    getEmbedReady(): boolean {
+      return this.embedReady
+    },
+    getParams(): Record<string, any> {
+      return this.params
     }
   },
   actions: {
@@ -192,7 +203,7 @@ export const userStore = defineStore('embedded', {
     setOpt(opt: string) {
       this.opt = opt
     },
-    async setIframeData(data: any) {
+    setIframeData(data: any) {
       this.type = data['type']
       this.token = data['embeddedToken']
       this.busiFlag = data['busiFlag']
@@ -204,8 +215,17 @@ export const userStore = defineStore('embedded', {
       this.resourceId = data['resourceId']
       this.dfId = data['dfId']
     },
-    async setTokenInfo(tokenInfo: Map<string, object>) {
+    setTokenInfo(tokenInfo: Map<string, object>) {
       this.tokenInfo = tokenInfo
+    },
+    setEmbedReady(embedReady: boolean) {
+      this.embedReady = embedReady
+    },
+    setParam(key: string, value: any) {
+      this.params[key] = value
+    },
+    setParams(params: Record<string, any>) {
+      this.params = params
     },
     clearState() {
       this.setPid('')
@@ -223,6 +243,9 @@ export const userStore = defineStore('embedded', {
       this.setDatasetCopyId('')
       this.setdatasetPid('')
       this.setAllowedOrigins([])
+      this.setEmbedReady(false)
+      this.setParams({})
+      this.setTokenInfo(new Map())
     }
   }
 })

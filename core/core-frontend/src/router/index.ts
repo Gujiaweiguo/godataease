@@ -172,6 +172,20 @@ export const routes: AppRouteRecordRaw[] = [
     component: () => import('@/views/template/indexInject.vue')
   },
   {
+    path: '/module-dataset',
+    name: 'module-dataset',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/visualized/data/dataset/ModulePageWithTree.vue')
+  },
+  {
+    path: '/module-datasource',
+    name: 'module-datasource',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/visualized/datasource/ModulePageWithTree.vue')
+  },
+  {
     path: '/system',
     name: 'system',
     redirect: '/system/user',

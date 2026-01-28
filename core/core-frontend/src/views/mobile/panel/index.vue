@@ -10,6 +10,7 @@ import { deepCopy } from '@/utils/utils'
 import { embeddedInitIframeApi } from '@/api/embedded'
 import { useEmbedded } from '@/store/modules/embedded'
 import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
+import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 const panelInit = ref(false)
 const dvMainStore = dvMainStoreWithOut()
 const embeddedStore = useEmbedded()
@@ -173,25 +174,35 @@ const hanedleMessage = event => {
   }
 }
 
-const initIframe = async () => {
-  if (embeddedStore.getToken) {
-    try {
-      const initResult = await embeddedInitIframeApi({
-        token: embeddedStore.getToken,
-        origin: resolveEmbeddedOrigin()
-      })
-      if (Array.isArray(initResult?.data)) {
-        embeddedStore.setAllowedOrigins(initResult.data)
+  const { initialize: initToken } = useTokenLifecycle()
+  
+  const initIframe = async () => {
+    if (embeddedStore.getToken) {
+      try {
+        const token = embeddedStore.getToken
+        const origin = resolveEmbeddedOrigin()
+        
+        await initToken(token, { refreshEnabled: true, tokenType: 'iframe' })
+        
+        const initResult = await embeddedInitIframeApi({
+          token,
+          origin
+        })
+        if (Array.isArray(initResult?.data)) {
+          embeddedStore.setAllowedOrigins(initResult.data)
+        }
+        
+        panelInit.value = false
+      } catch (error) {
+        console.error('Embedded iframe initialization failed', error)
+      } finally {
+        setTimeout(() => {
+          panelInit.value = true
+        }, 100)
       }
-    } catch (error) {
-      console.error('Embedded iframe initialization failed', error)
     }
   }
-  panelInit.value = false
-  setTimeout(() => {
-    panelInit.value = true
-  })
-}
+
 const curComponentChangeHandle = (type, value) => {
   window.parent.postMessage({ type: type, value: value }, '*')
 }

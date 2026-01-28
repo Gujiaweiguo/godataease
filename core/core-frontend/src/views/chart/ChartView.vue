@@ -13,11 +13,13 @@ import { XpackComponent } from '@/components/plugin'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { useLoading } from '@/hooks/web/useLoading'
 import { useEmbedded } from '@/store/modules/embedded'
+import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 import { embeddedInitIframeApi } from '@/api/embedded'
 import { resolveEmbeddedOrigin } from '@/utils/embedded'
 
 const { close } = useLoading()
 const embeddedStore = useEmbedded()
+const tokenLifecycle = useTokenLifecycle()
 const currentComponent = shallowRef()
 const Preview = defineAsyncComponent(() => import('@/views/data-visualization/PreviewCanvas.vue'))
 const VisualizationEditor = defineAsyncComponent(
@@ -72,21 +74,28 @@ onBeforeUnmount(() => {
 const showComponent = ref(false)
 const dataFillingPath = ref('')
 
-const initIframe = async (name: string) => {
-  if (embeddedStore.getToken) {
-    try {
-      const initResult = await embeddedInitIframeApi({
-        token: embeddedStore.getToken,
-        origin: resolveEmbeddedOrigin()
-      })
-      if (Array.isArray(initResult?.data)) {
-        embeddedStore.setAllowedOrigins(initResult.data)
+  const initIframe = async (name: string) => {
+    if (embeddedStore.getToken) {
+      try {
+        const initResult = await embeddedInitIframeApi({
+          token: embeddedStore.getToken,
+          origin: resolveEmbeddedOrigin()
+        })
+        if (Array.isArray(initResult?.data)) {
+          embeddedStore.setAllowedOrigins(initResult.data)
+        }
+        
+        // Initialize token lifecycle
+        await tokenLifecycle.initialize(embeddedStore.getToken, window.location.origin, {
+          refreshEnabled: true,
+          tokenType: 'iframe',
+          resourceId: embeddedStore.resourceId
+        })
+      } catch (error) {
+        console.error('Embedded iframe initialization failed', error)
       }
-    } catch (error) {
-      console.error('Embedded iframe initialization failed', error)
     }
-  }
-  showComponent.value = false
+    showComponent.value = false
   if (name && name.includes('DataFilling')) {
     if (name === 'DataFilling') {
       dataFillingPath.value = 'L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvbWFuYWdlL2luZGV4'

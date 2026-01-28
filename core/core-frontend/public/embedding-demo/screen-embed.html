@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embedded Screen Example - DataEase</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 2px solid #52c41a;
+      padding-bottom: 10px;
+    }
+    .controls {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    label {
+      font-weight: 600;
+      color: #555;
+    }
+    input, select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .iframe-container {
+      margin-top: 20px;
+      border: 2px solid #52c41a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+      display: block;
+    }
+    .event-log {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f0fdf4;
+      border: 1px solid #52c41a;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    .event-log h3 {
+      margin: 0 0 10px 0;
+      color: #52c41a;
+    }
+    .event-log p {
+      margin: 4px 0;
+      padding: 4px 8px;
+      background-color: white;
+      border-radius: 2px;
+      border-left: 3px solid #52c41a;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>DataEase Screen Embedding Demo</h1>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="screenUrl">Screen URL:</label>
+        <input 
+          type="text" 
+          id="screenUrl" 
+          value="http://localhost:5100/preview#/screenDataV" 
+          style="width: 300px;"
+        />
+      </div>
+      
+      <div class="control-group">
+        <label for="token">Access Token:</label>
+        <input 
+          type="text" 
+          id="token" 
+          placeholder="Enter your access token"
+          style="width: 300px;"
+        />
+      </div>
+      
+      <div class="control-group">
+        <label for="dvId">Visualization ID:</label>
+        <input 
+          type="text" 
+          id="dvId" 
+          placeholder="Enter dv ID"
+          style="width: 150px;"
+        />
+      </div>
+      
+      <div class="control-group">
+        <button onclick="updateEmbedding()" style="padding: 10px 20px; background-color: #52c41a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+          Update Embedding
+        </button>
+        <button onclick="clearEventLog()" style="padding: 10px 20px; background-color: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          Clear Log
+        </button>
+      </div>
+    </div>
+    
+    <div class="iframe-container">
+      <iframe
+        id="de-screen-iframe"
+        src="http://localhost:5100/preview#/screenDataV"
+        frameborder="0"
+      ></iframe>
+    </div>
+    
+    <div class="event-log">
+      <h3>Event Log</h3>
+      <div id="eventLog"></div>
+    </div>
+  </div>
+  
+  <script>
+    let messageCount = 0
+    
+    function addLogEntry(type, message) {
+      const log = document.getElementById('eventLog')
+      const entry = document.createElement('p')
+      const timestamp = new Date().toLocaleTimeString()
+      entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> <strong>${type}:</strong> ${message}`
+      log.appendChild(entry)
+      messageCount++
+    }
+    
+    function clearEventLog() {
+      document.getElementById('eventLog').innerHTML = ''
+      messageCount = 0
+    }
+    
+    function updateEmbedding() {
+      const iframe = document.getElementById('de-screen-iframe')
+      const baseUrl = document.getElementById('screenUrl').value
+      const token = document.getElementById('token').value
+      const dvId = document.getElementById('dvId').value
+      
+      let url = baseUrl
+      const params = new URLSearchParams()
+      
+      if (token) {
+        params.append('token', token)
+      }
+      if (dvId) {
+        params.append('dvId', dvId)
+      }
+      
+      const paramString = params.toString()
+      if (paramString) {
+        url += `?${paramString}`
+      }
+      
+      iframe.src = url
+      addLogEntry('INFO', `Updated embedding URL: ${url}`)
+    }
+    
+    window.addEventListener('message', handleEmbeddingEvent)
+    
+    function handleEmbeddingEvent(event) {
+      const msg = event.data
+      
+      switch (msg.type) {
+        case 'dataease-embedded-interactive':
+          if (msg.args) {
+            addLogEntry('PARAM_UPDATE', JSON.stringify(msg.args))
+          }
+          break
+          
+        case 'dataease-embedded-host':
+          if (msg.args) {
+            addLogEntry('CHILD_INIT', `Child initialized`)
+          }
+          break
+          
+        case 'ready':
+          addLogEntry('CHILD_READY', 'Screen is fully ready')
+          break
+          
+        case 'error':
+          addLogEntry('CHILD_ERROR', msg.args || 'Unknown error')
+          break
+      }
+    }
+    
+    window.onload = function() {
+      addLogEntry('INFO', 'Demo page loaded')
+    }
+  </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ import { ElMessage } from 'element-plus-secondary'
 import { useEmbedded } from '@/store/modules/embedded'
 import { embeddedInitIframeApi } from '@/api/embedded'
 import { resolveEmbeddedOrigin } from '@/utils/embedded'
+import { extractTokenExpiryTime, isTokenExpiringSoon } from '@/utils/embeddedTokenUtils'
 import { useI18n } from '@/hooks/web/useI18n'
 import { XpackComponent } from '@/components/plugin'
 import { propTypes } from '@/utils/propTypes'
@@ -22,11 +23,17 @@ import { useRoute } from 'vue-router_2'
 import { filterEnumMapSync } from '@/utils/componentUtils'
 import CanvasOptBar from '@/components/visualization/CanvasOptBar.vue'
 import DvPreview from '@/views/data-visualization/DvPreview.vue'
+import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
+import type { InitReadyPayload } from '@/events/embedding/payloads'
+import { EmbeddingEventType } from '@/events/embedding/types'
+import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
+
 const routeWatch = useRoute()
 
 const dvMainStore = dvMainStoreWithOut()
 const { t } = useI18n()
 const embeddedStore = useEmbedded()
+const { emitToChild } = useEmbeddedParentCommunication()
 const previewCanvasContainer = ref(null)
 const downloadStatus = ref(false)
 const state = reactive({
@@ -170,6 +177,12 @@ const loadCanvasDataAsync = async (dvId, dvType, ignoreParams = false) => {
       }
       initBrowserTimer()
       await nextTick(() => {
+        // Send standardized init_ready event
+        const payload: InitReadyPayload = {
+          resourceId: dvId
+        }
+        emitToChild(EmbeddingEventType.INIT_READY, payload)
+        // Fallback to legacy event for backward compatibility
         onInitReady({ resourceId: dvId })
       })
     }
@@ -198,21 +211,34 @@ watch(
 let p = null
 let p1 = null
 const XpackLoaded = () => p(true)
-const initIframe = async () => {
-  try {
-    if (embeddedStore.getToken) {
-      const initResult = await embeddedInitIframeApi({
-        token: embeddedStore.getToken,
-        origin: resolveEmbeddedOrigin()
-      })
-      if (Array.isArray(initResult?.data)) {
-        embeddedStore.setAllowedOrigins(initResult.data)
+ const initIframe = async () => {
+    try {
+      if (embeddedStore.getToken) {
+        const initResult = await embeddedInitIframeApi({
+          token: embeddedStore.getToken,
+          origin: resolveEmbeddedOrigin()
+        })
+        if (Array.isArray(initResult?.data)) {
+          embeddedStore.setAllowedOrigins(initResult.data)
+        }
+        
+         // Initialize token lifecycle
+        await tokenLifecycle.initialize(embeddedStore.getToken, window.location.origin, {
+          refreshEnabled: true,
+          tokenType: 'iframe',
+          resourceId: embeddedStore.dvId
+        })
+
+        // Add token expiry warning
+        const expiryTime = tokenLifecycle.getCurrentTokenInfo()?.expiryTime
+        if (expiryTime && tokenLifecycle.needsRefresh(window.location.origin, 5)) {
+          console.warn(`Token will expire in 5 minutes. Current expiry time: ${new Date(expiryTime).toISOString()}`)
+        }
       }
+    } finally {
+      p1(true)
     }
-  } finally {
-    p1(true)
   }
-}
 onMounted(async () => {
   useEmitt({
     name: 'canvasDownload',

@@ -33,6 +33,18 @@ import { embeddedInitIframeApi } from '@/api/embedded'
 import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
 import { changeComponentSizeWithScale } from '@/utils/changeComponentsSizeWithScale'
 import { useEmitt } from '@/hooks/web/useEmitt'
+import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
+import type { InitReadyPayload } from '@/events/embedding/payloads'
+import { EmbeddingEventType } from '@/events/embedding/types'
+import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
+import CanvasCore from '@/components/data-visualization/canvas/CanvasCore.vue'
+import { listenGlobalKeyDown, releaseAttachKey } from '@/utils/DeShortcutKey'
+import { adaptCurThemeCommonStyle } from '@/utils/canvasStyle'
+import { useEmbedded } from '@/store/modules/embedded'
+import { embeddedInitIframeApi } from '@/api/embedded'
+import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
+import { changeComponentSizeWithScale } from '@/utils/changeComponentsSizeWithScale'
+import { useEmitt } from '@/hooks/web/useEmitt'
 import { check, compareStorage } from '@/utils/CrossPermission'
 import { useCache } from '@/hooks/web/useCache'
 import RealTimeListTree from '@/components/data-visualization/RealTimeListTree.vue'
@@ -322,6 +334,11 @@ const initLocalCanvasData = async callback => {
             snapshotStore.recordSnapshotCache('renderChart')
           }, 1500)
         }
+        const { emitToChild } = useEmbeddedParentCommunication()
+        const payload: InitReadyPayload = {
+          resourceId: resourceId
+        }
+        emitToChild(EmbeddingEventType.INIT_READY, payload)
         onInitReady({ resourceId: resourceId })
         callback && callback()
       })

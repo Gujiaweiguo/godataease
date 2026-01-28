@@ -14,6 +14,10 @@ import { getDatasetTree } from '@/api/dataset'
 import { Tree } from '@/views/visualized/data/dataset/form/CreatDsGroup.vue'
 import DbCanvasAttr from '@/components/dashboard/DbCanvasAttr.vue'
 import { decompressionPre, initCanvasData, onInitReady } from '@/utils/canvasUtils'
+import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
+import type { InitReadyPayload } from '@/events/embedding/payloads'
+import { EmbeddingEventType } from '@/events/embedding/types'
+import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 import ChartStyleBatchSet from '@/views/chart/components/editor/editor-style/ChartStyleBatchSet.vue'
 import DeCanvas from '@/views/canvas/DeCanvas.vue'
 import { check, compareStorage } from '@/utils/CrossPermission'
@@ -178,6 +182,11 @@ const initLocalCanvasData = callBack => {
           snapshotStore.recordSnapshotCache('initLocalCanvasData')
         }, 1500)
       }
+      const { emitToChild } = useEmbeddedParentCommunication()
+      const payload: InitReadyPayload = {
+        resourceId: resourceId
+      }
+      emitToChild(EmbeddingEventType.INIT_READY, payload)
       onInitReady({ resourceId: resourceId })
       callBack && callBack()
     }

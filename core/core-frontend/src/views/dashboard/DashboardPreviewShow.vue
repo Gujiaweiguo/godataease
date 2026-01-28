@@ -30,6 +30,11 @@ import {
   exportLogPDF,
   exportLogTemplate
 } from '@/api/visualization/dataVisualization'
+import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
+import type { InitReadyPayload } from '@/events/embedding/payloads'
+import { EmbeddingEventType } from '@/events/embedding/types'
+import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
+
 const userStore = useUserStoreWithOut()
 
 const userName = computed(() => userStore.getName)
@@ -129,6 +134,11 @@ const loadCanvasData = (dvId, weight?) => {
       dataInitState.value = true
       nextTick(() => {
         dashboardPreview.value.restore()
+        const { emitToChild } = useEmbeddedParentCommunication()
+        const payload: InitReadyPayload = {
+          resourceId: dvId
+        }
+        emitToChild(EmbeddingEventType.INIT_READY, payload)
         onInitReady({ resourceId: dvId })
       })
     }
