@@ -5,7 +5,12 @@
       <el-button type="primary" @click="handleCreate">新建组织</el-button>
     </div>
 
-    <el-table :data="orgList" border row-key="orgId" :tree-props="{ children: 'children', hasChildren: 'hasChildren' }">
+    <el-table
+      :data="orgList"
+      border
+      row-key="orgId"
+      :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+    >
       <el-table-column prop="orgName" label="组织名称" width="250" />
       <el-table-column prop="orgDesc" label="描述" />
       <el-table-column prop="parentId" label="父组织" width="150">

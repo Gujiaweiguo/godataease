@@ -8,6 +8,14 @@ spring:
     active: '@profiles.active@'
   application:
     name: core-backend
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
   messages:
     encoding: UTF-8
   main:

@@ -39,6 +39,7 @@ services:
       SPRING_PROFILES_ACTIVE: standalone
       SPRING_FLYWAY_ENABLED: false
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      MYSQL_MAX_CONNECTIONS: 500
     volumes:
       - dataease-data:/opt/dataease2.0
       - dataease-logs:/opt/dataease2.0/logs

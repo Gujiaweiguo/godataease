@@ -10,7 +10,8 @@ export const userDeleteApi = (id: number) => request.post({ url: '/api/system/us
 
 export const roleCreateApi = (data: any) => request.post({ url: '/api/system/role/create', data })
 export const roleUpdateApi = (data: any) => request.post({ url: '/api/system/role/update', data })
-export const roleDeleteApi = (roleId: number) => request.post({ url: '/api/system/role/delete/' + roleId })
+export const roleDeleteApi = (roleId: number) =>
+  request.post({ url: '/api/system/role/delete/' + roleId })
 
 export const resourceTreeApi = (flag: string) => request.get({ url: '/auth/busiResource/' + flag })
 
@@ -23,7 +24,8 @@ export const menuPerApi = data => request.post({ url: '/auth/menuPermission', da
 export const busiPerSaveApi = data => request.post({ url: '/auth/saveBusiPer', data })
 export const menuPerSaveApi = data => request.post({ url: '/auth/saveMenuPer', data })
 
-export const resourcePerSaveApi = data => request.post({ url: '/api/system/role/permission/save', data })
+export const resourcePerSaveApi = data =>
+  request.post({ url: '/api/system/role/permission/save', data })
 
 export const resourceTargetPerApi = data =>
   request.post({ url: '/auth/busiTargetPermission', data })

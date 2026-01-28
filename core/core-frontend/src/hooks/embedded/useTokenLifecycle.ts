@@ -13,10 +13,17 @@ export function useTokenLifecycle() {
   /**
    * Initialize token lifecycle on mount.
    */
-  const initialize = async (token: string, options?: { refreshEnabled?: boolean; tokenType?: 'iframe' | 'div' | 'module'; resourceId?: string }) => {
+  const initialize = async (
+    token: string,
+    options?: {
+      refreshEnabled?: boolean
+      tokenType?: 'iframe' | 'div' | 'module'
+      resourceId?: string
+    }
+  ) => {
     const origin = window.location.origin
     const validation = await tokenManager.initializeToken(token, origin, options)
-    
+
     tokenValidationResult.value = validation
     isInitialized.value = validation.isValid
 
@@ -32,11 +39,11 @@ export function useTokenLifecycle() {
    */
   const refresh = async (origin: string) => {
     const needsRefreshCheck = tokenManager.needsRefresh(origin)
-    
+
     if (needsRefreshCheck) {
       lastRefreshTime.value = Date.now()
       const success = await tokenManager.refreshToken(origin)
-      
+
       if (!success) {
         console.warn('Token refresh failed')
         tokenValidationResult.value = {
@@ -81,7 +88,7 @@ export function useTokenLifecycle() {
       const origin = window.location.origin
       const needsRefreshCheck = tokenManager.needsRefresh(origin)
       const tokenInfo = tokenManager.getCurrentTokenInfo()
-      
+
       if (needsRefreshCheck && tokenInfo?.expiryTime) {
         const timeUntilExpiry = tokenInfo.expiryTime - Date.now()
         const warningThreshold = 5 * 60 * 1000

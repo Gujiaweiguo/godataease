@@ -5,7 +5,12 @@
       <el-button type="primary" @click="handleCreate">新建权限</el-button>
     </div>
 
-    <el-table :data="permList" border row-key="permId" :tree-props="{ children: 'children', hasChildren: 'hasChildren' }">
+    <el-table
+      :data="permList"
+      border
+      row-key="permId"
+      :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+    >
       <el-table-column prop="permName" label="权限名称" width="200" />
       <el-table-column prop="permKey" label="权限标识" width="200" />
       <el-table-column prop="permType" label="权限类型" width="120">

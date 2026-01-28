@@ -308,31 +308,32 @@ export interface EmbeddingEvent<T extends EmbeddingEventPayload = EmbeddingEvent
 /**
  * Maps event types to their corresponding payload types.
  */
-export type PayloadForEventType<T extends EmbeddingEventType> = T extends EmbeddingEventType.PARAM_UPDATE
-  ? ParamUpdatePayload
-  : T extends EmbeddingEventType.INTERACTION
+export type PayloadForEventType<T extends EmbeddingEventType> =
+  T extends EmbeddingEventType.PARAM_UPDATE
+    ? ParamUpdatePayload
+    : T extends EmbeddingEventType.INTERACTION
     ? InteractionPayload
     : T extends EmbeddingEventType.INIT_READY
-      ? InitReadyPayload
-      : T extends EmbeddingEventType.READY
-        ? ReadyPayload
-        : T extends EmbeddingEventType.ERROR
-          ? ErrorPayload
-          : T extends EmbeddingEventType.DE_INIT
-            ? DeInitPayload
-            : T extends EmbeddingEventType.CANVAS_INIT
-              ? CanvasInitPayload
-              : T extends EmbeddingEventType.ATTACH_PARAMS
-                ? AttachParamsPayload
-                : T extends EmbeddingEventType.JUMP_TO_TARGET
-                  ? JumpToTargetPayload
-                  : T extends EmbeddingEventType.MODULE_INIT
-                    ? ModuleInitPayload
-                    : T extends EmbeddingEventType.MODULE_UPDATE
-                      ? ModuleUpdatePayload
-                      : T extends EmbeddingEventType.MODULE_INTERACTION
-                        ? ModuleInteractionPayload
-                        : never
+    ? InitReadyPayload
+    : T extends EmbeddingEventType.READY
+    ? ReadyPayload
+    : T extends EmbeddingEventType.ERROR
+    ? ErrorPayload
+    : T extends EmbeddingEventType.DE_INIT
+    ? DeInitPayload
+    : T extends EmbeddingEventType.CANVAS_INIT
+    ? CanvasInitPayload
+    : T extends EmbeddingEventType.ATTACH_PARAMS
+    ? AttachParamsPayload
+    : T extends EmbeddingEventType.JUMP_TO_TARGET
+    ? JumpToTargetPayload
+    : T extends EmbeddingEventType.MODULE_INIT
+    ? ModuleInitPayload
+    : T extends EmbeddingEventType.MODULE_UPDATE
+    ? ModuleUpdatePayload
+    : T extends EmbeddingEventType.MODULE_INTERACTION
+    ? ModuleInteractionPayload
+    : never
 
 /**
  * Validates if a payload matches expected structure for an event type.

@@ -28,7 +28,15 @@ export class TokenManager {
     return TokenManager.instance
   }
 
-  async initializeToken(token: string, origin: string, options?: { refreshEnabled?: boolean; tokenType?: 'iframe' | 'div' | 'module'; resourceId?: string }): Promise<TokenValidationResult> {
+  async initializeToken(
+    token: string,
+    origin: string,
+    options?: {
+      refreshEnabled?: boolean
+      tokenType?: 'iframe' | 'div' | 'module'
+      resourceId?: string
+    }
+  ): Promise<TokenValidationResult> {
     const { refreshEnabled = true, tokenType = 'iframe', resourceId } = options || {}
 
     this.embeddedStore.setToken(token)
@@ -55,12 +63,19 @@ export class TokenManager {
       this.setupAutoRefresh()
     }
 
-    this.embeddedStore.setTokenInfo(new Map([['current', {
-      token,
-      expiryTime: validation.expiryTime,
-      type: tokenType,
-      resourceId
-    }]))
+    this.embeddedStore.setTokenInfo(
+      new Map([
+        [
+          'current',
+          {
+            token,
+            expiryTime: validation.expiryTime,
+            type: tokenType,
+            resourceId
+          }
+        ]
+      ])
+    )
 
     return validation
   }
@@ -122,11 +137,18 @@ export class TokenManager {
         }
 
         const validation = await this.validateToken(newToken, origin)
-        this.embeddedStore.setTokenInfo(new Map([['current', {
-          token: newToken,
-          expiryTime: validation.expiryTime,
-          type: 'iframe'
-        }]))
+        this.embeddedStore.setTokenInfo(
+          new Map([
+            [
+              'current',
+              {
+                token: newToken,
+                expiryTime: validation.expiryTime,
+                type: 'iframe'
+              }
+            ]
+          ])
+        )
 
         return true
       }

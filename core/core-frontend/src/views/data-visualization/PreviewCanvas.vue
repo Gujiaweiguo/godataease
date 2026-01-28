@@ -211,34 +211,38 @@ watch(
 let p = null
 let p1 = null
 const XpackLoaded = () => p(true)
- const initIframe = async () => {
-    try {
-      if (embeddedStore.getToken) {
-        const initResult = await embeddedInitIframeApi({
-          token: embeddedStore.getToken,
-          origin: resolveEmbeddedOrigin()
-        })
-        if (Array.isArray(initResult?.data)) {
-          embeddedStore.setAllowedOrigins(initResult.data)
-        }
-        
-         // Initialize token lifecycle
-        await tokenLifecycle.initialize(embeddedStore.getToken, window.location.origin, {
-          refreshEnabled: true,
-          tokenType: 'iframe',
-          resourceId: embeddedStore.dvId
-        })
-
-        // Add token expiry warning
-        const expiryTime = tokenLifecycle.getCurrentTokenInfo()?.expiryTime
-        if (expiryTime && tokenLifecycle.needsRefresh(window.location.origin, 5)) {
-          console.warn(`Token will expire in 5 minutes. Current expiry time: ${new Date(expiryTime).toISOString()}`)
-        }
+const initIframe = async () => {
+  try {
+    if (embeddedStore.getToken) {
+      const initResult = await embeddedInitIframeApi({
+        token: embeddedStore.getToken,
+        origin: resolveEmbeddedOrigin()
+      })
+      if (Array.isArray(initResult?.data)) {
+        embeddedStore.setAllowedOrigins(initResult.data)
       }
-    } finally {
-      p1(true)
+
+      // Initialize token lifecycle
+      await tokenLifecycle.initialize(embeddedStore.getToken, window.location.origin, {
+        refreshEnabled: true,
+        tokenType: 'iframe',
+        resourceId: embeddedStore.dvId
+      })
+
+      // Add token expiry warning
+      const expiryTime = tokenLifecycle.getCurrentTokenInfo()?.expiryTime
+      if (expiryTime && tokenLifecycle.needsRefresh(window.location.origin, 5)) {
+        console.warn(
+          `Token will expire in 5 minutes. Current expiry time: ${new Date(
+            expiryTime
+          ).toISOString()}`
+        )
+      }
     }
+  } finally {
+    p1(true)
   }
+}
 onMounted(async () => {
   useEmitt({
     name: 'canvasDownload',

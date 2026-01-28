@@ -76,7 +76,10 @@ const handleSelect = (index: string) => {
 const initShowSystem = () => {
   const routers = permissionStore.getRouters
   console.log('All routers:', routers)
-  console.log('Checking for /system route:', routers.some(route => route.path === '/system'))
+  console.log(
+    'Checking for /system route:',
+    routers.some(route => route.path === '/system')
+  )
   showSystem.value = routers.some(route => route.path === '/system')
 }
 const initShowMsg = () => {

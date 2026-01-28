@@ -34,12 +34,16 @@ describe('useEmbeddedParentCommunication', () => {
 
       listenForChildMessages()
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function), expect.any(Object))
+      expect(addEventListenerSpy).toHaveBeenCalledWith(
+        'message',
+        expect.any(Function),
+        expect.any(Object)
+      )
     })
 
     it('should validate message origin before processing', () => {
       const { listenForChildMessages } = useEmbeddedParentCommunication()
-      const { isAllowedEmbeddedMessageOrigin } = require('@/utils/embedded')
+      const { isAllowedEmbeddedMessageOrigin } = jest.requireActual('@/utils/embedded')
       const mockEvent = new MessageEvent('message', {
         data: JSON.stringify({ type: 'param_update' }),
         origin: 'https://trusted-origin.com'
@@ -67,7 +71,9 @@ describe('useEmbeddedParentCommunication', () => {
       window.dispatchEvent(mockEvent)
 
       // Should reject the message
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Message from untrusted origin blocked: https://untrusted-origin.com')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Message from untrusted origin blocked: https://untrusted-origin.com'
+      )
     })
   })
 
@@ -78,12 +84,13 @@ describe('useEmbeddedParentCommunication', () => {
 
       emitToChild(EmbeddingEventType.INIT_READY, { resourceId: 'test' })
 
-      const expectedMessage = 'dataease-embedded-host:{"type":"init_ready","payload":{"resourceId":"test"}}'
+      const expectedMessage =
+        'dataease-embedded-host:{"type":"init_ready","payload":{"resourceId":"test"}}'
       expect(postMessageSpy).toHaveBeenCalledWith(expectedMessage, '*')
     })
 
     it('should skip emit if not in embedded mode', () => {
-      const { useEmbedded: mockUseEmbedded } = require('@/store/modules/embedded')
+      const { useEmbedded: mockUseEmbedded } = jest.requireActual('@/store/modules/embedded')
       mockUseEmbedded.mockReturnValue({ getToken: '', parent: false })
 
       const { emitToChild } = useEmbeddedParentCommunication()

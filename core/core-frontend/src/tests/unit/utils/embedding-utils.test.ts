@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { encodeOuterParams, decodeOuterParams, validateOuterParams } from '@/utils/embeddedParams'
-import { isTokenExpiringSoon, extractTokenExpiryTime, needsTokenRefresh } from '@/utils/embeddedTokenUtils'
+import {
+  isTokenExpiringSoon,
+  extractTokenExpiryTime,
+  needsTokenRefresh
+} from '@/utils/embeddedTokenUtils'
 import { validateOrigin, isOriginAllowed } from '@/utils/embeddedOriginValidation'
 
 describe('Embedding Parameter Initialization and Callback Messaging', () => {
@@ -314,7 +318,11 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
       })
 
       it('should handle multiple allowed origins', () => {
-        const allowedOrigins = ['https://example.com', 'https://other.com', 'https://*.wildcard.com']
+        const allowedOrigins = [
+          'https://example.com',
+          'https://other.com',
+          'https://*.wildcard.com'
+        ]
         const result1 = isOriginAllowed('https://example.com', allowedOrigins, false)
         const result2 = isOriginAllowed('https://sub.wildcard.com', allowedOrigins, false)
         const result3 = isOriginAllowed('https://other.com', allowedOrigins, false)

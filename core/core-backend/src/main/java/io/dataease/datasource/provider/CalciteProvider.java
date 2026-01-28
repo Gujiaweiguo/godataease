@@ -955,6 +955,8 @@ public class CalciteProvider extends Provider {
                     dataSource.setTimeBetweenEvictionRunsMillis(60 * 1000);
                     dataSource.setValidationQuery("select 1");
                     dataSource.setValidationQueryTimeout(5);
+                    dataSource.setMaxTotal(20);
+                    dataSource.setInitialSize(5);
                     Schema schema = null;
                     DatasourceConfiguration configuration = null;
                     DatasourceConfiguration.DatasourceType datasourceType = DatasourceConfiguration.DatasourceType.valueOf(ds.getType());

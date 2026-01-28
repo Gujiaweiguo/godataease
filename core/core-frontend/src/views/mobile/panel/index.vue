@@ -174,34 +174,34 @@ const hanedleMessage = event => {
   }
 }
 
-  const { initialize: initToken } = useTokenLifecycle()
-  
-  const initIframe = async () => {
-    if (embeddedStore.getToken) {
-      try {
-        const token = embeddedStore.getToken
-        const origin = resolveEmbeddedOrigin()
-        
-        await initToken(token, { refreshEnabled: true, tokenType: 'iframe' })
-        
-        const initResult = await embeddedInitIframeApi({
-          token,
-          origin
-        })
-        if (Array.isArray(initResult?.data)) {
-          embeddedStore.setAllowedOrigins(initResult.data)
-        }
-        
-        panelInit.value = false
-      } catch (error) {
-        console.error('Embedded iframe initialization failed', error)
-      } finally {
-        setTimeout(() => {
-          panelInit.value = true
-        }, 100)
+const { initialize: initToken } = useTokenLifecycle()
+
+const initIframe = async () => {
+  if (embeddedStore.getToken) {
+    try {
+      const token = embeddedStore.getToken
+      const origin = resolveEmbeddedOrigin()
+
+      await initToken(token, { refreshEnabled: true, tokenType: 'iframe' })
+
+      const initResult = await embeddedInitIframeApi({
+        token,
+        origin
+      })
+      if (Array.isArray(initResult?.data)) {
+        embeddedStore.setAllowedOrigins(initResult.data)
       }
+
+      panelInit.value = false
+    } catch (error) {
+      console.error('Embedded iframe initialization failed', error)
+    } finally {
+      setTimeout(() => {
+        panelInit.value = true
+      }, 100)
     }
   }
+}
 
 const curComponentChangeHandle = (type, value) => {
   window.parent.postMessage({ type: type, value: value }, '*')
