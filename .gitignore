@@ -24,6 +24,11 @@ target/
 .lh/
 *.iml
 hs_err_pid*
+# Eclipse IDE
+.classpath
+.project
+.settings/
+.factorypath
 node_modules/
 dist/
 package-lock.json
