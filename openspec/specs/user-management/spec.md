@@ -1,7 +1,7 @@
 # user-management Specification
 
 ## Purpose
-TBD - created by archiving change add-user-org-permission-full. Update Purpose after archive.
+This capability provides complete user lifecycle management including CRUD operations, profile management, search and filtering, and bulk operations. It integrates with organization and role systems to support multi-user environments with efficient user administration workflows.
 ## Requirements
 ### Requirement: User CRUD Operations
 The system SHALL provide full CRUD operations for user management including:

@@ -1,7 +1,7 @@
 # permission-config Specification
 
 ## Purpose
-TBD - created by archiving change add-user-org-permission. Update Purpose after archive.
+This capability provides comprehensive permission configuration for DataEase, enabling fine-grained access control across menus, resources, data rows, and columns. It supports permission inheritance, role-based and user-based assignment, and granular export controls to meet enterprise security requirements for multi-tenant environments.
 ## Requirements
 ### Requirement: Row-Level Permission Filtering
 The system SHALL support row-level permission filtering for dataset queries based on

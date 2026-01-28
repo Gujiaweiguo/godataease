@@ -1,7 +1,7 @@
 # embedded-bi Specification
 
 ## Purpose
-TBD - created by archiving change add-multi-embed. Update Purpose after archive.
+This capability defines the multi-dimensional embedding framework for DataEase content integration. It supports embedding dashboards, screens, module pages, and individual charts into third-party systems using iframe or DIV containers. The framework includes token-based authentication, origin validation, and bidirectional parameter passing for seamless cross-system interaction and data synchronization.
 ## Requirements
 ### Requirement: Embedded Application Registration
 The system SHALL allow administrators to create embedded applications with an app id, app secret, and allowed origin list.

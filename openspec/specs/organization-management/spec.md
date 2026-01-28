@@ -1,7 +1,7 @@
 # organization-management Specification
 
 ## Purpose
-TBD - created by archiving change add-user-org-permission-full. Update Purpose after archive.
+This capability defines the multi-organization management system for DataEase, supporting hierarchical organization structures, member management, data isolation, organization switching, and statistics. It enables multi-tenant deployment where resources and users are scoped to specific organizations with proper access controls.
 ## Requirements
 ### Requirement: Organization Hierarchy
 The system SHALL support multi-organization management with the following capabilities:
