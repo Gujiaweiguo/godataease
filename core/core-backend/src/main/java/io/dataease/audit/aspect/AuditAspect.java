@@ -1,12 +1,13 @@
 package io.dataease.audit.aspect;
 
 import io.dataease.audit.constant.AuditConstants;
+import io.dataease.audit.entity.AuditLog;
 import io.dataease.audit.service.IAuditService;
 import io.dataease.auth.bo.TokenUserBO;
-import io.dataease.auth.utils.AuthUtils;
-import io.dataease.utils.UserUtils;
+import io.dataease.utils.AuthUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,7 @@ public class AuditAspect {
 
     @Around("@annotation(io.dataease.audit.annotation.AuditLog)")
     public Object aroundAuditLog(ProceedingJoinPoint joinPoint) throws Throwable {
-        Method method = joinPoint.getSignature().getMethod();
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         Object[] args = joinPoint.getArgs();
         Object result = null;
 
@@ -38,6 +39,7 @@ public class AuditAspect {
             
             AuditLog auditLog = createAuditLog(method, args, result, "SUCCESS", null);
             auditService.createAuditLog(auditLog);
+            return result;
         } catch (Exception e) {
             AuditLog auditLog = createAuditLog(method, args, null, "FAILED", e.getMessage());
             auditService.createAuditLog(auditLog);
@@ -52,7 +54,6 @@ public class AuditAspect {
         TokenUserBO userBO = AuthUtils.getUser();
         if (userBO != null) {
             auditLog.setUserId(userBO.getUserId());
-            auditLog.setUsername(userBO.getUsername());
         }
 
         String actionType = determineActionType(method);
@@ -61,11 +62,11 @@ public class AuditAspect {
         auditLog.setOperation(determineOperation(method));
         auditLog.setStatus(status);
         auditLog.setFailureReason(failureReason);
-        auditLog.setIpAddress(UserUtils.getIpAddress());
-        auditLog.setUserAgent(UserUtils.getUserAgent());
+        auditLog.setIpAddress(getRequestIp());
+        auditLog.setUserAgent(getUserAgent());
 
         if (args != null && args.length > 0) {
-            String resourceInfo = extractResourceInfo(args);
+            ResourceInfo resourceInfo = extractResourceInfo(args);
             auditLog.setResourceType(resourceInfo.type);
             auditLog.setResourceId(resourceInfo.id);
             auditLog.setResourceName(resourceInfo.name);
@@ -123,7 +124,7 @@ public class AuditAspect {
             
             if (firstArg instanceof Long) {
                 info.id = (Long) firstArg;
-                info.type = determineResourceType(firstArg.toString());
+                info.type = "UNKNOWN";
             } else if (firstArg instanceof String) {
                 info.name = (String) firstArg;
                 info.type = "SYSTEM_CONFIG";
@@ -151,5 +152,24 @@ public class AuditAspect {
         String name;
         String before;
         String after;
+    }
+
+    private String getRequestIp() {
+        if (request == null) {
+            return "";
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isEmpty() && !"unknown".equalsIgnoreCase(forwarded)) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private String getUserAgent() {
+        if (request == null) {
+            return "";
+        }
+        String agent = request.getHeader("User-Agent");
+        return agent != null ? agent : "";
     }
 }

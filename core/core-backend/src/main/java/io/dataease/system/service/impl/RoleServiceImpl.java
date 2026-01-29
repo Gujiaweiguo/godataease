@@ -1,13 +1,22 @@
+package io.dataease.system.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import io.dataease.audit.annotation.AuditLog;
+import io.dataease.audit.constant.AuditConstants;
 import io.dataease.system.dao.auto.mapper.SysRoleMapper;
 import io.dataease.system.dao.auto.mapper.SysRoleMenuMapper;
-import io.dataease.system.entity.SysRolePerm;
+import io.dataease.system.dao.auto.mapper.SysRolePermMapper;
+import io.dataease.system.dao.auto.mapper.SysUserRoleMapper;
 import io.dataease.system.entity.SysRole;
+import io.dataease.system.entity.SysRolePerm;
+import io.dataease.system.entity.SysUserRole;
 import io.dataease.system.service.IRoleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -19,10 +28,12 @@ public class RoleServiceImpl implements IRoleService {
     @Autowired
     private SysRoleMenuMapper roleMenuMapper;
     @Autowired
-    private SysRolePerm rolePermMapper;
+    private SysRolePermMapper rolePermMapper;
+    @Autowired
+    private SysUserRoleMapper userRoleMapper;
 
     @Override
-    @io.dataease.audit.annotation.AuditLog(actionType = AuditConstants.ACTION_TYPE_PERMISSION_CHANGE, actionName = "CREATE_ROLE", resourceType = AuditConstants.RESOURCE_TYPE_ROLE)
+    @AuditLog(actionType = AuditConstants.ACTION_TYPE_PERMISSION_CHANGE, actionName = "CREATE_ROLE", resourceType = AuditConstants.RESOURCE_TYPE_ROLE)
     @Transactional(rollbackFor = Exception.class)
     public void createRole(SysRole role) {
         role.setCreateTime(LocalDateTime.now());
