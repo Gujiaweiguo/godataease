@@ -242,7 +242,7 @@ describe('TokenManager', () => {
 
   describe('getCurrentTokenInfo', () => {
     it('should return current token info', () => {
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token' }]))
+      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token' }]]))
 
       const tokenInfo = tokenManager.getCurrentTokenInfo()
 
@@ -269,7 +269,7 @@ describe('TokenManager', () => {
 
     it('should return true if token is expired', () => {
       const expiredTime = Date.now() - 1000
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token', expiryTime: expiredTime }]))
+      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token', expiryTime: expiredTime }]]))
 
       const needsRefresh = tokenManager.needsRefresh('https://example.com')
 
@@ -278,7 +278,7 @@ describe('TokenManager', () => {
 
     it('should return false if token is valid and not expired', () => {
       const futureTime = Date.now() + 3600000
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token', expiryTime: futureTime }]))
+      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token', expiryTime: futureTime }]]))
 
       const needsRefresh = tokenManager.needsRefresh('https://example.com')
 
@@ -287,7 +287,7 @@ describe('TokenManager', () => {
 
     it('should return true if expiry time is undefined', () => {
       mockEmbeddedStore.getTokenInfo = vi.fn(() =>
-        new Map([['current', { token: 'test-token' }])
+        new Map([['current', { token: 'test-token' }]])
       )
 
       const needsRefresh = tokenManager.needsRefresh('https://example.com')
