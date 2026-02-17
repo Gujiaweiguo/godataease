@@ -63,5 +63,5 @@ func Init(cfg *Config) (func(context.Context) error, error) {
 
 func StartSpan(ctx context.Context, name string) (context.Context, func()) {
 	ctx, span := tracer.Start(ctx, name)
-	return ctx, span.End
+	return ctx, func() { span.End() }
 }

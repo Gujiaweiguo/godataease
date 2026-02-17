@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -61,10 +62,10 @@ func requestLogger() gin.HandlerFunc {
 		status := c.Writer.Status()
 
 		logger.Info("HTTP request",
-			logger.L().String("method", c.Request.Method),
-			logger.L().String("path", path),
-			logger.L().Int("status", status),
-			logger.L().Duration("latency", latency),
+			zap.String("method", c.Request.Method),
+			zap.String("path", path),
+			zap.Int("status", status),
+			zap.Duration("latency", latency),
 		)
 	}
 }
@@ -122,7 +123,7 @@ func Start(application *app.Application, db *gorm.DB) error {
 		port = "8080"
 	}
 
-	logger.Info("Starting HTTP server", logger.L().String("port", port))
+	logger.Info("Starting HTTP server", zap.String("port", port))
 
 	return router.Engine().Run(":" + port)
 }

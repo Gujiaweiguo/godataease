@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/app"
 	applogger "dataease/backend/internal/pkg/logger"
 
+	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -43,9 +44,9 @@ func Init(config *app.DatabaseConfig) (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	applogger.Info("Database connected successfully",
-		applogger.L().String("host", config.Host),
-		applogger.L().Int("port", config.Port),
-		applogger.L().String("database", config.Name),
+		zap.String("host", config.Host),
+		zap.Int("port", config.Port),
+		zap.String("database", config.Name),
 	)
 
 	return db, nil
