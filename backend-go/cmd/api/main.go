@@ -1,12 +1,14 @@
 package main
 
 import (
-	"dataease/backend/internal/app"
-	"dataease/backend/internal/pkg/logger"
-	"dataease/backend/internal/transport/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"dataease/backend/internal/app"
+	"dataease/backend/internal/pkg/database"
+	"dataease/backend/internal/pkg/logger"
+	httptransport "dataease/backend/internal/transport/http"
 )
 
 func main() {
@@ -21,8 +23,15 @@ func main() {
 		logger.L().String("version", application.Version),
 	)
 
+	db, err := database.Init(&application.Config.Database)
+	if err != nil {
+		logger.Fatal("Failed to connect database", logger.L().String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer database.Close()
+
 	go func() {
-		if err := http.Start(application); err != nil {
+		if err := httptransport.Start(application, db); err != nil {
 			logger.Fatal("Failed to start HTTP server", logger.L().String("error", err.Error()))
 		}
 	}()

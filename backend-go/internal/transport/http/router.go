@@ -1,24 +1,32 @@
 package http
 
 import (
-	"dataease/backend/internal/app"
-	"dataease/backend/internal/pkg/logger"
-	"dataease/backend/internal/pkg/metrics"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	"dataease/backend/internal/app"
+	"dataease/backend/internal/pkg/logger"
+	"dataease/backend/internal/pkg/metrics"
+	"dataease/backend/internal/repository"
+	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/handler"
+	"dataease/backend/internal/transport/http/middleware"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"gorm.io/gorm"
 )
 
 type Router struct {
-	engine *gin.Engine
-	app    *app.Application
+	engine       *gin.Engine
+	app          *app.Application
+	db           *gorm.DB
+	auditHandler *handler.AuditHandler
 }
 
-func NewRouter(application *app.Application) *Router {
+func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 
@@ -26,7 +34,20 @@ func NewRouter(application *app.Application) *Router {
 	engine.Use(requestLogger())
 	engine.Use(metricsMiddleware())
 
-	return &Router{engine: engine, app: application}
+	auditLogRepo := repository.NewAuditLogRepository(db)
+	loginFailureRepo := repository.NewLoginFailureRepository(db)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(db)
+	auditService := service.NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+	auditHandler := handler.NewAuditHandler(auditService)
+
+	middleware.SetAuditService(auditService)
+
+	return &Router{
+		engine:       engine,
+		app:          application,
+		db:           db,
+		auditHandler: auditHandler,
+	}
 }
 
 func requestLogger() gin.HandlerFunc {
@@ -83,6 +104,8 @@ func (r *Router) RegisterRoutes() {
 				"message": "pong",
 			})
 		})
+
+		handler.RegisterAuditRoutes(api, r.auditHandler)
 	}
 }
 
@@ -90,8 +113,8 @@ func (r *Router) Engine() *gin.Engine {
 	return r.engine
 }
 
-func Start(application *app.Application) error {
-	router := NewRouter(application)
+func Start(application *app.Application, db *gorm.DB) error {
+	router := NewRouter(application, db)
 	router.RegisterRoutes()
 
 	port := os.Getenv("SERVER_PORT")
