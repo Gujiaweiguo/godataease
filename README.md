@@ -3,10 +3,8 @@
 <p align="center">
   <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://img.shields.io/github/license/dataease/dataease?color=%231890FF" alt="License: GPL v3"></a>
   <a href="https://app.codacy.com/gh/dataease/dataease?utm_source=github.com&utm_medium=referral&utm_content=dataease/dataease&utm_campaign=Badge_Grade_Dashboard"><img src="https://app.codacy.com/project/badge/Grade/da67574fd82b473992781d1386b937ef" alt="Codacy"></a>
-  <a href="https://github.com/dataease/dataease"><img src="https://img.shields.io/github/stars/dataease/dataease?color=%231890FF&style=flat-square" alt="GitHub Stars"></a>
-  <a href="https://github.com/dataease/dataease/releases"><img src="https://img.shields.io/github/v/release/dataease/dataease" alt="GitHub release"></a>
-  <a href="https://gitee.com/fit2cloud-feizhiyun/DataEase"><img src="https://gitee.com/fit2cloud-feizhiyun/DataEase/badge/star.svg?theme=gvp" alt="Gitee Stars"></a>
-  <a href="https://gitcode.com/feizhiyun/DataEase"><img src="https://gitcode.com/feizhiyun/DataEase/star/badge.svg" alt="GitCode Stars"></a>
+  <a href="https://github.com/Gujiaweiguo/godataease"><img src="https://img.shields.io/github/stars/Gujiaweiguo/godataease?color=%231890FF&style=flat-square" alt="GitHub Stars"></a>
+  <a href="https://github.com/Gujiaweiguo/godataease/releases"><img src="https://img.shields.io/github/v/release/Gujiaweiguo/godataease" alt="GitHub release"></a>
 </p>
 <p align="center">
   <a href="/README.md"><img alt="中文(简体)" src="https://img.shields.io/badge/中文(简体)-d9d9d9"></a>
@@ -52,46 +50,145 @@ DataEase 是开源的 BI 工具，帮助用户快速分析数据并洞察业务�
 
 
 
-## 快速开始
+## 快速开始（源码安装）
 
-**桌面版：**
+### 环境要求
+- Java: JDK 21+
+- Node.js: 18+
+- Maven: 3.8+
+- MySQL: 8.0+
+- Redis: 7.0+
 
-你可以在 PC 上安装 DataEasae 桌面版，下载地址为：https://dataease.cn/desktop/index.html
+### 本地开发
 
-**服务器版：**
+```bash
+# 克隆项目
+git clone https://github.com/Gujiaweiguo/godataease.git
+cd dataease
 
+# 编译后端
+cd core/core-backend
+mvn clean install -DskipTests
+
+# 编译前端
+cd ../core-frontend
+npm install
+npm run dev  # 访问 http://localhost:5173
+
+# 启动后端（需要配置数据库）
+cd ../core-backend
+mvn spring-boot:run  # API 访问 http://localhost:8100
 ```
-# 准备一台 2 核 4G 以上的 Linux 服务器，并以 root 用户运行以下一键安装脚本：
 
-curl -sSL https://dataease.oss-cn-hangzhou.aliyuncs.com/quick_start_v2.sh | bash
+### 打包构建
 
-# 用户名: admin
-# 密码: DataEase@123456
+```bash
+# 后端打包
+mvn clean package -DskipTests
+
+# 前端构建
+cd core/core-frontend
+npm run build:base
 ```
 
-你也可以通过 [1Panel 应用商店](https://dataease.io/docs/v2/installation/1panel_installation/) 快速部署 DataEase。如果是用于生产环境，推荐使用 [离线安装包方式](https://dataease.io/docs/v2/installation/offline_INSTL_and_UPG/) 进行安装部署。
+### 容器部署（Docker Compose）
 
-如你有更多问题，可以查看在线文档，或者通过论坛和交流群与我们交流。
+使用 Docker Compose 部署完整的开发环境（MySQL + Redis + DataEase）。
 
--   [视频介绍](https://www.bilibili.com/video/BV1Y8dAYLErb/)
--   [在线文档](https://dataease.io/docs/)
--   [社区论坛](https://bbs.fit2cloud.com/c/de/6)
--   微信交流群
+#### 部署步骤
 
-  <img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/a8e4cd48-ed0f-4754-ba34-d047063b1633" />
+1. 构建后端包
+
+```bash
+cd core/core-backend
+mvn clean package -Pstandalone -DskipTests
+```
+
+2. 构建前端资源
+
+```bash
+cd ../core-frontend
+npm install
+npm run build:base
+```
+
+3. 启动所有服务
+
+```bash
+cd ../../
+docker compose up -d --build
+```
+
+服务包括：
+- **mysql8**: MySQL 8.0 数据库（端口 3306）
+- **redis7**: Redis 7.0 缓存（端口 6379）
+- **dataease-app**: DataEase 应用（端口 8100）
+
+4. 自定义配置（可选）
+
+在项目根目录创建 `.env`：
+
+```env
+MYSQL_ROOT_PASSWORD=your_password
+MYSQL_DATABASE=dataease10
+TZ=Asia/Shanghai
+JAVA_OPTS=-Xms2g -Xmx4g -Dfile.encoding=utf-8
+```
+
+5. 访问服务
+
+- 应用地址: http://localhost:8100
+- API 文档: http://localhost:8100/doc.html
+
+6. 查看日志
+
+```bash
+# 查看所有服务日志
+docker compose logs -f
+
+# 查看特定服务日志
+docker compose logs -f dataease-app
+docker compose logs -f mysql8
+docker compose logs -f redis7
+```
+
+7. 停止服务
+
+```bash
+# 停止并删除容器
+docker compose down
+
+# 停止并删除容器和数据卷（⚠️ 会清除数据）
+docker compose down -v
+```
+
+#### 复用现有容器
+
+如果系统中已有 MySQL 和 Redis 容器，可以只构建 dataease-app 服务：
+
+```bash
+# 修改 docker-compose.yml，注释掉 mysql8 和 redis7 服务
+docker compose up -d --build dataease-app
+```
+
+确保 application-standalone.yml 配置正确指向现有容器：
+- MySQL: `mysql8:3306`
+- Redis: `redis7:6379`
+
+更多开发指南请参考 [development_guide.md](./development_guide.md) 和 [AGENTS.md](./AGENTS.md)。
 
 
 ## UI 展示
 
 <table style="border-collapse: collapse; border: 1px solid black;">
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/8dbed4e1-39f0-4392-aa8c-d1fd83ba42eb" alt="DataEase 工作台"   /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/7c54cb07-51ef-4bb6-a931-8a95c64c7e11" alt="DataEase 仪表板"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/workbench.png" alt="DataEase 工作台"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/dashboard.png" alt="DataEase 仪表板"   /></td>
   </tr>
 
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/ffa79361-a7b3-4486-b14a-f3fd3a28f01a" alt="DataEase 数据源"   /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/bb28f4e4-636e-4ab0-85c5-1dfbd7a5397e" alt="DataEase 模板中心"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/datasource.png" alt="DataEase 数据源"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/template.png" alt="DataEase 模板中心"   /></td>
   </tr>
 </table>
 

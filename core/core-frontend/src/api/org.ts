@@ -8,6 +8,7 @@ export const orgUpdateApi = (data: any) =>
 export const orgDeleteApi = (id: number) =>
   request.post({ url: '/api/system/organization/delete/' + id })
 export const orgTreeApi = () => request.get({ url: '/api/system/organization/tree' })
+export const queryUserOptionsApi = () => request.get({ url: '/user/org/option' })
 
 export const permListApi = (params?: any) =>
   request.post({ url: '/api/system/permission/list', data: params || {} })

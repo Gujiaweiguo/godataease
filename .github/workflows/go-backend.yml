@@ -1,0 +1,39 @@
+name: Go Backend CI
+
+on:
+  push:
+    branches: [ main, dev ]
+    paths:
+      - 'backend-go/**'
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'backend-go/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install dependencies
+      run: go mod tidy
+
+    - name: Build
+      run: make build
+
+    - name: Run tests
+      run: make test
+
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v4
+      with:
+        working-directory: backend-go

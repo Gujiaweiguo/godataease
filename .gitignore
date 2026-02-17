@@ -57,3 +57,17 @@ core/core-frontend/src/assets/fsSvg.html
 .vite/
 /core/backend/
 /classpath:substitule.json
+
+# Environment files
+.env
+.env.*
+
+# Build artifacts
+BOOT-INF/
+
+# Runtime data
+dataease-data/
+redis-dataease-compose.yml
+
+# Go backend build
+backend-go/dataease-backend

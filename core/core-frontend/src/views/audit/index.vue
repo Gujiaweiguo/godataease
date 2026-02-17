@@ -60,6 +60,7 @@
           <el-button type="primary" @click="handleQuery">查询</el-button>
           <el-button type="default" @click="handleReset">重置</el-button>
         </el-form-item>
+      </el-form>
     </div>
 
     <el-table :data="auditLogList" border v-loading="loading" stripe>
@@ -67,7 +68,9 @@
       <el-table-column prop="username" label="用户名" width="120" />
       <el-table-column prop="actionType" label="操作类型" width="120">
         <template #default="{ row }">
-          <el-tag :type="getActionTypeTag(row.actionType)" size="small">{{ getActionTypeText(row.actionType) }}</el-tag>
+          <el-tag :type="getActionTypeTag(row.actionType)" size="small">
+            {{ getActionTypeText(row.actionType) }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="resourceType" label="资源类型" width="100">
@@ -99,18 +102,22 @@
       </el-table-column>
       <el-table-column label="操作" width="100" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="handleViewDetail(row)">详情</el-button>
-          <el-button link type="primary" size="small" @click="handleExport([row.id])">导出</el-button>
+          <el-button link type="primary" size="small" @click="handleViewDetail(row)">
+            详情
+          </el-button>
+          <el-button link type="primary" size="small" @click="handleExport([row.id])">
+            导出
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <el-pagination
-      v-model:pagination"
-      :page-size="pagination.pageSize"
+      v-model:current-page="pagination.currentPage"
+      v-model:page-size="pagination.pageSize"
       :total="pagination.total"
-      @size-change="handleSizeChange"
-      @current-change="handlePageChange"
+      @update:current-page="handlePageChange"
+      @update:page-size="handleSizeChange"
     />
   </div>
 </template>
@@ -197,7 +204,6 @@ const handleExport = async (ids: number[]) => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
     await exportAuditLogsApi(ids, 'csv')
     ElMessage.success('导出成功')
   } catch (error) {

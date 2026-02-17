@@ -14,11 +14,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-org/dataease.git
+git clone https://github.com/Gujiaweiguo/godataease.git
 cd dataease
-
-# 启动基础设施
-docker-compose up -d
 
 # 编译后端
 cd core/core-backend
@@ -32,13 +29,41 @@ npm install
 npm run dev
 # 访问 http://localhost:5173
 
-# 启动后端
+# 启动后端（需要配置数据库连接）
 cd core/core-backend
 mvn spring-boot:run
 # API 访问 http://localhost:8100
 ```
 
-### 3. 项目结构
+### 3. 容器部署（Docker Compose）
+
+```bash
+# 构建后端包
+cd core/core-backend
+mvn clean package -DskipTests
+
+# 回到项目根目录启动
+cd ../../
+docker compose up -d --build
+```
+
+如需自定义数据库信息，请在项目根目录创建 `.env`：
+
+```env
+MYSQL_ROOT_PASSWORD=你的密码
+MYSQL_DATABASE=dataease10
+TZ=Asia/Shanghai
+```
+
+服务启动后访问：`http://localhost:8100`
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+### 4. 项目结构
 
 ```
 dataease/
@@ -47,8 +72,7 @@ dataease/
 │   └── core-frontend/   # Vue 3 + TypeScript 前端
 ├── sdk/                 # 共享 SDK 模块
 │   ├── common/          # 通用工具类
-│   ├── api/             # API 定义
-│   └── distributed/      # 分布式组件
+│   └── api/             # API 定义
 ├── openspec/            # OpenSpec 变更管理
 └── docs/               # 文档
 ```
@@ -174,18 +198,12 @@ mvn flyway:migrate            # 数据库迁移
 ```bash
 npm install                   # 安装依赖
 npm run dev                   # 开发模式
-npm run build:distributed        # 构建分布式版本
+npm run build:base            # 构建前端
 npm run lint                  # ESLint 检查
 npm run ts:check             # TypeScript 类型检查
 ```
 
-### Docker
 
-```bash
-docker-compose up -d            # 启动所有服务
-docker-compose logs -f dataease  # 查看应用日志
-docker-compose restart dataease  # 重启应用
-```
 
 ## 故障排查
 
@@ -194,8 +212,8 @@ docker-compose restart dataease  # 重启应用
 1. **后端启动失败**
    ```bash
    # 检查数据库连接
-   docker-compose ps
-   curl http://localhost:3306
+   # 确认 MySQL 和 Redis 已启动
+   # 检查 application.yml 中的数据库配置
    ```
 
 2. **前端编译错误**

@@ -57,9 +57,7 @@ public class DefaultChartHandler extends AbstractChartPlugin {
     protected DatasetTableFieldManage datasetTableFieldManage;
     @Resource
     protected ChartViewManege chartViewManege;
-    @Getter
     private String render = "antv";
-    @Getter
     private String type = "*";
     @Autowired(required = false)
     public PluginManageApi pluginManage;
@@ -864,4 +862,7 @@ public class DefaultChartHandler extends AbstractChartPlugin {
         }
         return res;
     }
+
+    public String getRender() { return render; }
+    public String getType() { return type; }
 }

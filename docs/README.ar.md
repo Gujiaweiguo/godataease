@@ -3,8 +3,8 @@
 <p align="center">
   <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://img.shields.io/github/license/dataease/dataease?color=%231890FF" alt="License: GPL v3"></a>
   <a href="https://app.codacy.com/gh/dataease/dataease?utm_source=github.com&utm_medium=referral&utm_content=dataease/dataease&utm_campaign=Badge_Grade_Dashboard"><img src="https://app.codacy.com/project/badge/Grade/da67574fd82b473992781d1386b937ef" alt="Codacy"></a>
-  <a href="https://github.com/dataease/dataease"><img src="https://img.shields.io/github/stars/dataease/dataease?color=%231890FF&style=flat-square" alt="GitHub Stars"></a>
-  <a href="https://github.com/dataease/dataease/releases"><img src="https://img.shields.io/github/v/release/dataease/dataease" alt="GitHub release"></a>
+  <a href="https://github.com/Gujiaweiguo/godataease"><img src="https://img.shields.io/github/stars/Gujiaweiguo/godataease?color=%231890FF&style=flat-square" alt="GitHub Stars"></a>
+  <a href="https://github.com/Gujiaweiguo/godataease/releases"><img src="https://img.shields.io/github/v/release/Gujiaweiguo/godataease" alt="GitHub release"></a>
 </p>
 <p align="center">
   <a href="/README.md"><img alt="中文(简体)" src="https://img.shields.io/badge/中文(简体)-d9d9d9"></a>
@@ -43,14 +43,9 @@ DataEase هو أداة تحليل بيانات مفتوحة المصدر مصم�
 -  ملفات البيانات: Excel، CSV، وما إلى ذلك.
 -   مصادر البيانات عبر واجهة برمجة التطبيقات (API).
 
-## التشغيل السريع
+## Quick Start (Source Code Installation)
 
-```
-# أعد تجهيز خادم Linux بحد أدنى معالجين مركزيين وذاكرة 4 غيغابايت، ثم قم بتشغيل سكربت تثبيت بضغطة واحدة التالي كوظيفة مستخدم جذر.
-curl -sSL https://dataease.oss-cn-hangzhou.aliyuncs.com/quick_start_v2.sh | bash
-# اسم المستخدم: admin
-# كلمة المرور: DataEase@123456
-```
+See the source installation steps in [README.md](/README.md) and [development_guide.md](../development_guide.md).
 
 ## مكدس التقنية
 

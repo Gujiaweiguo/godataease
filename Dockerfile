@@ -1,28 +1,21 @@
-FROM registry.cn-qingdao.aliyuncs.com/dataease/alpine-openjdk21-jre
-STOPSIGNAL SIGTERM
-RUN mkdir -p /opt/apps/config \
-    /opt/dataease2.0/drivers/ \
-    /opt/dataease2.0/cache/ \
-    /opt/dataease2.0/data/map \
-    /opt/dataease2.0/data/static-resource/ \
-    /opt/dataease2.0/data/appearance/ \
-    /opt/dataease2.0/data/exportData/ \
-    /opt/dataease2.0/data/excel/ \
-    /opt/dataease2.0/data/i8n/ \
-    /opt/dataease2.0/data/plugin/
+FROM eclipse-temurin:21-jre-alpine
 
-ADD drivers/* /opt/dataease2.0/drivers/
-ADD mapFiles/ /opt/dataease2.0/data/map/
-ADD staticResource/ /opt/dataease2.0/data/static-resource/
+WORKDIR /opt/dataease
 
-WORKDIR /opt/apps
+RUN mkdir -p /opt/dataease/drivers \
+    /opt/dataease/cache \
+    /opt/dataease/data/map \
+    /opt/dataease/data/static-resource \
+    /opt/dataease/data/appearance \
+    /opt/dataease/data/exportData \
+    /opt/dataease/data/excel \
+    /opt/dataease/data/i8n \
+    /opt/dataease/data/plugin \
+    /opt/dataease/logs
 
-ADD core/core-backend/target/CoreApplication.jar /opt/apps/app.jar
+COPY core/core-backend/target/CoreApplication.jar /opt/dataease/app.jar
 
-ENV JAVA_APP_JAR=/opt/apps/app.jar
-ENV RUNNING_PORT=8100
-ENV JAVA_OPTIONS="-Dfile.encoding=utf-8 -Dloader.path=/opt/apps -Dspring.config.additional-location=/opt/apps/config/"
+ENV JAVA_OPTS="-Xms2g -Xmx4g -Dfile.encoding=utf-8"
+ENV SERVER_PORT=8100
 
-HEALTHCHECK --interval=15s --timeout=5s --retries=20 --start-period=30s CMD nc -zv 127.0.0.1 $RUNNING_PORT
-
-CMD ["/deployments/run-java.sh"]
+CMD ["java", "-jar", "/opt/dataease/app.jar", "--spring.profiles.active=standalone"]

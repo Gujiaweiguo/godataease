@@ -62,10 +62,8 @@ dataease/
 ├── sdk/                      # SDK 模块
 │   ├── api/                 # API 接口定义
 │   ├── common/              # 通用工具类
-│   ├── distributed/         # 分布式组件
 │   └── extensions/          # 扩展模块
 ├── openspec/                 # OpenSpec 变更管理
-├── dataease-deploy/          # 部署配置
 └── docs/                     # 文档
 ```
 
@@ -287,11 +285,8 @@ cd core/core-frontend
 # 开发模式
 npm run dev
 
-# 构建（基础版）
+# 构建（前端）
 npm run build:base
-
-# 构建（分布式版）
-npm run build:distributed
 
 # 代码检查
 npm run lint

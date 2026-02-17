@@ -17,6 +17,7 @@ spring:
       max-lifetime: 1800000
       connection-test-query: SELECT 1
   messages:
+    basename: i18n/core
     encoding: UTF-8
   main:
     allow-circular-references: true

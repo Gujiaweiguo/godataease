@@ -12,6 +12,8 @@ import io.dataease.system.entity.SysRolePerm;
 import io.dataease.system.entity.SysUserRole;
 import io.dataease.system.service.IRoleService;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +22,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@Slf4j
 public class RoleServiceImpl implements IRoleService {
+
+    private static final Logger log = LoggerFactory.getLogger(RoleServiceImpl.class);
 
     @Autowired
     private SysRoleMapper roleMapper;

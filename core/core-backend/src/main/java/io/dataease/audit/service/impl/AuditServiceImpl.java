@@ -3,21 +3,6 @@ package io.dataease.audit.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import io.dataease.audit.constant.AuditConstants;
-import io.dataease.audit.dao.auto.mapper.AuditLogMapper;
-import io.dataease.audit.dao.auto.mapper.LoginFailureMapper;
-import io.dataease.audit.entity.AuditLog;
-import io.dataease.audit.entity.LoginFailure;
-import io.dataease.audit.service.IAuditService;
-import io.dataease.auth.bo.TokenUserBO;
-import io.dataease.utils.AuthUtils;
-
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.dataease.audit.constant.AuditConstants;
 import io.dataease.audit.dao.auto.mapper.AuditLogMapper;
 import io.dataease.audit.dao.auto.mapper.LoginFailureMapper;
@@ -27,6 +12,8 @@ import io.dataease.audit.service.IAuditService;
 import io.dataease.auth.bo.TokenUserBO;
 import io.dataease.utils.AuthUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,8 +21,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@Slf4j
 public class AuditServiceImpl implements IAuditService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuditServiceImpl.class);
 
     private final AuditLogMapper auditLogMapper;
     private final LoginFailureMapper loginFailureMapper;
@@ -48,17 +36,18 @@ public class AuditServiceImpl implements IAuditService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AuditLog createAuditLog(AuditLog auditLog) {
-        if (auditLog.getCreateTime() == null) {
-            auditLog.setCreateTime(LocalDateTime.now());
+        if (auditLog.getUserAgent() == null || auditLog.getUserAgent().isEmpty()) {
+            auditLog.setUserAgent("");
         }
-        if (auditLog.getStatus() == null) {
-            auditLog.setStatus(AuditConstants.STATUS_SUCCESS);
+
+        if (auditLog.getStatus() == null || auditLog.getStatus().isEmpty()) {
+            auditLog.setStatus("SUCCESS");
         }
-        if (auditLog.getIpAddress() == null) {
+        if (auditLog.getIpAddress() == null || auditLog.getIpAddress().isEmpty()) {
             auditLog.setIpAddress("127.0.0.1");
         }
-        if (auditLog.getUserAgent() == null) {
-            auditLog.setUserAgent("");
+        if (auditLog.getCreateTime() == null) {
+            auditLog.setCreateTime(LocalDateTime.now());
         }
 
         auditLogMapper.insert(auditLog);
@@ -161,10 +150,10 @@ public class AuditServiceImpl implements IAuditService {
         QueryWrapper<AuditLog> queryWrapper = new QueryWrapper<>();
         queryWrapper.lt("create_time", date);
         List<AuditLog> logsToDelete = auditLogMapper.selectList(queryWrapper);
-        
+
         if (!logsToDelete.isEmpty()) {
-            for (AuditLog log : logsToDelete) {
-                auditLogMapper.deleteById(log.getId());
+            for (AuditLog auditLog : logsToDelete) {
+                auditLogMapper.deleteById(auditLog.getId());
             }
             log.info("Deleted {} audit logs older than {}", logsToDelete.size(), date);
         }

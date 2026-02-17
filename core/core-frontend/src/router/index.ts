@@ -176,14 +176,14 @@ export const routes: AppRouteRecordRaw[] = [
     name: 'module-dataset',
     hidden: true,
     meta: {},
-    component: () => import('@/views/visualized/data/dataset/ModulePageWithTree.vue')
+    component: () => import('@/views/visualized/data/dataset/index.vue')
   },
   {
     path: '/module-datasource',
     name: 'module-datasource',
     hidden: true,
     meta: {},
-    component: () => import('@/views/visualized/datasource/ModulePageWithTree.vue')
+    component: () => import('@/views/visualized/data/datasource/index.vue')
   },
   {
     path: '/system',
@@ -215,6 +215,24 @@ export const routes: AppRouteRecordRaw[] = [
         name: 'system-permission',
         component: () => import('@/views/system/permission/index.vue'),
         meta: { title: '权限管理' }
+      },
+      {
+        path: 'audit',
+        name: 'system-audit',
+        component: () => import('@/views/audit/index.vue'),
+        meta: { title: '审计日志' }
+      },
+      {
+        path: 'audit-dashboard',
+        name: 'system-audit-dashboard',
+        component: () => import('@/views/audit/dashboard.vue'),
+        meta: { title: '审计仪表板' }
+      },
+      {
+        path: 'audit-settings',
+        name: 'system-audit-settings',
+        component: () => import('@/views/audit/settings.vue'),
+        meta: { title: '审计设置' }
       }
     ]
   }

@@ -1,0 +1,34 @@
+# DataEase Backend Configuration Example
+# Copy this file to config.yaml and modify as needed
+
+server:
+  port: 8080          # HTTP server port
+  mode: debug         # debug, release, test
+
+database:
+  host: localhost     # Database host
+  port: 3306          # Database port
+  name: dataease10    # Database name
+  user: root          # Database user
+  password: ""        # Database password (use env var in production)
+  max_open_conns: 100 # Max open connections
+  max_idle_conns: 10  # Max idle connections
+
+redis:
+  host: localhost     # Redis host
+  port: 6379          # Redis port
+  password: ""        # Redis password
+  db: 0               # Redis database number
+  pool_size: 100      # Connection pool size
+
+jwt:
+  secret: "CHANGE-ME-IN-PRODUCTION"  # JWT signing secret
+  expire: 86400                       # Token expiry in seconds (24h)
+
+log:
+  level: info         # debug, info, warn, error
+  format: console     # console, json
+
+telemetry:
+  enabled: false      # Enable OpenTelemetry
+  endpoint: ""        # OTel collector endpoint

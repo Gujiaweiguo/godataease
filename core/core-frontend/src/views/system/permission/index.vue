@@ -31,9 +31,10 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+          <el-button link type="primary" @click="handleViewAudit(row)">审计日志</el-button>
           <el-button link type="danger" @click="handleDelete(row.permId)">删除</el-button>
         </template>
       </el-table-column>
@@ -81,9 +82,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { permListApi, permCreateApi, permUpdateApi, permDeleteApi } from '@/api/org'
 import { resourceTreeApi } from '@/api/auth'
+
+const router = useRouter()
 
 const permList = ref([])
 const permTreeData = computed(() => buildPermTree(permList.value))
@@ -196,6 +200,13 @@ const handleDelete = async (permId: number) => {
       ElMessage.error('删除失败')
     }
   }
+}
+
+const handleViewAudit = (row: any) => {
+  router.push({
+    path: '/system/audit',
+    query: { resourceType: 'PERMISSION', resourceId: row.permId }
+  })
 }
 
 const handleSubmit = async () => {

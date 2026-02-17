@@ -17,9 +17,10 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200">
+      <el-table-column label="操作" width="280">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+          <el-button link type="primary" @click="handleViewAudit(row)">审计日志</el-button>
           <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
         </template>
       </el-table-column>
@@ -63,9 +64,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { queryUserApi, userCreateApi, userUpdateApi, userDeleteApi } from '@/api/auth'
 import { queryUserOptionsApi } from '@/api/org'
+
+const router = useRouter()
 
 const userList = ref([])
 const dialogVisible = ref(false)
@@ -148,10 +152,15 @@ const handleDelete = async (id: number) => {
       loadUserList()
     }
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
+    ElMessage.error('删除失败')
   }
+}
+
+const handleViewAudit = (row: any) => {
+  router.push({
+    path: '/system/audit',
+    query: { userId: row.userId, username: row.username }
+  })
 }
 
 const handleSubmit = async () => {

@@ -24,6 +24,10 @@ public class WhitelistUtils {
 
     public static List<String> WHITE_PATH = List.of(
             "/login/localLogin",
+            "/login/platformLogin",
+            "/login/mfa/login",
+            "/auth/login",
+            "/de2api/auth/login",
             "/apisix/check",
             "/dekey",
             "/metricKey",
@@ -88,7 +92,7 @@ public class WhitelistUtils {
                 || StringUtils.startsWithAny(requestURI, "/oauth2/")
                 || StringUtils.startsWithAny(requestURI, "/mfa/qr/")
                 || StringUtils.startsWithAny(requestURI, "/mfa/login")
-                || StringUtils.startsWithAny(requestURI, "/typeface/download")
+                || StringUtils.startsWithAny(requestURI, "/typeface/download")RI, "/typeface/download")
                 || StringUtils.startsWithAny(requestURI, "/typeface/defaultFont")
                 || StringUtils.startsWithAny(requestURI, "/typeface/listFont")
                 || StringUtils.startsWithAny(requestURI, "/exportCenter/download")

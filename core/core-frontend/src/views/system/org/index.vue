@@ -30,10 +30,11 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="300" fixed="right">
+      <el-table-column label="操作" width="380" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
           <el-button link type="primary" @click="handleAddChild(row)">添加子组织</el-button>
+          <el-button link type="primary" @click="handleViewAudit(row)">审计日志</el-button>
           <el-button link type="danger" @click="handleDelete(row.orgId)">删除</el-button>
         </template>
       </el-table-column>
@@ -74,8 +75,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { orgCreateApi, orgUpdateApi, orgDeleteApi, orgListApi } from '@/api/org'
+
+const router = useRouter()
 
 const orgList = ref([])
 const orgTreeData = computed(() => buildTreeData(orgList.value))
@@ -189,6 +193,13 @@ const handleDelete = async (orgId: number) => {
       ElMessage.error('删除失败')
     }
   }
+}
+
+const handleViewAudit = (row: any) => {
+  router.push({
+    path: '/system/audit',
+    query: { resourceType: 'ORGANIZATION', resourceId: row.orgId }
+  })
 }
 
 const handleSubmit = async () => {

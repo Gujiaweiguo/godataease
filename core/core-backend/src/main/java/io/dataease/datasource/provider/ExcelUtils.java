@@ -556,7 +556,6 @@ public class ExcelUtils {
 
     }
 
-    @Data
     public class NoModelDataListener extends AnalysisEventListener<Map<Integer, String>> {
         private List<String[]> data = new ArrayList<>();
         private List<String> header = new ArrayList<>();
@@ -610,6 +609,30 @@ public class ExcelUtils {
         public void clear() {
             data.clear();
             header.clear();
+        }
+
+        public List<String[]> getData() {
+            return data;
+        }
+
+        public void setData(List<String[]> data) {
+            this.data = data;
+        }
+
+        public List<String> getHeader() {
+            return header;
+        }
+
+        public void setHeader(List<String> header) {
+            this.header = header;
+        }
+
+        public List<Integer> getHeaderKey() {
+            return headerKey;
+        }
+
+        public void setHeaderKey(List<Integer> headerKey) {
+            this.headerKey = headerKey;
         }
     }
 

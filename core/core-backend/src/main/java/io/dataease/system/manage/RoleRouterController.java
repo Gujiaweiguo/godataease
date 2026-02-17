@@ -25,7 +25,7 @@ public class RoleRouterController {
         Map<String, Object> userRoute = new HashMap<>();
         userRoute.put("path", "user");
         userRoute.put("name", "system-user");
-        userRoute.put("component", "system/user/index");
+        userRoute.put("component", "system/user");
         userRoute.put("meta", new HashMap<String, Object>() {{
             put("title", "用户管理");
             put("icon", "peoples");
@@ -34,7 +34,7 @@ public class RoleRouterController {
         Map<String, Object> roleRoute = new HashMap<>();
         roleRoute.put("path", "role");
         roleRoute.put("name", "system-role");
-        roleRoute.put("component", "system/role/index");
+        roleRoute.put("component", "system/role");
         roleRoute.put("meta", new HashMap<String, Object>() {{
             put("title", "角色管理");
             put("icon", "auth");
@@ -43,7 +43,7 @@ public class RoleRouterController {
         Map<String, Object> orgRoute = new HashMap<>();
         orgRoute.put("path", "org");
         orgRoute.put("name", "system-org");
-        orgRoute.put("component", "system/org/index");
+        orgRoute.put("component", "system/org");
         orgRoute.put("meta", new HashMap<String, Object>() {{
             put("title", "组织管理");
             put("icon", "org");
@@ -52,7 +52,7 @@ public class RoleRouterController {
         Map<String, Object> permRoute = new HashMap<>();
         permRoute.put("path", "permission");
         permRoute.put("name", "system-permission");
-        permRoute.put("component", "system/permission/index");
+        permRoute.put("component", "system/permission");
         permRoute.put("meta", new HashMap<String, Object>() {{
             put("title", "权限管理");
             put("icon", "icon_security");

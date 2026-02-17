@@ -3,8 +3,8 @@
 <p align="center">
   <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://img.shields.io/github/license/dataease/dataease?color=%231890FF" alt="License: GPL v3"></a>
   <a href="https://app.codacy.com/gh/dataease/dataease?utm_source=github.com&utm_medium=referral&utm_content=dataease/dataease&utm_campaign=Badge_Grade_Dashboard"><img src="https://app.codacy.com/project/badge/Grade/da67574fd82b473992781d1386b937ef" alt="Codacy"></a>
-  <a href="https://github.com/dataease/dataease"><img src="https://img.shields.io/github/stars/dataease/dataease?color=%231890FF&style=flat-square" alt="GitHub Stars"></a>
-  <a href="https://github.com/dataease/dataease/releases"><img src="https://img.shields.io/github/v/release/dataease/dataease" alt="GitHub release"></a>
+  <a href="https://github.com/Gujiaweiguo/godataease"><img src="https://img.shields.io/github/stars/Gujiaweiguo/godataease?color=%231890FF&style=flat-square" alt="GitHub Stars"></a>
+  <a href="https://github.com/Gujiaweiguo/godataease/releases"><img src="https://img.shields.io/github/v/release/Gujiaweiguo/godataease" alt="GitHub release"></a>
 </p>
 <p align="center">
   <a href="/README.md"><img alt="中文(简体)" src="https://img.shields.io/badge/中文(简体)-d9d9d9"></a>
@@ -44,43 +44,58 @@ DataEase 是開源的 BI 工具，幫助用戶快速分析數據並洞察業務�
 
 如果您需要向團隊介紹 DataEase，可以使用這個 [官方 PPT 材料](https://fit2cloud.com/dataease/download/introduce-dataease_202411.pdf)。
 
-## 快速開始
+## 快速開始（原始碼安裝）
 
-**桌面版：**
+### 環境需求
+- Java: JDK 21+
+- Node.js: 18+
+- Maven: 3.8+
+- MySQL: 8.0+
+- Redis: 7.0+
 
-您可以在 PC 上安裝 DataEase 桌面版，下載地址為：https://dataease.cn/
+### 本機開發
 
-**伺服器版：**
+```bash
+# 取得專案
+git clone https://github.com/Gujiaweiguo/godataease.git
+cd dataease
 
+# 編譯後端
+cd core/core-backend
+mvn clean install -DskipTests
+
+# 編譯前端
+cd ../core-frontend
+npm install
+npm run dev  # 造訪 http://localhost:5173
+
+# 啟動後端（需先設定資料庫）
+cd ../core-backend
+mvn spring-boot:run  # API 造訪 http://localhost:8100
 ```
-# 準備一台 2 核 4G 以上的 Linux 伺服器，並以 root 用戶運行以下一鍵安裝腳本：
+
+### 打包建置
+
+```bash
+# 後端打包
+mvn clean package -DskipTests
+
+# 前端建置
+cd core/core-frontend
+npm run build:base
 ```
-
-curl -sSL https://dataease.oss-cn-hangzhou.aliyuncs.com/quick_start_v2.sh | bash
-
-
-# 使用者名稱: admin
-# 密碼: DataEase@123456
-```
-
-你也可以透過 [1Panel 應用商店](https://dataease.io/docs/v2/installation/1panel_installation/) 快速部署 DataEase。如果是用於生產環境，建議使用 [離線安裝包方式](https://dataease.io/docs/v2/installation/offline_INSTL_and_UPG/) 進行安裝部署。
-
-如你有更多問題，可以查看線上文件，或者透過論壇與我們交流。
-
--   [線上文件](https://dataease.io/docs/)
--   [社區論壇](https://bbs.fit2cloud.com/c/de/6)
 
 ## UI 展示
 
 <table style="border-collapse: collapse; border: 1px solid black;">
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/8dbed4e1-39f0-4392-aa8c-d1fd83ba42eb" alt="DataEase 工作台"   /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/7c54cb07-51ef-4bb6-a931-8a95c64c7e11" alt="DataEase 仪表板"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/workbench.png" alt="DataEase 工作台"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/dashboard.png" alt="DataEase 仪表板"   /></td>
   </tr>
 
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/ffa79361-a7b3-4486-b14a-f3fd3a28f01a" alt="DataEase 数据源"   /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/dataease/dataease/assets/41712985/bb28f4e4-636e-4ab0-85c5-1dfbd7a5397e" alt="DataEase 模板中心"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/datasource.png" alt="DataEase 数据源"   /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "/docs/assets/ui/template.png" alt="DataEase 模板中心"   /></td>
   </tr>
 </table>
 

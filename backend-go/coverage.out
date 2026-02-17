@@ -1,0 +1,4 @@
+mode: atomic
+dataease/backend/cmd/api/main.go:5.13,7.2 1 0
+dataease/backend/internal/app/app.go:3.14,3.15 0 0
+dataease/backend/internal/app/config.go:3.25,5.2 1 0
