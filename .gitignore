@@ -94,3 +94,16 @@ legacy/sdk/*/target/
 # Python cache
 __pycache__/
 *.pyc
+
+# AI agent workspace
+.sisyphus/
+
+# Go generated artifacts
+apps/backend-go/api
+apps/backend-go/migrate
+
+# Temporary files
+tmp/
+
+# Debug screenshots (root level)
+/*.png
