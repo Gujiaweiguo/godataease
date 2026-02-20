@@ -10,7 +10,7 @@ export default {
       '/api': {
         target: 'http://localhost:8100',
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/api/, 'de2api')
+        rewrite: path => path
       }
     },
     port: 8080

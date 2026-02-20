@@ -36,10 +36,10 @@ func NewAuditService(
 }
 
 type PaginatedResult struct {
-	List     interface{} `json:"list"`
-	Total    int64       `json:"total"`
-	Page     int         `json:"page"`
-	PageSize int         `json:"pageSize"`
+	List    interface{} `json:"list"`
+	Total   int64       `json:"total"`
+	Current int         `json:"current"`
+	Size    int         `json:"size"`
 }
 
 func (s *AuditService) CreateAuditLog(req *audit.AuditLogCreateRequest) (*audit.AuditLog, error) {
@@ -90,10 +90,10 @@ func (s *AuditService) GetAuditLogsByUserID(userID int64, page, pageSize int) (*
 	}
 
 	return &PaginatedResult{
-		List:     logs,
-		Total:    total,
-		Page:     page,
-		PageSize: pageSize,
+		List:    logs,
+		Total:   total,
+		Current: page,
+		Size:    pageSize,
 	}, nil
 }
 
@@ -113,10 +113,10 @@ func (s *AuditService) QueryAuditLogs(query *audit.AuditLogQuery) (*PaginatedRes
 	}
 
 	return &PaginatedResult{
-		List:     logs,
-		Total:    total,
-		Page:     page,
-		PageSize: pageSize,
+		List:    logs,
+		Total:   total,
+		Current: page,
+		Size:    pageSize,
 	}, nil
 }
 

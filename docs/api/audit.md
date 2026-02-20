@@ -4,6 +4,8 @@
 
 审计日志 API 提供完整的操作审计功能，用于记录和追踪系统中的所有用户操作、权限变更、数据访问和系统操作。
 
+当前 API 由 Go 主线后端（`apps/backend-go`）提供；Java 后端（`legacy/backend-java`）为只读备份。
+
 ## 基础信息
 
 - **Base URL**: `/api/audit`
@@ -341,28 +343,28 @@ POST /api/audit/log
 ### 查询最近失败的操作
 
 ```bash
-curl -X GET "http://localhost:8100/api/audit/list?status=FAILED&page=1&pageSize=20" \
+curl -X GET "http://localhost:8080/api/audit/list?status=FAILED&page=1&pageSize=20" \
   -H "Authorization: Bearer <token>"
 ```
 
 ### 查询特定用户的操作
 
 ```bash
-curl -X GET "http://localhost:8100/api/audit/list?userId=1&actionType=USER_ACTION" \
+curl -X GET "http://localhost:8080/api/audit/list?userId=1&actionType=USER_ACTION" \
   -H "Authorization: Bearer <token>"
 ```
 
 ### 查询日期范围内的操作
 
 ```bash
-curl -X GET "http://localhost:8100/api/audit/list?startTime=2025-01-01 00:00:00&endTime=2025-01-31 23:59:59" \
+curl -X GET "http://localhost:8080/api/audit/list?startTime=2025-01-01 00:00:00&endTime=2025-01-31 23:59:59" \
   -H "Authorization: Bearer <token>"
 ```
 
 ### 导出审计日志
 
 ```bash
-curl -X POST "http://localhost:8100/api/audit/export?format=csv" \
+curl -X POST "http://localhost:8080/api/audit/export?format=csv" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d "[1,2,3,4,5]"
@@ -371,6 +373,6 @@ curl -X POST "http://localhost:8100/api/audit/export?format=csv" \
 ### 清理90天前的日志
 
 ```bash
-curl -X DELETE "http://localhost:8100/api/audit/retention?days=90" \
+curl -X DELETE "http://localhost:8080/api/audit/retention?days=90" \
   -H "Authorization: Bearer <token>"
 ```

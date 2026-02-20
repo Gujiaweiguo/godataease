@@ -1,9 +1,49 @@
+# Version control
 .git
 .gitignore
+.gitmodules
+
+# Build artifacts
 target
 node_modules
+dist
 *.log
+
+# Environment files
 .env
+.env.*
+.env.local
+.env.*.local
+
+# Documentation
 docs
+
+# Deprecated installer
 installer
+
+# Empty submodule
 de-xpack
+
+# Development files
+.sisyphus
+.opencode
+.vscode
+.idea
+
+# Go build artifacts
+apps/backend-go/dataease-backend
+apps/backend-go/tmp
+apps/backend-go/coverage.out
+
+# Frontend build cache
+apps/frontend/node_modules
+apps/frontend/dist
+apps/frontend/.vite
+
+# Legacy Java target
+legacy/backend-java/core-backend/target
+
+# Runtime data
+dataease-data
+logs
+opt

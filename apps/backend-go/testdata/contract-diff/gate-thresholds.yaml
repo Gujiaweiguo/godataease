@@ -1,0 +1,139 @@
+# Gate Threshold Configuration for Contract Diff CI Gate
+# Version: 1.0.0
+# Last Updated: 2026-02-18
+# Change ID: add-go-contract-diff-ci-gate
+#
+# This file defines the thresholds and blocking rules for the
+# Java/Go contract diff CI gate evaluation.
+
+metadata:
+  version: "1.0.0"
+  changeId: "add-go-contract-diff-ci-gate"
+  lastUpdated: "2026-02-18"
+  sourceWhitelist: "critical-whitelist.yaml"
+
+# Core thresholds for gate evaluation
+thresholds:
+  # Minimum percentage of APIs that must have parity
+  overallParity: 99
+
+  # All P0 (critical) APIs must pass
+  requiredApiPassRate: 100
+
+  # Zero tolerance for critical-level failures
+  maxCriticalFailures: 0
+
+  # Allow limited high-priority failures before blocking
+  maxHighFailures: 5
+
+# Blocking level definitions
+# Controls how gate reacts to failures at each priority level
+blockingLevels:
+  critical:
+    description: "Zero tolerance - any failure blocks immediately"
+    action: "block"
+    threshold: 0
+    message: "Critical API contract mismatch detected"
+
+  high:
+    description: "Block after threshold exceeded"
+    action: "block_after_threshold"
+    threshold: 5
+    message: "Too many high-priority API contract mismatches"
+
+  normal:
+    description: "Warning only - does not block"
+    action: "warn"
+    threshold: -1
+    message: "Minor API contract differences detected"
+
+# APIs that must pass 100% - extracted from critical-whitelist.yaml
+# These are P0 endpoints with blockingLevel: critical
+requiredApis:
+  # Template Management
+  - path: "/templateManage/templateList"
+    method: "POST"
+  - path: "/templateManage/save"
+    method: "POST"
+  - path: "/templateMarket/searchTemplate"
+    method: "GET"
+
+  # Datasource Management
+  - path: "/datasource/list"
+    method: "POST"
+  - path: "/datasource/tree"
+    method: "POST"
+  - path: "/datasource/validate"
+    method: "POST"
+  - path: "/datasource/getTables"
+    method: "POST"
+  - path: "/datasource/previewData"
+    method: "POST"
+  - path: "/datasource/save"
+    method: "POST"
+  - path: "/datasource/delete/:id"
+    method: "GET"
+
+  # Dataset Management
+  - path: "/datasetTree/tree"
+    method: "POST"
+  - path: "/datasetData/tableField"
+    method: "POST"
+  - path: "/datasetData/previewData"
+    method: "POST"
+
+  # Chart Data
+  - path: "/chartData/getData"
+    method: "POST"
+  - path: "/chart/getData"
+    method: "POST"
+
+  # Export Center
+  - path: "/exportCenter/exportTasks"
+    method: "GET"
+  - path: "/exportCenter/download/:id"
+    method: "GET"
+
+  # User Management
+  - path: "/user/list"
+    method: "POST"
+  - path: "/user/create"
+    method: "POST"
+
+  # Authentication
+  - path: "/login/localLogin"
+    method: "POST"
+  - path: "/logout"
+    method: "GET"
+
+  # Share
+  - path: "/share/create"
+    method: "POST"
+  - path: "/share/validate"
+    method: "POST"
+
+  # Organization
+  - path: "/org/list"
+    method: "GET"
+  - path: "/org/tree"
+    method: "GET"
+
+# Gate evaluation rules
+rules:
+  # Skip comparison for native Go routes (no Java equivalent)
+  skipNativeGoRoutes: true
+
+  # Compare response schema strictly
+  strictSchemaComparison: true
+
+  # Allow additional fields in Go responses
+  allowAdditionalFields: true
+
+  # Require exact field type matching
+  requireExactTypes: false
+
+# Output configuration
+output:
+  format: "json"
+  includeDiffDetails: true
+  includeSuggestions: true

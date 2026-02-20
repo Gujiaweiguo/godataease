@@ -4,6 +4,8 @@
 
 DataEase 提供完整的用户、组织、角色和权限管理系统，支持菜单权限、资源权限、行级权限和列级权限。
 
+当前 API 由 Go 主线后端（`apps/backend-go`）提供；Java 后端（`legacy/backend-java`）为只读备份。
+
 ## 认证
 
 ### 1. 用户登录

@@ -6,16 +6,16 @@ server:
   mode: debug         # debug, release, test
 
 database:
-  host: localhost     # Database host
+  host: mysql8        # Database host (Docker: mysql8, Local: localhost)
   port: 3306          # Database port
   name: dataease10    # Database name
   user: root          # Database user
-  password: ""        # Database password (use env var in production)
+  password: "Admin168"  # Database password
   max_open_conns: 100 # Max open connections
   max_idle_conns: 10  # Max idle connections
 
 redis:
-  host: localhost     # Redis host
+  host: redis-dataease  # Redis host (Docker: redis-dataease, Local: localhost)
   port: 6379          # Redis port
   password: ""        # Redis password
   db: 0               # Redis database number

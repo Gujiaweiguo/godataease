@@ -1,0 +1,24 @@
+{
+  "scenario_id": "NS-007",
+  "apiIdentity": {
+    "path": "/api/dataset/data",
+    "method": "POST",
+    "owner": "dataset-team",
+    "priority": "P1",
+    "blockingLevel": "high"
+  },
+  "identityContext": {
+    "type": "low_privilege",
+    "token": "${VIEWER_TOKEN}"
+  },
+  "expectedResponse": {
+    "status": 200,
+    "code": "000000",
+    "msg": "success",
+    "dataValidation": {
+      "emailColumn": "email",
+      "maskedPattern": "^[a-z]{1,3}\\*+@.*$"
+    }
+  },
+  "securityAssertions": ["SEC-MASK-001"]
+}

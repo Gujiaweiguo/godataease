@@ -50,7 +50,8 @@ See the source installation steps in [README.md](/README.md) and [development_gu
 
 -   フロントエンド：[Vue.js](https://vuejs.org/)、[Element](https://element.eleme.cn/)
 -   可視化ライブラリ：[AntV](https://antv.vision/zh)
--   バックエンド：[Spring Boot](https://spring.io/projects/spring-boot)
+-   バックエンド（メインライン）：[Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   バックエンド（レガシー・読み取り専用）：[Spring Boot](https://spring.io/projects/spring-boot)
 -   データベース：[MySQL](https://www.mysql.com/)
 -   データ処理：[Apache Calcite](https://github.com/apache/calcite/)、[Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   インフラストラクチャ：[Docker](https://www.docker.com/)

@@ -49,7 +49,8 @@ See the source installation steps in [README.md](/README.md) and [development_gu
 
 -   Ön Kısmı: [Vue.js](https://vuejs.org/), [Element](https://element.eleme.cn/)
 -   Görselleştirme Kütüphanesi: [AntV](https://antv.vision/zh)
--   Arka Kısmı: [Spring Boot](https://spring.io/projects/spring-boot)
+-   Backend (ana hat): [Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   Backend (eski, salt okunur): [Spring Boot](https://spring.io/projects/spring-boot)
 -   Veri Tabanı: [MySQL](https://www.mysql.com/)
 -   Veri İşleme: [Apache Calcite](https://github.com/apache/calcite/), [Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   Altyapı: [Docker](https://www.docker.com/)

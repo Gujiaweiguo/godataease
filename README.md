@@ -53,41 +53,59 @@ DataEase 是开源的 BI 工具，帮助用户快速分析数据并洞察业务�
 ## 快速开始（源码安装）
 
 ### 环境要求
-- Java: JDK 21+
+- Go: 1.21+
 - Node.js: 18+
-- Maven: 3.8+
 - MySQL: 8.0+
 - Redis: 7.0+
+
+### 目录结构
+
+```
+godataease/
+├── apps/                    # 运行时应用
+│   ├── backend-go/         # Go 后端（主线）
+│   └── frontend/           # Vue 3 前端
+├── legacy/                  # 历史备份（只读）
+│   ├── backend-java/       # Java 后端备份
+│   └── sdk/                # Java SDK 模块
+├── infra/                   # 部署与运维
+│   ├── compose/            # Docker Compose 配置
+│   ├── assets/             # 运维资产（地图等）
+│   └── scripts/            # 部署脚本
+├── docs/                    # 文档
+└── openspec/               # OpenSpec 规范
+```
 
 ### 本地开发
 
 ```bash
 # 克隆项目
 git clone https://github.com/Gujiaweiguo/godataease.git
-cd dataease
+cd godataease
 
-# 编译后端
-cd core/core-backend
-mvn clean install -DskipTests
+# 编译 Go 后端
+cd apps/backend-go
+make build
 
 # 编译前端
-cd ../core-frontend
+cd ../frontend
 npm install
 npm run dev  # 访问 http://localhost:5173
 
-# 启动后端（需要配置数据库）
-cd ../core-backend
-mvn spring-boot:run  # API 访问 http://localhost:8100
+# 启动 Go 后端（需要配置数据库）
+cd ../backend-go
+make run  # API 访问 http://localhost:8080
 ```
 
 ### 打包构建
 
 ```bash
-# 后端打包
-mvn clean package -DskipTests
+# Go 后端打包
+cd apps/backend-go
+make build
 
 # 前端构建
-cd core/core-frontend
+cd apps/frontend
 npm run build:base
 ```
 
@@ -97,50 +115,57 @@ npm run build:base
 
 #### 部署步骤
 
-1. 构建后端包
+1. 构建 Go 后端
 
 ```bash
-cd core/core-backend
-mvn clean package -Pstandalone -DskipTests
+cd apps/backend-go
+make build
 ```
 
 2. 构建前端资源
 
 ```bash
-cd ../core-frontend
+cd apps/frontend
 npm install
 npm run build:base
 ```
 
-3. 启动所有服务
+3. 创建外部网络（供多系统共用）
+
+```bash
+docker network create my-net
+```
+
+4. 启动所有服务
 
 ```bash
 cd ../../
-docker compose up -d --build
+docker compose -f infra/compose/docker-compose.yml up -d --build
 ```
 
 服务包括：
 - **mysql8**: MySQL 8.0 数据库（端口 3306）
-- **redis7**: Redis 7.0 缓存（端口 6379）
-- **dataease-app**: DataEase 应用（端口 8100）
+- **redis**: Redis 7.0 缓存（端口 6379）
+- **dataease-app**: DataEase 应用（端口 8080）
 
-4. 自定义配置（可选）
+5. 自定义配置（可选）
 
 在项目根目录创建 `.env`：
 
 ```env
-MYSQL_ROOT_PASSWORD=your_password
-MYSQL_DATABASE=dataease10
-TZ=Asia/Shanghai
-JAVA_OPTS=-Xms2g -Xmx4g -Dfile.encoding=utf-8
+DB_HOST=mysql8
+DB_PORT=3306
+DB_NAME=dataease10
+DB_USER=root
+DB_PASSWORD=Admin168
 ```
 
-5. 访问服务
+6. 访问服务
 
-- 应用地址: http://localhost:8100
-- API 文档: http://localhost:8100/doc.html
+- 应用地址: http://localhost:8080
+- API 文档: http://localhost:8080/doc.html
 
-6. 查看日志
+7. 查看日志
 
 ```bash
 # 查看所有服务日志
@@ -149,10 +174,10 @@ docker compose logs -f
 # 查看特定服务日志
 docker compose logs -f dataease-app
 docker compose logs -f mysql8
-docker compose logs -f redis7
+docker compose logs -f redis
 ```
 
-7. 停止服务
+8. 停止服务
 
 ```bash
 # 停止并删除容器
@@ -167,13 +192,13 @@ docker compose down -v
 如果系统中已有 MySQL 和 Redis 容器，可以只构建 dataease-app 服务：
 
 ```bash
-# 修改 docker-compose.yml，注释掉 mysql8 和 redis7 服务
+# 修改 docker-compose.yml，注释掉 mysql8 和 redis 服务
 docker compose up -d --build dataease-app
 ```
 
 确保 application-standalone.yml 配置正确指向现有容器：
 - MySQL: `mysql8:3306`
-- Redis: `redis7:6379`
+- Redis: `redis:6379`
 
 更多开发指南请参考 [development_guide.md](./development_guide.md) 和 [AGENTS.md](./AGENTS.md)。
 
@@ -196,7 +221,8 @@ docker compose up -d --build dataease-app
 
 -   前端：[Vue.js](https://vuejs.org/)、[Element](https://element.eleme.cn/)
 -   图库：[AntV](https://antv.vision/zh)
--   后端：[Spring Boot](https://spring.io/projects/spring-boot)
+-   后端（主线）：[Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   后端（历史只读备份）：[Spring Boot](https://spring.io/projects/spring-boot)
 -   数据库：[MySQL](https://www.mysql.com/)
 -   数据处理：[Apache Calcite](https://github.com/apache/calcite/)、[Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   基础设施：[Docker](https://www.docker.com/)

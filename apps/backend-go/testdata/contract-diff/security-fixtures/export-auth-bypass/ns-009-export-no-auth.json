@@ -1,0 +1,20 @@
+{
+  "scenario_id": "NS-009",
+  "apiIdentity": {
+    "path": "/api/dashboard/export/{id}",
+    "method": "GET",
+    "owner": "export-team",
+    "priority": "P0",
+    "blockingLevel": "critical"
+  },
+  "identityContext": {
+    "type": "anonymous",
+    "token": null
+  },
+  "expectedResponse": {
+    "status": 401,
+    "code": "401001",
+    "msg": "Unauthorized"
+  },
+  "securityAssertions": ["SEC-EXP-001"]
+}

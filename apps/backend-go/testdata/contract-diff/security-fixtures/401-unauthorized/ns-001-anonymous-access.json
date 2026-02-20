@@ -1,0 +1,43 @@
+{
+  "apiIdentity": {
+    "path": "/api/dashboard/list",
+    "method": "GET",
+    "owner": "dashboard-team",
+    "priority": "P0",
+    "blockingLevel": "critical"
+  },
+  "requestContext": {
+    "params": {},
+    "pathParams": {}
+  },
+  "standardResponse": {
+    "status": 401,
+    "code": "401001",
+    "msg": "Unauthorized: authentication required",
+    "data": null
+  },
+  "securityContext": {
+    "scenario_id": "NS-001",
+    "category": "401_UNAUTHORIZED",
+    "identity_context": "anonymous",
+    "expected_behavior": "reject",
+    "description": "Request without Authorization header should be rejected"
+  },
+  "headers": {
+    "request": {},
+    "response": {
+      "WWW-Authenticate": "Bearer"
+    }
+  },
+  "versionMetadata": {
+    "captured_at": "2025-02-18T00:00:00Z",
+    "java_version": "21.0.2",
+    "baseline_version": "1.0.0",
+    "commit_sha": "placeholder"
+  },
+  "notes": {
+    "description": "Anonymous access to protected dashboard list endpoint",
+    "caveats": ["Token may also be malformed or invalid"],
+    "relatedApis": ["/api/dashboard/detail/{id}"]
+  }
+}

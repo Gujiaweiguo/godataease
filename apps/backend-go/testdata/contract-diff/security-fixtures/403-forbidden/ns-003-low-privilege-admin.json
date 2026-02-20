@@ -1,0 +1,46 @@
+{
+  "apiIdentity": {
+    "path": "/api/sys/user/list",
+    "method": "GET",
+    "owner": "system-team",
+    "priority": "P0",
+    "blockingLevel": "critical"
+  },
+  "requestContext": {
+    "params": {
+      "page": 1,
+      "pageSize": 10
+    },
+    "pathParams": {}
+  },
+  "standardResponse": {
+    "status": 403,
+    "code": "403001",
+    "msg": "Forbidden: insufficient privileges",
+    "data": null
+  },
+  "securityContext": {
+    "scenario_id": "NS-003",
+    "category": "403_FORBIDDEN",
+    "identity_context": "low_privilege",
+    "expected_behavior": "reject",
+    "description": "Viewer role user cannot access admin-only user list endpoint"
+  },
+  "headers": {
+    "request": {
+      "Authorization": "Bearer <viewer_token>"
+    },
+    "response": {}
+  },
+  "versionMetadata": {
+    "captured_at": "2025-02-18T00:00:00Z",
+    "java_version": "21.0.2",
+    "baseline_version": "1.0.0",
+    "commit_sha": "placeholder"
+  },
+  "notes": {
+    "description": "Low privilege user accessing admin endpoint",
+    "caveats": ["User must have valid but non-admin token"],
+    "relatedApis": ["/api/sys/user/create", "/api/sys/user/delete/{id}"]
+  }
+}

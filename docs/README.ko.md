@@ -50,7 +50,8 @@ See the source installation steps in [README.md](/README.md) and [development_gu
 
 - 프론트엔드:[Vue.js](https://vuejs.org/), [Element](https://element.eleme.cn/)
 - 시각화 라이브러리:[AntV](https://antv.vision/zh)
-- 백엔드:[스프링 부트](https://spring.io/projects/spring-boot)
+- 백엔드(메인라인): [Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+- 백엔드(레거시, 읽기 전용): [Spring Boot](https://spring.io/projects/spring-boot)
 - 데이터베이스:[MySQL](https://www.mysql.com/)
 - 자료처리:[Apache Calcite](https://github.com/apache/calcite/), [Apache SeaTunnel](https://github.com/apache/seatunnel)
 - 인프라:[Docker](https://www.docker.com/)

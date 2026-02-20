@@ -214,7 +214,8 @@ export const useAppearanceStore = defineStore('appearanceStore', {
         return
       }
       defaultFont().then(res => {
-        const [font] = res || []
+        const fontList = Array.isArray(res) ? res : res ? [res] : []
+        const [font] = fontList
         setDefaultFont(
           `${
             embeddedStore.baseUrl

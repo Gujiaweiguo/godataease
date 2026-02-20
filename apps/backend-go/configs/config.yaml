@@ -1,18 +1,18 @@
 server:
-  port: 8080
+  port: 8100
   mode: debug
 
 database:
-  host: localhost
+  host: mysql8
   port: 3306
-  name: dataease10
+  name: dataease_dev
   user: root
-  password: ""
+  password: "Admin168"
   max_open_conns: 100
   max_idle_conns: 10
 
 redis:
-  host: localhost
+  host: redis-dataease
   port: 6379
   password: ""
   db: 0

@@ -1,0 +1,20 @@
+{
+  "scenario_id": "NS-005",
+  "apiIdentity": {
+    "path": "/api/dashboard/detail/{id}",
+    "method": "GET",
+    "owner": "dashboard-team",
+    "priority": "P0",
+    "blockingLevel": "critical"
+  },
+  "identityContext": {
+    "type": "cross_tenant",
+    "token": "${OTHER_ORG_TOKEN}"
+  },
+  "expectedResponse": {
+    "status": 403,
+    "code": "403002",
+    "msg": "Access denied"
+  },
+  "securityAssertions": ["SEC-ROW-001"]
+}

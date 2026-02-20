@@ -9,43 +9,15 @@
 
 ### Requirement: Comprehensive Audit Logging
 
-系统 SHALL 提供审计日志功能，记录所有关键系统操作，包括用户管理、组织管理、权限管理、嵌入功能、登录活动等。
+系统 SHALL 在 Go 实现中保持与 Java 版本相同的审计日志记录行为。
 
 #### Scenario: User Operation Audit
 - **WHEN** 管理员创建、更新或删除用户
-- **THEN** 系统 SHALL 自动记录操作类型（USER_ACTION）、操作名称、资源类型（USER）、操作时间、操作者、IP 地址和 User-Agent
+- **THEN** 系统 SHALL 自动记录操作类型（USER_ACTION）、操作名称、资源类型（USER）、操作时间、操作者、IP 地址和 User-Agent，格式与 Java 版本一致
 
-#### Scenario: Organization Operation Audit
-- **WHEN** 管理员创建、更新或删除组织，或修改组织状态
-- **THEN** 系统 SHALL 记录权限变更类型（PERMISSION_CHANGE）、操作类型、组织 ID、操作详情和操作者
-
-#### Scenario: Permission Operation Audit
-- **WHEN** 管理员创建、更新或删除权限
-- **THEN** 系统 SHALL 记录权限变更类型（PERMISSION_CHANGE）、操作类型、权限 ID、操作详情和操作者
-
-#### Scenario: Failed Login Attempts
-- **WHEN** 用户使用错误的凭证登录系统
-- **THEN** 系统 SHALL 记录失败登录日志，包含用户名、IP 地址、User-Agent 和失败原因
-
-#### Scenario: Data Export Audit
-- **WHEN** 用户导出数据（数据集、仪表板、视图等）
-- **THEN** 系统 SHALL 记录操作类型（EXPORT）、数据来源、导出格式、记录数和操作者
-
-#### Scenario: Embedded BI Access Audit
-- **WHEN** 外部系统通过 iframe 访问嵌入的 BI 内容
-- **THEN** 系统 SHALL 记录数据访问类型（DATA_ACCESS）、应用 ID、origin 来源和访问时间
-
-#### Scenario: Audit Log Query and Filtering
-- **WHEN** 管理员查询审计日志
-- **THEN** 系统 SHALL 支持按用户 ID、用户名、操作类型、资源类型、组织 ID、日期范围进行筛选，并支持分页
-
-#### Scenario: Audit Log Export
-- **WHEN** 管理员需要导出审计日志
-- **THEN** 系统 SHALL 支持按日志 ID 列表导出为 CSV 或 JSON 格式
-
-#### Scenario: Audit Log Retention
-- **WHEN** 系统需要清理旧审计日志
-- **THEN** 系统 SHALL 提供自动清理接口，默认保留 90 天的审计日志
+#### Scenario: Audit Log Storage
+- **WHEN** 审计日志生成
+- **THEN** 系统 SHALL 将日志存储在相同的数据库表中，字段格式与 Java 版本兼容
 
 ### Requirement: Automatic Audit Logging via Annotations
 
@@ -98,4 +70,16 @@
 #### Scenario: Unauthorized Access Attempts
 - **WHEN** 检测到未授权的访问尝试
 - **THEN** 系统 SHALL 记录详细信息并保留用于安全分析
+
+### Requirement: Audit Log Query Performance
+
+系统 SHALL 在 Go 实现中保持或提升审计日志查询性能。
+
+#### Scenario: Paginated query latency
+- **WHEN** 查询审计日志列表
+- **THEN** P95 延迟 SHALL 小于或等于 Java 实现
+
+#### Scenario: Filter query performance
+- **WHEN** 使用复杂过滤条件查询审计日志
+- **THEN** 查询性能 SHALL 不低于 Java 实现
 

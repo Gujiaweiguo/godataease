@@ -49,7 +49,8 @@ See the source installation steps in [README.md](/README.md) and [development_gu
 
 -   Frontend: [Vue.js](https://vuejs.org/), [Element](https://element.eleme.cn/)
 -   Visualisierungsbibliothek: [AntV](https://antv.vision/zh)
--   Backend: [Spring Boot](https://spring.io/projects/spring-boot)
+-   Backend (Hauptlinie): [Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   Backend (Legacy, schreibgeschützt): [Spring Boot](https://spring.io/projects/spring-boot)
 -   Datenbank: [MySQL](https://www.mysql.com/)
 -   Datenverarbeitung: [Apache Calcite](https://github.com/apache/calcite/), [Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   Infrastruktur: [Docker](https://www.docker.com/)

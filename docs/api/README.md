@@ -2,6 +2,11 @@
 
 本文档包含 DataEase 主要功能模块的 API 使用指南。
 
+## 后端实现说明
+
+- 主线后端：Go + Gin（`apps/backend-go`）
+- 历史后端：Spring Boot（`legacy/backend-java`，只读备份）
+
 ## 文档列表
 
 1. [嵌入式 BI (Embedded BI)](./embedded-bi.md)
@@ -40,7 +45,7 @@
 |------|------|
 | 快速开始 | [快速入门](../quick-start.md) |
 | API 参考 | 本目录所有文档 |
-| OpenSpec 规范 | [OpenSpec 指南](../openspec/AGENTS.md) |
+| OpenSpec 规范 | [OpenSpec 指南](../../openspec/AGENTS.md) |
 
 ## API 端点汇总
 

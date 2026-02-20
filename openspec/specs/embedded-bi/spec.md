@@ -11,11 +11,16 @@ The system SHALL allow administrators to create embedded applications with an ap
 - **THEN** the system stores the application and provides an app id and secret
 
 ### Requirement: Token-Based Embedding Initialization
-The system SHALL support initializing embedded content using a JWT-style embedded token generated from app id, app secret, and a DataEase user account.
+
+系统 SHALL 支持使用 Go 实现的 JWT 算法初始化嵌入式内容，生成与 Java 版本兼容的 embedded token。
 
 #### Scenario: Generating an embedded token
 - **WHEN** a caller provides app id, app secret, and a valid user account
-- **THEN** the system returns an embedded token for use in iframe or DIV embedding
+- **THEN** the system returns an embedded token compatible with the Java implementation
+
+#### Scenario: Token format compatibility
+- **WHEN** generating an embedded token in Go
+- **THEN** the token format and claims SHALL be identical to the Java implementation
 
 ### Requirement: Designer Embedding
 The system SHALL support embedding the dashboard and data screen designers in a third-party system with edit capability.
@@ -73,4 +78,16 @@ The system SHALL validate the origin of embedding initialization and bidirection
 #### Scenario: Rejecting untrusted origins
 - **WHEN** a message is received from an origin not in the allowlist
 - **THEN** the message is ignored and the embedded session remains uninitialized
+
+### Requirement: Embedded API Performance
+
+系统 SHALL 在 Go 实现中保持或提升嵌入式 API 的性能指标。
+
+#### Scenario: Token generation latency
+- **WHEN** generating an embedded token
+- **THEN** the P95 latency SHALL be less than or equal to the Java implementation
+
+#### Scenario: Embedding initialization latency
+- **WHEN** initializing an embedded session
+- **THEN** the P95 latency SHALL be less than or equal to the Java implementation
 

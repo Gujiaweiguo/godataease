@@ -56,20 +56,23 @@ DataEase is an open-source BI tool designed to help users quickly analyze data a
 ```bash
 # Clone the project
 git clone https://github.com/Gujiaweiguo/godataease.git
-cd dataease
+cd godataease
 
-# Build backend
-cd core/core-backend
-mvn clean install -DskipTests
+# Build backend (Go mainline)
+cd apps/backend-go
+make build
 
 # Build frontend
-cd ../core-frontend
+cd ../frontend
 npm install
 npm run dev  # Visit http://localhost:5173
 
 # Start backend (configure database first)
-cd ../core-backend
-mvn spring-boot:run  # API: http://localhost:8100
+cd ../backend-go
+make run  # API: http://localhost:8080
+
+# Legacy Java backend is read-only backup
+# See legacy/README-READONLY.md for emergency operations
 ```
 
 For more development guides, see [development_guide.md](../development_guide.md).
@@ -78,7 +81,8 @@ For more development guides, see [development_guide.md](../development_guide.md)
 
 -   Frontend: [Vue.js](https://vuejs.org/), [Element](https://element.eleme.cn/)
 -   Visualization Library: [AntV](https://antv.vision/zh)
--   Backend: [Spring Boot](https://spring.io/projects/spring-boot)
+-   Backend (Mainline): [Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   Backend (Legacy, Read-only): [Spring Boot](https://spring.io/projects/spring-boot)
 -   Database: [MySQL](https://www.mysql.com/)
 -   Data Processing: [Apache Calcite](https://github.com/apache/calcite/), [Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   Infrastructure: [Docker](https://www.docker.com/)

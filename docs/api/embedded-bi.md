@@ -4,6 +4,8 @@
 
 DataEase 支持多维度嵌入，允许将 Dashboard、Screen、模块页面和图表嵌入到第三方系统中。
 
+当前 API 由 Go 主线后端（`apps/backend-go`）提供；Java 后端（`legacy/backend-java`）为只读备份。
+
 ## 支持的嵌入类型
 
 | 类型 | 端点 | 说明 |

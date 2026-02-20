@@ -3,9 +3,10 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>core</artifactId>
+        <artifactId>backend-java</artifactId>
         <groupId>io.dataease</groupId>
         <version>${dataease.version}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -163,7 +164,7 @@
                                 <configuration>
                                     <target>
                                         <copy todir="src/main/resources/static">
-                                            <fileset dir="../core-frontend/dist">
+                                            <fileset dir="../../../apps/frontend/dist">
                                                 <include name="**"/>
                                             </fileset>
                                         </copy>

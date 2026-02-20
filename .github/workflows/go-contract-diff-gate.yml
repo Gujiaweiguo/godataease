@@ -1,0 +1,89 @@
+name: Go Contract Diff Gate
+
+on:
+  push:
+    branches: [ main, dev ]
+    paths:
+      - 'apps/backend-go/**'
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'apps/backend-go/**'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run in dry-run mode (continue-on-error enabled)'
+        required: false
+        default: 'false'
+        type: boolean
+      baseline-url:
+        description: 'Baseline backend URL'
+        required: false
+        default: ''
+        type: string
+      candidate-url:
+        description: 'Candidate backend URL'
+        required: false
+        default: ''
+        type: string
+
+env:
+  BASELINE_URL: ${{ github.event.inputs.baseline-url || secrets.CONTRACT_DIFF_BASELINE_URL || 'http://localhost:8081' }}
+  CANDIDATE_URL: ${{ github.event.inputs.candidate-url || secrets.CONTRACT_DIFF_CANDIDATE_URL || 'http://localhost:8082' }}
+
+jobs:
+  contract-diff:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event.inputs.dry-run == 'true' }}
+    defaults:
+      run:
+        working-directory: apps/backend-go
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Run contract diff
+      run: |
+        chmod +x scripts/contract-diff/run_contract_diff.sh
+        scripts/contract-diff/run_contract_diff.sh \
+          --java-base "${BASELINE_URL}" \
+          --go-base "${CANDIDATE_URL}" \
+          --out-dir reports \
+          --whitelist testdata/contract-diff/critical-whitelist.yaml
+      env:
+        BASELINE_URL: ${{ env.BASELINE_URL }}
+        CANDIDATE_URL: ${{ env.CANDIDATE_URL }}
+
+    - name: Upload JSON report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: contract-diff-json
+        path: apps/backend-go/reports/contract-diff.json
+        retention-days: 30
+
+    - name: Upload Markdown report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: contract-diff-md
+        path: apps/backend-go/reports/contract-diff.md
+        retention-days: 30
+
+    - name: Summary
+      if: always()
+      run: |
+        echo "## Contract Diff Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f reports/contract-diff.md ]; then
+          cat reports/contract-diff.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No report generated." >> $GITHUB_STEP_SUMMARY
+        fi

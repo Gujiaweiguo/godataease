@@ -51,7 +51,8 @@ See the source installation steps in [README.md](/README.md) and [development_gu
 
 -   الواجهة الأمامية: [Vue.js](https://vuejs.org/), [Element](https://element.eleme.cn/)
 -   مكتبة تصور البيانات.: [AntV](https://antv.vision/zh)
--   الخلفية: [Spring Boot](https://spring.io/projects/spring-boot)
+-   الخلفية (المسار الرئيسي): [Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   الخلفية (تراثية، للقراءة فقط): [Spring Boot](https://spring.io/projects/spring-boot)
 -   قاعدة البيانات: [MySQL](https://www.mysql.com/)
 -   معالجة البيانات: [Apache Calcite](https://github.com/apache/calcite/), [Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   بنية تحتية: [Docker](https://www.docker.com/)

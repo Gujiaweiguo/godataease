@@ -10,7 +10,14 @@ PR are always welcome, even if they only contain small fixes like typos or a few
 
 Please submit a PR broken down into small changes' bit by bit. A PR consisting of a lot of features and code changes may be hard to review. It is recommended to submit PRs in an incremental fashion.
 
-This [development guideline](https://dataease.cn/docs/v2/installation/deployment_installation/) contains information about repository structure, how to set up development environment, how to run it, and more.
+Please use the in-repo guides first:
+
+- `development_guide.md` (repository structure, local setup, run/build commands)
+- `AGENTS.md` (module layout and command quick reference)
+
+Repository note:
+- Mainline backend is Go (`apps/backend-go`)
+- Java backend and SDK are legacy read-only (`legacy/backend-java`, `legacy/sdk`)
 
 Note: If you split your pull request to small changes, please make sure any of the changes goes to master will not break anything. Otherwise, it can not be merged until this feature complete.
 

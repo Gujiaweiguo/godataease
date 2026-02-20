@@ -8,30 +8,48 @@ Follow existing project conventions, keep changes minimal, and prefer verifiable
 - 使用私有仓库地址：`https://github.com/Gujiaweiguo/godataease.git`
 
 ## Repository Layout
-- `core/core-backend/`: Spring Boot backend (Java 21)
-- `core/core-frontend/`: Vue 3 + TypeScript frontend (Vite)
-- `sdk/`: SDK modules (Maven multi-module)
-- `openspec/`: spec-driven change management
+
+```
+godataease/
+├── apps/                    # 运行时应用
+│   ├── backend-go/         # Go 后端（主线）
+│   └── frontend/           # Vue 3 前端
+├── legacy/                  # 历史备份（只读）
+│   ├── backend-java/       # Java 后端备份
+│   └── sdk/                # Java SDK 模块
+├── infra/                   # 部署与运维
+│   ├── assets/             # 运维资产（地图数据等）
+│   ├── compose/            # Docker Compose 配置
+│   └── scripts/            # 部署脚本
+├── docs/                    # 文档
+└── openspec/               # OpenSpec 规范
+```
 
 ## Environment Requirements
-- Java 21+
-- Maven 3.8+
-- Node.js 18+
-- MySQL 8.0+
-- Redis 7.0+
+- Go: 1.21+
+- Node.js: 18+
+- MySQL: 8.0+
+- Redis: 7.0+
 
 ## Build, Lint, Test, Run
 
 ### Repo Root
-Run in `/opt/code/dataease`:
-- Build root modules: `mvn clean install`
-- Build without tests: `mvn clean install -DskipTests`
-- Docker dev stack: `docker compose up -d`
-- Docker app URL: `http://localhost:8100`
-- Docker API docs: `http://localhost:8100/doc.html`
+Run in `/opt/code/godataease`:
+- Validate repo aggregator: `mvn -N validate`
+- Docker dev stack: `docker compose -f infra/compose/docker-compose.yml up -d`
+- Docker app URL: `http://localhost:8080`
+- Docker API docs: `http://localhost:8080/doc.html`
+- Legacy Java emergency operations: see `legacy/README-READONLY.md`
 
-### Frontend (`core/core-frontend`)
-Run in `/opt/code/dataease/core/core-frontend`:
+### Go Backend (`apps/backend-go`)
+Run in `/opt/code/godataease/apps/backend-go`:
+- Build: `make build`
+- Run: `make run`
+- Test: `make test`
+- Lint: `golangci-lint run`
+
+### Frontend (`apps/frontend`)
+Run in `/opt/code/godataease/apps/frontend`:
 - Install dependencies: `npm install`
 - Dev server: `npm run dev` (Vite, default `http://localhost:5173`)
 - Build (base): `npm run build:base`
@@ -43,40 +61,22 @@ Run in `/opt/code/dataease/core/core-frontend`:
 - Preview build: `npm run preview`
 
 Notes:
-- Build scripts set `NODE_OPTIONS` memory in `core/core-frontend/package.json`.
-- NPM registry is configured in `core/core-frontend/.npmrc`.
+- Build scripts set `NODE_OPTIONS` memory in `apps/frontend/package.json`.
+- NPM registry is configured in `apps/frontend/.npmrc`.
 - There is no standard `npm test` script currently; use lint + ts check as quality gates.
 
-### Backend (`core/core-backend`)
-Run in `/opt/code/dataease/core/core-backend`:
-- Run app: `mvn spring-boot:run`
-- Run app (standalone profile): `mvn spring-boot:run -Dspring-boot.run.profiles=standalone`
-- Package standalone: `mvn clean package -Pstandalone`
-- DB migration: `mvn flyway:migrate`
-
-Testing (JUnit 4):
-- Run tests (explicitly enable): `mvn test -DskipTests=false`
-- Single test class: `mvn test -Dtest=PermissionManageTest -DskipTests=false`
-- Single test method: `mvn test -Dtest=PermissionManageTest#testMethodName -DskipTests=false`
-- FQCN test class: `mvn test -Dtest=io.dataease.dataset.manage.PermissionManageTest -DskipTests=false`
-- FQCN method example: `mvn test -Dtest=EmbeddedTokenUtilTest#testTokenGeneration -DskipTests=false`
-
-Important:
-- `core/core-backend/pom.xml` sets Surefire `<skip>true>` by default.
-- If tests appear skipped, always add `-DskipTests=false`.
-
-### SDK (`sdk`)
-Run in `/opt/code/dataease/sdk`:
-- Build all SDK modules: `mvn clean install`
-- Modules include: `common`, `api`, `distributed`, `extensions`
+### Legacy (Read Only)
+- `legacy/backend-java/` 与 `legacy/sdk/` 为只读备份，不承接常规功能开发。
+- 仅允许安全补丁、应急修复和迁移对照改动。
+- 详细命令与审批规则见 `legacy/README-READONLY.md`。
 
 ## Code Style and Conventions
 
 ### Source of Truth
-- Frontend formatting: `core/core-frontend/.editorconfig`, `core/core-frontend/prettier.config.js`
-- Frontend lint: `core/core-frontend/.eslintrc.js`, `core/core-frontend/stylelint.config.js`
-- Frontend types: `core/core-frontend/tsconfig.json`
-- Backend build/test behavior: `pom.xml`, `core/core-backend/pom.xml`
+- Frontend formatting: `apps/frontend/.editorconfig`, `apps/frontend/prettier.config.js`
+- Frontend lint: `apps/frontend/.eslintrc.js`, `apps/frontend/stylelint.config.js`
+- Frontend types: `apps/frontend/tsconfig.json`
+- Backend build/test behavior: `legacy/pom.xml`, `legacy/backend-java/pom.xml`
 - Project development conventions: `development_guide.md`, `CONTRIBUTING.md`
 
 ### General Formatting
@@ -111,31 +111,8 @@ Error handling:
 - API calls in UI logic should use `try/catch` and user-facing message feedback.
 - Keep response code checks consistent with existing patterns (`code === '000000'` where used).
 
-### Backend (Java + Spring Boot)
-Architecture and package conventions:
-- Package prefix: `io.dataease.<module>`.
-- Layering: controller / service / mapper / entity / dto.
-- Controllers typically use `@RestController` + `@RequestMapping`.
-
-Code style:
-- Follow existing class naming: `*Controller`, `*Service`, `*Mapper`, `*DTO`.
-- Keep service logic focused; avoid mixing controller concerns into services.
-- Prefer existing project response/error patterns over introducing a new global style in small changes.
-
-Testing:
-- JUnit 4 is used in backend test modules.
-- Tests are under `core/core-backend/src/test/java`.
-- For quick validation, run single test class/method first.
-
-Error handling:
-- Maintain module-consistent exception behavior.
-- Do not swallow exceptions silently.
-- If touching existing `try/catch` blocks, preserve response contracts expected by current callers.
-
-## Single-Test Quick Reference
-- Backend class: `mvn test -Dtest=PermissionManageTest -DskipTests=false`
-- Backend method: `mvn test -Dtest=PermissionManageTest#testMethodName -DskipTests=false`
-- Backend FQCN: `mvn test -Dtest=io.dataease.dataset.manage.PermissionManageTest -DskipTests=false`
+## Legacy Java Note
+- Java 代码规范与应急命令统一维护在 `legacy/README-READONLY.md`，避免主线文档混入双栈细节。
 
 ## Cursor / Copilot Rules
 - No `.cursorrules` found in this repository.

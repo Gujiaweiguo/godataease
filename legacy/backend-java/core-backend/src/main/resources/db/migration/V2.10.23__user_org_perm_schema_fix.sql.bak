@@ -1,0 +1,96 @@
+-- Align user/org/permission schema with entities and mappers
+-- Version: V2.10.23__user_org_perm_schema_fix
+
+SET @schema := DATABASE();
+
+-- sys_perm: add missing columns
+-- fix permission description column
+-- 首先检查列是否不存在，不存在才添加
+
+-- add perm_desc column
+SET @perm_desc_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE table_schema = @schema
+    AND table_name = 'sys_perm'
+    AND column_name = 'perm_desc'
+);
+
+SET @add_perm_desc_sql = IF(@perm_desc_exists = 0,
+    'ALTER TABLE sys_perm ADD COLUMN perm_desc TEXT NULL COMMENT ''权限描述'' AFTER perm_type',
+    ''
+);
+
+PREPARE add_perm_desc_stmt FROM @add_perm_desc_sql;
+EXECUTE add_perm_desc_stmt;
+
+-- add status column
+SET @status_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE table_schema = @schema
+    AND table_name = 'sys_perm'
+    AND column_name = 'status'
+);
+
+SET @add_status_sql = IF(@status_exists = 0,
+    'ALTER TABLE sys_perm ADD COLUMN status TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''状态：0-禁用，1-启用'' AFTER perm_desc',
+    ''
+);
+
+PREPARE add_status_stmt FROM @add_status_sql;
+EXECUTE add_status_stmt;
+
+-- add update_by column
+SET @update_by_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE table_schema = @schema
+    AND table_name = 'sys_perm'
+    AND column_name = 'update_by'
+);
+
+SET @add_update_by_sql = IF(@update_by_exists = 0,
+    'ALTER TABLE sys_perm ADD COLUMN update_by VARCHAR(50) NULL COMMENT ''更新人'' AFTER status',
+    ''
+);
+
+PREPARE add_update_by_stmt FROM @add_update_by_sql;
+EXECUTE add_update_by_stmt;
+
+-- add update_time column
+SET @update_time_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE table_schema = @schema
+    AND table_name = 'sys_perm'
+    AND column_name = 'update_time'
+);
+
+SET @add_update_time_sql = IF(@update_time_exists = 0,
+    'ALTER TABLE sys_perm ADD COLUMN update_time BIGINT NULL COMMENT ''更新时间'' AFTER update_by',
+    ''
+);
+
+PREPARE add_update_time_stmt FROM @add_update_time_sql;
+EXECUTE add_update_time_stmt;
+
+-- add del_flag column
+SET @del_flag_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE table_schema = @schema
+    AND table_name = 'sys_perm'
+    AND column_name = 'del_flag'
+);
+
+SET @add_del_flag_sql = IF(@del_flag_exists = 0,
+    'ALTER TABLE sys_perm ADD COLUMN del_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''删除标记：0-未删除，1-已删除'' AFTER update_time',
+    ''
+);
+
+PREPARE add_del_flag_stmt FROM @add_del_flag_sql;
+EXECUTE add_del_flag_stmt;
+
+UPDATE sys_perm SET perm_key = perm_code WHERE perm_key IS NULL AND perm_code IS NOT NULL;
+UPDATE sys_perm SET update_time = create_time WHERE update_time IS NULL AND create_time IS NOT NULL;

@@ -1,0 +1,40 @@
+{
+  "samples": [
+    {
+      "name": "table-info",
+      "chartId": 10001,
+      "resultCount": 3,
+      "expectedColumns": ["city", "metric", "value"],
+      "rows": [
+        {"city": "Beijing", "metric": "sales", "value": 120.5},
+        {"city": "Shanghai", "metric": "sales", "value": 88.2},
+        {"city": "Guangzhou", "metric": "sales", "value": 66.0}
+      ],
+      "total": 3
+    },
+    {
+      "name": "bar",
+      "chartId": 10002,
+      "resultCount": 2,
+      "expectedColumns": ["category", "value"],
+      "rows": [
+        {"category": "A", "value": 300.0},
+        {"category": "B", "value": 210.0},
+        {"category": "C", "value": 90.0}
+      ],
+      "total": 3
+    },
+    {
+      "name": "line",
+      "chartId": 10003,
+      "resultCount": 3,
+      "expectedColumns": ["dt", "uv"],
+      "rows": [
+        {"dt": "2026-02-01", "uv": 1000.0},
+        {"dt": "2026-02-02", "uv": 1080.0},
+        {"dt": "2026-02-03", "uv": 980.0}
+      ],
+      "total": 3
+    }
+  ]
+}

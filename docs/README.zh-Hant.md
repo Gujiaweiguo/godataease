@@ -58,30 +58,34 @@ DataEase 是開源的 BI 工具，幫助用戶快速分析數據並洞察業務�
 ```bash
 # 取得專案
 git clone https://github.com/Gujiaweiguo/godataease.git
-cd dataease
+cd godataease
 
-# 編譯後端
-cd core/core-backend
-mvn clean install -DskipTests
+# 編譯後端（Go 主線）
+cd apps/backend-go
+make build
 
 # 編譯前端
-cd ../core-frontend
+cd ../frontend
 npm install
 npm run dev  # 造訪 http://localhost:5173
 
 # 啟動後端（需先設定資料庫）
-cd ../core-backend
-mvn spring-boot:run  # API 造訪 http://localhost:8100
+cd ../backend-go
+make run  # API 造訪 http://localhost:8080
+
+# Java 後端為歷史唯讀備份
+# 應急操作請參考 legacy/README-READONLY.md
 ```
 
 ### 打包建置
 
 ```bash
-# 後端打包
-mvn clean package -DskipTests
+# 後端打包（Go 主線）
+cd apps/backend-go
+make build
 
 # 前端建置
-cd core/core-frontend
+cd ../frontend
 npm run build:base
 ```
 
@@ -103,7 +107,8 @@ npm run build:base
 
 -   前端：[Vue.js](https://vuejs.org/)、[Element](https://element.eleme.cn/)
 -   圖庫：[AntV](https://antv.vision/zh)
--   後端：[Spring Boot](https://spring.io/projects/spring-boot)
+-   後端（主線）：[Go](https://go.dev/) + [Gin](https://gin-gonic.com/)
+-   後端（歷史唯讀備份）：[Spring Boot](https://spring.io/projects/spring-boot)
 -   資料庫：[MySQL](https://www.mysql.com/)
 -   資料處理：[Apache Calcite](https://github.com/apache/calcite/)、[Apache SeaTunnel](https://github.com/apache/seatunnel)
 -   基礎設施：[Docker](https://www.docker.com/)

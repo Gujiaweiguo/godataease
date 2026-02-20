@@ -1,0 +1,45 @@
+{
+  "apiIdentity": {
+    "path": "/api/dashboard/detail/{id}",
+    "method": "GET",
+    "owner": "dashboard-team",
+    "priority": "P0",
+    "blockingLevel": "critical"
+  },
+  "requestContext": {
+    "params": {},
+    "pathParams": {
+      "id": "dashboard-from-org-b"
+    }
+  },
+  "standardResponse": {
+    "status": 403,
+    "code": "403002",
+    "msg": "Forbidden: resource not accessible",
+    "data": null
+  },
+  "securityContext": {
+    "scenario_id": "NS-005",
+    "category": "ROW_LEVEL_BYPASS",
+    "identity_context": "cross_tenant",
+    "expected_behavior": "reject",
+    "description": "User from org A cannot access dashboard belonging to org B"
+  },
+  "headers": {
+    "request": {
+      "Authorization": "Bearer <org_a_user_token>"
+    },
+    "response": {}
+  },
+  "versionMetadata": {
+    "captured_at": "2025-02-18T00:00:00Z",
+    "java_version": "21.0.2",
+    "baseline_version": "1.0.0",
+    "commit_sha": "placeholder"
+  },
+  "notes": {
+    "description": "Cross-tenant data isolation test for dashboard detail",
+    "caveats": ["Resource ID must belong to a different organization"],
+    "relatedApis": ["/api/dashboard/update/{id}", "/api/dashboard/delete/{id}"]
+  }
+}
