@@ -1,0 +1,329 @@
+# Critical API Whitelist for Contract Diff Gate
+# Version: 1.0.0
+# Last Updated: 2026-02-18
+# Change ID: add-go-contract-diff-ci-gate
+#
+# This whitelist defines the critical APIs that MUST be validated
+# in the Java/Go contract diff CI gate.
+#
+# Field Definitions:
+#   - path: API endpoint path
+#   - method: HTTP method (GET, POST, DELETE, PUT)
+#   - owner: Team responsible for this endpoint
+#   - priority: P0 (critical), P1 (high), P2 (normal)
+#   - blockingLevel: critical (blocks all), high (blocks merge), normal (warning only)
+#   - javaStatus: Implementation status in Java (exists, partial, n/a)
+#   - goStatus: Implementation status in Go (full, partial, stub, missing)
+#   - notes: Additional context
+
+metadata:
+  version: "1.0.1"
+  changeId: "add-go-security-compatibility-readiness"
+  lastUpdated: "2026-02-20"
+  sourceMatrix: "openspec/changes/add-go-security-compatibility-readiness/compatibility-matrix.md"
+
+# Default thresholds for gate evaluation
+thresholds:
+  overallParity: 99  # Minimum percentage of APIs that must pass
+  requiredApiPassRate: 100  # All P0/critical APIs must pass
+  blockingLevelCritical: zero-tolerance  # Any critical-level difference fails the gate
+
+# Critical APIs - P0 endpoints that MUST have contract parity
+criticalApis:
+  # Template Management
+  - path: "/templateManage/templateList"
+    method: "POST"
+    owner: "template-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "missing"
+    notes: "Core template listing - blocks template management"
+
+  - path: "/templateManage/save"
+    method: "POST"
+    owner: "template-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "partial"
+    notes: "Template save functionality - partial implementation needs completion"
+
+  - path: "/templateMarket/searchTemplate"
+    method: "GET"
+    owner: "template-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Template marketplace search - implemented via /templateMarket/search alias"
+
+  # Datasource Management
+  - path: "/datasource/list"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Core datasource listing"
+
+  - path: "/datasource/tree"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Datasource tree structure"
+
+  - path: "/datasource/validate"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Connection validation"
+
+  - path: "/datasource/getTables"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Table metadata retrieval"
+
+  - path: "/datasource/previewData"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "stub"
+    notes: "Data preview - stub needs full implementation"
+
+  - path: "/datasource/save"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "stub"
+    notes: "Save datasource - stub needs full implementation"
+
+  - path: "/datasource/delete/:id"
+    method: "GET"
+    owner: "datasource-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "stub"
+    notes: "Delete datasource - stub needs full implementation"
+
+  # Dataset Management
+  - path: "/datasetTree/tree"
+    method: "POST"
+    owner: "dataset-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Dataset tree structure"
+
+  - path: "/datasetData/tableField"
+    method: "POST"
+    owner: "dataset-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Table field metadata"
+
+  - path: "/datasetData/previewData"
+    method: "POST"
+    owner: "dataset-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Dataset data preview"
+
+  # Chart Data
+  - path: "/chartData/getData"
+    method: "POST"
+    owner: "chart-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Chart data query - core visualization"
+
+  - path: "/chart/getData"
+    method: "POST"
+    owner: "chart-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Chart data retrieval - implemented via compatibility bridge"
+
+  # Export Center
+  - path: "/exportCenter/exportTasks"
+    method: "GET"
+    owner: "export-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Export task listing"
+
+  - path: "/exportCenter/download/:id"
+    method: "GET"
+    owner: "export-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Export download"
+
+  # User Management
+  - path: "/user/list"
+    method: "POST"
+    owner: "user-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "User listing"
+
+  - path: "/user/create"
+    method: "POST"
+    owner: "user-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "User creation"
+
+  # Authentication
+  - path: "/login/localLogin"
+    method: "POST"
+    owner: "auth-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Local authentication"
+
+  - path: "/logout"
+    method: "GET"
+    owner: "auth-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Logout"
+
+# High Priority APIs - P1 endpoints that should have contract parity
+highPriorityApis:
+  # Template
+  - path: "/templateManage/delete"
+    method: "POST"
+    owner: "template-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "stub"
+    notes: "Template deletion"
+
+  - path: "/templateMarket/categories"
+    method: "GET"
+    owner: "template-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "missing"
+    notes: "Marketplace categories"
+
+  # Datasource
+  - path: "/datasource/types"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "stub"
+    notes: "Datasource types"
+
+  # Dataset
+  - path: "/datasetTree/get/:id"
+    method: "POST"
+    owner: "dataset-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "stub"
+    notes: "Get dataset by ID"
+
+  # Share
+  - path: "/share/create"
+    method: "POST"
+    owner: "share-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Share creation"
+
+  - path: "/share/validate"
+    method: "POST"
+    owner: "share-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Share validation"
+
+  # Organization
+  - path: "/org/list"
+    method: "GET"
+    owner: "org-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Organization listing"
+
+  - path: "/org/tree"
+    method: "GET"
+    owner: "org-team"
+    priority: "P0"
+    blockingLevel: "critical"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Organization tree"
+
+# Native Go routes (no Java equivalent, for reference)
+nativeGoRoutes:
+  - path: "/ds/list"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P1"
+    blockingLevel: "normal"
+    notes: "Native Go datasource route"
+
+  - path: "/dataset/tree"
+    method: "POST"
+    owner: "dataset-team"
+    priority: "P1"
+    blockingLevel: "normal"
+    notes: "Native Go dataset route"
+
+  - path: "/chart/query"
+    method: "POST"
+    owner: "chart-team"
+    priority: "P1"
+    blockingLevel: "normal"
+    notes: "Native Go chart route"
