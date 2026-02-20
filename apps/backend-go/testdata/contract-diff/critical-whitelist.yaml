@@ -17,8 +17,8 @@
 #   - notes: Additional context
 
 metadata:
-  version: "1.0.1"
-  changeId: "add-go-security-compatibility-readiness"
+  version: "1.0.2"
+  changeId: "add-go-shadow-validation-cutover-gate"
   lastUpdated: "2026-02-20"
   sourceMatrix: "openspec/changes/add-go-security-compatibility-readiness/compatibility-matrix.md"
 
@@ -37,8 +37,8 @@ criticalApis:
     priority: "P0"
     blockingLevel: "critical"
     javaStatus: "exists"
-    goStatus: "missing"
-    notes: "Core template listing - blocks template management"
+    goStatus: "full"
+    notes: "Core template listing - implemented via /template/list alias"
 
   - path: "/templateManage/save"
     method: "POST"
@@ -46,8 +46,8 @@ criticalApis:
     priority: "P0"
     blockingLevel: "critical"
     javaStatus: "exists"
-    goStatus: "partial"
-    notes: "Template save functionality - partial implementation needs completion"
+    goStatus: "full"
+    notes: "Template save functionality - implemented via /template/create alias"
 
   - path: "/templateMarket/searchTemplate"
     method: "GET"
@@ -101,8 +101,8 @@ criticalApis:
     priority: "P0"
     blockingLevel: "critical"
     javaStatus: "exists"
-    goStatus: "stub"
-    notes: "Data preview - stub needs full implementation"
+    goStatus: "full"
+    notes: "Data preview - implemented via service.PreviewData"
 
   - path: "/datasource/save"
     method: "POST"
@@ -110,8 +110,8 @@ criticalApis:
     priority: "P0"
     blockingLevel: "critical"
     javaStatus: "exists"
-    goStatus: "stub"
-    notes: "Save datasource - stub needs full implementation"
+    goStatus: "full"
+    notes: "Save datasource - implemented via service.Save"
 
   - path: "/datasource/delete/:id"
     method: "GET"
@@ -119,8 +119,8 @@ criticalApis:
     priority: "P0"
     blockingLevel: "critical"
     javaStatus: "exists"
-    goStatus: "stub"
-    notes: "Delete datasource - stub needs full implementation"
+    goStatus: "full"
+    notes: "Delete datasource - implemented via service.Delete"
 
   # Dataset Management
   - path: "/datasetTree/tree"
@@ -235,8 +235,8 @@ highPriorityApis:
     priority: "P1"
     blockingLevel: "high"
     javaStatus: "exists"
-    goStatus: "stub"
-    notes: "Template deletion"
+    goStatus: "full"
+    notes: "Template deletion - implemented via DeleteWithCategory"
 
   - path: "/templateMarket/categories"
     method: "GET"
@@ -244,8 +244,8 @@ highPriorityApis:
     priority: "P1"
     blockingLevel: "high"
     javaStatus: "exists"
-    goStatus: "missing"
-    notes: "Marketplace categories"
+    goStatus: "stub"
+    notes: "Marketplace categories - stub returns empty array"
 
   # Datasource
   - path: "/datasource/types"
@@ -254,8 +254,8 @@ highPriorityApis:
     priority: "P1"
     blockingLevel: "high"
     javaStatus: "exists"
-    goStatus: "stub"
-    notes: "Datasource types"
+    goStatus: "full"
+    notes: "Datasource types - implemented with type list"
 
   # Dataset
   - path: "/datasetTree/get/:id"
@@ -264,8 +264,8 @@ highPriorityApis:
     priority: "P1"
     blockingLevel: "high"
     javaStatus: "exists"
-    goStatus: "stub"
-    notes: "Get dataset by ID"
+    goStatus: "full"
+    notes: "Get dataset by ID - implemented via buildDatasetDetail"
 
   # Share
   - path: "/share/create"
