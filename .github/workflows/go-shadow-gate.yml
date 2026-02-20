@@ -1,0 +1,140 @@
+name: Go Shadow Gate Manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Window profile to run'
+        required: true
+        default: smoke-1h
+        type: choice
+        options:
+          - smoke-1h
+          - gate-4h
+      mismatch_rate:
+        description: 'Observed mismatch rate percent (e.g. 0.30)'
+        required: false
+        default: '0.30'
+        type: string
+      security_incidents:
+        description: 'Critical security incidents count'
+        required: false
+        default: '0'
+        type: string
+      sev1:
+        description: 'Sev-1 regressions count'
+        required: false
+        default: '0'
+        type: string
+      sev2:
+        description: 'Sev-2 regressions count'
+        required: false
+        default: '0'
+        type: string
+      accelerated:
+        description: 'Use 1-second checkpoints (rehearsal only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shadow-gate-${{ github.ref }}-${{ github.event.inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  shadow-window:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend-go
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl tar
+
+      - name: Bootstrap shadow tooling
+        run: |
+          chmod +x scripts/shadow-gate/*.sh scripts/shadow-gate/*.py
+          scripts/shadow-gate/bootstrap_tooling.sh --install-dir tmp/shadow-gate/tools/bin
+
+      - name: Resolve window profile
+        run: |
+          if [ "${{ github.event.inputs.profile }}" = "gate-4h" ]; then
+            duration=4
+          else
+            duration=1
+          fi
+
+          interval=3600
+          if [ "${{ github.event.inputs.accelerated }}" = "true" ]; then
+            interval=1
+          fi
+
+          out_dir="tmp/shadow-gate/window-${{ github.event.inputs.profile }}-${{ github.run_id }}"
+
+          echo "DURATION_HOURS=${duration}" >> "$GITHUB_ENV"
+          echo "INTERVAL_SECONDS=${interval}" >> "$GITHUB_ENV"
+          echo "OUT_DIR=${out_dir}" >> "$GITHUB_ENV"
+
+      - name: Run shadow window
+        run: |
+          scripts/shadow-gate/run_shadow_window.sh \
+            --duration-hours "$DURATION_HOURS" \
+            --interval-seconds "$INTERVAL_SECONDS" \
+            --migration-mode go-only \
+            --skip-shadow-control \
+            --mismatch-rate "${{ github.event.inputs.mismatch_rate }}" \
+            --out-dir "$OUT_DIR" \
+            --tool-bin-dir tmp/shadow-gate/tools/bin \
+            --security-incidents "${{ github.event.inputs.security_incidents }}" \
+            --sev1 "${{ github.event.inputs.sev1 }}" \
+            --sev2 "${{ github.event.inputs.sev2 }}"
+
+      - name: Upload shadow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-gate-${{ github.event.inputs.profile }}-${{ github.run_id }}
+          path: apps/backend-go/${{ env.OUT_DIR }}
+          retention-days: 30
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file="$OUT_DIR/window-summary.md"
+          checkpoint_file="$OUT_DIR/checkpoint-H$(printf '%02d' "$DURATION_HOURS")/shadow-gate-decision.md"
+
+          echo "## Shadow Gate Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Profile: ${{ github.event.inputs.profile }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Duration hours: $DURATION_HOURS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Interval seconds: $INTERVAL_SECONDS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact dir: $OUT_DIR" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f "$summary_file" ]; then
+            echo "### Window Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Window summary not found: $summary_file" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -f "$checkpoint_file" ]; then
+            echo "### Final Decision" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat "$checkpoint_file" >> "$GITHUB_STEP_SUMMARY"
+          fi
