@@ -10,6 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/chart"
+	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/menu"
+	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 
@@ -51,6 +56,11 @@ func TestMain(m *testing.M) {
 	if err = testDB.AutoMigrate(
 		&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{},
 		&role.SysRole{},
+		&org.SysOrg{},
+		&menu.CoreMenu{},
+		&datasource.CoreDatasource{},
+		&chart.CoreChartView{},
+		&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
