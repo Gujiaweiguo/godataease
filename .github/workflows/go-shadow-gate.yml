@@ -92,12 +92,10 @@ jobs:
         run: |
           mkdir -p testdata/contract-diff
           if [ ! -f testdata/contract-diff/critical-whitelist.yaml ]; then
-            cat > testdata/contract-diff/critical-whitelist.yaml <<'EOF'
-            version: "1.0"
-            criticalApis: []
-            highPriorityApis: []
-            nativeGoRoutes: []
-            EOF
+            echo 'version: "1.0"' > testdata/contract-diff/critical-whitelist.yaml
+            echo 'criticalApis: []' >> testdata/contract-diff/critical-whitelist.yaml
+            echo 'highPriorityApis: []' >> testdata/contract-diff/critical-whitelist.yaml
+            echo 'nativeGoRoutes: []' >> testdata/contract-diff/critical-whitelist.yaml
           fi
 
       - name: Run shadow window
