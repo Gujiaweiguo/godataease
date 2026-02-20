@@ -1,4 +1,4 @@
-.PHONY: build test lint run clean fmt vet
+.PHONY: build test lint run clean fmt vet test-integration
 
 # Go parameters
 GOCMD=go
@@ -22,6 +22,15 @@ build:
 # Test
 test:
 	$(GOTEST) -v -race -coverprofile=coverage.out ./...
+
+# Integration Test (requires MySQL 8)
+test-integration:
+	TEST_DB_HOST=$(or $(TEST_DB_HOST),localhost) \
+	TEST_DB_PORT=$(or $(TEST_DB_PORT),3306) \
+	TEST_DB_USER=$(or $(TEST_DB_USER),root) \
+	TEST_DB_PASSWORD=$(or $(TEST_DB_PASSWORD),Admin168) \
+	TEST_DB_NAME=$(or $(TEST_DB_NAME),dataease_test) \
+	$(GOTEST) -tags=integration -v -count=1 ./internal/repository/...
 
 # Lint
 lint:
