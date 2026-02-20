@@ -1,0 +1,200 @@
+{
+  "name": "shadow-gate-observability",
+  "version": "1.0.0",
+  "generatedAt": "2026-02-20T05:37:01Z",
+  "sourceWhitelist": "testdata/contract-diff/critical-whitelist.yaml",
+  "coverage": {
+    "criticalRouteCount": 21,
+    "highPriorityRouteCount": 8
+  },
+  "panels": [
+    {
+      "id": "shadow_mismatch_rate",
+      "title": "Shadow Critical Route Mismatch Rate",
+      "type": "timeseries",
+      "query": "shadow_mismatch_rate_percent{scope=\"critical\"}",
+      "thresholds": {
+        "warning": 0.5,
+        "critical": 1.0
+      }
+    },
+    {
+      "id": "shadow_security_incidents",
+      "title": "Shadow Critical Security Incidents",
+      "type": "stat",
+      "query": "shadow_security_incidents_total{severity=~\"critical|high\"}",
+      "thresholds": {
+        "critical": 0
+      }
+    },
+    {
+      "id": "shadow_sev12_regressions",
+      "title": "Shadow Sev-1/Sev-2 Regressions",
+      "type": "stat",
+      "query": "shadow_regressions_total{severity=~\"sev1|sev2\"}",
+      "thresholds": {
+        "critical": 0
+      }
+    },
+    {
+      "id": "shadow_error_distribution",
+      "title": "Shadow Route Error Distribution",
+      "type": "timeseries",
+      "query": "sum by (route, error_class) (rate(shadow_route_errors_total[5m]))"
+    },
+    {
+      "id": "shadow_critical_route_coverage",
+      "title": "Critical Route Coverage",
+      "type": "table",
+      "rows": [
+        {
+          "route": "POST /templateManage/templateList",
+          "owner": "template-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "missing"
+        },
+        {
+          "route": "POST /templateManage/save",
+          "owner": "template-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "partial"
+        },
+        {
+          "route": "GET /templateMarket/searchTemplate",
+          "owner": "template-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "missing"
+        },
+        {
+          "route": "POST /datasource/list",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /datasource/tree",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /datasource/validate",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /datasource/getTables",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /datasource/previewData",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "stub"
+        },
+        {
+          "route": "POST /datasource/save",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "stub"
+        },
+        {
+          "route": "GET /datasource/delete/:id",
+          "owner": "datasource-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "stub"
+        },
+        {
+          "route": "POST /datasetTree/tree",
+          "owner": "dataset-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /datasetData/tableField",
+          "owner": "dataset-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /datasetData/previewData",
+          "owner": "dataset-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /chartData/getData",
+          "owner": "chart-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /chart/getData",
+          "owner": "chart-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "partial"
+        },
+        {
+          "route": "GET /exportCenter/exportTasks",
+          "owner": "export-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "GET /exportCenter/download/:id",
+          "owner": "export-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /user/list",
+          "owner": "user-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /user/create",
+          "owner": "user-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "POST /login/localLogin",
+          "owner": "auth-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        },
+        {
+          "route": "GET /logout",
+          "owner": "auth-team",
+          "priority": "P0",
+          "blockingLevel": "critical",
+          "goStatus": "full"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+version: "1.0.0"
+generatedAt: "2026-02-20T05:37:01Z"
+sourceWhitelist: "testdata/contract-diff/critical-whitelist.yaml"
+severityModel:
+  critical: "block cutover immediately"
+  high: "investigate within 30m"
+  warning: "review within 4h"
+rules:
+  -
+    name: "shadow_mismatch_rate_block"
+    expr: "shadow_mismatch_rate_percent{scope=\"critical\"} >= 1"
+    for: "5m"
+    severity: "critical"
+    action: "no-go"
+  -
+    name: "shadow_security_incident_block"
+    expr: "shadow_security_incidents_total{severity=~\"critical|high\"} > 0"
+    for: "1m"
+    severity: "critical"
+    action: "no-go"
+  -
+    name: "shadow_sev12_regression_block"
+    expr: "shadow_regressions_total{severity=~\"sev1|sev2\"} > 0"
+    for: "1m"
+    severity: "critical"
+    action: "no-go"
+  -
+    name: "shadow_error_distribution_warn"
+    expr: "sum(rate(shadow_route_errors_total[5m])) > 0"
+    for: "10m"
+    severity: "warning"
+    action: "investigate"
+escalation:
+  critical:
+    - "Observability Engineer"
+    - "Release Manager"
+    - "Engineering Manager"
+  high:
+    - "Observability Engineer"
+    - "API Compatibility Owner"
+  warning:
+    - "Observability Engineer"
