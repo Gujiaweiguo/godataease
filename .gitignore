@@ -10,7 +10,7 @@
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
@@ -18,56 +18,79 @@
 *.zip
 *.tar.gz
 *.rar
+
+# IDE
 .idea/
-target/
 .vscode/
 .lh/
 *.iml
 hs_err_pid*
-# Eclipse IDE
 .classpath
 .project
 .settings/
 .factorypath
+
+# Build artifacts
+target/
 node_modules/
 dist/
 package-lock.json
 .DS_Store
 .stylelintcache
-core/core-frontend/release/
-plugins/vite-test
-core/core-frontend/.stylelintcache
-/core/core-backend/src/main/resources/static/
-/core/core-backend/src/test
-/core/core-frontend/node/
-/core/core-frontend/lib/
-/core/core-frontend/components.d.ts
-core/core-frontend/src/assets/fsSvg.js
-core/core-frontend/src/assets/fsSvg.html
-.flattened-pom.xml
-/core/core-backend/
-/core/frontend/
-/core/mobile/
-/sdk/dataease-plugin-common/
-/sdk/dataease-plugin-datasource/
-/sdk/dataease-plugin-filter/
-/sdk/dataease-plugin-interface/
-/sdk/dataease-plugin-view/
-/extensions/
 .vite/
-/core/backend/
-/classpath:substitule.json
+BOOT-INF/
+.flattened-pom.xml
+
+# Frontend build artifacts (apps/frontend)
+apps/frontend/node/
+apps/frontend/lib/
+apps/frontend/components.d.ts
+apps/frontend/src/assets/fsSvg.js
+apps/frontend/src/assets/fsSvg.html
+apps/frontend/.stylelintcache
+apps/frontend/release/
+plugins/vite-test
+
+# Go backend build (apps/backend-go)
+apps/backend-go/dataease-backend
+apps/backend-go/coverage.out
+apps/backend-go/tmp/
+
+# Legacy Java backend (read-only backup)
+legacy/backend-java/core-backend/src/main/resources/static/
+legacy/backend-java/core-backend/src/test
+legacy/backend-java/core-backend/target/
+
+# Runtime data
+dataease-data/
+logs/
+opt/
 
 # Environment files
 .env
 .env.*
+.env.local
+.env.*.local
+!apps/backend-go/.env.shadow-gate.example
+!apps/backend-go/.env.shadow-gate.go-only.example
 
-# Build artifacts
-BOOT-INF/
+# Deprecated paths (kept for compatibility during transition)
+core/
+/backend-go/
 
-# Runtime data
-dataease-data/
+# Redis compose (use infra/compose/ instead)
 redis-dataease-compose.yml
 
-# Go backend build
-backend-go/dataease-backend
+# Installer (deprecated)
+installer/
+
+# Extensions (if not used)
+/extensions/
+
+# Legacy SDK plugins (deprecated paths, now under legacy/sdk)
+legacy/sdk/*/target/
+.flattened-pom.xml
+
+# Python cache
+__pycache__/
+*.pyc
