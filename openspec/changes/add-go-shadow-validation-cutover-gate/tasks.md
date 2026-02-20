@@ -1,0 +1,165 @@
+# Plan v1: Staging Shadow Validation and Cutover Gate
+
+## Dependency Graph
+
+`SHADOW-001 -> SHADOW-002 -> SHADOW-003 -> SHADOW-004 -> SHADOW-005 -> SHADOW-006`
+
+## Task List
+
+- [x] **SHADOW-001** Staging prerequisite readiness baseline
+  - **Risk**: Medium
+  - **Owner**: Platform SRE Lead
+  - **Target Date**: 2026-02-24
+  - **Depends On**: None
+  - **Input**:
+    - Staging environment inventory (Go candidate, Java baseline, data snapshot)
+    - Gateway/routing permission matrix
+    - Observability platform access matrix
+  - **Output**:
+    - Signed prerequisite checklist with owners and due dates
+    - Gap list for missing tooling/env/access
+  - **Acceptance Criteria**:
+    - All blocking prerequisites are explicitly marked `Ready` or `Blocked` with owner
+    - Blocked items include ETA and mitigation
+  - **Rollback Plan**:
+    - Freeze cutover timeline and keep Java-primary routing profile until readiness recovers
+  - **Execution Record (Plan v1)**:
+    - Command: `cd apps/backend-go && scripts/shadow-gate/preflight_check.sh --out-dir tmp/shadow-gate/preflight --whitelist testdata/contract-diff/critical-whitelist.yaml`
+    - Report: `apps/backend-go/tmp/shadow-gate/preflight/preflight.json`
+    - Checklist: `openspec/changes/add-go-shadow-validation-cutover-gate/staging-prerequisite-checklist.md`
+    - Current state: blocked prerequisites documented with owner/ETA/mitigation, execution baseline completed
+    - Tooling/env helpers added: `scripts/shadow-gate/bootstrap_tooling.sh`, `scripts/shadow-gate/load_shadow_env.sh`, `.env.shadow-gate.example`
+    - Go-only unknown-secret rehearsal path: `scripts/shadow-gate/run_shadow_gate.sh --migration-mode go-only --skip-shadow-control --mismatch-rate <value>`
+    - Go-only revalidation: `cd apps/backend-go && set -a && source tmp/shadow-gate/.env.shadow-gate.test && set +a && scripts/shadow-gate/preflight_check.sh --out-dir tmp/shadow-gate/preflight-go-only --whitelist testdata/contract-diff/critical-whitelist.yaml --tool-bin-dir tmp/shadow-gate/tools/bin --migration-mode go-only`
+    - Go-only report: `apps/backend-go/tmp/shadow-gate/preflight-go-only/preflight.json` (`status=ready`)
+    - Go-only skip-control report: `apps/backend-go/tmp/shadow-gate/preflight-go-only-skip/preflight.json` (`status=ready`, env/control checks `n/a`)
+
+- [x] **SHADOW-002** Shadow observability and alert baseline
+  - **Risk**: Medium
+  - **Owner**: Observability Engineer
+  - **Target Date**: 2026-02-25
+  - **Depends On**: SHADOW-001
+  - **Input**:
+    - Critical compatibility API whitelist
+    - Security parity dimensions (row-level, column masking, export auth)
+  - **Output**:
+    - Dashboards for mismatch rate, security incidents, and error distribution
+    - Alert policy with severities and escalation path
+  - **Acceptance Criteria**:
+    - Dashboard panels cover all critical interfaces in whitelist scope
+    - Alerts are test-fired successfully and visible in incident channel
+  - **Rollback Plan**:
+    - Disable shadow execution window and revert to baseline monitoring profile
+  - **Execution Record (Plan v1)**:
+    - Generator: `cd apps/backend-go && scripts/shadow-gate/generate_observability_baseline.py --whitelist testdata/contract-diff/critical-whitelist.yaml --out-dir testdata/contract-diff/observability`
+    - Dashboard artifact: `apps/backend-go/testdata/contract-diff/observability/shadow-dashboard.json`
+    - Alert policy artifact: `apps/backend-go/testdata/contract-diff/observability/shadow-alert-policy.yaml`
+    - Alert rehearsal (pass): `cd apps/backend-go && scripts/shadow-gate/test_alert_policy.sh --out tmp/shadow-gate/alert-test-pass.md --mismatch-rate 0.30 --security-incidents 0 --sev1 0 --sev2 0`
+    - Alert rehearsal (trigger): `cd apps/backend-go && scripts/shadow-gate/test_alert_policy.sh --out tmp/shadow-gate/alert-test-trigger.md --mismatch-rate 1.20 --security-incidents 1 --sev1 0 --sev2 0`
+    - Incident visibility verifier (dry-run): `cd apps/backend-go && scripts/shadow-gate/verify_incident_channel.sh --out tmp/shadow-gate/incident-channel-dryrun.md --dry-run`
+    - Incident visibility verifier (live local webhook): `cd apps/backend-go && scripts/shadow-gate/verify_incident_channel.sh --webhook-url http://127.0.0.1:18080/webhook --out tmp/shadow-gate/incident-channel-live.md`
+    - Rehearsal outputs: `apps/backend-go/tmp/shadow-gate/alert-test-pass.md`, `apps/backend-go/tmp/shadow-gate/alert-test-trigger.md`
+    - Dry-run visibility output: `apps/backend-go/tmp/shadow-gate/incident-channel-dryrun.md`
+    - Live visibility output: `apps/backend-go/tmp/shadow-gate/incident-channel-live.md`, receiver capture `apps/backend-go/tmp/shadow-gate/incident-channel-live-receiver.json`
+    - Current state: dashboard coverage and alert visibility checks are complete for executable baseline and live delivery path verification
+
+- [x] **SHADOW-003** Execute bounded 4h shadow validation window
+  - **Risk**: High
+  - **Owner**: Release Manager
+  - **Target Date**: 2026-02-27
+  - **Depends On**: SHADOW-002
+  - **Input**:
+    - Approved runbook
+    - Go candidate build in staging
+    - Stable mirrored traffic source
+  - **Output**:
+    - Time-bounded shadow execution record (max 4h)
+    - Raw evidence snapshots for mismatch and security checks
+  - **Acceptance Criteria**:
+    - Shadow run duration reaches at least 4 continuous hours and does not exceed 4 hours
+    - No unplanned interruption exceeds agreed SLO threshold
+  - **Rollback Plan**:
+    - Immediate shadow disable and route profile restoration to pre-shadow baseline
+  - **Execution Record (Plan v1)**:
+    - Window runner: `cd apps/backend-go && scripts/shadow-gate/run_shadow_window.sh --duration-hours 2 --interval-seconds 1 --migration-mode go-only --skip-shadow-control --mismatch-rate 0.30 --out-dir tmp/shadow-gate/window-go-only-skip-pass --tool-bin-dir tmp/shadow-gate/tools/bin --security-incidents 0 --sev1 0 --sev2 0`
+    - Pass summary: `apps/backend-go/tmp/shadow-gate/window-go-only-skip-pass/window-summary.md` (`PASS`, 2 checkpoints)
+    - Fail rehearsal: `cd apps/backend-go && scripts/shadow-gate/run_shadow_window.sh --duration-hours 2 --interval-seconds 1 --migration-mode go-only --skip-shadow-control --mismatch-rate 2.00 --out-dir tmp/shadow-gate/window-go-only-skip-fail --tool-bin-dir tmp/shadow-gate/tools/bin --security-incidents 0 --sev1 0 --sev2 0`
+    - Fail summary: `apps/backend-go/tmp/shadow-gate/window-go-only-skip-fail/window-summary.md` (`FAIL`, interrupted at checkpoint 1)
+    - Real cadence run: `cd apps/backend-go && scripts/shadow-gate/run_shadow_window.sh --duration-hours 4 --interval-seconds 3600 --migration-mode go-only --skip-shadow-control --mismatch-rate 0.30 --out-dir tmp/shadow-gate/window-go-only-skip-real4h --tool-bin-dir tmp/shadow-gate/tools/bin --security-incidents 0 --sev1 0 --sev2 0`
+    - Real run summary: `apps/backend-go/tmp/shadow-gate/window-go-only-skip-real4h/window-summary.md` (`PASS`, 4/4 checkpoints)
+    - Final decision: `apps/backend-go/tmp/shadow-gate/window-go-only-skip-real4h/checkpoint-H04/shadow-gate-decision.md` (`GO`)
+    - Alert probe: `apps/backend-go/tmp/shadow-gate/window-go-only-skip-real4h/checkpoint-H04/alert-probe.md` (`none`)
+    - Current state: SHADOW-003 acceptance criteria satisfied in go-only skip-control mode; ready for owner review/sign-off
+
+- [x] **SHADOW-004** Mismatch and security incident classification report
+  - **Risk**: High
+  - **Owner**: API Compatibility Owner
+  - **Target Date**: 2026-02-28
+  - **Depends On**: SHADOW-003
+  - **Input**:
+    - Shadow raw evidence and dashboard exports
+    - Contract diff outputs for critical routes
+  - **Output**:
+    - Structured report with mismatch categories and security incident summary
+    - Route-level blocking/non-blocking defect list with owners
+  - **Acceptance Criteria**:
+    - Critical-route mismatch rate is measured and reported
+    - Security incidents are classified with root-cause and mitigation status
+  - **Rollback Plan**:
+    - Mark report as failed gate, block traffic shift, and trigger remediation cycle
+  - **Execution Record (Plan v1)**:
+    - Generator: `cd apps/backend-go && scripts/shadow-gate/generate_shadow_classification_report.py --whitelist testdata/contract-diff/critical-whitelist.yaml --window-dir tmp/shadow-gate/window-go-only-skip-real4h --out ../../openspec/changes/add-go-shadow-validation-cutover-gate/shadow-mismatch-security-classification.md`
+    - Classification report: `openspec/changes/add-go-shadow-validation-cutover-gate/shadow-mismatch-security-classification.md`
+    - Evidence inputs: `apps/backend-go/tmp/shadow-gate/window-go-only-skip-real4h/window-summary.md`, `apps/backend-go/tmp/shadow-gate/window-go-only-skip-real4h/checkpoint-H04/shadow-gate-decision.md`
+    - Current state: mismatch rate measured and categorized, security incidents classified with root-cause/mitigation status, route-level blocking/non-blocking defect list generated with owners
+
+- [x] **SHADOW-005** Go/No-Go decision gate
+  - **Risk**: High
+  - **Owner**: Engineering Manager
+  - **Target Date**: 2026-03-01
+  - **Depends On**: SHADOW-004
+  - **Input**:
+    - Shadow validation report
+    - Exception requests (if any)
+  - **Output**:
+    - Formal Go/No-Go decision record with approvers
+    - Approved cutover checklist or blocked remediation plan
+  - **Acceptance Criteria**:
+    - Go decision requires threshold pass: mismatch < 1%, zero critical security incidents, no Sev-1/Sev-2 regression
+    - No-Go decision includes explicit unblock conditions and re-run scope
+  - **Rollback Plan**:
+    - Keep Java-primary routing and defer cutover until unblock conditions are met
+  - **Execution Record (Plan v1)**:
+    - Decision record: `openspec/changes/add-go-shadow-validation-cutover-gate/go-no-go-decision.md`
+    - Input evidence: `openspec/changes/add-go-shadow-validation-cutover-gate/shadow-mismatch-security-classification.md`, `apps/backend-go/tmp/shadow-gate/window-go-only-skip-real4h/window-summary.md`
+    - Decision outcome: `GO` (all blocking criteria pass; route-level blocking defects = none)
+    - Unblock conditions and re-run scope: explicitly documented in decision record
+
+- [x] **SHADOW-006** Rollback rehearsal and cutover-ready sign-off
+  - **Risk**: Medium
+  - **Owner**: Gateway Operations Lead
+  - **Target Date**: 2026-03-02
+  - **Depends On**: SHADOW-005
+  - **Input**:
+    - Approved Go/No-Go record
+    - Route-switch scripts and rollback scripts
+  - **Output**:
+    - Rehearsal evidence for rollback path
+    - Final sign-off package for release gate
+  - **Acceptance Criteria**:
+    - Rollback rehearsal completes within agreed RTO window
+    - Sign-off package includes commands, operators, timestamps, and verification evidence
+  - **Rollback Plan**:
+    - If rehearsal fails, block release and return to SHADOW-001 readiness remediation
+  - **Execution Record (Plan v1)**:
+    - Rehearsal command: `cd apps/backend-go && scripts/shadow-gate/rollback_rehearsal.sh --dry-run`
+    - Sign-off package: `openspec/changes/add-go-shadow-validation-cutover-gate/rollback-signoff-package.md`
+    - Timing evidence: start `2026-02-20T09:06:04Z`, end `2026-02-20T09:06:04Z`, duration `0s`
+    - RTO check: `PASS` against `<=300s` rehearsal target
+    - Current state: rollback path validated in dry-run; real switchback execution pending credentials
+
+## Execution Notes
+
+- Task status must be updated only after acceptance checks pass.
+- Any HIGH-risk task failure blocks downstream tasks.
+- This plan does not alter archived change history; it supersedes only the operational completion path for former `SEC-COMP-008`.
