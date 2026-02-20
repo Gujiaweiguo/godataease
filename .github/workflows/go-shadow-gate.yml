@@ -88,16 +88,6 @@ jobs:
           echo "INTERVAL_SECONDS=${interval}" >> "$GITHUB_ENV"
           echo "OUT_DIR=${out_dir}" >> "$GITHUB_ENV"
 
-      - name: Ensure whitelist exists
-        run: |
-          mkdir -p testdata/contract-diff
-          if [ ! -f testdata/contract-diff/critical-whitelist.yaml ]; then
-            echo 'version: "1.0"' > testdata/contract-diff/critical-whitelist.yaml
-            echo 'criticalApis: []' >> testdata/contract-diff/critical-whitelist.yaml
-            echo 'highPriorityApis: []' >> testdata/contract-diff/critical-whitelist.yaml
-            echo 'nativeGoRoutes: []' >> testdata/contract-diff/critical-whitelist.yaml
-          fi
-
       - name: Run shadow window
         run: |
           scripts/shadow-gate/run_shadow_window.sh \
