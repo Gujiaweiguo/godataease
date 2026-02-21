@@ -255,7 +255,3 @@ func TestPermRepository_GetByType(t *testing.T) {
 		t.Errorf("Expected 3 button permissions, got %d", len(buttonPerms))
 	}
 }
-
-func strPtr(s string) *string {
-	return &s
-}

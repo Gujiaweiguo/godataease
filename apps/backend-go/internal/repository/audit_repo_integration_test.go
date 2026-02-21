@@ -11,40 +11,42 @@ import (
 	"dataease/backend/internal/domain/audit"
 )
 
+func int64PtrAudit(v int64) *int64 { return &v }
+func strPtrAudit(v string) *string { return &v }
+
 func TestAuditLogRepository_CreateAndGetByID(t *testing.T) {
 	if testDB == nil {
 		t.Skip("Test database not available")
 	}
 
 	repo := NewAuditLogRepository(testDB)
-	cleanupTables("sys_audit_log")
+	cleanupTables("de_audit_log")
 
-	log := &audit.AuditLog{
-		UserID:       1,
-		Username:     "testuser",
-		ActionType:   "login",
-		ResourceType: "user",
-		ResourceID:   "1",
-		Status:       "success",
-		CreateTime:   time.Now().UnixMilli(),
+	logEntry := &audit.AuditLog{
+		UserID:       int64PtrAudit(1),
+		Username:     strPtrAudit("testuser"),
+		ActionType:   audit.ActionTypeUserAction,
+		ResourceType: strPtrAudit("user"),
+		ResourceID:   int64PtrAudit(1),
+		Status:       audit.StatusSuccess,
 	}
 
-	err := repo.Create(log)
+	err := repo.Create(logEntry)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if log.ID == 0 {
+	if logEntry.ID == 0 {
 		t.Error("Expected ID to be set after creation")
 	}
 
-	found, err := repo.GetByID(log.ID)
+	found, err := repo.GetByID(logEntry.ID)
 	if err != nil {
 		t.Fatalf("GetByID failed: %v", err)
 	}
 
-	if found.Username != "testuser" {
-		t.Errorf("Expected Username 'testuser', got '%s'", found.Username)
+	if found.Username == nil || *found.Username != "testuser" {
+		t.Errorf("Expected Username 'testuser', got '%v'", found.Username)
 	}
 }
 
@@ -54,16 +56,15 @@ func TestAuditLogRepository_CreateBatch(t *testing.T) {
 	}
 
 	repo := NewAuditLogRepository(testDB)
-	cleanupTables("sys_audit_log")
+	cleanupTables("de_audit_log")
 
 	logs := make([]*audit.AuditLog, 5)
 	for i := 0; i < 5; i++ {
 		logs[i] = &audit.AuditLog{
-			UserID:       1,
-			Username:     fmt.Sprintf("user%d", i),
-			ActionType:   "create",
-			ResourceType: "dashboard",
-			CreateTime:   time.Now().UnixMilli(),
+			UserID:       int64PtrAudit(1),
+			Username:     strPtrAudit(fmt.Sprintf("user%d", i)),
+			ActionType:   audit.ActionTypeDataAccess,
+			ResourceType: strPtrAudit("dashboard"),
 		}
 	}
 
@@ -79,16 +80,15 @@ func TestAuditLogRepository_GetByUserID(t *testing.T) {
 	}
 
 	repo := NewAuditLogRepository(testDB)
-	cleanupTables("sys_audit_log")
+	cleanupTables("de_audit_log")
 
 	for i := 0; i < 3; i++ {
-		log := &audit.AuditLog{
-			UserID:     100,
-			Username:   "testuser",
-			ActionType: "login",
-			CreateTime: time.Now().UnixMilli(),
+		logEntry := &audit.AuditLog{
+			UserID:     int64PtrAudit(100),
+			Username:   strPtrAudit("testuser"),
+			ActionType: audit.ActionTypeUserAction,
 		}
-		_ = repo.Create(log)
+		_ = repo.Create(logEntry)
 	}
 
 	logs, total, err := repo.GetByUserID(100, 1, 10)
@@ -110,27 +110,26 @@ func TestAuditLogRepository_Query(t *testing.T) {
 	}
 
 	repo := NewAuditLogRepository(testDB)
-	cleanupTables("sys_audit_log")
+	cleanupTables("de_audit_log")
 
 	for i := 0; i < 3; i++ {
-		log := &audit.AuditLog{
-			UserID:       1,
-			Username:     "queryuser",
-			ActionType:   "query",
-			ResourceType: "dataset",
-			CreateTime:   time.Now().UnixMilli(),
+		logEntry := &audit.AuditLog{
+			UserID:       int64PtrAudit(1),
+			Username:     strPtrAudit("queryuser"),
+			ActionType:   audit.ActionTypeDataAccess,
+			ResourceType: strPtrAudit("dataset"),
 		}
-		_ = repo.Create(log)
+		_ = repo.Create(logEntry)
 	}
 
-	actionType := "query"
+	actionType := audit.ActionTypeDataAccess
 	query := &audit.AuditLogQuery{
 		ActionType: &actionType,
 		Page:       1,
 		PageSize:   10,
 	}
 
-	logs, total, err := repo.Query(query)
+	_, total, err := repo.Query(query)
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
@@ -146,17 +145,16 @@ func TestAuditLogRepository_GetByIDs(t *testing.T) {
 	}
 
 	repo := NewAuditLogRepository(testDB)
-	cleanupTables("sys_audit_log")
+	cleanupTables("de_audit_log")
 
 	var ids []int64
 	for i := 0; i < 3; i++ {
-		log := &audit.AuditLog{
-			UserID:     1,
-			Username:   "test",
-			CreateTime: time.Now().UnixMilli(),
+		logEntry := &audit.AuditLog{
+			UserID:   int64PtrAudit(1),
+			Username: strPtrAudit("test"),
 		}
-		_ = repo.Create(log)
-		ids = append(ids, log.ID)
+		_ = repo.Create(logEntry)
+		ids = append(ids, logEntry.ID)
 	}
 
 	logs, err := repo.GetByIDs(ids)
@@ -175,12 +173,11 @@ func TestLoginFailureRepository_Create(t *testing.T) {
 	}
 
 	repo := NewLoginFailureRepository(testDB)
-	cleanupTables("sys_login_failure")
+	cleanupTables("de_login_failure")
 
 	failure := &audit.LoginFailure{
-		Username:   "faileduser",
-		IP:         "192.168.1.1",
-		CreateTime: time.Now().UnixMilli(),
+		Username:  "faileduser",
+		IPAddress: strPtrAudit("192.168.1.1"),
 	}
 
 	err := repo.Create(failure)
@@ -199,13 +196,12 @@ func TestLoginFailureRepository_GetByUsername(t *testing.T) {
 	}
 
 	repo := NewLoginFailureRepository(testDB)
-	cleanupTables("sys_login_failure")
+	cleanupTables("de_login_failure")
 
 	for i := 0; i < 3; i++ {
 		failure := &audit.LoginFailure{
-			Username:   "getuser",
-			IP:         "192.168.1.1",
-			CreateTime: time.Now().UnixMilli(),
+			Username:  "getuser",
+			IPAddress: strPtrAudit("192.168.1.1"),
 		}
 		_ = repo.Create(failure)
 	}
@@ -226,13 +222,12 @@ func TestLoginFailureRepository_CountSinceTime(t *testing.T) {
 	}
 
 	repo := NewLoginFailureRepository(testDB)
-	cleanupTables("sys_login_failure")
+	cleanupTables("de_login_failure")
 
 	for i := 0; i < 3; i++ {
 		failure := &audit.LoginFailure{
-			Username:   "countuser",
-			IP:         "192.168.1.1",
-			CreateTime: time.Now().UnixMilli(),
+			Username:  "countuser",
+			IPAddress: strPtrAudit("192.168.1.1"),
 		}
 		_ = repo.Create(failure)
 	}
@@ -253,14 +248,13 @@ func TestAuditLogDetailRepository_CreateAndGetByAuditLogID(t *testing.T) {
 	}
 
 	repo := NewAuditLogDetailRepository(testDB)
-	cleanupTables("sys_audit_log_detail")
+	cleanupTables("de_audit_log_detail")
 
 	detail := &audit.AuditLogDetail{
-		AuditLogID:   1,
-		FieldName:    "status",
-		OldValue:     "active",
-		NewValue:     "inactive",
-		ChangeDetail: "User status changed",
+		AuditLogID:  1,
+		DetailType:  strPtrAudit("field"),
+		DetailKey:   strPtrAudit("status"),
+		DetailValue: strPtrAudit("changed from active to inactive"),
 	}
 
 	err := repo.Create(detail)
@@ -284,11 +278,11 @@ func TestAuditLogDetailRepository_DeleteByAuditLogID(t *testing.T) {
 	}
 
 	repo := NewAuditLogDetailRepository(testDB)
-	cleanupTables("sys_audit_log_detail")
+	cleanupTables("de_audit_log_detail")
 
 	detail := &audit.AuditLogDetail{
 		AuditLogID: 2,
-		FieldName:  "test",
+		DetailKey:  strPtrAudit("test"),
 	}
 	_ = repo.Create(detail)
 
