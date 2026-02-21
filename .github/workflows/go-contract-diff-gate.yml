@@ -3,12 +3,8 @@ name: Go Contract Diff Gate
 on:
   push:
     branches: [ main, dev ]
-    paths:
-      - 'apps/backend-go/**'
   pull_request:
     branches: [ main, dev ]
-    paths:
-      - 'apps/backend-go/**'
   workflow_dispatch:
     inputs:
       dry-run:
@@ -46,10 +42,20 @@ jobs:
       with:
         go-version: '1.21'
 
+    - name: Detect backend-go changes
+      id: changes
+      uses: dorny/paths-filter@v3
+      with:
+        filters: |
+          backend:
+            - 'apps/backend-go/**'
+
     - name: Install jq
+      if: steps.changes.outputs.backend == 'true'
       run: sudo apt-get update && sudo apt-get install -y jq
 
     - name: Run contract diff
+      if: steps.changes.outputs.backend == 'true'
       run: |
         chmod +x scripts/contract-diff/run_contract_diff.sh
         scripts/contract-diff/run_contract_diff.sh \
@@ -63,7 +69,7 @@ jobs:
 
     - name: Upload JSON report
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && steps.changes.outputs.backend == 'true'
       with:
         name: contract-diff-json
         path: apps/backend-go/reports/contract-diff.json
@@ -71,7 +77,7 @@ jobs:
 
     - name: Upload Markdown report
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && steps.changes.outputs.backend == 'true'
       with:
         name: contract-diff-md
         path: apps/backend-go/reports/contract-diff.md
@@ -82,7 +88,9 @@ jobs:
       run: |
         echo "## Contract Diff Report" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        if [ -f reports/contract-diff.md ]; then
+        if [ "${{ steps.changes.outputs.backend }}" != "true" ]; then
+          echo "No backend-go changes detected; contract diff skipped intentionally." >> $GITHUB_STEP_SUMMARY
+        elif [ -f reports/contract-diff.md ]; then
           cat reports/contract-diff.md >> $GITHUB_STEP_SUMMARY
         else
           echo "No report generated." >> $GITHUB_STEP_SUMMARY
