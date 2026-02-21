@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -20,10 +21,10 @@ func TestNewScheduler(t *testing.T) {
 
 func TestScheduler_AddFunc(t *testing.T) {
 	s := NewScheduler()
-	executed := false
+	var executed atomic.Bool
 
 	err := s.AddFunc("* * * * * *", func() {
-		executed = true
+		executed.Store(true)
 	})
 
 	if err != nil {
@@ -35,7 +36,7 @@ func TestScheduler_AddFunc(t *testing.T) {
 
 	time.Sleep(1100 * time.Millisecond)
 
-	if !executed {
+	if !executed.Load() {
 		t.Error("Expected job to be executed")
 	}
 }
@@ -68,10 +69,10 @@ func TestScheduler_SetRedis(t *testing.T) {
 
 func TestScheduler_AddDistributedFunc_NoRedis(t *testing.T) {
 	s := NewScheduler()
-	executed := false
+	var executed atomic.Bool
 
 	err := s.AddDistributedFunc("test-job", "* * * * * *", func() {
-		executed = true
+		executed.Store(true)
 	})
 
 	if err != nil {
@@ -83,7 +84,7 @@ func TestScheduler_AddDistributedFunc_NoRedis(t *testing.T) {
 
 	time.Sleep(1100 * time.Millisecond)
 
-	if !executed {
+	if !executed.Load() {
 		t.Error("Expected job to be executed even without Redis")
 	}
 }
