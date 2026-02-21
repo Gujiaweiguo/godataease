@@ -11,6 +11,8 @@ import (
 	"dataease/backend/internal/domain/user"
 )
 
+func strPtrUser(v string) *string { return &v }
+
 func TestUserRepository_CreateAndGetByID(t *testing.T) {
 	if testDB == nil {
 		t.Skip("Test database not available")
@@ -22,11 +24,11 @@ func TestUserRepository_CreateAndGetByID(t *testing.T) {
 	u := &user.SysUser{
 		Username:   "testuser",
 		NickName:   "Test User",
-		Email:      "test@example.com",
-		Phone:      "13800138000",
+		Email:      strPtrUser("test@example.com"),
+		Phone:      strPtrUser("13800138000"),
 		Status:     1,
 		DelFlag:    user.DelFlagNormal,
-		CreateTime: time.Now().Unix(),
+		CreateTime: time.Now(),
 	}
 
 	err := repo.Create(u)
@@ -61,7 +63,7 @@ func TestUserRepository_GetByUsername(t *testing.T) {
 		NickName:   "Unique User",
 		Status:     1,
 		DelFlag:    user.DelFlagNormal,
-		CreateTime: time.Now().Unix(),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(u)
 
@@ -88,7 +90,7 @@ func TestUserRepository_Delete(t *testing.T) {
 		NickName:   "Delete User",
 		Status:     1,
 		DelFlag:    user.DelFlagNormal,
-		CreateTime: time.Now().Unix(),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(u)
 
@@ -116,7 +118,7 @@ func TestUserRepository_Update(t *testing.T) {
 		NickName:   "Update User",
 		Status:     1,
 		DelFlag:    user.DelFlagNormal,
-		CreateTime: time.Now().Unix(),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(u)
 
@@ -146,7 +148,7 @@ func TestUserRepository_Query(t *testing.T) {
 			NickName:   fmt.Sprintf("Query User %d", i),
 			Status:     1,
 			DelFlag:    user.DelFlagNormal,
-			CreateTime: time.Now().Unix(),
+			CreateTime: time.Now(),
 		}
 		_ = repo.Create(u)
 	}
@@ -184,7 +186,7 @@ func TestUserRepository_CountByUsername(t *testing.T) {
 		NickName:   "Count User",
 		Status:     1,
 		DelFlag:    user.DelFlagNormal,
-		CreateTime: time.Now().Unix(),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(u)
 
@@ -209,10 +211,10 @@ func TestUserRepository_CheckEmailExists(t *testing.T) {
 	u := &user.SysUser{
 		Username:   "emailuser",
 		NickName:   "Email User",
-		Email:      "exists@example.com",
+		Email:      strPtrUser("exists@example.com"),
 		Status:     1,
 		DelFlag:    user.DelFlagNormal,
-		CreateTime: time.Now().Unix(),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(u)
 
@@ -246,7 +248,7 @@ func TestUserRepository_ListUsersByIds(t *testing.T) {
 			NickName:   fmt.Sprintf("List User %d", i),
 			Status:     1,
 			DelFlag:    user.DelFlagNormal,
-			CreateTime: time.Now().Unix(),
+			CreateTime: time.Now(),
 		}
 		_ = repo.Create(u)
 		ids = append(ids, u.UserID)

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"regexp"
 	"strings"
@@ -163,20 +164,28 @@ func (r *DatasourceRepository) ListTables(datasourceID int64) ([]datasource.Tabl
 }
 
 func (r *DatasourceRepository) ListSchemas() ([]string, error) {
-	type schemaRow struct {
-		SchemaName string `gorm:"column:schema_name"`
-	}
-	rows := make([]schemaRow, 0)
-	if err := r.db.Raw("SELECT schema_name FROM information_schema.schemata ORDER BY schema_name ASC").Scan(&rows).Error; err != nil {
+	rows, err := r.db.Raw("SELECT schema_name FROM information_schema.schemata ORDER BY schema_name ASC").Rows()
+	if err != nil {
 		return nil, err
 	}
-	result := make([]string, 0, len(rows))
-	for _, row := range rows {
-		if strings.TrimSpace(row.SchemaName) == "" {
+	defer rows.Close()
+
+	result := make([]string, 0)
+	for rows.Next() {
+		var schemaName sql.NullString
+		if err := rows.Scan(&schemaName); err != nil {
+			return nil, err
+		}
+		if !schemaName.Valid || strings.TrimSpace(schemaName.String) == "" {
 			continue
 		}
-		result = append(result, row.SchemaName)
+		result = append(result, schemaName.String)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return result, nil
 }
 

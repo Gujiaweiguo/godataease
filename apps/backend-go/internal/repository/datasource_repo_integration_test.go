@@ -184,6 +184,7 @@ func TestDatasourceRepository_CountByNameAndPID(t *testing.T) {
 	ds := &datasource.CoreDatasource{
 		Name:       "Unique Name",
 		Type:       "mysql",
+		PID:        int64Ptr(0),
 		CreateTime: int64Ptr(time.Now().Unix()),
 	}
 	_ = repo.Create(ds)

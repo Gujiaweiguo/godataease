@@ -11,6 +11,8 @@ import (
 	"dataease/backend/internal/domain/role"
 )
 
+func ptrTimeRole(t time.Time) *time.Time { return &t }
+
 func TestRoleRepository_CreateAndGetByID(t *testing.T) {
 	if testDB == nil {
 		t.Skip("Test database not available")
@@ -23,7 +25,7 @@ func TestRoleRepository_CreateAndGetByID(t *testing.T) {
 		RoleName:   "Test Role",
 		RoleCode:   "ROLE_TEST",
 		Status:     role.StatusEnabled,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: ptrTimeRole(time.Now()),
 	}
 
 	err := repo.Create(r)
@@ -57,7 +59,7 @@ func TestRoleRepository_Update(t *testing.T) {
 		RoleName:   "Update Role",
 		RoleCode:   "ROLE_UPDATE",
 		Status:     role.StatusEnabled,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: ptrTimeRole(time.Now()),
 	}
 	_ = repo.Create(r)
 
@@ -85,7 +87,7 @@ func TestRoleRepository_Delete(t *testing.T) {
 		RoleName:   "Delete Role",
 		RoleCode:   "ROLE_DELETE",
 		Status:     role.StatusEnabled,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: ptrTimeRole(time.Now()),
 	}
 	_ = repo.Create(r)
 
@@ -113,7 +115,7 @@ func TestRoleRepository_Query(t *testing.T) {
 			RoleName:   fmt.Sprintf("Query Role %d", i),
 			RoleCode:   fmt.Sprintf("ROLE_QUERY_%d", i),
 			Status:     role.StatusEnabled,
-			CreateTime: ptrTime(time.Now()),
+			CreateTime: ptrTimeRole(time.Now()),
 		}
 		_ = repo.Create(r)
 	}
@@ -145,7 +147,7 @@ func TestRoleRepository_CountByRoleCode(t *testing.T) {
 		RoleName:   "Count Role",
 		RoleCode:   "ROLE_COUNT",
 		Status:     role.StatusEnabled,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: ptrTimeRole(time.Now()),
 	}
 	_ = repo.Create(r)
 
@@ -162,8 +164,4 @@ func TestRoleRepository_CountByRoleCode(t *testing.T) {
 	if count != 0 {
 		t.Errorf("Expected count 0, got %d", count)
 	}
-}
-
-func ptrTime(t time.Time) *time.Time {
-	return &t
 }

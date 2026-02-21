@@ -67,6 +67,8 @@ func TestMain(m *testing.M) {
 		&audit.AuditLog{}, &audit.AuditLogDetail{}, &audit.LoginFailure{},
 		&permission.SysPerm{},
 		&visualization.DataVisualizationInfo{},
+		&coreShare{}, &coreShareTicket{},
+		&coreVisualizationTemplate{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}

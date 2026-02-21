@@ -23,7 +23,7 @@ func TestOrgRepository_CreateAndGetByID(t *testing.T) {
 		OrgName:    "Test Org",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 
 	err := repo.Create(o)
@@ -57,7 +57,7 @@ func TestOrgRepository_GetByName(t *testing.T) {
 		OrgName:    "Unique Org",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(o)
 
@@ -83,7 +83,7 @@ func TestOrgRepository_Update(t *testing.T) {
 		OrgName:    "Update Org",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(o)
 
@@ -111,7 +111,7 @@ func TestOrgRepository_Delete(t *testing.T) {
 		OrgName:    "Delete Org",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(o)
 
@@ -139,7 +139,7 @@ func TestOrgRepository_List(t *testing.T) {
 			OrgName:    fmt.Sprintf("List Org %d", i),
 			Level:      i,
 			DelFlag:    org.DelFlagNormal,
-			CreateTime: ptrTime(time.Now()),
+			CreateTime: time.Now(),
 		}
 		_ = repo.Create(o)
 	}
@@ -166,17 +166,17 @@ func TestOrgRepository_ListByParentID(t *testing.T) {
 		OrgName:    "Parent Org",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(parent)
 
 	for i := 1; i <= 2; i++ {
 		child := &org.SysOrg{
 			OrgName:    fmt.Sprintf("Child Org %d", i),
-			ParentID:   &parent.OrgID,
+			ParentID:   parent.OrgID,
 			Level:      2,
 			DelFlag:    org.DelFlagNormal,
-			CreateTime: ptrTime(time.Now()),
+			CreateTime: time.Now(),
 		}
 		_ = repo.Create(child)
 	}
@@ -203,7 +203,7 @@ func TestOrgRepository_CheckNameExists(t *testing.T) {
 		OrgName:    "Existing Org",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(o)
 
@@ -234,17 +234,17 @@ func TestOrgRepository_CountChildren(t *testing.T) {
 		OrgName:    "Parent",
 		Level:      1,
 		DelFlag:    org.DelFlagNormal,
-		CreateTime: ptrTime(time.Now()),
+		CreateTime: time.Now(),
 	}
 	_ = repo.Create(parent)
 
 	for i := 1; i <= 3; i++ {
 		child := &org.SysOrg{
 			OrgName:    fmt.Sprintf("Child %d", i),
-			ParentID:   &parent.OrgID,
+			ParentID:   parent.OrgID,
 			Level:      2,
 			DelFlag:    org.DelFlagNormal,
-			CreateTime: ptrTime(time.Now()),
+			CreateTime: time.Now(),
 		}
 		_ = repo.Create(child)
 	}
@@ -273,7 +273,7 @@ func TestOrgRepository_GetByIDs(t *testing.T) {
 			OrgName:    fmt.Sprintf("GetByIDs Org %d", i),
 			Level:      1,
 			DelFlag:    org.DelFlagNormal,
-			CreateTime: ptrTime(time.Now()),
+			CreateTime: time.Now(),
 		}
 		_ = repo.Create(o)
 		ids = append(ids, o.OrgID)

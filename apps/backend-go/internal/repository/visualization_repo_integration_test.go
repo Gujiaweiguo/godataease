@@ -179,6 +179,9 @@ func TestVisualizationRepository_Query(t *testing.T) {
 	if total2 != 2 {
 		t.Errorf("Expected total 2 for screen type, got %d", total2)
 	}
+	if len(list2) != 2 {
+		t.Errorf("Expected 2 items for screen type, got %d", len(list2))
+	}
 }
 
 func TestVisualizationRepository_QueryPagination(t *testing.T) {
