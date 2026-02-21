@@ -10,13 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
+	"dataease/backend/internal/domain/visualization"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -61,6 +64,9 @@ func TestMain(m *testing.M) {
 		&datasource.CoreDatasource{},
 		&chart.CoreChartView{},
 		&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{},
+		&audit.AuditLog{}, &audit.AuditLogDetail{}, &audit.LoginFailure{},
+		&permission.SysPerm{},
+		&visualization.DataVisualizationInfo{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
