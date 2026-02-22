@@ -1,18 +1,60 @@
-# Vue 3 + TypeScript + Vite
+# DataEase Frontend
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+DataEase 前端主工程，基于 Vue 3 + TypeScript + Vite，负责仪表板、数据集、数据源、系统管理等核心页面。
 
-## Recommended IDE Setup
+## 环境要求
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+- Node.js 18+
 
-## Type Support For `.vue` Imports in TS
+## 本地开发
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
+```bash
+cd apps/frontend
+npm install
+npm run dev
+```
 
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
+默认开发地址：`http://localhost:8080`
 
-1. Disable the built-in TypeScript Extension
-   1. Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-   2. Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+## 构建
+
+```bash
+# 基础构建（默认）
+npm run build:base
+
+# 分布式构建
+npm run build:distributed
+
+# 库模式构建
+npm run build:lib
+```
+
+## 质量检查
+
+```bash
+# ESLint
+npm run lint
+
+# Stylelint
+npm run lint:stylelint
+
+# TypeScript 类型检查
+npm run ts:check
+```
+
+说明：当前仓库没有统一的 `npm test` 脚本，通常以 `lint + ts:check` 作为前端改动的基础质量门禁。
+
+## 关键目录
+
+- `src/views/`: 页面视图
+- `src/components/`: 通用组件
+- `src/api/`: API 封装
+- `src/store/`: Pinia 状态管理
+- `src/router/`: 路由配置
+- `src/utils/`: 工具函数
+
+## 开发约定
+
+- 推荐使用 `<script setup lang="ts">`
+- 遵循仓库内 ESLint / Prettier / Stylelint 规范
+- 优先使用 `@/*` 别名导入 `src/*`

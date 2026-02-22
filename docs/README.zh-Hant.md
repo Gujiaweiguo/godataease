@@ -47,11 +47,14 @@ DataEase 是開源的 BI 工具，幫助用戶快速分析數據並洞察業務�
 ## 快速開始（原始碼安裝）
 
 ### 環境需求
-- Java: JDK 21+
+- Go: 1.24+
 - Node.js: 18+
-- Maven: 3.8+
 - MySQL: 8.0+
 - Redis: 7.0+
+
+說明：
+- 主線後端為 Go（`apps/backend-go`）。
+- Java 後端為歷史唯讀備份（`legacy/backend-java`），僅用於應急/對照。
 
 ### 本機開發
 
@@ -67,11 +70,14 @@ make build
 # 編譯前端
 cd ../frontend
 npm install
-npm run dev  # 造訪 http://localhost:5173
+npm run dev  # 造訪 http://localhost:8080
 
 # 啟動後端（需先設定資料庫）
 cd ../backend-go
-make run  # API 造訪 http://localhost:8080
+make run  # API 埠由 apps/backend-go/configs/config.yaml 決定
+
+# 使用本機 MySQL/Redis（localhost）
+make run-local
 
 # Java 後端為歷史唯讀備份
 # 應急操作請參考 legacy/README-READONLY.md

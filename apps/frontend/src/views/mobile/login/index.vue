@@ -120,10 +120,8 @@ const onSubmit = async () => {
   }
   const name = username.value.trim()
   const pwd = password.value
-  if (!wsCache.get(appStore.getDekey)) {
-    const res = await queryDekey()
-    wsCache.set(appStore.getDekey, res.data)
-  }
+  const res = await queryDekey()
+  wsCache.set(appStore.getDekey, res.data)
   const isLdap = loginType.value === 'ldap'
   const param = {
     name: rsaEncryp(name),

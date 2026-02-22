@@ -21,7 +21,7 @@ DataEase 是开源的 BI（商业智能）工具，支持通过拖拽方式制�
 - **路由**: Vue Router 4
 
 ### 后端（Go 主线）
-- **框架**: Go 1.21+
+- **框架**: Go 1.24+
 - **HTTP**: Gin
 - **ORM**: GORM
 - **缓存**: Redis
@@ -87,14 +87,16 @@ godataease/
 ### 2. 启动方式（Docker Compose）
 
 ```bash
-# 启动 Redis + MySQL + DataEase
-cd infra/compose
-docker compose up -d
+# 在项目根目录启动服务
+docker network create my-net
+docker compose -f infra/compose/docker-compose.yml up -d --build
 
 # 访问地址
 # 前端: http://localhost:8080
 # 后端 API: http://localhost:8080/api
 ```
+
+说明：当前 `infra/compose/docker-compose.yml` 启动 `dataease-app + redis`，MySQL 需要提前可用，且可在 `my-net` 网络中通过 `mysql8:3306` 访问。
 
 ### 3. 前端开发模式
 
@@ -107,7 +109,7 @@ npm install
 # 启动开发服务器
 npm run dev
 
-# 访问: http://localhost:5173
+# 访问: http://localhost:8080
 ```
 
 ### 4. Go 后端开发模式
@@ -121,9 +123,14 @@ go mod tidy
 # 运行
 make run
 
+# 本机 MySQL/Redis（localhost）
+make run-local
+
 # 或直接运行
 go run ./cmd/api
 ```
+
+提示：本地运行端口由 `apps/backend-go/configs/config.yaml` 的 `server.port` 控制（当前仓库默认值为 `8100`）。
 
 ### 5. Java 后端开发模式（仅参考）
 

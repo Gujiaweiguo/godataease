@@ -156,6 +156,30 @@ func (h *TemplateHandler) SearchTemplates(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *TemplateHandler) SearchTemplateMarket(c *gin.Context) {
+	response.Success(c, map[string]interface{}{
+		"baseUrl":    "",
+		"contents":   []interface{}{},
+		"categories": []interface{}{},
+	})
+}
+
+func (h *TemplateHandler) SearchTemplateMarketRecommend(c *gin.Context) {
+	response.Success(c, map[string]interface{}{
+		"baseUrl":    "",
+		"contents":   []interface{}{},
+		"categories": []interface{}{},
+	})
+}
+
+func (h *TemplateHandler) SearchTemplateMarketPreview(c *gin.Context) {
+	response.Success(c, map[string]interface{}{
+		"baseUrl":    "",
+		"contents":   []interface{}{},
+		"categories": []interface{}{},
+	})
+}
+
 func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 	// Original Go routes
 	group := r.Group("/template")
@@ -181,8 +205,11 @@ func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 	// Java-compatible aliases: /templateMarket/*
 	templateMarket := r.Group("/templateMarket")
 	{
-		templateMarket.GET("/search", h.SearchTemplates) // GET search alias
-		templateMarket.GET("/searchTemplate", h.SearchTemplates)
+		templateMarket.GET("/search", h.SearchTemplateMarket)
+		templateMarket.GET("/searchTemplate", h.SearchTemplateMarket)
+		templateMarket.GET("/searchRecommend", h.SearchTemplateMarketRecommend)
+		templateMarket.GET("/searchPreview", h.SearchTemplateMarketPreview)
 		templateMarket.GET("/categories", h.ListCategories) // stub - returns empty array
+		templateMarket.GET("/categoriesObject", h.ListCategories)
 	}
 }

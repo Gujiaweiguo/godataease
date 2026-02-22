@@ -2,13 +2,13 @@ export default {
   server: {
     proxy: {
       '/api/f': {
-        target: 'http://localhost:8100',
+        target: 'http://localhost:8088',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api\/f/, '')
       },
       // 使用 proxy 实例
       '/api': {
-        target: 'http://localhost:8100',
+        target: 'http://localhost:8088',
         changeOrigin: true,
         rewrite: path => path
       }

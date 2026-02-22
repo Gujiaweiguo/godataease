@@ -57,7 +57,7 @@ const getTimeOut = () => {
       if (xhr.responseText) {
         try {
           const response = JSON.parse(xhr.responseText)
-          if (response.code === 0) {
+          if (response.code === 0 || response.code === '000000') {
             time = response.data
           } else {
             ElMessage.error('系统异常，请联系管理员')

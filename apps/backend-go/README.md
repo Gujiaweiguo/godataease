@@ -20,3 +20,15 @@ make build
 ```bash
 make run
 ```
+
+For local MySQL/Redis on `localhost`, use:
+
+```bash
+make run-local
+```
+
+You can also override hosts/ports explicitly:
+
+```bash
+DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 REDIS_HOST=127.0.0.1 REDIS_PORT=6379 make run-local
+```

@@ -1,7 +1,10 @@
-.PHONY: build test lint run clean fmt vet test-integration
+.PHONY: build test lint run run-local clean fmt vet test-integration
 
 # Go parameters
-GOCMD=go
+GOCMD?=$(shell command -v go 2>/dev/null)
+ifeq ($(strip $(GOCMD)),)
+$(error go command not found in PATH)
+endif
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
@@ -46,6 +49,14 @@ fmt:
 
 # Run
 run:
+	$(GOBUILD) -o $(BINARY_NAME) $(MAIN_PACKAGE) && ./$(BINARY_NAME)
+
+# Run with local service defaults
+run-local:
+	DATABASE_HOST=$(or $(DATABASE_HOST),localhost) \
+	DATABASE_PORT=$(or $(DATABASE_PORT),3306) \
+	REDIS_HOST=$(or $(REDIS_HOST),localhost) \
+	REDIS_PORT=$(or $(REDIS_PORT),6379) \
 	$(GOBUILD) -o $(BINARY_NAME) $(MAIN_PACKAGE) && ./$(BINARY_NAME)
 
 # Clean

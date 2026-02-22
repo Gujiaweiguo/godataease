@@ -68,8 +68,11 @@ func LoadConfig() (*Config, error) {
 	viper.AddConfigPath(configPath)
 	viper.AddConfigPath("./configs")
 
-	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+	if err := bindEnvKeys(); err != nil {
+		return nil, err
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -85,6 +88,39 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func bindEnvKeys() error {
+	keys := map[string]string{
+		"server.port":             "SERVER_PORT",
+		"server.mode":             "SERVER_MODE",
+		"database.host":           "DATABASE_HOST",
+		"database.port":           "DATABASE_PORT",
+		"database.name":           "DATABASE_NAME",
+		"database.user":           "DATABASE_USER",
+		"database.password":       "DATABASE_PASSWORD",
+		"database.max_open_conns": "DATABASE_MAX_OPEN_CONNS",
+		"database.max_idle_conns": "DATABASE_MAX_IDLE_CONNS",
+		"redis.host":              "REDIS_HOST",
+		"redis.port":              "REDIS_PORT",
+		"redis.password":          "REDIS_PASSWORD",
+		"redis.db":                "REDIS_DB",
+		"redis.pool_size":         "REDIS_POOL_SIZE",
+		"jwt.secret":              "JWT_SECRET",
+		"jwt.expire":              "JWT_EXPIRE",
+		"log.level":               "LOG_LEVEL",
+		"log.format":              "LOG_FORMAT",
+		"telemetry.enabled":       "TELEMETRY_ENABLED",
+		"telemetry.endpoint":      "TELEMETRY_ENDPOINT",
+	}
+
+	for key, envName := range keys {
+		if err := viper.BindEnv(key, envName); err != nil {
+			return fmt.Errorf("failed to bind env %s for key %s: %w", envName, key, err)
+		}
+	}
+
+	return nil
 }
 
 func validateConfig(config *Config) error {

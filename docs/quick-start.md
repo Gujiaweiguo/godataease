@@ -26,12 +26,15 @@ npm install
 
 # 启动前端开发服务器
 npm run dev
-# 访问 http://localhost:5173
+# 访问 http://localhost:8080
 
 # 启动后端（需要配置数据库连接）
 cd ../backend-go
 make run
-# API 访问 http://localhost:8080
+# API 端口由 apps/backend-go/configs/config.yaml 的 server.port 决定
+
+# 本机 MySQL/Redis（localhost）可用时
+make run-local
 
 # Java 后端仅为只读备份（应急场景）
 # 参考 legacy/README-READONLY.md
@@ -40,25 +43,26 @@ make run
 ### 3. 容器部署（Docker Compose）
 
 ```bash
-# 在项目根目录启动
+# 在项目根目录启动（首次需要创建外部网络）
+docker network create my-net
 docker compose -f infra/compose/docker-compose.yml up -d --build
 ```
 
-如需自定义数据库信息，请在 `infra/compose` 下创建 `.env`（可从 `.env.example` 复制）：
+如需自定义端口与数据库账号，请在项目根目录创建 `.env`：
 
 ```env
 SERVER_PORT=8080
-DB_HOST=mysql
 DB_PORT=3306
-DB_NAME=dataease10
+DB_NAME=dataease_dev
 DB_USER=root
 DB_PASSWORD=your-password
-MYSQL_PORT=3306
-REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=
-REDIS_EXTERNAL_PORT=6379
+REDIS_EXTERNAL_PORT=16379
 ```
+
+说明：当前开发编排默认启动 `dataease-app + redis`，MySQL 需提前可用，并且在 `my-net` 网络里可通过主机名 `mysql8` 访问。
+若你的 MySQL 主机名不是 `mysql8`，请调整 `infra/compose/docker-compose.yml` 中 `dataease-app.environment.DATABASE_HOST`。
 
 服务启动后访问：`http://localhost:8080`
 
@@ -218,9 +222,9 @@ npm run ts:check             # TypeScript 类型检查
 
 1. **后端启动失败**
    ```bash
-   # 检查数据库连接
-   # 确认 MySQL 和 Redis 已启动
-   # 检查 application.yml 中的数据库配置
+   # 检查 apps/backend-go/configs/config.yaml 数据库配置
+   # 检查 MySQL/Redis 是否可达
+   # 检查端口占用（默认读取 server.port）
    ```
 
 2. **前端编译错误**
@@ -232,8 +236,8 @@ npm run ts:check             # TypeScript 类型检查
 
 3. **数据库迁移失败**
    ```bash
-   # 检查 Flyway 版本历史
-   mvn flyway:info
+   # 检查数据库连接和权限
+   # 确认初始化 SQL/迁移脚本已正确执行
    ```
 
 4. **权限问题**
