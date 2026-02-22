@@ -1,10 +1,8 @@
-import { onBeforeUnmount, onMounted, type Ref } from 'vue'
-import { useEmbedded } from '@/store/modules/embedded'
+import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import { useTokenManager } from '@/services/TokenManager'
 import type { TokenValidationResult } from '@/services/TokenManager'
 
 export function useTokenLifecycle() {
-  const embeddedStore = useEmbedded()
   const tokenManager = useTokenManager()
   const tokenValidationResult: Ref<TokenValidationResult | null> = ref(null)
   const isInitialized = ref(false)
@@ -38,11 +36,12 @@ export function useTokenLifecycle() {
    * Refresh token if needed.
    */
   const refresh = async (origin: string) => {
-    const needsRefreshCheck = tokenManager.needsRefresh(origin)
+    void origin
+    const needsRefreshCheck = tokenManager.needsRefresh()
 
     if (needsRefreshCheck) {
       lastRefreshTime.value = Date.now()
-      const success = await tokenManager.refreshToken(origin)
+      const success = await tokenManager.refreshToken()
 
       if (!success) {
         console.warn('Token refresh failed')
@@ -70,7 +69,8 @@ export function useTokenLifecycle() {
    * Check if token needs refresh.
    */
   const needsRefresh = (origin: string): boolean => {
-    return tokenManager.needsRefresh(origin)
+    void origin
+    return tokenManager.needsRefresh()
   }
 
   /**
@@ -85,8 +85,7 @@ export function useTokenLifecycle() {
    */
   onMounted(() => {
     const refreshCheckInterval = setInterval(() => {
-      const origin = window.location.origin
-      const needsRefreshCheck = tokenManager.needsRefresh(origin)
+      const needsRefreshCheck = tokenManager.needsRefresh()
       const tokenInfo = tokenManager.getCurrentTokenInfo()
 
       if (needsRefreshCheck && tokenInfo?.expiryTime) {

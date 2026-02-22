@@ -106,20 +106,20 @@ describe('TokenManager', () => {
 
   describe('validateToken', () => {
     it('should validate non-empty token', async () => {
-      const result = await tokenManager.validateToken('valid-token', 'https://example.com')
+      const result = await tokenManager.validateToken('valid-token')
 
       expect(result.isValid).toBe(true)
     })
 
     it('should reject empty token', async () => {
-      const result = await tokenManager.validateToken('', 'https://example.com')
+      const result = await tokenManager.validateToken('')
 
       expect(result.isValid).toBe(false)
       expect(result.error).toBe('Token is empty')
     })
 
     it('should reject null token', async () => {
-      const result = await tokenManager.validateToken(null as any, 'https://example.com')
+      const result = await tokenManager.validateToken(null as any)
 
       expect(result.isValid).toBe(false)
       expect(result.error).toBe('Token is empty')
@@ -132,7 +132,7 @@ describe('TokenManager', () => {
       const signature = 'signature'
       const jwtToken = `${header}.${payload}.${signature}`
 
-      const result = await tokenManager.validateToken(jwtToken, 'https://example.com')
+      const result = await tokenManager.validateToken(jwtToken)
 
       expect(result.isValid).toBe(true)
       expect(result.expiryTime).toBe(expTime)
@@ -145,21 +145,21 @@ describe('TokenManager', () => {
       const signature = 'signature'
       const jwtToken = `${header}.${payload}.${signature}`
 
-      const result = await tokenManager.validateToken(jwtToken, 'https://example.com')
+      const result = await tokenManager.validateToken(jwtToken)
 
       expect(result.isValid).toBe(false)
       expect(result.error).toBe('Token has expired')
     })
 
     it('should handle non-JWT tokens gracefully', async () => {
-      const result = await tokenManager.validateToken('simple-token', 'https://example.com')
+      const result = await tokenManager.validateToken('simple-token')
 
       expect(result.isValid).toBe(true)
       expect(result.expiryTime).toBeUndefined()
     })
 
     it('should handle malformed tokens gracefully', async () => {
-      const result = await tokenManager.validateToken('invalid..token', 'https://example.com')
+      const result = await tokenManager.validateToken('invalid..token')
 
       expect(result.isValid).toBe(true)
       expect(result.expiryTime).toBeUndefined()
@@ -167,8 +167,6 @@ describe('TokenManager', () => {
   })
 
   describe('refreshToken', () => {
-    const mockOrigin = 'https://example.com'
-
     beforeEach(() => {
       vi.mocked(embeddedGetTokenArgsApi).mockResolvedValue({
         data: {
@@ -179,7 +177,7 @@ describe('TokenManager', () => {
     })
 
     it('should refresh token successfully', async () => {
-      const success = await tokenManager.refreshToken(mockOrigin)
+      const success = await tokenManager.refreshToken()
 
       expect(success).toBe(true)
       expect(mockEmbeddedStore.setToken).toHaveBeenCalledWith('new-refreshed-token')
@@ -187,7 +185,7 @@ describe('TokenManager', () => {
     })
 
     it('should update token info after refresh', async () => {
-      await tokenManager.refreshToken(mockOrigin)
+      await tokenManager.refreshToken()
 
       const tokenInfo = tokenManager.getCurrentTokenInfo()
       expect(tokenInfo?.token).toBe('new-refreshed-token')
@@ -196,7 +194,7 @@ describe('TokenManager', () => {
     it('should handle refresh failure gracefully', async () => {
       vi.mocked(embeddedGetTokenArgsApi).mockRejectedValue(new Error('Refresh failed'))
 
-      const success = await tokenManager.refreshToken(mockOrigin)
+      const success = await tokenManager.refreshToken()
 
       expect(success).toBe(false)
     })
@@ -206,7 +204,7 @@ describe('TokenManager', () => {
         data: {}
       })
 
-      const success = await tokenManager.refreshToken(mockOrigin)
+      const success = await tokenManager.refreshToken()
 
       expect(success).toBe(false)
     })
@@ -262,7 +260,7 @@ describe('TokenManager', () => {
     it('should return true if no token info', () => {
       mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map())
 
-      const needsRefresh = tokenManager.needsRefresh('https://example.com')
+      const needsRefresh = tokenManager.needsRefresh()
 
       expect(needsRefresh).toBe(true)
     })
@@ -273,7 +271,7 @@ describe('TokenManager', () => {
         () => new Map([['current', { token: 'test-token', expiryTime: expiredTime }]])
       )
 
-      const needsRefresh = tokenManager.needsRefresh('https://example.com')
+      const needsRefresh = tokenManager.needsRefresh()
 
       expect(needsRefresh).toBe(true)
     })
@@ -284,7 +282,7 @@ describe('TokenManager', () => {
         () => new Map([['current', { token: 'test-token', expiryTime: futureTime }]])
       )
 
-      const needsRefresh = tokenManager.needsRefresh('https://example.com')
+      const needsRefresh = tokenManager.needsRefresh()
 
       expect(needsRefresh).toBe(false)
     })
@@ -292,7 +290,7 @@ describe('TokenManager', () => {
     it('should return true if expiry time is undefined', () => {
       mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token' }]]))
 
-      const needsRefresh = tokenManager.needsRefresh('https://example.com')
+      const needsRefresh = tokenManager.needsRefresh()
 
       expect(needsRefresh).toBe(true)
     })

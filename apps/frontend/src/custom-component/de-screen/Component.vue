@@ -172,7 +172,7 @@ import PreviewCanvas from '@/views/data-visualization/PreviewCanvas.vue'
 import SelectScreenDialog from '@/custom-component/de-screen/SelectScreenDialog.vue'
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
-const { tabMoveInActiveId, bashMatrixInfo, editMode, mobileInPc } = storeToRefs(dvMainStore)
+const { bashMatrixInfo, editMode, mobileInPc } = storeToRefs(dvMainStore)
 const tabComponentRef = ref(null)
 let carouselTimer = null
 const { t } = useI18n()
@@ -225,16 +225,7 @@ const props = defineProps({
     default: 'inherit'
   }
 })
-const {
-  element,
-  isEdit,
-  showPosition,
-  canvasStyleData,
-  canvasViewInfo,
-  dvInfo,
-  scale,
-  searchCount
-} = toRefs(props)
+const { element, isEdit, showPosition, dvInfo, scale } = toRefs(props)
 
 const screenType =
   dvInfo.value.type === 'dataV' ? t('work_branch.big_data_screen') : t('work_branch.dashboard')
@@ -340,12 +331,6 @@ const beforeHandleCommand = (item, param) => {
     param: param
   }
 }
-const curPreviewGap = computed(() =>
-  dvInfo.value.type === 'dashboard' && canvasStyleData.value['dashboard'].gap === 'yes'
-    ? canvasStyleData.value['dashboard'].gapSize
-    : 0
-)
-
 function sureCurTitle() {
   state.curItem.title = state.textarea
   state.dialogVisible = false
@@ -492,10 +477,6 @@ const addToMain = component => {
     isFromGroup: true
   })
 }
-
-const moveActive = computed(() => {
-  return tabMoveInActiveId.value && tabMoveInActiveId.value === element.value.id
-})
 
 const headClass = computed(() => {
   if (tabsAreaScroll.value) {

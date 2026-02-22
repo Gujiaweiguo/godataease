@@ -54,7 +54,7 @@ export class TokenManager {
       }
     }
 
-    const validation = await this.validateToken(token, origin)
+    const validation = await this.validateToken(token)
     if (!validation.isValid) {
       return validation
     }
@@ -80,7 +80,7 @@ export class TokenManager {
     return validation
   }
 
-  async validateToken(token: string, origin: string): Promise<TokenValidationResult> {
+  async validateToken(token: string): Promise<TokenValidationResult> {
     try {
       if (!token || token.length === 0) {
         return {
@@ -125,7 +125,7 @@ export class TokenManager {
     }
   }
 
-  async refreshToken(origin: string): Promise<boolean> {
+  async refreshToken(): Promise<boolean> {
     try {
       const tokenArgs = await embeddedGetTokenArgsApi()
       if (tokenArgs?.data?.token) {
@@ -136,7 +136,7 @@ export class TokenManager {
           this.embeddedStore.setAllowedOrigins(tokenArgs.data.allowedOrigins)
         }
 
-        const validation = await this.validateToken(newToken, origin)
+        const validation = await this.validateToken(newToken)
         this.embeddedStore.setTokenInfo(
           new Map([
             [
@@ -164,7 +164,7 @@ export class TokenManager {
     this.stopAutoRefresh()
 
     this.refreshIntervalId = window.setInterval(() => {
-      this.refreshToken(window.location.origin)
+      this.refreshToken()
     }, this.REFRESH_INTERVAL_MS)
   }
 
@@ -183,11 +183,20 @@ export class TokenManager {
   }
 
   getCurrentTokenInfo(): TokenInfo | undefined {
-    const tokenInfoMap = this.embeddedStore.getTokenInfo()
-    return tokenInfoMap?.get('current')
+    const tokenInfoMap = this.embeddedStore.getTokenInfo
+    const currentTokenInfo = tokenInfoMap?.get('current')
+    if (
+      !currentTokenInfo ||
+      typeof currentTokenInfo !== 'object' ||
+      !('token' in currentTokenInfo)
+    ) {
+      return undefined
+    }
+
+    return currentTokenInfo as TokenInfo
   }
 
-  needsRefresh(origin: string): boolean {
+  needsRefresh(): boolean {
     const tokenInfo = this.getCurrentTokenInfo()
 
     if (!tokenInfo) {
