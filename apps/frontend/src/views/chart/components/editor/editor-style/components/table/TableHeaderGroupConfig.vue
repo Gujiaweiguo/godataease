@@ -12,7 +12,6 @@ import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { formatterItem, valueFormatter } from '@/views/chart/components/js/formatter'
 import {
   BaseTooltip,
-  ColumnNode,
   S2DataConfig,
   S2Event,
   S2Options,
@@ -20,7 +19,10 @@ import {
   TooltipShowOptions,
   ColCell,
   Node,
-  LayoutResult
+  LayoutResult,
+  type Meta,
+  type ViewMeta,
+  type S2CellType
 } from '@antv/s2'
 import { ElMessageBox } from 'element-plus-secondary'
 import { cloneDeep, debounce, isEqual, isNumber } from 'lodash-es'
@@ -112,7 +114,7 @@ const renderTable = (chart: ChartObj) => {
     realData = data.tableRow.slice(0, 10)
   }
   const { headerGroupConfig } = chart.customAttr.tableHeader
-  const meta = [...headerGroupConfig.meta]
+  const meta: Meta[] = [...headerGroupConfig.meta]
   const columns = headerGroupConfig.columns
   const axisMap = allAxis.value.reduce((pre, cur) => {
     pre[cur.dataeaseName] = cur
@@ -205,10 +207,10 @@ const renderTable = (chart: ChartObj) => {
   s2.on(S2Event.COL_CELL_CONTEXT_MENU, e => {
     e.preventDefault()
     const curColumns = s2.dataCfg.fields.columns as Array<ColumnNode>
-    const curMeta = s2.dataCfg.meta
+    const curMeta: Meta[] = s2.dataCfg.meta
     const activeCells = s2.interaction.getActiveCells()
     const colKeys = activeCells?.map(cell => cell.getMeta().field)
-    const activeColumns = getColumns(colKeys, curColumns)
+    const activeColumns = getColumns(colKeys, curColumns as unknown as Array<ColumnNode>)
     const curCell = s2.getCell(e.target)
     groupMenuContainer.innerText = ''
     // 右键点击的目标单元格不在已选的单元格中，清空已选单元格，隐藏菜单
@@ -229,10 +231,13 @@ const renderTable = (chart: ChartObj) => {
       cancelBtn.innerText = t('chart.cancel_group')
       cancelBtn.onclick = () => {
         s2.hideTooltip()
-        const parent = curCell.getMeta().parent
+        const parent = curCell.getMeta().parent as Node
         if (parent?.id === 'root') {
           const startIndex = curColumns.findIndex(cell => cell.key === curCell.getMeta().field)
-          const [curCol] = getColumns([curCell.getMeta().field], curColumns)
+          const [curCol] = getColumns(
+            [curCell.getMeta().field],
+            curColumns as unknown as Array<ColumnNode>
+          )
           curColumns.splice(startIndex, 1, ...curCol.children)
           const index = curMeta.findIndex(meta => meta.field === curCell.getMeta().field)
           curMeta.splice(index, 1)
@@ -244,12 +249,18 @@ const renderTable = (chart: ChartObj) => {
           })
           s2.render(true)
         } else {
-          const [parentColumn] = getColumns([parent.field], curColumns)
+          const [parentColumn] = getColumns(
+            [parent.field],
+            curColumns as unknown as Array<ColumnNode>
+          )
           if (parentColumn) {
             const startIndex = parentColumn.children?.findIndex(
               cell => cell.key === curCell.getMeta().field
             )
-            const [curCol] = getColumns([curCell.getMeta().field], parentColumn.children)
+            const [curCol] = getColumns(
+              [curCell.getMeta().field],
+              parentColumn.children as unknown as Array<ColumnNode>
+            )
             parentColumn.children?.splice(startIndex, 1, ...curCol.children)
             const index = curMeta.findIndex(meta => meta.field === curCell.getMeta().field)
             curMeta.splice(index, 1)
@@ -269,9 +280,12 @@ const renderTable = (chart: ChartObj) => {
       cancelAllBtn.innerText = t('chart.cancel_all_group')
       cancelAllBtn.onclick = () => {
         s2.hideTooltip()
-        const parent = curCell.getMeta().parent
+        const parent = curCell.getMeta().parent as Node
         if (parent?.id === 'root') {
-          const [curCol] = getColumns([curCell.getMeta().field], curColumns)
+          const [curCol] = getColumns(
+            [curCell.getMeta().field],
+            curColumns as unknown as Array<ColumnNode>
+          )
           const leafNodes = getLeafNodes(curCol.children)
           const startIndex = curColumns.findIndex(cell => cell.key === curCell.getMeta().field)
           curColumns.splice(startIndex, 1, ...leafNodes)
@@ -285,9 +299,15 @@ const renderTable = (chart: ChartObj) => {
           })
           s2.render(true)
         } else {
-          const [parentColumn] = getColumns([parent.field], curColumns)
+          const [parentColumn] = getColumns(
+            [parent.field],
+            curColumns as unknown as Array<ColumnNode>
+          )
           if (parentColumn) {
-            const [curCol] = getColumns([curCell.getMeta().field], parentColumn.children)
+            const [curCol] = getColumns(
+              [curCell.getMeta().field],
+              parentColumn.children as unknown as Array<ColumnNode>
+            )
             const leafNodes = getLeafNodes(curCol.children)
             const startIndex = parentColumn.children?.findIndex(
               cell => cell.key === curCell.getMeta().field
@@ -351,20 +371,25 @@ const renderTable = (chart: ChartObj) => {
     //如果有多个cell都在同一个层级，并且parent相同，那就是可以进行合并分组操作
     if (activeColumns?.length > 1) {
       const sameParent = activeCells.every(
-        cell => cell.getMeta().parent.id === curCell.getMeta().parent.id
+        cell => (cell.getMeta().parent as Node)?.id === (curCell.getMeta().parent as Node)?.id
       )
       if (!sameParent) {
         return
       }
       let upDepth = -1
-      let tmpCell = curCell
-      while (tmpCell?.getMeta?.()?.parent || tmpCell?.parent) {
+      let tmpCell: unknown = curCell
+      while (
+        (tmpCell as S2CellType<ViewMeta>)?.getMeta?.()?.parent ||
+        (tmpCell as { parent?: unknown })?.parent
+      ) {
         upDepth++
-        tmpCell = tmpCell?.getMeta?.()?.parent || tmpCell?.parent
+        tmpCell =
+          (tmpCell as S2CellType<ViewMeta>)?.getMeta?.()?.parent ||
+          (tmpCell as { parent?: unknown }).parent
       }
       let startIndex = -1
       let endIndex = -1
-      const parent = curCell.getMeta().parent
+      const parent = curCell.getMeta().parent as Node
       // 分组的节点
       if (parent.colIndex !== -1) {
         activeColumns.forEach(cell => {
@@ -391,7 +416,10 @@ const renderTable = (chart: ChartObj) => {
       if (parent?.id === 'root') {
         totalColumns.push(...curColumns.slice(startIndex, endIndex + 1))
       } else {
-        const [parentColumn] = getColumns([parent.field], curColumns)
+        const [parentColumn] = getColumns(
+          [parent.field],
+          curColumns as unknown as Array<ColumnNode>
+        )
         totalColumns.push(...parentColumn.children?.slice(startIndex, endIndex + 1))
       }
       const chiildDepth = getTreesMaxDepth(totalColumns)
@@ -439,7 +467,10 @@ const renderTable = (chart: ChartObj) => {
               })
               s2.render(true)
             } else {
-              const [parentColumn] = getColumns([parent.field], curColumns)
+              const [parentColumn] = getColumns(
+                [parent.field],
+                curColumns as unknown as Array<ColumnNode>
+              )
               const newKey = uuid.v4()
               parentColumn.children?.splice(startIndex, endIndex - startIndex + 1, {
                 key: newKey,

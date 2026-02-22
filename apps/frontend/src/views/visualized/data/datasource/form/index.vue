@@ -55,6 +55,23 @@ interface Form {
   syncSetting?: SyncSetting
   isPlugin?: boolean
   staticMap?: any
+  enableDataFill?: boolean
+}
+
+interface ExcelRemoteConfiguration {
+  datasourceId?: number | string
+  editType?: number
+  userName: string
+  passwd: string
+  [key: string]: unknown
+}
+
+interface ApiItemWithFields {
+  deTableName?: string
+  name: string
+  jsonFields?: unknown[]
+  fields: Array<{ value: unknown[]; [key: string]: unknown }>
+  [key: string]: unknown
 }
 
 const { t } = useI18n()
@@ -295,7 +312,7 @@ const continueCreating = () => {
   init(null, pid.value)
 }
 
-const handleShowFinishPage = ({ id, name, pid: pidVal }) => {
+const handleShowFinishPage = ({ id, name, pid: pidVal = pid.value }) => {
   isShowFinishPage()
     .then(res => {
       if (editDs.value || !res.data) {
@@ -396,7 +413,7 @@ const validateDS = () => {
 const doValidateDs = request => {
   dsLoading.value = true
   if (currentDsType.value === 'ExcelRemote') {
-    let excelRequest = JSON.parse(JSON.stringify(form2.configuration))
+    let excelRequest = JSON.parse(JSON.stringify(form2.configuration)) as ExcelRemoteConfiguration
     excelRequest.datasourceId = form2.id || 0
     excelRequest.editType = form2.editType
     excelRequest.userName = Base64.encode(excelRequest.userName)
@@ -476,6 +493,10 @@ const saveDS = () => {
     apiConfiguration: string
   }
 
+  const apiRequest = request as unknown as Omit<Form, 'apiConfiguration'> & {
+    apiConfiguration: ApiItemWithFields[]
+  }
+
   if (currentDsType.value === 'Excel') {
     excel.value.uploadStatus(false)
     if (!excel.value.sheetFile?.name) {
@@ -513,31 +534,31 @@ const saveDS = () => {
     })
     return
   } else if (currentDsType.value.includes('API')) {
-    for (let i = 0; i < request.apiConfiguration.length; i++) {
+    for (let i = 0; i < apiRequest.apiConfiguration.length; i++) {
       if (
-        request.apiConfiguration[i].deTableName === '' ||
-        request.apiConfiguration[i].deTableName === undefined ||
-        request.apiConfiguration[i].deTableName === null
+        apiRequest.apiConfiguration[i].deTableName === '' ||
+        apiRequest.apiConfiguration[i].deTableName === undefined ||
+        apiRequest.apiConfiguration[i].deTableName === null
       ) {
-        request.apiConfiguration[i].deTableName =
+        apiRequest.apiConfiguration[i].deTableName =
           'api_' +
-          request.apiConfiguration[i].name +
+          apiRequest.apiConfiguration[i].name +
           '_' +
           uuid.v1().replaceAll('-', '').substring(0, 10)
       }
-      request.apiConfiguration[i].jsonFields = []
-      for (let j = 0; j < request.apiConfiguration[i].fields.length; j++) {
-        request.apiConfiguration[i].fields[j].value = []
+      apiRequest.apiConfiguration[i].jsonFields = []
+      for (let j = 0; j < apiRequest.apiConfiguration[i].fields.length; j++) {
+        apiRequest.apiConfiguration[i].fields[j].value = []
       }
     }
     let apiItems = []
-    apiItems = apiItems.concat(request.apiConfiguration)
-    if (request.paramsConfiguration) {
-      apiItems = apiItems.concat(request.paramsConfiguration)
+    apiItems = apiItems.concat(apiRequest.apiConfiguration)
+    if (apiRequest.paramsConfiguration) {
+      apiItems = apiItems.concat(apiRequest.paramsConfiguration)
     }
     request.configuration = Base64.encode(JSON.stringify(apiItems))
-    request.syncSetting.startTime = new Date(request.syncSetting.startTime).getTime()
-    request.syncSetting.endTime = new Date(request.syncSetting.endTime).getTime()
+    apiRequest.syncSetting.startTime = new Date(apiRequest.syncSetting.startTime).getTime()
+    apiRequest.syncSetting.endTime = new Date(apiRequest.syncSetting.endTime).getTime()
   } else {
     request.configuration = Base64.encode(JSON.stringify(request.configuration))
   }
@@ -618,11 +639,12 @@ const doSaveDs = request => {
   }
 }
 
-const defaultForm = {
+const defaultForm: Form = {
   id: '',
   name: '',
   description: '',
   type: 'API',
+  copy: false,
   apiConfiguration: [],
   paramsConfiguration: [],
   enableDataFill: false
@@ -663,7 +685,7 @@ watch(
   { deep: true }
 )
 
-const init = (nodeInfo: Form | Param, id?: string, res?: object, supportSetKey: boolean) => {
+const init = (nodeInfo: Form | Param, id?: string, res?: object, supportSetKey?: boolean) => {
   isPlugin.value = nodeInfo?.isPlugin
   pluginIndex.value = isPlugin.value ? nodeInfo?.staticMap?.index : null
   isSupportSetKey.value = supportSetKey

@@ -41,7 +41,8 @@ import {
   DEFAULT_LABEL,
   DEFAULT_LEGEND_STYLE
 } from '@/views/chart/components/editor/util/chart'
-import type { Options } from '@antv/g2plot/esm'
+import type { Options, PickOptions } from '@antv/g2plot'
+import type { Plot } from '@antv/g2plot/esm/core/plot'
 import { Group } from '@antv/g-canvas'
 import { extremumEvt } from '@/views/chart/components/js/extremumUitl'
 
@@ -178,7 +179,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
 
     newChart.on('point:click', action)
     newChart.on('interval:click', action)
-    extremumEvt(newChart, chart, options, container)
+    extremumEvt(newChart as unknown as Plot<PickOptions>, chart, options, container)
     configPlotTooltipEvent(chart, newChart)
     return newChart
   }
