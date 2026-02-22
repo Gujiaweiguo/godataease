@@ -81,7 +81,7 @@ describe('validatePayload', () => {
 
     it('should allow optional fields in InteractionPayload', () => {
       const payload = {
-        interactionType: 'click'
+        interactionType: 'click',
         metadata: { source: 'user' }
       }
       expect(validatePayload(EmbeddingEventType.INTERACTION, payload)).toBe(true)

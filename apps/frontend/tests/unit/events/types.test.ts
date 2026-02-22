@@ -39,4 +39,4 @@ describe('EmbeddingEventType', () => {
       expect(EmbeddingEventType.MODULE_INTERACTION).toBe('module_interaction')
     })
   })
-
+})

@@ -61,7 +61,7 @@ describe('useEmbeddedParentCommunication', () => {
 
     it('should reject message from untrusted origin', () => {
       const { listenForChildMessages } = useEmbeddedParentCommunication()
-      const { isAllowedEmbeddedMessageOrigin } = require('@/utils/embedded')
+      const { isAllowedEmbeddedMessageOrigin } = jest.requireActual('@/utils/embedded')
       const consoleWarnSpy = vi.spyOn(console, 'warn')
       const mockEvent = new MessageEvent('message', {
         data: JSON.stringify({ type: 'param_update' }),
