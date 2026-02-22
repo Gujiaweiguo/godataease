@@ -2,9 +2,6 @@ import { describe, it, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PreviewCanvas from '@/views/data-visualization/PreviewCanvas.vue'
-import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
-import type { InitReadyPayload } from '@/events/embedding/payloads'
-import { EmbeddingEventType } from '@/events/embedding/types'
 
 describe('Parent-Child Communication Integration', () => {
   beforeEach(() => {

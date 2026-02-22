@@ -4,8 +4,6 @@ import type {
   OuterParamsOptions,
   DecodedOuterParams
 } from '@/types/embeddingParams'
-import { getNormalizedOrigin } from '@/utils/embedded'
-import type { OriginValidationOptions, OriginValidationResult } from '@/types/embeddingOrigin'
 
 export function encodeOuterParams(
   params: EmbeddingOuterParams,

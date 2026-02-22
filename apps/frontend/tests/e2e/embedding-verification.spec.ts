@@ -5,7 +5,6 @@ import path from 'path'
 describe('Embedding Verification - Automated Browser Tests', () => {
   let browser: any
   let page: any
-  const baseUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5100'
 
   beforeAll(async () => {
     browser = await chromium.launch({
@@ -297,7 +296,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
 
       await page.waitForTimeout(1000)
 
-      const logs = await page.evaluate(() => {
+      await page.evaluate(() => {
         return window.consoleErrors || []
       })
 

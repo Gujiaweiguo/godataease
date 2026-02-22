@@ -2,8 +2,6 @@ import { EnumValue, enumValueObj } from '@/api/dataset'
 
 let filterEnumMap = {}
 
-const filterIdNameEnumMap = {}
-
 const findFilterEnum = async (val: EnumValue) => {
   const queryId = val.queryId
   const displayId = val.displayId

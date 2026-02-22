@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
-import { useEmbedded } from '@/store/modules/embedded'
-import { resolveEmbeddedOrigin } from '@/utils/embedded'
-import type { InitReadyPayload } from '@/events/embedding/payloads'
 import { EmbeddingEventType } from '@/events/embedding/types'
 
 vi.mock('@/utils/embedded', () => ({
@@ -42,7 +39,7 @@ describe('useEmbeddedParentCommunication', () => {
     })
 
     it('should validate message origin before processing', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
+      useEmbeddedParentCommunication()
       const { isAllowedEmbeddedMessageOrigin } = jest.requireActual('@/utils/embedded')
       const mockEvent = new MessageEvent('message', {
         data: JSON.stringify({ type: 'param_update' }),
@@ -60,8 +57,7 @@ describe('useEmbeddedParentCommunication', () => {
     })
 
     it('should reject message from untrusted origin', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
-      const { isAllowedEmbeddedMessageOrigin } = jest.requireActual('@/utils/embedded')
+      useEmbeddedParentCommunication()
       const consoleWarnSpy = vi.spyOn(console, 'warn')
       const mockEvent = new MessageEvent('message', {
         data: JSON.stringify({ type: 'param_update' }),
@@ -104,7 +100,7 @@ describe('useEmbeddedParentCommunication', () => {
 
   describe('event handlers', () => {
     it('should handle param_update event and update store', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
+      useEmbeddedParentCommunication()
       const mockSetParam = vi.fn()
 
       const mockEvent = new MessageEvent('message', {
@@ -118,7 +114,7 @@ describe('useEmbeddedParentCommunication', () => {
     })
 
     it('should handle user_interaction event and update store', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
+      useEmbeddedParentCommunication()
       const mockSetParam = vi.fn()
 
       const mockEvent = new MessageEvent('message', {
@@ -131,7 +127,7 @@ describe('useEmbeddedParentCommunication', () => {
     })
 
     it('should handle init_ready event', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
+      useEmbeddedParentCommunication()
       const consoleLogSpy = vi.spyOn(console, 'log')
 
       const mockEvent = new MessageEvent('message', {
@@ -144,7 +140,7 @@ describe('useEmbeddedParentCommunication', () => {
     })
 
     it('should handle error event', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
+      useEmbeddedParentCommunication()
       const consoleErrorSpy = vi.spyOn(console, 'error')
 
       const mockEvent = new MessageEvent('message', {

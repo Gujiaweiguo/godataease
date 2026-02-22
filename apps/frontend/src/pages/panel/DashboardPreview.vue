@@ -2,11 +2,9 @@
 import { ref, reactive, onBeforeMount, nextTick, inject } from 'vue'
 import { initCanvasData, initCanvasDataMobile, onInitReady } from '@/utils/canvasUtils'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
-import router from '@/router/mobile'
 import { useEmbedded } from '@/store/modules/embedded'
 import { isMobile } from '@/utils/utils'
 import { check } from '@/utils/CrossPermission'
-import { useEmitt } from '@/hooks/web/useEmitt'
 import { useCache } from '@/hooks/web/useCache'
 import { getOuterParamsInfo } from '@/api/visualization/outerParams'
 import { ElMessage } from 'element-plus-secondary'
@@ -49,14 +47,14 @@ onBeforeMount(async () => {
   if (!checkResult) {
     return
   }
-  let tokenInfo = null
-  if (embeddedStore.getToken && !Object.keys((tokenInfo = embeddedStore.getTokenInfo)).length) {
+  let tokenInfo = embeddedStore.getTokenInfo
+  if (embeddedStore.getToken && !Object.keys(tokenInfo).length) {
     const res = await request.get({ url: '/embedded/getTokenArgs' })
     embeddedStore.setTokenInfo(res.data)
     tokenInfo = embeddedStore.getTokenInfo
   }
   // 添加外部参数
-  let attachParams
+  let attachParams: Record<string, unknown> | undefined
   try {
     await getOuterParamsInfo(embeddedParams.dvId).then(rsp => {
       dvMainStore.setNowPanelOuterParamsInfoV2(rsp.data, embeddedParams.dvId)

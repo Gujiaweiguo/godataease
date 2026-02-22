@@ -1,6 +1,6 @@
 function parseUrl(url) {
   const [pathname, params] = url.split('?')
-  const [_, path] = pathname.split('#/')
+  const [, path] = pathname.split('#/')
   return {
     path,
     query: params

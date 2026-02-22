@@ -85,7 +85,7 @@ export default {
 
     function initialize() {
       connection()
-      const timeInterval = setInterval(() => {
+      setInterval(() => {
         if (!isLoginStatus()) {
           disconnect()
           return
