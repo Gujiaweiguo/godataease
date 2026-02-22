@@ -694,7 +694,9 @@ export function mappingColor(value, defaultColor, field, type, filedValueMap?, r
   for (let i = 0; i < field.conditions.length; i++) {
     let flag = false
     const t = field.conditions[i]
-    let tv, max, min
+    let tv: string | number | undefined
+    let max: number | undefined
+    let min: number | undefined
     if (t.type === 'dynamic') {
       if (t.term === 'between') {
         max = parseFloat(getValue(t.dynamicMaxField, filedValueMap, rowData))
@@ -2391,7 +2393,9 @@ export const calculateHeaderHeight = (info, newChart, tableHeader, basicStyle, l
 
   if (layoutResult) {
     if (basicStyle.tableColumnMode === 'adapt') maxHeight -= textStyle.fontSize - 2
-    ev.colLeafNodes.forEach(n => (n.height = maxHeight))
+    ev.colLeafNodes.forEach(n => {
+      n.height = maxHeight
+    })
     ev.colsHierarchy.height = maxHeight
   }
 }
@@ -2458,10 +2462,10 @@ export function getSummaryRow(data, axis, sumCon = [], customSumResult = {}) {
     const a = axis[i].dataeaseName
     let savedAxis = find(sumCon, s => s.field === a)
     if (savedAxis) {
-      if (savedAxis.summary == undefined) {
+      if (savedAxis.summary === undefined) {
         savedAxis.summary = 'sum' // 默认汇总方式为求和
       }
-      if (savedAxis.show == undefined) {
+      if (savedAxis.show === undefined) {
         savedAxis.show = true // 默认显示汇总结果
       }
     } else {
@@ -2612,7 +2616,9 @@ export const getLeafNodes = (tree: Array<ColumnNode>): ColumnNode[] => {
   }
 
   // 遍历树中所有节点
-  tree.forEach(node => inorderTraversal(node))
+  tree.forEach(node => {
+    inorderTraversal(node)
+  })
   return result
 }
 
@@ -2635,7 +2641,9 @@ export function drawImage() {
   img.src = fieldValue as string
   img.setAttribute('crossOrigin', 'anonymous')
   img.onload = () => {
-    !this.cfg.children && (this.cfg.children = [])
+    if (!this.cfg.children) {
+      this.cfg.children = []
+    }
     const { width: imgWidth, height: imgHeight } = img
     const ratio = Math.max(imgWidth / width, imgHeight / height)
     // 不铺满，部分留白
@@ -2800,8 +2808,7 @@ const calculateGroupHeaderMaxTextHeight = (
   info,
   newChart,
   tableHeader,
-  basicStyle,
-  _layoutResult
+  basicStyle
 ) => {
   if (tableHeader.showTableHeader === false) return
   const maxLines = basicStyle.maxLines ?? 1

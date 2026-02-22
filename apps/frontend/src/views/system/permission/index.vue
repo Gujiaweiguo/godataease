@@ -85,7 +85,6 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { permListApi, permCreateApi, permUpdateApi, permDeleteApi } from '@/api/org'
-import { resourceTreeApi } from '@/api/auth'
 
 const router = useRouter()
 

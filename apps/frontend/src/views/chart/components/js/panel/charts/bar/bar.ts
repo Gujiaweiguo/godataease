@@ -89,9 +89,6 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
       clearExtremum(chart)
       return
     }
-    const isGroup = 'bar-group' === this.name && chart.xAxisExt?.length > 0
-    const isStack =
-      ['bar-stack', 'bar-group-stack'].includes(this.name) && chart.extStack?.length > 0
     const data = cloneDeep(drawOptions.chart.data?.data)
     const initOptions: ColumnOptions = {
       ...this.baseOptions,
@@ -144,7 +141,7 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
     if (!xAxis.show || !xAxis.axisLabel?.show) {
       return
     }
-    let hideTimer
+    let hideTimer: ReturnType<typeof setTimeout> | undefined
     const { tooltip } = parseJson(chart.customAttr)
     chartObj?.on('axis-label:mousemove', e => {
       const showText = e.target?.attrs?.text
@@ -304,7 +301,7 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
       ...options,
       ...configRoundAngle(chart, 'columnStyle')
     }
-    let columnWidthRatio
+    let columnWidthRatio: number | undefined
     const _v = basicStyle.columnWidthRatio ?? DEFAULT_BASIC_STYLE.columnWidthRatio
     if (_v >= 1 && _v <= 100) {
       columnWidthRatio = _v / 100.0
@@ -571,7 +568,7 @@ export class StackBar extends Bar {
     }
     const extStack = chart.extStack[0]
     const customStyle = parseJson(chart.customStyle)
-    let size
+    let size: number
     if (customStyle && customStyle.legend) {
       size = defaults(JSON.parse(JSON.stringify(customStyle.legend)), DEFAULT_LEGEND_STYLE).size
     } else {

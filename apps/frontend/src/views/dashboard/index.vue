@@ -17,7 +17,6 @@ import { decompressionPre, initCanvasData, onInitReady } from '@/utils/canvasUti
 import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
 import type { InitReadyPayload } from '@/events/embedding/payloads'
 import { EmbeddingEventType } from '@/events/embedding/types'
-import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 import ChartStyleBatchSet from '@/views/chart/components/editor/editor-style/ChartStyleBatchSet.vue'
 import DeCanvas from '@/views/canvas/DeCanvas.vue'
 import { check, compareStorage } from '@/utils/CrossPermission'
@@ -40,7 +39,6 @@ import eventBus from '@/utils/eventBus'
 import { useI18n } from '@/hooks/web/useI18n'
 import DashboardHiddenComponent from '@/components/dashboard/DashboardHiddenComponent.vue'
 import { recoverToPublished } from '@/api/visualization/dataVisualization'
-import SqlAssistant from '@/views/sqlbot/assistant.vue'
 const embeddedStore = useEmbedded()
 const { wsCache } = useCache()
 const canvasCacheOutRef = ref(null)
@@ -146,8 +144,12 @@ const onMobileConfig = () => {
 
 const loadFinish = ref(false)
 const newWindowFromDiv = ref(false)
-let p = null
-const XpackLoaded = () => p(true)
+let p: ((value?: unknown) => void) | null = null
+const XpackLoaded = () => {
+  if (p) {
+    p(true)
+  }
+}
 
 const doUseCache = flag => {
   const canvasCache = wsCache.get('DE-DV-CATCH-' + state.resourceId)
@@ -214,7 +216,9 @@ onMounted(async () => {
   if (window.location.hash.includes('#/dashboard')) {
     newWindowFromDiv.value = true
   }
-  await new Promise(r => (p = r))
+  await new Promise(resolve => {
+    p = resolve
+  })
   loadFinish.value = true
   useEmitt({
     name: 'mobileConfig',
@@ -252,7 +256,7 @@ onMounted(async () => {
     }
   } else if (opt && opt === 'create') {
     dataInitState.value = false
-    let watermarkBaseInfo
+    let watermarkBaseInfo: { settingContent?: string } | null = null
     try {
       await watermarkFind().then(rsp => {
         watermarkBaseInfo = rsp.data
@@ -261,8 +265,14 @@ onMounted(async () => {
     } catch (e) {
       console.error('can not find watermark info')
     }
-    let deTemplateData
-    let preName
+    let deTemplateData: {
+      baseInfo?: { preName?: string }
+      componentData?: unknown
+      canvasStyleData?: unknown
+      canvasViewInfo?: unknown
+      appData?: unknown
+    } | null = null
+    let preName: string | undefined
     if (createType === 'template') {
       const templateParamsApply = JSON.parse(Base64.decode(decodeURIComponent(templateParams + '')))
       await decompressionPre(templateParamsApply, result => {
@@ -275,10 +285,12 @@ onMounted(async () => {
       // 从模板新建
       if (createType === 'template') {
         wsCache.delete('de-template-data')
-        dvMainStore.setComponentData(deTemplateData['componentData'])
-        dvMainStore.setCanvasStyle(deTemplateData['canvasStyleData'])
-        dvMainStore.setCanvasViewInfo(deTemplateData['canvasViewInfo'])
-        dvMainStore.setAppDataInfo(deTemplateData['appData'])
+        if (deTemplateData) {
+          dvMainStore.setComponentData(deTemplateData.componentData)
+          dvMainStore.setCanvasStyle(deTemplateData.canvasStyleData)
+          dvMainStore.setCanvasViewInfo(deTemplateData.canvasViewInfo)
+          dvMainStore.setAppDataInfo(deTemplateData.appData)
+        }
         setTimeout(() => {
           snapshotStore.recordSnapshotCache('template')
         }, 1500)

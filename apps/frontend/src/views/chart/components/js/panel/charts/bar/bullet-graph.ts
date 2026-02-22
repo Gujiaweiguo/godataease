@@ -58,7 +58,7 @@ export class BulletGraph extends G2PlotChartView<G2BulletOptions, G2Bullet> {
     'label-selector': ['hPosition', 'fontSize', 'color', 'labelFormatter'],
     'tooltip-selector': ['fontSize', 'color', 'backgroundColor', 'seriesTooltipFormatter', 'show'],
     'x-axis-selector': [
-      ...BAR_EDITOR_PROPERTY_INNER['x-axis-selector'].filter(item => item != 'position'),
+      ...BAR_EDITOR_PROPERTY_INNER['x-axis-selector'].filter(item => item !== 'position'),
       'showLengthLimit'
     ],
     'y-axis-selector': [
@@ -78,16 +78,24 @@ export class BulletGraph extends G2PlotChartView<G2BulletOptions, G2Bullet> {
     const { bullet } = parseJson(chart.customAttr).misc
     if (bullet.bar.ranges.showType === 'fixed') {
       const customRange = bullet.bar.ranges.fixedRange?.map(item => item.fixedRangeValue) || [0]
-      result.forEach(item => (item.ranges = customRange))
+      result.forEach(item => {
+        item.ranges = customRange
+      })
     } else {
-      result.forEach(item => (item.ranges = item.originalRanges))
+      result.forEach(item => {
+        item.ranges = item.originalRanges
+      })
     }
     // 处理自定义目标值
     if (bullet.bar.target.showType === 'fixed') {
       const customTarget = bullet.bar.target.value || 0
-      result.forEach(item => (item.target = customTarget))
+      result.forEach(item => {
+        item.target = customTarget
+      })
     } else {
-      result.forEach(item => (item.target = item.originalTarget))
+      result.forEach(item => {
+        item.target = item.originalTarget
+      })
     }
     const initialOptions: BulletOptions = {
       appendPadding: getPadding(chart),
@@ -343,7 +351,7 @@ export class BulletGraph extends G2PlotChartView<G2BulletOptions, G2Bullet> {
 
     const formatterMap = tooltipAttr.seriesTooltipFormatter
       ?.filter(i => i.show)
-      .reduce((pre, next, _index) => {
+      .reduce((pre, next) => {
         switch (next.axisType) {
           case 'yAxis':
             pre['measures'] = next
@@ -368,7 +376,7 @@ export class BulletGraph extends G2PlotChartView<G2BulletOptions, G2Bullet> {
         const rangeFormatter = chart.extBubble[0]
         const result = []
         const data = options.data.find(item => item.title === originalItems[0].title)
-        Object.keys(formatterMap).forEach((key, _index) => {
+        Object.keys(formatterMap).forEach(key => {
           if (key === '记录数*') return
           const formatter = formatterMap[key]
           if (formatter) {

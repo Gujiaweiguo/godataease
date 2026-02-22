@@ -227,10 +227,6 @@ const handleCurrentPlaceholderCustomChange = () => {
   }
 }
 
-const handleCurrentPlaceholderChange = () => {
-  snapshotStore.recordSnapshotCacheToMobile('propValue')
-}
-
 const checkItalic = type => {
   if (!chart.value.customStyle.component.labelShow) return
   chart.value.customStyle.component[type] = chart.value.customStyle.component[type] ? '' : 'italic'

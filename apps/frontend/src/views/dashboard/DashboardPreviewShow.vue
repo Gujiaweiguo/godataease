@@ -33,7 +33,6 @@ import {
 import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
 import type { InitReadyPayload } from '@/events/embedding/payloads'
 import { EmbeddingEventType } from '@/events/embedding/types'
-import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 
 const userStore = useUserStoreWithOut()
 
@@ -148,7 +147,9 @@ const loadCanvasData = (dvId, weight?) => {
 const downloadH2 = type => {
   downloadStatus.value = true
   const mapElementIds = getMapElementIds(state.canvasDataPreview)
-  mapElementIds.forEach(id => useEmitt().emitter.emit('l7-prepare-picture', id))
+  mapElementIds.forEach(id => {
+    useEmitt().emitter.emit('l7-prepare-picture', id)
+  })
   setTimeout(() => {
     const vueDom = previewCanvasContainer.value.querySelector('.canvas-container')
     downloadCanvas2(type, vueDom, state.dvInfo.name, () => {
@@ -157,8 +158,14 @@ const downloadH2 = type => {
         id: state.dvInfo.id,
         type: state.dvInfo.type === 'dashboard' ? 'panel' : 'screen'
       }
-      type === 'img' ? exportLogImg(param) : exportLogPDF(param)
-      mapElementIds.forEach(id => useEmitt().emitter.emit('l7-unprepare-picture', id))
+      if (type === 'img') {
+        exportLogImg(param)
+      } else {
+        exportLogPDF(param)
+      }
+      mapElementIds.forEach(id => {
+        useEmitt().emitter.emit('l7-unprepare-picture', id)
+      })
     })
   }, 1000)
 }
@@ -201,7 +208,9 @@ const checkTemplate = () => {
 const fileDownload = (downloadType, attachParams) => {
   downloadStatus.value = true
   const mapElementIds = getMapElementIds(state.canvasDataPreview)
-  mapElementIds.forEach(id => useEmitt().emitter.emit('l7-prepare-picture', id))
+  mapElementIds.forEach(id => {
+    useEmitt().emitter.emit('l7-prepare-picture', id)
+  })
   setTimeout(() => {
     const vueDom = previewCanvasContainer.value.querySelector('.canvas-container')
     download2AppTemplate(downloadType, vueDom, state.dvInfo.name, attachParams, () => {
@@ -210,8 +219,14 @@ const fileDownload = (downloadType, attachParams) => {
         id: state.dvInfo.id,
         type: state.dvInfo.type === 'dashboard' ? 'panel' : 'screen'
       }
-      downloadType === 'app' ? exportLogApp(param) : exportLogTemplate(param)
-      mapElementIds.forEach(id => useEmitt().emitter.emit('l7-unprepare-picture', id))
+      if (downloadType === 'app') {
+        exportLogApp(param)
+      } else {
+        exportLogTemplate(param)
+      }
+      mapElementIds.forEach(id => {
+        useEmitt().emitter.emit('l7-unprepare-picture', id)
+      })
     })
   }, 1000)
 }

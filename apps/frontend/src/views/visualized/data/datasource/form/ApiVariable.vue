@@ -39,9 +39,6 @@ const { t } = useI18n()
 const keyText = computed(() => {
   return props.keyPlaceholder || t('datasource.key')
 })
-const valueText = computed(() => {
-  return props.valuePlaceholder || t('datasource.value')
-})
 
 const { parameters, suggestions } = toRefs(props)
 
@@ -103,7 +100,7 @@ const createFilter = (queryString: string) => {
 const changeNameType = element => {
   element.value = ''
 }
-const activeName = inject('api-active-name')
+inject('api-active-name')
 const options = [
   {
     label: t('data_source.parameter'),

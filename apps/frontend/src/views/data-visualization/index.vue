@@ -28,7 +28,6 @@ import {
 import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
 import type { InitReadyPayload } from '@/events/embedding/payloads'
 import { EmbeddingEventType } from '@/events/embedding/types'
-import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 import { check, compareStorage } from '@/utils/CrossPermission'
 import { useCache } from '@/hooks/web/useCache'
 import RealTimeListTree from '@/components/data-visualization/RealTimeListTree.vue'
@@ -95,9 +94,12 @@ const leftSidebarRef = ref(null)
 const dvLayout = ref(null)
 const canvasCenterRef = ref(null)
 const mainHeight = ref(300)
-let createType = null
+let createType: string | null = null
 let isDragging = false // 标记是否在拖动
-let startX, startY, scrollLeft, scrollTop
+let startX = 0
+let startY = 0
+let scrollLeft = 0
+let scrollTop = 0
 const state = reactive({
   sideShow: true,
   countTime: 0,
@@ -247,7 +249,7 @@ const deselectCurComponent = e => {
   }
 
   // 0 左击 1 滚轮 2 右击
-  if (e.button != 2) {
+  if (e.button !== 2) {
     contextmenuStore.hideContextMenu()
   }
 }
@@ -386,8 +388,12 @@ const winMsgWebParamsHandle = msgInfo => {
 
 const loadFinish = ref(false)
 const newWindowFromDiv = ref(false)
-let p = null
-const XpackLoaded = () => p(true)
+let p: ((value?: unknown) => void) | null = null
+const XpackLoaded = () => {
+  if (p) {
+    p(true)
+  }
+}
 onMounted(async () => {
   if (embeddedStore.getToken) {
     try {
@@ -409,7 +415,9 @@ onMounted(async () => {
   if (window.location.hash.includes('#/dvCanvas')) {
     newWindowFromDiv.value = true
   }
-  await new Promise(r => (p = r))
+  await new Promise(resolve => {
+    p = resolve
+  })
   loadFinish.value = true
   window.addEventListener('blur', releaseAttachKey)
   window.addEventListener('message', winMsgHandle)
@@ -443,7 +451,7 @@ onMounted(async () => {
     }
   } else if (opt && opt === 'create') {
     state.canvasInitStatus = false
-    let watermarkBaseInfo
+    let watermarkBaseInfo: { settingContent?: string } | null = null
     try {
       await watermarkFind().then(rsp => {
         watermarkBaseInfo = rsp.data
@@ -452,8 +460,14 @@ onMounted(async () => {
     } catch (e) {
       console.error('can not find watermark info')
     }
-    let deTemplateData
-    let preName
+    let deTemplateData: {
+      baseInfo?: { preName?: string }
+      componentData?: unknown
+      canvasStyleData?: unknown
+      canvasViewInfo?: unknown
+      appData?: unknown
+    } | null = null
+    let preName: string | undefined
     if (createType === 'template') {
       const templateParamsApply = JSON.parse(Base64.decode(decodeURIComponent(templateParams + '')))
       await decompressionPre(templateParamsApply, result => {
@@ -468,10 +482,12 @@ onMounted(async () => {
       snapshotStore.recordSnapshotCache('renderChart')
       // 从模板新建
       if (createType === 'template') {
-        dvMainStore.setComponentData(deTemplateData['componentData'])
-        dvMainStore.setCanvasStyle(deTemplateData['canvasStyleData'])
-        dvMainStore.setCanvasViewInfo(deTemplateData['canvasViewInfo'])
-        dvMainStore.setAppDataInfo(deTemplateData['appData'])
+        if (deTemplateData) {
+          dvMainStore.setComponentData(deTemplateData.componentData)
+          dvMainStore.setCanvasStyle(deTemplateData.canvasStyleData)
+          dvMainStore.setCanvasViewInfo(deTemplateData.canvasViewInfo)
+          dvMainStore.setAppDataInfo(deTemplateData.appData)
+        }
         setTimeout(() => {
           snapshotStore.recordSnapshotCache('template')
         }, 1500)

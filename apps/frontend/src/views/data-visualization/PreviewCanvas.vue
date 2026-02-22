@@ -12,7 +12,6 @@ import { ElMessage } from 'element-plus-secondary'
 import { useEmbedded } from '@/store/modules/embedded'
 import { embeddedInitIframeApi } from '@/api/embedded'
 import { resolveEmbeddedOrigin } from '@/utils/embedded'
-import { extractTokenExpiryTime, isTokenExpiringSoon } from '@/utils/embeddedTokenUtils'
 import { useI18n } from '@/hooks/web/useI18n'
 import { XpackComponent } from '@/components/plugin'
 import { propTypes } from '@/utils/propTypes'
@@ -33,6 +32,7 @@ const routeWatch = useRoute()
 const dvMainStore = dvMainStoreWithOut()
 const { t } = useI18n()
 const embeddedStore = useEmbedded()
+const tokenLifecycle = useTokenLifecycle()
 const { emitToChild } = useEmbeddedParentCommunication()
 const previewCanvasContainer = ref(null)
 const downloadStatus = ref(false)
@@ -69,9 +69,9 @@ const props = defineProps({
   ticketArgs: propTypes.string.def(null)
 })
 
-const loadCanvasDataAsync = async (dvId, dvType, ignoreParams = false) => {
+const loadCanvasDataAsync = async (dvId: string, dvType: string, ignoreParams = false) => {
   const jumpInfoParam = embeddedStore.jumpInfoParam || router.currentRoute.value.query.jumpInfoParam
-  let jumpParam
+  let jumpParam: { sourceDvId?: string; sourceViewId?: string } | null = null
   // 获取外部跳转参数
   if (jumpInfoParam) {
     jumpParam = JSON.parse(Base64.decode(decodeURIComponent(jumpInfoParam)))
@@ -101,7 +101,7 @@ const loadCanvasDataAsync = async (dvId, dvType, ignoreParams = false) => {
   const hasTicketArgs = argsObject && Object.keys(argsObject)
 
   // 添加外部参数
-  let attachParam
+  let attachParam: Record<string, unknown> | undefined
   await getOuterParamsInfo(dvId).then(rsp => {
     dvMainStore.setNowPanelOuterParamsInfoV2(rsp.data, dvId)
   })
@@ -208,8 +208,8 @@ watch(
   { deep: true }
 )
 
-let p = null
-let p1 = null
+let p: ((value: boolean) => void) | null = null
+let p1: ((value: boolean) => void) | null = null
 const XpackLoaded = () => p(true)
 const initIframe = async () => {
   try {
@@ -250,7 +250,14 @@ onMounted(async () => {
       downloadH2(type)
     }
   })
-  await Promise.all([new Promise(r => (p = r)), new Promise(r => (p1 = r))])
+  await Promise.all([
+    new Promise<boolean>(r => {
+      p = r
+    }),
+    new Promise<boolean>(r => {
+      p1 = r
+    })
+  ])
   let dvId = props.outerId || embeddedStore.dvId || router.currentRoute.value.query.dvId
   if (router.currentRoute.value.query.jumpInfoParam && router.currentRoute.value.query.dvId) {
     dvId = router.currentRoute.value.query.dvId
@@ -304,11 +311,6 @@ const prepareForPrint = async () => {
   await getPrintHeight()
 }
 
-// 暴露方法给外部调用打印
-const handlePrint = async () => {
-  await prepareForPrint()
-  window.print()
-}
 defineExpose({
   loadCanvasDataAsync
 })
@@ -328,7 +330,7 @@ defineExpose({
       :canvas-style-data="state.canvasStylePreview || {}"
       :component-data="state.canvasDataPreview || []"
     ></canvas-opt-bar>
-    <dv-preview
+    <DvPreview
       ref="dvPreviewRef"
       style="height: 100vh"
       v-if="state.canvasStylePreview && state.initState && state.dvInfo?.type === 'dataV'"
@@ -342,7 +344,7 @@ defineExpose({
       :show-pop-bar="true"
       :show-position="state.showPosition"
       :show-linkage-button="false"
-    ></dv-preview>
+    ></DvPreview>
     <de-preview
       ref="dvPreview"
       v-if="state.canvasStylePreview && state.initState && state.dvInfo?.type === 'dashboard'"

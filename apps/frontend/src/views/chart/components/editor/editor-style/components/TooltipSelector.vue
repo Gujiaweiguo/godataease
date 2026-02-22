@@ -15,7 +15,7 @@ import {
   mergeTooltipFormat
 } from '@/views/chart/components/js/formatter'
 import { fieldType } from '@/utils/attr'
-import { defaultTo, partition, map, includes, isEmpty, merge } from 'lodash-es'
+import { defaultTo, partition, map, includes, isEmpty } from 'lodash-es'
 import chartViewManager from '../../../js/panel'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { storeToRefs } from 'pinia'

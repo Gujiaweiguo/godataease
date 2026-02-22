@@ -39,9 +39,6 @@ const { t } = useI18n()
 const keyText = computed(() => {
   return props.keyPlaceholder || t('datasource.key')
 })
-const valueText = computed(() => {
-  return props.valuePlaceholder || t('datasource.value')
-})
 
 const { suggestions, items } = toRefs(props)
 
@@ -56,7 +53,7 @@ onBeforeMount(() => {
   }
 })
 
-const activeName = inject('api-active-name')
+inject('api-active-name')
 
 const remove = (index: number) => {
   if (isDisable()) return
