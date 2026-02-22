@@ -49,6 +49,59 @@ import ChartCarouselTooltip, {
   isSupport
 } from '@/views/chart/components/js/g2plot_tooltip_carousel'
 
+// 地图扩展属性接口 - 用于腾讯地图、天地图等
+interface DeMapExtensions {
+  deMapProvider?: string
+  deMapAutoFit?: boolean
+  deMapAutoZoom?: number
+  deMapAutoLng?: number
+  deMapAutoLat?: number
+  deMapZoom?: number
+  deMapCenter?: [number, number]
+  getZoom?: () => number
+  getCenter?: () => { getLng: () => number; getLat: () => number; lng: number; lat: number }
+  on?: (event: string, callback: () => void) => void
+  checkResize?: () => void
+  removeStyle?: () => void
+  showLabel?: boolean
+  setBaseMap?: (options: { type: string; features?: string[] }) => void
+  // 腾讯地图方法
+  setDraggable?: (enable: boolean) => void
+  setScrollable?: (enable: boolean) => void
+  setDoubleClickZoom?: (enable: boolean) => void
+  setTouchZoomable?: (enable: boolean) => void
+  setPitchable?: (enable: boolean) => void
+  setRotatable?: (enable: boolean) => void
+  // 天地图方法
+  enableDrag?: () => void
+  disableDrag?: () => void
+  enableScrollWheelZoom?: () => void
+  disableScrollWheelZoom?: () => void
+  enableDoubleClickZoom?: () => void
+  disableDoubleClickZoom?: () => void
+  enableKeyboard?: () => void
+  disableKeyboard?: () => void
+  enablePinchToZoom?: () => void
+  disablePinchToZoom?: () => void
+  // 高德地图方法
+  setStatus?: (status: Record<string, boolean>) => void
+}
+
+// 样式表扩展接口
+interface StyleSheetExtensions {
+  fontFamily?: string
+}
+
+// L7 Label 样式扩展接口
+interface L7LabelStyleExtensions {
+  fill: string
+  fontSize: number
+  textAllowOverlap: boolean
+  fontWeight: string
+  padding?: number[]
+  fontFamily?: string
+}
+
 const { t: tI18n } = useI18n()
 
 export function getPadding(chart: Chart): number[] {
@@ -184,7 +237,7 @@ export function getTheme(chart: Chart) {
     }
   }
   if (chart.fontFamily) {
-    theme.styleSheet.fontFamily = chart.fontFamily
+    ;(theme.styleSheet as StyleSheetExtensions).fontFamily = chart.fontFamily
   }
   return theme
 }
@@ -946,7 +999,7 @@ export function transAxisPosition(position: string): string {
 export function configL7Label(chart: Chart): false | LabelOptions {
   const customAttr = parseJson(chart.customAttr)
   const label = customAttr.label
-  const style = {
+  const style: L7LabelStyleExtensions = {
     fill: label.color,
     fontSize: label.fontSize,
     textAllowOverlap: true,
@@ -961,7 +1014,7 @@ export function configL7Label(chart: Chart): false | LabelOptions {
   }
   return {
     visible: label.show,
-    style
+    style: style as unknown as LabelOptions['style']
   }
 }
 
@@ -1177,11 +1230,12 @@ export class CustomZoom extends Zoom {
       'l7-button-control',
       container,
       () => {
-        if (this.mapsService.map?.deMapProvider == 'qq') {
-          if (this.mapsService.map.deMapAutoFit) {
-            this.mapsService.setZoomAndCenter(this.mapsService.map.deMapAutoZoom, [
-              this.mapsService.map.deMapAutoLng,
-              this.mapsService.map.deMapAutoLat
+        const deMap = this.mapsService.map as DeMapExtensions
+        if (deMap?.deMapProvider == 'qq') {
+          if (deMap.deMapAutoFit) {
+            this.mapsService.setZoomAndCenter(deMap.deMapAutoZoom, [
+              deMap.deMapAutoLng,
+              deMap.deMapAutoLat
             ])
           } else {
             this.mapsService.setZoomAndCenter(
@@ -1277,10 +1331,11 @@ export function configL7Zoom(
             //天地图
             {
               const initZoom = basicStyle.autoFit === false ? basicStyle.zoomLevel : scene.getZoom()
+              const deMap = scene.map as DeMapExtensions
               const center =
                 basicStyle.autoFit === false
                   ? [basicStyle.mapCenter.longitude, basicStyle.mapCenter.latitude]
-                  : [scene.map.getCenter().getLng(), scene.map.getCenter().getLat()]
+                  : [deMap?.getCenter?.()?.getLng?.(), deMap?.getCenter?.()?.getLat?.()]
               const newZoomOptions = {
                 initZoom: initZoom,
                 center: center,
@@ -1293,10 +1348,11 @@ export function configL7Zoom(
           case 'qq':
             {
               const initZoom = basicStyle.autoFit === false ? basicStyle.zoomLevel : scene.getZoom()
+              const deMap = scene.map as DeMapExtensions
               const center =
                 basicStyle.autoFit === false
                   ? [basicStyle.mapCenter.longitude, basicStyle.mapCenter.latitude]
-                  : [scene.map.getCenter().lng, scene.map.getCenter().lat]
+                  : [deMap?.getCenter?.()?.lng, deMap?.getCenter?.()?.lat]
               const newZoomOptions = {
                 initZoom: initZoom,
                 center: center,
@@ -1306,13 +1362,14 @@ export function configL7Zoom(
               scene.addControl(new CustomZoom(newZoomOptions))
             }
             break
-          default:
-            scene.map.on('complete', () => {
+          default: {
+            const deMap = scene.map as DeMapExtensions
+            deMap?.on?.('complete', () => {
               const initZoom = basicStyle.autoFit === false ? basicStyle.zoomLevel : scene.getZoom()
               const center =
                 basicStyle.autoFit === false
                   ? [basicStyle.mapCenter.longitude, basicStyle.mapCenter.latitude]
-                  : [scene.map.getCenter().lng, scene.map.getCenter().lat]
+                  : [deMap?.getCenter?.()?.lng, deMap?.getCenter?.()?.lat]
               const newZoomOptions = {
                 initZoom: initZoom,
                 center: center,
@@ -1321,6 +1378,7 @@ export function configL7Zoom(
               } as any
               scene.addControl(new CustomZoom(newZoomOptions))
             })
+          }
         }
       })
     } else {
@@ -1332,7 +1390,7 @@ export function configL7Zoom(
         newZoomOptions.initZoom = basicStyle.zoomLevel
         newZoomOptions.center = [basicStyle.mapCenter.longitude, basicStyle.mapCenter.latitude]
       } else {
-        const coordinates: [][] = []
+        const coordinates: number[][] = []
         if (chart.type === 'flow-map') {
           const startAxis = chart.xAxis
           const endAxis = chart.xAxisExt
@@ -1365,15 +1423,12 @@ export function configL7Zoom(
  * @param coordinates 经纬度数组 [[lng, lat], [lng, lat], ...]
  * @returns {[[number, number], [number, number]]} 返回东北角和西南角的坐标
  */
-export function calculateBounds(coordinates: number[][]): {
-  northEast: [number, number]
-  southWest: [number, number]
-} {
+export function calculateBounds(coordinates: number[][]): [[number, number], [number, number]] {
   if (!coordinates || coordinates.length === 0) {
-    return {
-      northEast: [180, 90],
-      southWest: [-180, -90]
-    }
+    return [
+      [180, 90],
+      [-180, -90]
+    ]
   }
 
   let maxLng = -180
@@ -1434,12 +1489,13 @@ export function mapRendering(dom: HTMLElement | string) {
 }
 
 export function qqMapRendered(scene?: Scene) {
-  if (scene?.map && scene.map.deMapProvider === 'qq') {
+  const deMap = scene?.map as DeMapExtensions
+  if (deMap && deMap.deMapProvider === 'qq') {
     setTimeout(() => {
       if (scene.map) {
-        scene.map.deMapAutoZoom = scene.map.getZoom()
-        scene.map.deMapAutoLng = scene.map.getCenter().getLng()
-        scene.map.deMapAutoLat = scene.map.getCenter().getLat()
+        deMap.deMapAutoZoom = deMap.getZoom?.()
+        deMap.deMapAutoLng = deMap.getCenter?.()?.getLng?.()
+        deMap.deMapAutoLat = deMap.getCenter?.()?.getLat?.()
       }
     }, 1000)
   }
@@ -1517,8 +1573,9 @@ export async function getMapScene(
       map: getMapObject(mapKey, basicStyle, miscStyle, mapStyle, center)
     })
   } else {
+    const deMap = scene.map as DeMapExtensions
     if (mapKey.mapType === 'tianditu') {
-      scene.map?.checkResize()
+      deMap?.checkResize?.()
     }
     if (scene.getLayers()?.length) {
       await scene.removeAllLayer()
@@ -1527,7 +1584,7 @@ export async function getMapScene(
       } catch (e) {}
       if (mapKey.mapType === 'tianditu') {
         if (mapStyle === 'normal') {
-          scene.map?.removeStyle()
+          deMap?.removeStyle?.()
         } else {
           scene.setMapStyle(mapStyle)
         }
@@ -1535,9 +1592,9 @@ export async function getMapScene(
         scene.setMapStyle(mapStyle)
       }
 
-      scene.map.showLabel = !(basicStyle.showLabel === false)
+      deMap.showLabel = !(basicStyle.showLabel === false)
       if (mapKey.mapType === 'qq') {
-        scene.map.setBaseMap({
+        deMap.setBaseMap?.({
           //底图设置（参数为：VectorBaseMap对象）
           type: 'vector', //类型：失量底图
           features: basicStyle.showLabel === false ? ['base', 'building2d'] : undefined
@@ -1548,17 +1605,18 @@ export async function getMapScene(
     if (basicStyle.autoFit === false) {
       scene.setZoomAndCenter(basicStyle.zoomLevel, center)
       if (mapKey.mapType === 'qq') {
-        scene.map.deMapAutoFit = false
-        scene.map.deMapZoom = basicStyle.zoomLevel
-        scene.map.deMapCenter = center
+        deMap.deMapAutoFit = false
+        deMap.deMapZoom = basicStyle.zoomLevel
+        deMap.deMapCenter = center
       }
     }
   }
   mapRendering(container)
   scene.once('loaded', () => {
     mapRendered(container)
+    const deMap = scene.map as DeMapExtensions
     if (mapKey.mapType === 'qq') {
-      scene.map.setBaseMap({
+      deMap?.setBaseMap?.({
         //底图设置（参数为：VectorBaseMap对象）
         type: 'vector', //类型：失量底图
         features: basicStyle.showLabel === false ? ['base', 'building2d'] : undefined
@@ -1566,8 +1624,8 @@ export async function getMapScene(
       })
       scene.setMapStyle(mapStyle)
 
-      scene.map.deMapProvider = 'qq'
-      scene.map.deMapAutoFit = !!basicStyle.autoFit
+      deMap.deMapProvider = 'qq'
+      deMap.deMapAutoFit = !!basicStyle.autoFit
       // scene.map.deMapAutoZoom = scene.map.getZoom()
       // scene.map.deMapAutoLng = scene.map.getCenter().getLng()
       // scene.map.deMapAutoLat = scene.map.getCenter().getLat()
@@ -1575,14 +1633,14 @@ export async function getMapScene(
     // 去除天地图自己的缩放按钮
     if (mapKey.mapType === 'tianditu') {
       if (mapStyle === 'normal') {
-        scene.map?.removeStyle()
+        deMap?.removeStyle?.()
       } else {
         scene.setMapStyle(mapStyle)
       }
 
       const tdtControl = document.querySelector(
         `#component${chart.id} .tdt-control-zoom.tdt-bar.tdt-control`
-      )
+      ) as HTMLElement
       if (tdtControl) {
         tdtControl.style.display = 'none'
       }
@@ -1591,12 +1649,12 @@ export async function getMapScene(
       )
       if (tdtControlOuter && tdtControlOuter.length > 0) {
         for (let i = 0; i < tdtControlOuter.length; i++) {
-          tdtControlOuter[i].style.display = 'none'
+          ;(tdtControlOuter[i] as HTMLElement).style.display = 'none'
         }
       }
       const tdtCopyrightControl = document.querySelector(
         `#component${chart.id} .tdt-control-copyright.tdt-control`
-      )
+      ) as HTMLElement
       if (tdtCopyrightControl) {
         tdtCopyrightControl.style.display = 'none'
       }
@@ -1605,7 +1663,7 @@ export async function getMapScene(
       )
       if (tdtCopyrightControlOuter && tdtCopyrightControlOuter.length > 0) {
         for (let i = 0; i < tdtCopyrightControlOuter.length; i++) {
-          tdtCopyrightControlOuter[i].style.display = 'none'
+          ;(tdtCopyrightControlOuter[i] as HTMLElement).style.display = 'none'
         }
       }
     }
@@ -2495,32 +2553,33 @@ export const configRoundAngle = (chart: Chart, styleName: string, callBack?: (da
  * @param enable
  */
 function updateMapStatusOption(mapType: string, scene: Scene, enable = false) {
+  const deMap = scene.map as DeMapExtensions
   switch (mapType) {
     case 'tianditu':
       if (enable) {
-        scene.map?.enableDrag()
-        scene.map?.enableScrollWheelZoom()
-        scene.map?.enableDoubleClickZoom()
-        scene.map?.enableKeyboard()
-        scene.map?.enablePinchToZoom()
+        deMap?.enableDrag?.()
+        deMap?.enableScrollWheelZoom?.()
+        deMap?.enableDoubleClickZoom?.()
+        deMap?.enableKeyboard?.()
+        deMap?.enablePinchToZoom?.()
       } else {
-        scene.map?.disableDrag()
-        scene.map?.disableScrollWheelZoom()
-        scene.map?.disableDoubleClickZoom()
-        scene.map?.disableKeyboard()
-        scene.map?.disablePinchToZoom()
+        deMap?.disableDrag?.()
+        deMap?.disableScrollWheelZoom?.()
+        deMap?.disableDoubleClickZoom?.()
+        deMap?.disableKeyboard?.()
+        deMap?.disablePinchToZoom?.()
       }
       break
     case 'qq':
-      scene.map?.setDraggable(enable)
-      scene.map?.setScrollable(enable)
-      scene.map?.setDoubleClickZoom(enable)
-      scene.map?.setTouchZoomable(enable)
-      scene.map?.setPitchable(enable)
-      scene.map?.setRotatable(enable)
+      deMap?.setDraggable?.(enable)
+      deMap?.setScrollable?.(enable)
+      deMap?.setDoubleClickZoom?.(enable)
+      deMap?.setTouchZoomable?.(enable)
+      deMap?.setPitchable?.(enable)
+      deMap?.setRotatable?.(enable)
       break
     default:
-      scene.map?.setStatus({
+      deMap?.setStatus?.({
         dragEnable: enable,
         keyboardEnable: enable,
         doubleClickZoom: enable,

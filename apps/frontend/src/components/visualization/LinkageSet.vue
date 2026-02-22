@@ -318,6 +318,39 @@ import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapsho
 import LinkageSetOption from '@/components/visualization/LinkageSetOption.vue'
 import { deepCopy } from '@/utils/utils'
 import { ACTION_SELECTION } from '@/custom-component/component-list'
+
+interface LinkageAxisField {
+  id: string
+  name?: string
+  deType?: number
+}
+
+interface LinkageViewInfo {
+  type: string
+  title: string
+  tableId?: number
+  xAxis?: LinkageAxisField[]
+  yAxis?: LinkageAxisField[]
+  xAxisExt?: LinkageAxisField[]
+  extStack?: LinkageAxisField[]
+  extBubble?: LinkageAxisField[]
+  drillFields?: LinkageAxisField[]
+}
+
+interface LinkageDatasetInfo {
+  name: string
+}
+
+interface TargetViewField {
+  id: string
+  name?: string
+  deType?: number
+}
+
+interface SourceLinkageInfo {
+  targetViewFields?: TargetViewField[]
+}
+
 const dvMainStore = dvMainStoreWithOut()
 const { dvInfo, canvasViewInfo, componentData, curComponent } = storeToRefs(dvMainStore)
 const linkageInfoTree = ref(null)
@@ -330,10 +363,10 @@ const curLinkageTargetViewsInfoSameDs = ref([])
 const curLinkageTargetViewsInfoDiffDs = ref([])
 const snapshotStore = snapshotStoreWithOut()
 const state = reactive({
-  sourceLinkageInfo: {},
+  sourceLinkageInfo: {} as SourceLinkageInfo,
   showSelected: false,
-  curLinkageViewInfo: {},
-  curDatasetInfo: {},
+  curLinkageViewInfo: {} as LinkageViewInfo,
+  curDatasetInfo: {} as LinkageDatasetInfo,
   initState: false,
   viewId: null,
   tableId: null,

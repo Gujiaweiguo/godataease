@@ -1,4 +1,54 @@
 <script setup lang="ts">
+// Type definitions for canvas components
+interface ComponentStyle {
+  width?: number
+  height?: number
+  left?: number
+  top?: number
+  rotate?: number
+  [key: string]: unknown
+}
+
+interface WatermarkInfo {
+  settingContent?: unknown
+  [key: string]: unknown
+}
+
+interface CanvasComponent {
+  id: string | number
+  component: string
+  style: ComponentStyle
+  isLock: boolean
+  isShow: boolean
+  x: number
+  y: number
+  sizeX: number
+  sizeY: number
+  sizex?: number
+  sizey?: number
+  propValue?: unknown
+  request?: {
+    method?: string
+    data?: unknown[]
+    url?: string
+    series?: boolean
+    time?: number
+    paramType?: string
+    requestCount?: number
+  }
+  canvasId?: string
+  innerType?: string
+  isPlugin?: boolean
+  editing?: boolean
+  canvasActive?: boolean
+  commonBackground?: {
+    innerImageColor?: string
+    [key: string]: unknown
+  }
+  _dragId?: number
+  [key: string]: unknown
+}
+
 import Shape from './Shape.vue'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import {
@@ -71,7 +121,7 @@ const props = defineProps({
     required: true
   },
   componentData: {
-    type: Array,
+    type: Array as () => CanvasComponent[],
     required: true
   },
   popComponentData: {
@@ -277,7 +327,7 @@ const initWatermark = (waterDomId = 'editor-canvas-main') => {
   try {
     if (
       dvInfo.value.watermarkInfo &&
-      dvInfo.value.watermarkInfo.settingContent &&
+      (dvInfo.value.watermarkInfo as WatermarkInfo).settingContent &&
       isMainCanvas(canvasId.value)
     ) {
       activeWatermarkCheckUser(waterDomId, canvasId.value, curScale.value)
@@ -1420,7 +1470,7 @@ const handleDragOver = e => {
   }
   infoBox.value.moveItem.style.left = e.pageX
   infoBox.value.moveItem.style.top = e.pageY + mainScrollTop.value
-  onDragging(e, infoBox.value.moveItem, 0)
+  onDragging(e, infoBox.value.moveItem)
 }
 
 const getMoveItem = () => {

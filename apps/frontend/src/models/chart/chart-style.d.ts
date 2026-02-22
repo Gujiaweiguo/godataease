@@ -30,6 +30,49 @@ declare interface ChartStyle {
     color: string
     alpha: string
   }
+  /**
+   * 组件样式（用于VQuery等）
+   */
+  component?: ChartComponentStyle
+}
+
+/**
+ * 组件样式（用于VQuery等）
+ */
+declare interface ChartComponentStyle {
+  /**
+   * 标题
+   */
+  title?: string
+  /**
+   * 标题颜色
+   */
+  titleColor?: string
+  /**
+   * 标题字体大小
+   */
+  titleFontSize?: number
+  /**
+   * 是否显示标题
+   */
+  showTitle?: boolean
+  /**
+   * 标题位置
+   */
+  titleLayout?: string
+  /**
+   * 提示
+   */
+  hint?: string
+  /**
+   * 是否显示提示
+   */
+  hintShow?: boolean
+  /**
+   * 提示颜色
+   */
+  hintBgColor?: string
+  [key: string]: any
 }
 
 /**

@@ -183,6 +183,54 @@ declare interface Axis extends ChartViewField {
    * 是否隐藏
    */
   hide: boolean
+  /**
+   * 日期样式
+   */
+  dateStyle?: string
+  /**
+   * 日期格式
+   */
+  datePattern?: string
+  /**
+   * 图表类型（用于混合图）
+   */
+  chartType?: 'bar' | 'line'
+  /**
+   * 过滤条件
+   */
+  filter?: AxisFilter[]
+  /**
+   * 逻辑关系
+   */
+  logic?: 'and' | 'or'
+  /**
+   * 同比/环比计算
+   */
+  compareCalc?: CompareCalc
+  /**
+   * 过滤类型
+   */
+  filterType?: string
+  /**
+   * 枚举选中字段
+   */
+  enumCheckField?: string[]
+  /**
+   * 轴类型
+   */
+  axisType?: string
+  /**
+   * 数据源ID
+   */
+  datasourceId?: number | string
+  /**
+   * 数据集表ID
+   */
+  datasetTableId?: number | string
+  /**
+   * 数据集组ID
+   */
+  datasetGroupId?: number | string
 }
 declare interface ChartViewField {
   /**

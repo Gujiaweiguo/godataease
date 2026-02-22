@@ -28,6 +28,15 @@ import { DEFAULT_TABLE_HEADER } from '@/views/chart/components/editor/util/chart
 
 type DataItem = Record<string, any>
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface _SortParam {
+  sortFieldId: string
+  sortMethod?: string
+  sortBy?: string[]
+  sortByMeasure?: typeof TOTAL_VALUE
+  query?: { [key: string]: string }
+}
+
 const { t } = useI18n()
 
 class CustomPivotDataset extends PivotDataSet {

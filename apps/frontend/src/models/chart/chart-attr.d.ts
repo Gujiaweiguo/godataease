@@ -46,7 +46,12 @@ declare interface ChartAttr {
    * 指标名称
    */
   indicatorName: ChartIndicatorNameStyle
+  /**
+   * 颜色设置
+   */
+  color?: ChartColorAttr
 }
+
 /**
  * 基础样式设置
  */
@@ -1402,4 +1407,31 @@ declare interface BulletAttr<T> {
   measures?: T
   target?: T
   ranges?: T
+}
+
+/**
+ * 颜色设置
+ */
+declare interface ChartColorAttr {
+  /**
+   * 颜色值列表
+   */
+  colors?: string[]
+  /**
+   * 渐变
+   */
+  gradient?: boolean
+  /**
+   * 配色方案
+   */
+  colorScheme?: string
+  /**
+   * 多序列颜色
+   */
+  seriesColor?: {
+    id: string
+    name: string
+    color: string
+  }[]
+  [key: string]: any
 }

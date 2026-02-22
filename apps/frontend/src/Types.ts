@@ -7,6 +7,10 @@ export enum ShorthandMode {
    */
   Uniform = 'uniform',
   /**
+   * 双轴模式，水平和垂直方向分别使用不同的值
+   */
+  Axis = 'axis',
+  /**
    * 逐边模式，可单独设置每条边的值
    */
   PerEdge = 'per_edge'

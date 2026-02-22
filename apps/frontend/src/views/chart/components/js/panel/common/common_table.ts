@@ -713,7 +713,7 @@ export function mappingColor(value, defaultColor, field, type, filedValueMap?, r
       }
     }
     if (field.field.deType === 2 || field.field.deType === 3 || field.field.deType === 4) {
-      tv = parseFloat(tv)
+      tv = parseFloat(String(tv))
       if (t.term === 'eq') {
         if (value === tv) {
           color = t[type]
@@ -828,7 +828,7 @@ export function mappingColor(value, defaultColor, field, type, filedValueMap?, r
       if (!tv || !value) {
         break
       }
-      tv = new Date(tv.replace(/-/g, '/') + ' GMT+8').getTime()
+      tv = new Date(String(tv).replace(/-/g, '/') + ' GMT+8').getTime()
       const v = new Date(value.replace(/-/g, '/') + ' GMT+8').getTime()
       if (fc.term === 'eq') {
         if (v === tv) {
@@ -1056,7 +1056,7 @@ export function configHeaderInteraction(chart: Chart, option: S2Options) {
         const parent = document.getElementById(chart.container)
         if (parent?.childNodes?.length) {
           const child = Array.from(parent.childNodes)
-            .filter(node => node.nodeType === Node.ELEMENT_NODE)
+            .filter((node): node is Element => node.nodeType === 1)
             .find(node => node.classList.contains('antv-s2-tooltip-container'))
           if (child) {
             const left = child.offsetLeft + child.clientWidth
@@ -1124,7 +1124,7 @@ export function copyContent(s2Instance: SpreadSheet, event, fieldMeta) {
     const brushSelection = s2Instance.interaction.interactions.get(
       InteractionName.BRUSH_SELECTION
     ) as DataCellBrushSelection
-    const selectedCells: TableDataCell[] = brushSelection.getScrollBrushRangeCells(cells)
+    const selectedCells: TableDataCell[] = (brushSelection as unknown as { getScrollBrushRangeCells: (cells: unknown) => TableDataCell[] }).getScrollBrushRangeCells(cells)
     selectedCells.sort((a, b) => {
       const aMeta = a.getMeta()
       const bMeta = b.getMeta()
@@ -1192,7 +1192,7 @@ export function copyContent(s2Instance: SpreadSheet, event, fieldMeta) {
       p[n.field] = n.name
       return p
     }, {})
-    content = cellMeta.value
+    content = cellMeta.value as string
     if (fieldMap?.[content]) {
       content = fieldMap[content]
     }
@@ -1249,16 +1249,17 @@ export async function exportGridPivot(instance: PivotSheet, chart: ChartObj) {
   }
   const workbook = new Exceljs.Workbook()
   const worksheet = workbook.addWorksheet(i18nt('chart.chart_data'))
-  const metaMap: Record<string, Meta> = meta?.reduce((p, n) => {
+  const metaMap: Record<string, Meta> = (meta?.reduce((p, n) => {
     if (n.field) {
       p[n.field] = n
     }
     return p
-  }, {})
+  }, {}) || {}) as Record<string, Meta>
   // 角头
   fields.columns?.forEach((column, index) => {
+    const columnKey = String(column)
     const cell = worksheet.getCell(index + 1, 1)
-    cell.value = metaMap[column]?.name ?? column
+    cell.value = metaMap[columnKey]?.name ?? columnKey
     cell.alignment = { vertical: 'middle', horizontal: 'center' }
     if (rowLength >= 2) {
       worksheet.mergeCells(index + 1, 1, index + 1, rowLength)
@@ -1443,12 +1444,12 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
   }
   const workbook = new Exceljs.Workbook()
   const worksheet = workbook.addWorksheet(i18nt('chart.chart_data'))
-  const metaMap: Record<string, Meta> = meta?.reduce((p, n) => {
+  const metaMap: Record<string, Meta> = (meta?.reduce((p, n) => {
     if (n.field) {
       p[n.field] = n
     }
     return p
-  }, {})
+  }, {}) || {}) as Record<string, Meta>
   // 角头
   if (colLength > 1) {
     fields.columns.forEach((column: string, index) => {
@@ -1470,7 +1471,7 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
     cell.alignment = { vertical: 'middle', horizontal: 'center' }
     cell.border = { bottom: { style: 'thick', color: { argb: '00000000' } } }
   })
-  const quotaColLabel = chart.customAttr.basicStyle.quotaColLabel ?? t('dataset.value')
+  const quotaColLabel = chart.customAttr.basicStyle.quotaColLabel ?? i18nt('dataset.value')
   const quotaColHeadCell = worksheet.getCell(colLength === 0 ? 1 : colLength, rowLength + 1)
   quotaColHeadCell.value = quotaColLabel
   quotaColHeadCell.alignment = { vertical: 'middle', horizontal: 'center' }
@@ -1631,17 +1632,18 @@ export async function exportTreePivot(instance: PivotSheet, chart: ChartObj) {
   const colLength = fields?.columns?.length || 0
   const workbook = new Exceljs.Workbook()
   const worksheet = workbook.addWorksheet(i18nt('chart.chart_data'))
-  const metaMap: Record<string, Meta> = meta?.reduce((p, n) => {
+  const metaMap: Record<string, Meta> = (meta?.reduce((p, n) => {
     if (n.field) {
       p[n.field] = n
     }
     return p
-  }, {})
+  }, {}) || {}) as Record<string, Meta>
 
   // 角头
   fields.columns?.forEach((column, index) => {
+    const columnKey = String(column)
     const cell = worksheet.getCell(index + 1, 1)
-    cell.value = metaMap[column]?.name ?? column
+    cell.value = metaMap[columnKey]?.name ?? columnKey
     cell.alignment = { vertical: 'middle', horizontal: 'center' }
     cell.border = {
       right: { style: 'thick', color: { argb: '00000000' } }
@@ -1772,12 +1774,12 @@ export async function exportRowQuotaTreePivot(instance: PivotSheet, chart: Chart
   const colLength = fields?.columns?.length || 0
   const workbook = new Exceljs.Workbook()
   const worksheet = workbook.addWorksheet(i18nt('chart.chart_data'))
-  const metaMap: Record<string, Meta> = meta?.reduce((p, n) => {
+  const metaMap: Record<string, Meta> = (meta?.reduce((p, n) => {
     if (n.field) {
       p[n.field] = n
     }
     return p
-  }, {})
+  }, {}) || {}) as Record<string, Meta>
 
   // 角头
   fields.columns?.forEach((column, index) => {
@@ -1791,7 +1793,7 @@ export async function exportRowQuotaTreePivot(instance: PivotSheet, chart: Chart
       right: { style: 'thick', color: { argb: '00000000' } }
     }
   })
-  const quotaColLabel = chart.customAttr.basicStyle.quotaColLabel ?? t('dataset.value')
+  const quotaColLabel = chart.customAttr.basicStyle.quotaColLabel ?? i18nt('dataset.value')
   const maxColHeight = layoutResult.colsHierarchy.maxLevel + 1
   const rowName = fields?.rows
     ?.map(row => metaMap[row]?.name ?? row)
@@ -2570,7 +2572,7 @@ export class SummaryCell extends CustomDataCell {
  * @param newData
  * @param container
  */
-export const configEmptyDataStyle = (newChart, basicStyle, newData, container) => {
+export const configEmptyDataStyle = (newChart, _basicStyle, newData, container) => {
   /**
    * 辅助函数：移除空数据dom
    */
@@ -2761,8 +2763,7 @@ export const calculateGroupHeaderHeight = (newChart, tableHeader, basicStyle) =>
         { info: { name: maxNameMeta.name, resizedWidth: colWidth } },
         newChart,
         tableHeader,
-        basicStyle,
-        null
+        basicStyle
       )
       maxGroupHeight = Math.max(maxGroupHeight, nodeHeight)
     }

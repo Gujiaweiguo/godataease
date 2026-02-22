@@ -159,6 +159,17 @@ import { activeWatermarkCheckUser, removeActiveWatermark } from '@/components/wa
 import { useI18n } from '@/hooks/web/useI18n'
 import { CommonBackground } from '@/components/visualization/component-background/Types'
 import { ShorthandMode } from '@/Types'
+
+/** 组件形状样式接口 */
+interface ComponentShapeStyle {
+  top: number
+  left: number
+  width: number
+  height: number
+  rotate: number
+  [key: string]: unknown
+}
+
 const { t } = useI18n()
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
@@ -560,7 +571,7 @@ const handleMouseDownOnShape = e => {
 
   cursors.value = getCursor() // 根据旋转角度获取光标位置
 
-  const pos = { ...defaultStyle.value }
+  const pos = { ...defaultStyle.value } as ComponentShapeStyle
   const startY = e.clientY
   const startX = e.clientX
 
@@ -725,7 +736,7 @@ const handleMouseDownOnPoint = (point, e) => {
   e.stopPropagation()
   e.preventDefault()
 
-  const style = { ...defaultStyle.value }
+  const style = { ...defaultStyle.value } as ComponentShapeStyle
 
   // 组件宽高比
   const proportion = style['width'] / style['height']
@@ -1022,7 +1033,8 @@ const settingAttribute = () => {
 }
 
 const tabMoveInCheck = async () => {
-  const curNode = document.querySelector('#' + domId.value)
+  const curNode = document.querySelector('#' + domId.value) as HTMLElement | null
+  if (!curNode) return
   const width = curNode.offsetWidth
   const height = curNode.offsetHeight
   const left = curNode.offsetLeft
@@ -1034,7 +1046,7 @@ const tabMoveInCheck = async () => {
     isTabMoveCheck.value &&
     !state.ignoreTabMoveComponent.includes(element.value.component)
   ) {
-    const nodes = Array.from(parentNode.value.childNodes) // 获取当前父节点下所有子节点
+    const nodes = Array.from(parentNode.value.childNodes) as HTMLElement[] // 获取当前父节点下所有子节点
     for (const item of nodes) {
       if (
         item.className !== undefined &&
