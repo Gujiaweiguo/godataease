@@ -45,11 +45,14 @@ DataEase is an open-source BI tool designed to help users quickly analyze data a
 ## Quick Start (Source Code Installation)
 
 ### Prerequisites
-- Java: JDK 21+
+- Go: 1.24+
 - Node.js: 18+
-- Maven: 3.8+
 - MySQL: 8.0+
 - Redis: 7.0+
+
+Notes:
+- Mainline backend is Go (`apps/backend-go`).
+- Java backend is legacy read-only backup (`legacy/backend-java`) for emergency/reference only.
 
 ### Local Development
 
@@ -65,11 +68,14 @@ make build
 # Build frontend
 cd ../frontend
 npm install
-npm run dev  # Visit http://localhost:5173
+npm run dev  # Visit http://localhost:8080
 
 # Start backend (configure database first)
 cd ../backend-go
-make run  # API: http://localhost:8080
+make run  # API port is defined by apps/backend-go/configs/config.yaml
+
+# Start backend with local MySQL/Redis defaults (localhost)
+make run-local
 
 # Legacy Java backend is read-only backup
 # See legacy/README-READONLY.md for emergency operations

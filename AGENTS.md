@@ -26,7 +26,7 @@ godataease/
 ```
 
 ## Environment Requirements
-- Go: 1.21+
+- Go: 1.24+
 - Node.js: 18+
 - MySQL: 8.0+
 - Redis: 7.0+
@@ -45,13 +45,14 @@ Run in `/opt/code/godataease`:
 Run in `/opt/code/godataease/apps/backend-go`:
 - Build: `make build`
 - Run: `make run`
+- Run (local DB/Redis): `make run-local`
 - Test: `make test`
 - Lint: `golangci-lint run`
 
 ### Frontend (`apps/frontend`)
 Run in `/opt/code/godataease/apps/frontend`:
 - Install dependencies: `npm install`
-- Dev server: `npm run dev` (Vite, default `http://localhost:5173`)
+- Dev server: `npm run dev` (Vite, default `http://localhost:8080`)
 - Build (base): `npm run build:base`
 - Build (distributed): `npm run build:distributed`
 - Build (library): `npm run build:lib`

@@ -3,7 +3,7 @@
 # Run: docker run -p 8080:8080 dataease:latest
 
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Set Go proxy for China network
 ENV GOPROXY=https://goproxy.cn,direct

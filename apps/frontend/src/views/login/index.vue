@@ -79,10 +79,8 @@ const handleLogin = () => {
     if (valid) {
       const name = state.loginForm.username.trim()
       const pwd = state.loginForm.password
-      if (!wsCache.get(appStore.getDekey)) {
-        const res = await queryDekey()
-        wsCache.set(appStore.getDekey, res.data)
-      }
+      const res = await queryDekey()
+      wsCache.set(appStore.getDekey, res.data)
       const param = { name: rsaEncryp(name), pwd: rsaEncryp(pwd) }
       const isLdap = activeName.value === 'ldap'
       if (isLdap) {

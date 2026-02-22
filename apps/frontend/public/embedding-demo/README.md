@@ -191,13 +191,13 @@ Test in the following browsers:
 ### Running Dev Server
 
 ```bash
-cd core/core-frontend
+cd apps/frontend
 npm run dev
 ```
 
 Then access demo pages at:
-- `http://localhost:5173/embedding-demo/dashboard-embed.html`
-- `http://localhost:5173/embedding-demo/screen-embed.html`
+- `http://localhost:8080/embedding-demo/dashboard-embed.html`
+- `http://localhost:8080/embedding-demo/screen-embed.html`
 
 ### API Endpoints
 

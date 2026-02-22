@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 
 	if err = testDB.AutoMigrate(
 		&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{},
-		&role.SysRole{},
+		&role.SysRole{}, &role.RoleMenu{},
 		&org.SysOrg{},
 		&menu.CoreMenu{},
 		&datasource.CoreDatasource{},

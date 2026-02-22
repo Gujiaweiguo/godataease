@@ -53,7 +53,7 @@ DataEase 是开源的 BI 工具，帮助用户快速分析数据并洞察业务�
 ## 快速开始（源码安装）
 
 ### 环境要求
-- Go: 1.21+
+- Go: 1.24+
 - Node.js: 18+
 - MySQL: 8.0+
 - Redis: 7.0+
@@ -90,11 +90,14 @@ make build
 # 编译前端
 cd ../frontend
 npm install
-npm run dev  # 访问 http://localhost:5173
+npm run dev  # 访问 http://localhost:8080
 
 # 启动 Go 后端（需要配置数据库）
 cd ../backend-go
-make run  # API 访问 http://localhost:8080
+make run  # API 端口由 apps/backend-go/configs/config.yaml 的 server.port 决定
+
+# 本机 MySQL/Redis（localhost）快速启动
+make run-local
 ```
 
 ### 打包构建
@@ -130,35 +133,41 @@ npm install
 npm run build:base
 ```
 
-3. 创建外部网络（供多系统共用）
+3. 创建外部网络（供容器互联）
 
 ```bash
 docker network create my-net
 ```
 
-4. 启动所有服务
+4. 启动服务
 
 ```bash
 cd ../../
 docker compose -f infra/compose/docker-compose.yml up -d --build
 ```
 
-服务包括：
-- **mysql8**: MySQL 8.0 数据库（端口 3306）
-- **redis**: Redis 7.0 缓存（端口 6379）
-- **dataease-app**: DataEase 应用（端口 8080）
+当前 `infra/compose/docker-compose.yml` 默认启动：
+- **redis**: Redis 7.0 缓存（默认映射到宿主机 `16379`）
+- **dataease-app**: DataEase 应用（默认端口 `8080`）
+
+说明：MySQL 需提前可用，并可在 `my-net` 网络内通过主机名 `mysql8` 访问。
 
 5. 自定义配置（可选）
 
 在项目根目录创建 `.env`：
 
 ```env
-DB_HOST=mysql8
 DB_PORT=3306
-DB_NAME=dataease10
+DB_NAME=dataease_dev
 DB_USER=root
 DB_PASSWORD=Admin168
+SERVER_PORT=8080
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_EXTERNAL_PORT=16379
 ```
+
+如果你的 MySQL 主机名不是 `mysql8`，请修改 `infra/compose/docker-compose.yml` 中 `dataease-app.environment.DATABASE_HOST`。
 
 6. 访问服务
 
@@ -173,7 +182,6 @@ docker compose logs -f
 
 # 查看特定服务日志
 docker compose logs -f dataease-app
-docker compose logs -f mysql8
 docker compose logs -f redis
 ```
 
@@ -187,18 +195,11 @@ docker compose down
 docker compose down -v
 ```
 
-#### 复用现有容器
+#### 连接已有 MySQL
 
-如果系统中已有 MySQL 和 Redis 容器，可以只构建 dataease-app 服务：
-
-```bash
-# 修改 docker-compose.yml，注释掉 mysql8 和 redis 服务
-docker compose up -d --build dataease-app
-```
-
-确保 application-standalone.yml 配置正确指向现有容器：
-- MySQL: `mysql8:3306`
-- Redis: `redis:6379`
+当前开发编排默认即复用外部 MySQL（主机名 `mysql8`），请确保：
+- 该 MySQL 实例已加入 `my-net` 网络
+- 数据库、账号与 `.env` 中 `DB_*` 配置一致
 
 更多开发指南请参考 [development_guide.md](./development_guide.md) 和 [AGENTS.md](./AGENTS.md)。
 
