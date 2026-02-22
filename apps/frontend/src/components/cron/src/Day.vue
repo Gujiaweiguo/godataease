@@ -88,15 +88,15 @@ const updateVal = () => {
     // 2周期
     if (props.modelValue.split('-').length === 2) {
       type.value = '2'
-      state.cycle.start = props.modelValue.split('-')[0]
-      state.cycle.end = props.modelValue.split('-')[1]
+      state.cycle.start = Number(props.modelValue.split('-')[0])
+      state.cycle.end = Number(props.modelValue.split('-')[1])
     }
   } else if (props.modelValue.indexOf('/') !== -1) {
     // 3循环
     if (props.modelValue.split('/').length === 2) {
       type.value = '3'
-      state.loop.start = props.modelValue.split('/')[0]
-      state.loop.end = props.modelValue.split('/')[1]
+      state.loop.start = Number(props.modelValue.split('/')[0])
+      state.loop.end = Number(props.modelValue.split('/')[1])
     }
   } else if (props.modelValue.indexOf('*') !== -1) {
     // 1每
@@ -104,18 +104,18 @@ const updateVal = () => {
   } else if (props.modelValue.indexOf('L') !== -1) {
     // 6最后
     type.value = '6'
-    last.value = props.modelValue.replace('L', '')
+    last.value = Number(props.modelValue.replace('L', '')) || 0
   } else if (props.modelValue.indexOf('#') !== -1) {
     // 7指定周
     if (props.modelValue.split('#').length === 2) {
       type.value = '7'
-      state.week.start = props.modelValue.split('#')[0]
-      state.week.end = props.modelValue.split('#')[1]
+      state.week.start = Number(props.modelValue.split('#')[0])
+      state.week.end = Number(props.modelValue.split('#')[1])
     }
   } else if (props.modelValue.indexOf('W') !== -1) {
     // 8工作日
     type.value = '8'
-    work.value = props.modelValue.replace('W', '')
+    work.value = Number(props.modelValue.replace('W', '')) || 0
   } else {
     // *
     type.value = '4'

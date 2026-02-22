@@ -177,7 +177,7 @@
         <span hidden>B</span>
         <ul class="dots" v-if="state.sliders.length > 1">
           <li
-            v-for="(dot, i) in state.sliders"
+            v-for="(_, i) in state.sliders"
             :key="i"
             :class="{ dotted: i === state.currentIndex - 1 }"
             @click="jump(i + 1)"

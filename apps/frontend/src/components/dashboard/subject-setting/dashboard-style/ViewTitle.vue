@@ -78,8 +78,32 @@ import { useI18n } from '@/hooks/web/useI18n'
 const { t } = useI18n()
 const emits = defineEmits(['onTextChange'])
 
-const state = reactive({
-  titleForm: {},
+interface TitleForm {
+  show: boolean
+  fontSize: string
+  color: string
+  hPosition: string
+  vPosition: string
+  isItalic: boolean
+  isBolder: boolean
+  modifyName?: string
+}
+
+const state = reactive<{
+  titleForm: TitleForm
+  fontSize: { value: string; name: string }[]
+  isSetting: boolean
+  predefineColors: string[]
+}>({
+  titleForm: {
+    show: false,
+    fontSize: '18',
+    color: '#000000',
+    hPosition: 'left',
+    vPosition: 'top',
+    isItalic: false,
+    isBolder: false
+  },
   fontSize: [],
   isSetting: false,
   predefineColors: COLOR_PANEL
