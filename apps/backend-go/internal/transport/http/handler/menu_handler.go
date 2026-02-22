@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"strconv"
+
+	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 
@@ -24,9 +27,172 @@ func (h *MenuHandler) Query(c *gin.Context) {
 	response.Success(c, result)
 }
 
+type CreateMenuRequest struct {
+	Pid       int64  `json:"pid"`
+	Type      int    `json:"type"`
+	Name      string `json:"name" binding:"required"`
+	Component string `json:"component"`
+	MenuSort  int    `json:"menuSort"`
+	Icon      string `json:"icon"`
+	Path      string `json:"path" binding:"required"`
+	Hidden    bool   `json:"hidden"`
+	InLayout  bool   `json:"inLayout"`
+	Auth      bool   `json:"auth"`
+}
+
+func (h *MenuHandler) Create(c *gin.Context) {
+	var req CreateMenuRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	m := &menu.CoreMenu{
+		Pid:       req.Pid,
+		Type:      req.Type,
+		Name:      req.Name,
+		Component: req.Component,
+		MenuSort:  req.MenuSort,
+		Icon:      req.Icon,
+		Path:      req.Path,
+		Hidden:    req.Hidden,
+		InLayout:  req.InLayout,
+		Auth:      req.Auth,
+	}
+
+	if err := h.service.Create(m); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, m.ID)
+}
+
+type UpdateMenuRequest struct {
+	ID        int64  `json:"id" binding:"required"`
+	Pid       int64  `json:"pid"`
+	Type      int    `json:"type"`
+	Name      string `json:"name" binding:"required"`
+	Component string `json:"component"`
+	MenuSort  int    `json:"menuSort"`
+	Icon      string `json:"icon"`
+	Path      string `json:"path" binding:"required"`
+	Hidden    bool   `json:"hidden"`
+	InLayout  bool   `json:"inLayout"`
+	Auth      bool   `json:"auth"`
+}
+
+func (h *MenuHandler) Update(c *gin.Context) {
+	var req UpdateMenuRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	m := &menu.CoreMenu{
+		ID:        req.ID,
+		Pid:       req.Pid,
+		Type:      req.Type,
+		Name:      req.Name,
+		Component: req.Component,
+		MenuSort:  req.MenuSort,
+		Icon:      req.Icon,
+		Path:      req.Path,
+		Hidden:    req.Hidden,
+		InLayout:  req.InLayout,
+		Auth:      req.Auth,
+	}
+
+	if err := h.service.Update(m); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *MenuHandler) Delete(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid menu ID")
+		return
+	}
+
+	if err := h.service.Delete(id); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+type UpdateSortRequest struct {
+	ID   int64 `json:"id" binding:"required"`
+	Sort int   `json:"sort" binding:"required"`
+}
+
+func (h *MenuHandler) UpdateSort(c *gin.Context) {
+	var req UpdateSortRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.service.UpdateSort(req.ID, req.Sort); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+type UpdateHiddenRequest struct {
+	ID     int64 `json:"id" binding:"required"`
+	Hidden bool  `json:"hidden"`
+}
+
+func (h *MenuHandler) UpdateHidden(c *gin.Context) {
+	var req UpdateHiddenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.service.UpdateHidden(req.ID, req.Hidden); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *MenuHandler) Detail(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid menu ID")
+		return
+	}
+
+	result, err := h.service.GetByID(id)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func RegisterMenuRoutes(r *gin.RouterGroup, h *MenuHandler) {
 	menuGroup := r.Group("/menu")
 	{
 		menuGroup.GET("/query", h.Query)
+		menuGroup.GET("/detail/:id", h.Detail)
+		menuGroup.POST("/create", h.Create)
+		menuGroup.POST("/update", h.Update)
+		menuGroup.POST("/delete/:id", h.Delete)
+		menuGroup.POST("/updateSort", h.UpdateSort)
+		menuGroup.POST("/updateHidden", h.UpdateHidden)
 	}
 }

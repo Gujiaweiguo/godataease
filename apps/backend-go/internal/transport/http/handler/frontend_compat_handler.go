@@ -1,103 +1,50 @@
 package handler
 
 import (
+	"strings"
+
+	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/pkg/response"
+	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-type FrontendCompatHandler struct{}
+type FrontendCompatHandler struct {
+	menuService *service.MenuService
+}
 
-func NewFrontendCompatHandler() *FrontendCompatHandler {
-	return &FrontendCompatHandler{}
+func NewFrontendCompatHandler(menuService *service.MenuService) *FrontendCompatHandler {
+	return &FrontendCompatHandler{menuService: menuService}
 }
 
 func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
-	routers := []map[string]interface{}{
-		{
-			"path":      "/system",
-			"name":      "system",
-			"component": "Layout",
-			"redirect":  "/system/user",
-			"top":       true,
-			"inLayout":  true,
-			"meta": map[string]interface{}{
-				"title": "系统管理",
-			},
-			"children": []map[string]interface{}{
-				{
-					"path":      "user",
-					"name":      "system-user",
-					"component": "system/user",
-					"meta": map[string]interface{}{
-						"title": "用户管理",
-						"icon":  "peoples",
-					},
-				},
-				{
-					"path":      "role",
-					"name":      "system-role",
-					"component": "system/role",
-					"meta": map[string]interface{}{
-						"title": "角色管理",
-						"icon":  "auth",
-					},
-				},
-				{
-					"path":      "org",
-					"name":      "system-org",
-					"component": "system/org",
-					"meta": map[string]interface{}{
-						"title": "组织管理",
-						"icon":  "org",
-					},
-				},
-				{
-					"path":      "permission",
-					"name":      "system-permission",
-					"component": "system/permission",
-					"meta": map[string]interface{}{
-						"title": "权限管理",
-						"icon":  "icon_security",
-					},
-				},
-			},
-		},
+	routers := make([]map[string]interface{}, 0)
+	if h.menuService != nil {
+		menus, err := h.menuService.Query()
+		if err != nil {
+			response.Error(c, "500000", "failed to load role routers")
+			return
+		}
+		for _, m := range menus {
+			routers = append(routers, toRoleRouter(m, true))
+		}
 	}
 
 	response.Success(c, routers)
 }
 
 func (h *FrontendCompatHandler) GetMenuResource(c *gin.Context) {
-	menuTree := []map[string]interface{}{
-		{
-			"path": "user",
-			"meta": map[string]interface{}{
-				"title": "用户管理",
-				"icon":  "peoples",
-			},
-		},
-		{
-			"path": "role",
-			"meta": map[string]interface{}{
-				"title": "角色管理",
-				"icon":  "auth",
-			},
-		},
-		{
-			"path": "org",
-			"meta": map[string]interface{}{
-				"title": "组织管理",
-				"icon":  "org",
-			},
-		},
-		{
-			"path": "permission",
-			"meta": map[string]interface{}{
-				"title": "权限管理",
-				"icon":  "icon_security",
-			},
-		},
+	menuTree := make([]map[string]interface{}, 0)
+	if h.menuService != nil {
+		menus, err := h.menuService.Query()
+		if err != nil {
+			response.Error(c, "500000", "failed to load menu resource")
+			return
+		}
+		for _, m := range menus {
+			menuTree = append(menuTree, toMenuResource(m))
+		}
 	}
 
 	response.Success(c, menuTree)
@@ -155,4 +102,104 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, h *FrontendCompatHandler) 
 	engine.GET("/api/xpackComponent/content/:id", h.GetXpackContent)
 	engine.GET("/api/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
 	engine.GET("/api/websocket/info", h.GetWebSocketInfo)
+}
+
+func toRoleRouter(m *menu.MenuVO, isRoot bool) map[string]interface{} {
+	path := normalizePath(m.Path, isRoot)
+	result := map[string]interface{}{
+		"path":     path,
+		"name":     safeName(m.Name, path),
+		"hidden":   m.Hidden,
+		"inLayout": m.InLayout,
+		"meta": map[string]interface{}{
+			"title": displayTitle(m),
+			"icon":  m.Meta.Icon,
+		},
+	}
+
+	if m.Component != "" {
+		result["component"] = m.Component
+	}
+	if m.Redirect != "" {
+		result["redirect"] = m.Redirect
+	}
+	if m.IsPlugin {
+		result["plugin"] = true
+	}
+
+	if len(m.Children) > 0 {
+		children := make([]map[string]interface{}, 0, len(m.Children))
+		for _, child := range m.Children {
+			children = append(children, toRoleRouter(child, false))
+		}
+		result["children"] = children
+	}
+
+	return result
+}
+
+func toMenuResource(m *menu.MenuVO) map[string]interface{} {
+	result := map[string]interface{}{
+		"path": m.Path,
+		"meta": map[string]interface{}{
+			"title": displayTitle(m),
+			"icon":  m.Meta.Icon,
+		},
+	}
+
+	if len(m.Children) > 0 {
+		children := make([]map[string]interface{}, 0, len(m.Children))
+		for _, child := range m.Children {
+			children = append(children, toMenuResource(child))
+		}
+		result["children"] = children
+	}
+
+	return result
+}
+
+func normalizePath(path string, isRoot bool) string {
+	if isRoot {
+		if strings.HasPrefix(path, "/") {
+			return path
+		}
+		return "/" + path
+	}
+	return strings.TrimPrefix(path, "/")
+}
+
+func safeName(name string, path string) string {
+	if name != "" {
+		return name
+	}
+	return strings.ReplaceAll(strings.Trim(path, "/"), "/", "-")
+}
+
+func displayTitle(m *menu.MenuVO) string {
+	if m.Meta != nil && m.Meta.Title != "" {
+		if title, ok := menuTitleMap[m.Meta.Title]; ok {
+			return title
+		}
+		return m.Meta.Title
+	}
+	if title, ok := menuTitleMap[m.Name]; ok {
+		return title
+	}
+	return m.Name
+}
+
+var menuTitleMap = map[string]string{
+	"workbranch":       "工作台",
+	"panel":            "仪表板",
+	"screen":           "数据大屏",
+	"data":             "数据准备",
+	"dataset":          "数据集",
+	"datasource":       "数据源",
+	"sys-setting":      "系统设置",
+	"template-market":  "模板市场",
+	"toolbox":          "工具箱",
+	"template-setting": "模板管理",
+	"msg":              "消息中心",
+	"parameter":        "系统参数",
+	"font":             "字体设置",
 }

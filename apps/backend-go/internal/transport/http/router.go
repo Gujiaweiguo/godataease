@@ -103,6 +103,7 @@ type Router struct {
 	permHandler           *handler.PermHandler
 	embeddedHandler       *handler.EmbeddedHandler
 	roleHandler           *handler.RoleHandler
+	roleMenuHandler       *handler.RoleMenuHandler
 	menuHandler           *handler.MenuHandler
 	mapHandler            *handler.MapHandler
 	authHandler           *handler.AuthHandler
@@ -172,6 +173,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	menuRepo := repository.NewMenuRepository(db)
 	menuService := service.NewMenuService(menuRepo)
 	menuHandler := handler.NewMenuHandler(menuService)
+
+	// RoleMenu module initialization
+	roleMenuRepo := repository.NewRoleMenuRepository(db)
+	roleMenuService := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	roleMenuHandler := handler.NewRoleMenuHandler(roleMenuService)
 
 	// Map module initialization
 	areaRepo := repository.NewAreaRepository(db)
@@ -249,7 +255,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateService := service.NewTemplateService(templateRepo)
 	templateHandler := handler.NewTemplateHandler(templateService)
 
-	frontendCompatHandler := handler.NewFrontendCompatHandler()
+	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService)
 
 	return &Router{
 		engine:                engine,
@@ -261,6 +267,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		permHandler:           permHandler,
 		embeddedHandler:       embeddedHandler,
 		roleHandler:           roleHandler,
+		roleMenuHandler:       roleMenuHandler,
 		menuHandler:           menuHandler,
 		mapHandler:            mapHandler,
 		authHandler:           authHandler,
@@ -351,6 +358,7 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterPermRoutes(api, r.permHandler)
 		handler.RegisterEmbeddedRoutes(api, r.embeddedHandler)
 		handler.RegisterRoleRoutes(api, r.roleHandler)
+		handler.RegisterRoleMenuRoutes(api, r.roleMenuHandler)
 		handler.RegisterMenuRoutes(api, r.menuHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
 		handler.RegisterDatasourceRoutes(api, r.datasourceHandler)

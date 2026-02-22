@@ -16,9 +16,10 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="380">
+      <el-table-column label="操作" width="450">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+          <el-button link type="primary" @click="handleMenuAuth(row)">菜单授权</el-button>
           <el-button link type="primary" @click="handlePermissions(row)">权限设置</el-button>
           <el-button link type="primary" @click="handleViewAudit(row)">审计日志</el-button>
           <el-button link type="danger" @click="handleDelete(row.roleId)">删除</el-button>
@@ -63,6 +64,24 @@
         <el-button type="primary" @click="handlePermissionSave">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="menuAuthDialogVisible" title="菜单授权" width="600px">
+      <div style="padding: 20px">
+        <el-tree
+          ref="menuTreeRef"
+          :data="menuTree"
+          :props="{ label: 'meta title', children: 'children' }"
+          show-checkbox
+          node-key="id"
+          :default-checked-keys="selectedMenuIds"
+          @check="handleMenuCheck"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="menuAuthDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleMenuAuthSave">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -70,18 +89,31 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
-import { queryRoleApi, roleCreateApi, roleUpdateApi, roleDeleteApi } from '@/api/auth'
-import { resourceTreeApi, resourcePerSaveApi } from '@/api/auth'
+import {
+  queryRoleApi,
+  roleCreateApi,
+  roleUpdateApi,
+  roleDeleteApi,
+  resourceTreeApi,
+  resourcePerSaveApi,
+  menuTreeApi,
+  roleMenuAuthApi,
+  roleMenuAuthSaveApi
+} from '@/api/auth'
 
 const router = useRouter()
 
 const roleList = ref([])
 const dialogVisible = ref(false)
 const permDialogVisible = ref(false)
+const menuAuthDialogVisible = ref(false)
 const dialogTitle = ref('')
 const currentRole = ref<any>(null)
 const permissionTree = ref([])
 const selectedPermissions = ref([])
+const menuTree = ref([])
+const selectedMenuIds = ref([])
+const menuTreeRef = ref()
 
 const form = ref({
   roleId: null,
@@ -145,6 +177,26 @@ const buildPermissionTree = (permissions: any[]) => {
   return tree
 }
 
+const loadMenuTree = async () => {
+  try {
+    const res = await menuTreeApi()
+    if (res.code === '000000') {
+      menuTree.value = buildMenuTree(res.data || [])
+    }
+  } catch (error) {
+    ElMessage.error('加载菜单列表失败')
+  }
+}
+
+const buildMenuTree = (menus: any[]) => {
+  return menus.map(menu => ({
+    id: menu.id,
+    path: menu.path,
+    meta: { title: menu.meta?.title || menu.name },
+    children: menu.children ? buildMenuTree(menu.children) : []
+  }))
+}
+
 const handleCreate = () => {
   dialogTitle.value = '新建角色'
   form.value = {
@@ -186,6 +238,40 @@ const handlePermissionSave = async () => {
     }
   } catch (error) {
     ElMessage.error('权限设置失败')
+  }
+}
+
+const handleMenuAuth = async (row: any) => {
+  currentRole.value = row
+  selectedMenuIds.value = []
+  await loadMenuTree()
+  try {
+    const res = await roleMenuAuthApi(row.roleId)
+    if (res.code === '000000') {
+      selectedMenuIds.value = res.data?.menuIds || []
+    }
+  } catch (error) {
+    ElMessage.error('加载菜单授权失败')
+  }
+  menuAuthDialogVisible.value = true
+}
+
+const handleMenuCheck = (checkedKeys: any[]) => {
+  selectedMenuIds.value = checkedKeys
+}
+
+const handleMenuAuthSave = async () => {
+  try {
+    const res = await roleMenuAuthSaveApi({
+      roleId: currentRole.value.roleId,
+      menuIds: selectedMenuIds.value
+    })
+    if (res.code === '000000') {
+      ElMessage.success('菜单授权成功')
+      menuAuthDialogVisible.value = false
+    }
+  } catch (error) {
+    ElMessage.error('菜单授权失败')
   }
 }
 

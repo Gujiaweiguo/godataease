@@ -18,6 +18,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&user.SysUserRole{},
 		&user.SysUserPerm{},
 		&role.SysRole{},
+		&role.RoleMenu{},
 		&org.SysOrg{},
 		&permission.SysPerm{},
 		&static.StaticResource{},

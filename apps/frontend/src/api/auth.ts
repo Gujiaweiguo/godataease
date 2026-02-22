@@ -4,14 +4,14 @@ export const queryUserApi = data => request.post({ url: '/user/byCurOrg', data }
 export const queryUserOptionsApi = () => request.get({ url: '/user/org/option' })
 export const queryRoleApi = data => request.post({ url: '/role/byCurOrg', data })
 
-export const userCreateApi = (data: any) => request.post({ url: '/api/system/user/create', data })
-export const userUpdateApi = (data: any) => request.post({ url: '/api/system/user/update', data })
-export const userDeleteApi = (id: number) => request.post({ url: '/api/system/user/delete/' + id })
+export const userCreateApi = (data: any) => request.post({ url: '/system/user/create', data })
+export const userUpdateApi = (data: any) => request.post({ url: '/system/user/update', data })
+export const userDeleteApi = (id: number) => request.post({ url: '/system/user/delete/' + id })
 
-export const roleCreateApi = (data: any) => request.post({ url: '/api/system/role/create', data })
-export const roleUpdateApi = (data: any) => request.post({ url: '/api/system/role/update', data })
+export const roleCreateApi = (data: any) => request.post({ url: '/system/role/create', data })
+export const roleUpdateApi = (data: any) => request.post({ url: '/system/role/update', data })
 export const roleDeleteApi = (roleId: number) =>
-  request.post({ url: '/api/system/role/delete/' + roleId })
+  request.post({ url: '/system/role/delete/' + roleId })
 
 export const resourceTreeApi = (flag: string) => request.get({ url: '/auth/busiResource/' + flag })
 
@@ -25,7 +25,7 @@ export const busiPerSaveApi = data => request.post({ url: '/auth/saveBusiPer', d
 export const menuPerSaveApi = data => request.post({ url: '/auth/saveMenuPer', data })
 
 export const resourcePerSaveApi = data =>
-  request.post({ url: '/api/system/role/permission/save', data })
+  request.post({ url: '/system/role/permission/save', data })
 
 export const resourceTargetPerApi = data =>
   request.post({ url: '/auth/busiTargetPermission', data })
@@ -34,3 +34,7 @@ export const menuTargetPerApi = data => request.post({ url: '/auth/menuTargetPer
 
 export const busiTargetPerSaveApi = data => request.post({ url: '/auth/saveBusiTargetPer', data })
 export const menuTargetPerSaveApi = data => request.post({ url: '/auth/saveMenuTargetPer', data })
+
+export const roleMenuAuthApi = (roleId: number) => request.get({ url: '/roleMenu/auth/' + roleId })
+export const roleMenuAuthSaveApi = (data: { roleId: number; menuIds: number[] }) =>
+  request.post({ url: '/roleMenu/auth', data })
