@@ -41,8 +41,8 @@ import {
   DEFAULT_LABEL,
   DEFAULT_LEGEND_STYLE
 } from '@/views/chart/components/editor/util/chart'
-import type { Options, PickOptions } from '@antv/g2plot'
-import type { Plot } from '@antv/g2plot/esm/core/plot'
+import type { Options } from '@antv/g2plot'
+import type { Plot, PickOptions } from '@antv/g2plot/esm/core/plot'
 import { Group } from '@antv/g-canvas'
 import { extremumEvt } from '@/views/chart/components/js/extremumUitl'
 
@@ -64,27 +64,27 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     ]
   }
   axis: AxisType[] = [...CHART_MIX_AXIS_TYPE, 'xAxisExtRight', 'yAxisExt']
-  axisConfig = {
+  axisConfig: AxisConfig = {
     xAxis: {
       name: `${t('chart.drag_block_type_axis')} / ${t('chart.dimension')}`,
-      type: 'd'
+      type: 'd' as const
     },
     yAxis: {
       name: `${t('chart.drag_block_value_axis_left')} / ${t('chart.column_quota')}`,
       limit: 1,
-      type: 'q'
+      type: 'q' as const
     },
     extBubble: {
       //用这个字段存放右轴分类
       name: `${t('chart.drag_block_type_axis_right')} / ${t('chart.dimension')}`,
       limit: 1,
-      type: 'd',
+      type: 'd' as const,
       allowEmpty: true
     },
     yAxisExt: {
       name: `${t('chart.drag_block_value_axis_right')} / ${t('chart.line_quota')}`,
       limit: 1,
-      type: 'q',
+      type: 'q' as const,
       allowEmpty: true
     }
   }
@@ -186,7 +186,8 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
 
   protected configLabel(chart: Chart, options: DualAxesOptions): DualAxesOptions {
     const tempLabel = getLabel(chart)
-    const tmpOption = { ...options }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tmpOption: any = { ...options }
     if (!tempLabel) {
       if (tmpOption.geometryOptions) {
         tmpOption.geometryOptions[0].label = false
@@ -285,7 +286,13 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     const leftLineStyle = {
       lineWidth: s.leftLineWidth
     }
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = {
+      ...options,
+      smooth,
+      point,
+      lineStyle
+    }
       ...options,
       smooth,
       point,
@@ -337,7 +344,8 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = { ...options }
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -375,7 +383,8 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
   }
 
   protected configSubCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = { ...options }
       ...options
     }
     const basicStyle = defaultsDeep(
@@ -464,7 +473,8 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     const yAxis = getYAxis(chart)
     const yAxisExt = getYAxisExt(chart)
 
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = { ...options }
       ...options
     }
 
@@ -683,7 +693,8 @@ export class GroupColumnLineMix extends ColumnLineMix {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = { ...options }
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -796,7 +807,8 @@ export class StackColumnLineMix extends ColumnLineMix {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = { ...options }
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -914,7 +926,8 @@ export class DualLineMix extends ColumnLineMix {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tempOption: any = { ...options }
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle

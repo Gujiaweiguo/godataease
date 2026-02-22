@@ -14,7 +14,8 @@ import {
   Aggregation,
   S2DataConfig,
   MergedCell,
-  LayoutResult
+  LayoutResult,
+  SortParams
 } from '@antv/s2'
 import { formatterItem, valueFormatter } from '../../../formatter'
 import { hexColorToRGBA, isAlphaColor, parseJson } from '../../../util'
@@ -250,7 +251,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       },
       meta: meta,
       data: newData,
-      sortParams: sortParams
+      sortParams: sortParams as unknown as SortParams
     }
     const s2Options: S2Options = {
       width: containerDom.offsetWidth,
@@ -699,7 +700,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     )
     const { tableTotal } = parseJson(chart.customAttr)
     // 解析合计、小计排序
-    const sortParams: SortParam[] = []
+    const sortParams: Partial<SortParam>[] = []
     let rowTotalSort = false
     if (
       tableTotal.row.totalSort &&

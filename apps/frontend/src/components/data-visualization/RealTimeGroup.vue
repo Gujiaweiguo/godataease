@@ -98,7 +98,10 @@ const props = defineProps({
     required: false,
     default: 'main'
   },
-  componentData: []
+  componentData: {
+    type: Array,
+    default: () => []
+  }
 })
 
 const { componentData } = toRefs(props)
