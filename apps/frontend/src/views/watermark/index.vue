@@ -105,7 +105,7 @@
   </el-row>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, reactive } from 'vue'
 import { watermarkFind, watermarkSave } from '@/api/watermark'
 import { ElMessage } from 'element-plus-secondary/es'

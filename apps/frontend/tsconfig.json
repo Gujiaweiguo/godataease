@@ -19,11 +19,14 @@
     "types": [
       "vite/client",
       "vite-plugin-svg-icons/client",
-      "element-plus-secondary/global",
-    ],
+      "element-plus-secondary/global"
+    ]
   },
   "include": [
-    "src/**/*",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "src/**/*.vue",
     "electron-main/**/*.ts",
     "types/**/*.d.ts",
     "types"
@@ -31,6 +34,6 @@
   "exclude": [
     "dist",
     "lib",
-    "node_modules",
+    "node_modules"
   ]
 }
