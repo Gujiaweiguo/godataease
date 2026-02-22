@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { propTypes } from '@/utils/propTypes'
-import { computed, PropType, reactive, toRefs, h } from 'vue'
+import { computed, PropType, reactive, toRefs } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 
 const { t } = useI18n()

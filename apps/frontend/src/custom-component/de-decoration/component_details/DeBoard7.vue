@@ -30,7 +30,7 @@ const mergeColor = () => {
 }
 
 const border_style = computed(() => {
-  const [primaryColor, secondaryColor] = mergedColor.value
+  const [primaryColor] = mergedColor.value
   return {
     width: `${width.value}px`,
     height: `${height.value}px`,

@@ -398,7 +398,6 @@ const { t } = useI18n()
 const curEditDataId = ref(null)
 const snapshotStore = snapshotStoreWithOut()
 import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
-import dvInfoSvg from '@/assets/svg/dv-info.svg'
 
 const state = reactive({
   filterExpand: true,

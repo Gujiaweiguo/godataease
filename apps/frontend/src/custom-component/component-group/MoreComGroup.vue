@@ -5,7 +5,6 @@ import eventBus from '@/utils/eventBus'
 import DragComponent from '@/custom-component/component-group/DragComponent.vue'
 import { commonHandleDragEnd, commonHandleDragStart } from '@/utils/canvasUtils'
 import { useI18n } from '@/hooks/web/useI18n'
-import dvTabScreen from '@/assets/svg/dv-tab-screen.svg'
 const { t } = useI18n()
 const props = defineProps({
   propValue: {

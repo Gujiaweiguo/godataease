@@ -120,7 +120,7 @@ const VanPopupSelect = defineAsyncComponent(() => import('./VanPopupSelect.vue')
 const cascade = computed(() => {
   return cascadeList() || []
 })
-let time
+let time: ReturnType<typeof setTimeout> | null = null
 const disabledFirstItem = computed(() => {
   const { defaultValueFirstItem, optionValueSource } = props.config
   return defaultValueFirstItem && optionValueSource === 1
@@ -199,7 +199,7 @@ const getCascadeFieldId = () => {
   cascade.value.forEach(ele => {
     let condition = null
     ele.forEach(item => {
-      const [_, queryId, fieldId] = item.datasetId.split('--')
+      const [, queryId, fieldId] = item.datasetId.split('--')
       if (queryId === config.value.id && condition) {
         if (item.fieldId) {
           condition.fieldId = item.fieldId
@@ -313,6 +313,7 @@ const customSort = () => {
           if (config.value.sortList.indexOf(a.value) !== -1) {
             return -1
           }
+          return 0
         })
         .sort((a, b) => {
           if (config.value.sortList.indexOf(a.value) === -1) {
@@ -626,7 +627,7 @@ const setOptions = (num: number) => {
     sortId
   } = config.value
   switch (optionValueSource) {
-    case 0:
+    case 0: {
       const arr = Object.values(checkedFieldsMap).filter(ele => !!ele) as string[]
       if (!!checkedFields.length && !!arr.length) {
         handleFieldIdDefaultChange(
@@ -636,6 +637,7 @@ const setOptions = (num: number) => {
         options.value = []
       }
       break
+    }
     case 1:
       if (field.id) {
         handleFieldIdChange({

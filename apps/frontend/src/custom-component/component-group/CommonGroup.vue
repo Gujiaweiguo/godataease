@@ -49,10 +49,6 @@ const groupActiveChange = category => {
   state.curCategory = category
   anchorPosition('#' + category)
 }
-
-const findUrl = name => {
-  return new URL(`/src/assets/dynamic-background/${name}`, import.meta.url).href
-}
 </script>
 
 <template>

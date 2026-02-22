@@ -421,17 +421,9 @@ const decodeHTMLEntities = text => {
   return textarea.value
 }
 
-const encodeHTMLEntities = text => {
-  if (!text) return text
-
-  const textarea = document.createElement('textarea')
-  textarea.textContent = text
-  return textarea.innerHTML
-}
 const initFontFamily = htmlText => {
   const regex = /font-family:\s*([^;"]+);/g
-  let match
-  while ((match = regex.exec(htmlText)) !== null) {
+  for (const match of htmlText.matchAll(regex)) {
     const font = match[1].trim()
     if (systemFontFamily.includes(font)) {
       appearanceStore.setCurrentFont(font)
@@ -494,7 +486,7 @@ const computedCanEdit = computed<boolean>(() => {
 
 const showPlaceHolder = computed<boolean>(() => {
   return (
-    computedCanEdit.value && (myValue.value == undefined || myValue.value == '') && !isError.value
+    computedCanEdit.value && (myValue.value === undefined || myValue.value === '') && !isError.value
   )
 })
 

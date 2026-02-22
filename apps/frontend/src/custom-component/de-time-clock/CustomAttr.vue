@@ -1,17 +1,4 @@
-<script setup lang="ts">
-import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
-import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
-
-import { storeToRefs } from 'pinia'
-import { onMounted, reactive } from 'vue'
-
-const state = reactive({})
-
-const dvMainStore = dvMainStoreWithOut()
-const snapshotStore = snapshotStoreWithOut()
-
-const { curComponent } = storeToRefs(dvMainStore)
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <el-collapse-item

@@ -116,7 +116,7 @@ const init = ref({
     editor.ui.registry.addSplitButton('splitDateButton', {
       icon: 'emoticons',
       tooltip: '图表选中字段',
-      onAction: _ => () => {
+      onAction: () => {
         editor.insertContent('')
       },
       onItemAction: (_, value) => {

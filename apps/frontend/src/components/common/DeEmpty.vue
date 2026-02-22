@@ -7,7 +7,10 @@ const { t } = useI18n()
 
 <template>
   <el-row class="custom-position">
-    <empty-background description="t('visualization.select_dimension_hint')" img-type="noneWhite" />
+    <empty-background
+      :description="t('visualization.select_dimension_hint')"
+      img-type="noneWhite"
+    />
   </el-row>
 </template>
 

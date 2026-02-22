@@ -111,7 +111,7 @@ watch(
     })
   }
 )
-let oldId
+let oldId: string | undefined
 watch(
   () => config.value.treeFieldList,
   val => {
@@ -254,7 +254,7 @@ const getCascadeFieldId = () => {
   cascade.value.forEach(ele => {
     let condition = null
     ele.forEach(item => {
-      const [_, queryId, fieldId] = item.datasetId.split('--')
+      const [, queryId, fieldId] = item.datasetId.split('--')
       const defaultValueFirstItem = item.defaultValueFirstItem
       if (queryId === config.value.id && condition) {
         if (item.fieldId) {

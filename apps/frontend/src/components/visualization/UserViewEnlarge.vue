@@ -162,7 +162,7 @@ import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { exportExcelDownload } from '@/views/chart/components/js/util'
 import { storeToRefs } from 'pinia'
 import { RefreshLeft } from '@element-plus/icons-vue'
-import { assign, merge } from 'lodash-es'
+import { assign } from 'lodash-es'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { ElMessage, ElButton } from 'element-plus-secondary'
 import { exportPivotExcel } from '@/views/chart/components/js/panel/common/common_table'
@@ -314,8 +314,12 @@ const dialogInit = (canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
   if (opt === 'details') {
     if (!viewInfo.value.type?.includes('table')) {
       assign(viewInfo.value, DETAIL_CHART_ATTR)
-      viewInfo.value.xAxis.forEach(i => (i.hide = false))
-      viewInfo.value.yAxis.forEach(i => (i.hide = false))
+      viewInfo.value.xAxis.forEach(i => {
+        i.hide = false
+      })
+      viewInfo.value.yAxis.forEach(i => {
+        i.hide = false
+      })
       viewInfo.value['customAttr']['tableHeader']['tableHeaderFontColor'] =
         canvasStyleData.value.dialogButton
       viewInfo.value['customAttr']['tableCell']['tableFontColor'] =

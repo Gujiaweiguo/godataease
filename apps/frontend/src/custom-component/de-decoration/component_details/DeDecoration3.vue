@@ -51,7 +51,7 @@ const points = ref<number[][]>([])
 
 // 预生成动画配置（优化随机性能）
 const animationConfigs = computed(() => {
-  return points.value.map((_, i) => ({
+  return points.value.map(() => ({
     shouldAnimate: Math.random() <= props.animationRatio,
     duration: 1 + Math.random(), // 1-2秒
     delay: Math.random() * 2 // 0-2秒

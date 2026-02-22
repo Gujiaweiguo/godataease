@@ -292,9 +292,6 @@ const handleContextMenu = e => {
     document.body.removeChild(customContextMenu)
   })
 }
-const expandClick = component => {
-  component['expand'] = !component['expand']
-}
 </script>
 
 <template>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import dbMoreWeb from '@/assets/svg/db-more-web.svg'
-import dvTabScreen from '@/assets/svg/dv-tab-screen.svg'
 import { toRefs } from 'vue'
 import eventBus from '@/utils/eventBus'
 import DragComponent from '@/custom-component/component-group/DragComponent.vue'
