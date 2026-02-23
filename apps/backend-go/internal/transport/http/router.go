@@ -191,13 +191,13 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	datasourceRepo := repository.NewDatasourceRepository(db)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	datasourceHandler := handler.NewDatasourceHandler(datasourceService)
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{1})
 
 	// Dataset with row permission integration
 	datasetRepo := repository.NewDatasetRepository(db)
 	rowPermRepo := repository.NewRowPermissionRepository(db)
 	columnPermRepo := repository.NewColumnPermissionRepository(db)
-	// adminChecker is defined later for permission middleware, pass nil for now
-	rowPermService := service.NewRowPermissionService(rowPermRepo, columnPermRepo, userRoleRepo, nil)
+	rowPermService := service.NewRowPermissionService(rowPermRepo, columnPermRepo, userRoleRepo, adminChecker)
 	datasetService := service.NewDatasetServiceWithPermission(datasetRepo, rowPermService)
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 
@@ -243,7 +243,6 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
-	adminChecker := middleware.NewDefaultAdminChecker([]int64{1}) // User ID 1 is admin
 	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
