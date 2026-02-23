@@ -80,12 +80,33 @@ func (m *mockResourcePermRepo) RevokePermFromRole(roleID, permID int64) error {
 	return nil
 }
 
+// mockExportPermSvc is a mock for ExportPermissionService
+type mockExportPermSvc struct {
+	hasPermission bool
+}
+
+func (m *mockExportPermSvc) CheckExportPermission(ctx interface{}, req *service.ExportCheckRequest) *service.ExportCheckResult {
+	return &service.ExportCheckResult{
+		CanExport: m.hasPermission,
+	}
+}
+
+func (m *mockExportPermSvc) CheckBatchExportPermission(ctx interface{}, userID int64, resourceType string, resourceIDs []int64) map[int64]bool {
+	results := make(map[int64]bool)
+	for _, id := range resourceIDs {
+		results[id] = m.hasPermission
+	}
+	return results
+}
+
 func TestDatasetPreviewWithPerm_401_Unauthenticated(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
-	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, nil)
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataset/previewWithPerm", permMiddleware.CheckDatasetView(), func(c *gin.Context) {
@@ -108,7 +129,8 @@ func TestDatasetPreviewWithPerm_403_Forbidden(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataset/previewWithPerm", func(c *gin.Context) {
@@ -134,7 +156,8 @@ func TestDatasetPreviewWithPerm_200_Success(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataset/previewWithPerm", func(c *gin.Context) {
@@ -160,7 +183,8 @@ func TestDatasetPreviewWithPerm_200_AdminBypass(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{1})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataset/previewWithPerm", func(c *gin.Context) {
@@ -185,7 +209,8 @@ func TestDataVisualizationFindById_401_Unauthenticated(t *testing.T) {
 
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, nil)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, nil)
 
 	r := gin.New()
 	r.POST("/dataVisualization/findById", permMiddleware.CheckDashboardView(), func(c *gin.Context) {
@@ -208,7 +233,8 @@ func TestDataVisualizationFindById_403_Forbidden(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataVisualization/findById", func(c *gin.Context) {
@@ -234,7 +260,8 @@ func TestDataVisualizationFindById_200_Success(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataVisualization/findById", func(c *gin.Context) {
@@ -260,7 +287,8 @@ func TestDataVisualizationFindById_200_AdminBypass(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{1})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataVisualization/findById", func(c *gin.Context) {
@@ -286,7 +314,8 @@ func TestDashboardEdit_403_Forbidden(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataVisualization/updateCanvas", func(c *gin.Context) {
@@ -312,7 +341,8 @@ func TestDashboardEdit_200_Success(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataVisualization/updateCanvas", func(c *gin.Context) {
@@ -338,7 +368,8 @@ func TestPermissionDenied_ResponseBody(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.POST("/dataset/previewWithPerm", func(c *gin.Context) {
@@ -368,7 +399,8 @@ func TestDatasetExport_401_Unauthenticated(t *testing.T) {
 
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, nil)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, nil)
 
 	r := gin.New()
 	r.POST("/export/dataset/:id", permMiddleware.CheckDatasetExport(), func(c *gin.Context) {
@@ -384,12 +416,113 @@ func TestDatasetExport_401_Unauthenticated(t *testing.T) {
 	}
 }
 
+func TestExportTasksDownload_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, nil)
+
+	r := gin.New()
+	r.GET("/exportTasks/:id/download", permMiddleware.CheckExportPermission("task"), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("GET", "/exportTasks/123/download", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Errorf("expected 401 for unauthenticated exportTasks download, got %d", w.Code)
+	}
+}
+
+func TestExportTasksDownload_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.GET("/exportTasks/:id/download", func(c *gin.Context) {
+		c.Set("user_id", uint64(500))
+		c.Next()
+	}, permMiddleware.CheckExportPermission("task"), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("GET", "/exportTasks/456/download", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Errorf("expected 403 for forbidden exportTasks download, got %d", w.Code)
+	}
+}
+
+func TestExportTasksDownload_200_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.GET("/exportTasks/:id/download", func(c *gin.Context) {
+		c.Set("user_id", uint64(500))
+		c.Next()
+	}, permMiddleware.CheckExportPermission("task"), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("GET", "/exportTasks/789/download", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("expected 200 for authorized exportTasks download, got %d", w.Code)
+	}
+}
+
+func TestExportTasksDownload_200_AdminBypass(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.GET("/exportTasks/:id/download", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckExportPermission("task"), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("GET", "/exportTasks/999/download", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("expected 200 for admin bypass exportTasks download, got %d", w.Code)
+	}
+}
+
 func TestScreenView_401_Unauthenticated(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, nil)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, nil)
 
 	r := gin.New()
 	r.POST("/screen/:id", permMiddleware.CheckScreenView(), func(c *gin.Context) {
@@ -410,7 +543,8 @@ func TestDatasourceView_401_Unauthenticated(t *testing.T) {
 
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, nil)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, nil)
 
 	r := gin.New()
 	r.POST("/datasource/:id", permMiddleware.CheckDatasourceView(), func(c *gin.Context) {
@@ -431,7 +565,8 @@ func TestDashboardDelete_401_Unauthenticated(t *testing.T) {
 
 	mockRepo := &mockResourcePermRepo{hasPermission: true}
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, nil)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, nil)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, nil)
 
 	r := gin.New()
 	r.DELETE("/dataVisualization/deleteLogic/:id", permMiddleware.CheckDashboardEdit(), func(c *gin.Context) {
@@ -453,7 +588,8 @@ func TestDashboardDelete_403_Forbidden(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.DELETE("/dataVisualization/deleteLogic/:id", func(c *gin.Context) {
@@ -478,7 +614,8 @@ func TestDashboardDelete_200_AdminBypass(t *testing.T) {
 	mockRepo := &mockResourcePermRepo{hasPermission: false}
 	adminChecker := NewDefaultAdminChecker([]int64{1})
 	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
-	permMiddleware := NewPermissionMiddleware(resourcePermSvc, nil, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	r := gin.New()
 	r.DELETE("/dataVisualization/deleteLogic/:id", func(c *gin.Context) {
