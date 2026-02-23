@@ -1,34 +1,31 @@
-# DataEase Backend Configuration Example
-# Copy this file to config.yaml and modify as needed
-
 server:
-  port: 8080          # HTTP server port
-  mode: debug         # debug, release, test
+  port: 8100
+  mode: debug
 
 database:
-  host: mysql8        # Database host (Docker: mysql8, Local: localhost)
-  port: 3306          # Database port
-  name: dataease10    # Database name
-  user: root          # Database user
-  password: "Admin168"  # Database password
-  max_open_conns: 100 # Max open connections
-  max_idle_conns: 10  # Max idle connections
+  host: ${DATABASE_HOST:-mysql8}
+  port: ${DATABASE_PORT:-3306}
+  name: ${DATABASE_NAME:-dataease_dev}
+  user: ${DATABASE_USER:-root}
+  password: ${DATABASE_PASSWORD:-change-me}
+  max_open_conns: 100
+  max_idle_conns: 10
 
 redis:
-  host: redis-dataease  # Redis host (Docker: redis-dataease, Local: localhost)
-  port: 6379          # Redis port
-  password: ""        # Redis password
-  db: 0               # Redis database number
-  pool_size: 100      # Connection pool size
+  host: ${REDIS_HOST:-redis-dataease}
+  port: ${REDIS_PORT:-6379}
+  password: ${REDIS_PASSWORD:-}
+  db: 0
+  pool_size: 100
 
 jwt:
-  secret: "CHANGE-ME-IN-PRODUCTION"  # JWT signing secret
-  expire: 86400                       # Token expiry in seconds (24h)
+  secret: ${JWT_SECRET:-change-me-in-production}
+  expire: 86400
 
 log:
-  level: info         # debug, info, warn, error
-  format: console     # console, json
+  level: info
+  format: console
 
 telemetry:
-  enabled: false      # Enable OpenTelemetry
-  endpoint: ""        # OTel collector endpoint
+  enabled: false
+  endpoint: ""
