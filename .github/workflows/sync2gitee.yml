@@ -6,13 +6,22 @@ on:
 jobs:
   repo-sync:
     runs-on: ubuntu-latest
+    env:
+      GITEE_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
     steps:
+      - name: Skip when Gitee secrets are missing
+        if: ${{ env.GITEE_PRIVATE_KEY == '' || env.GITEE_TOKEN == '' }}
+        run: |
+          echo "Skipping Gitee sync: GITEE_PRIVATE_KEY or GITEE_TOKEN is not configured."
+
       - name: Mirror the Github organization repos to Gitee.
+        if: ${{ env.GITEE_PRIVATE_KEY != '' && env.GITEE_TOKEN != '' }}
         uses: Yikun/hub-mirror-action@master
         with:
           src: 'github/dataease'
           dst: 'gitee/fit2cloud-feizhiyun'
-          dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
-          dst_token:  ${{ secrets.GITEE_TOKEN }}
+          dst_key: ${{ env.GITEE_PRIVATE_KEY }}
+          dst_token: ${{ env.GITEE_TOKEN }}
           static_list: "DataEase"
           force_update: true
