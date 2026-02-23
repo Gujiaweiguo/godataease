@@ -2,6 +2,7 @@ package handler
 
 import (
 	"dataease/backend/internal/domain/export"
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
@@ -10,11 +11,21 @@ import (
 )
 
 type ExportHandler struct {
-	service *service.ExportService
+	service       *service.ExportService
+	exportPermSvc *service.ExportPermissionService
+	adminChecker  middleware.AdminChecker
 }
 
-func NewExportHandler(service *service.ExportService) *ExportHandler {
-	return &ExportHandler{service: service}
+func NewExportHandler(
+	service *service.ExportService,
+	exportPermSvc *service.ExportPermissionService,
+	adminChecker middleware.AdminChecker,
+) *ExportHandler {
+	return &ExportHandler{
+		service:       service,
+		exportPermSvc: exportPermSvc,
+		adminChecker:  adminChecker,
+	}
 }
 
 func (h *ExportHandler) ExportTasks(c *gin.Context) {
@@ -104,6 +115,10 @@ func (h *ExportHandler) Download(c *gin.Context) {
 		return
 	}
 
+	if !h.checkExportPermission(c, task, userID, isAdmin) {
+		return
+	}
+
 	response.Success(c, &export.DownloadResponse{URL: "/downloads/" + task.ID})
 }
 
@@ -114,7 +129,84 @@ func (h *ExportHandler) GenerateDownloadURI(c *gin.Context) {
 		return
 	}
 
+	task, err := h.service.GetByID(id)
+	if err != nil {
+		response.NotFoundExport(c, "导出任务不存在")
+		return
+	}
+
+	userID := int64(middleware.GetUserID(c))
+	role := middleware.GetRole(c)
+	isAdmin := role == "admin"
+
+	if err = h.service.CheckAccess(task, userID, isAdmin); err != nil {
+		if err == service.ErrUnauthorized {
+			response.ForbiddenExport(c, "无权访问该导出任务")
+			return
+		}
+		response.NotFoundExport(c, "导出任务不存在")
+		return
+	}
+
+	if !h.checkExportPermission(c, task, userID, isAdmin) {
+		return
+	}
+
 	response.Success(c, "/downloads/"+id)
+}
+
+func (h *ExportHandler) checkExportPermission(c *gin.Context, task *export.ExportTask, userID int64, isAdmin bool) bool {
+	if task == nil || h.exportPermSvc == nil {
+		return true
+	}
+
+	if isAdmin || (h.adminChecker != nil && h.adminChecker.IsAdmin(userID)) {
+		return true
+	}
+
+	if task.ExportFrom <= 0 || task.ExportFromType == "" {
+		return true
+	}
+
+	resourceType := normalizeExportResourceType(task.ExportFromType)
+	if resourceType == "" {
+		return true
+	}
+
+	exportType := service.ExportType(c.Query("exportType"))
+	if exportType == "" {
+		exportType = service.ExportTypeImage
+	}
+
+	req := &service.ExportCheckRequest{
+		UserID:       userID,
+		ResourceType: resourceType,
+		ResourceID:   task.ExportFrom,
+		ExportType:   exportType,
+	}
+
+	result := h.exportPermSvc.CheckExportPermission(c.Request.Context(), req)
+	if !result.CanExport {
+		response.ForbiddenExport(c, "无权导出该资源")
+		return false
+	}
+
+	return true
+}
+
+func normalizeExportResourceType(raw string) string {
+	switch raw {
+	case permission.ResourceTypeDataset:
+		return permission.ResourceTypeDataset
+	case permission.ResourceTypeDashboard:
+		return permission.ResourceTypeDashboard
+	case permission.ResourceTypeScreen:
+		return permission.ResourceTypeScreen
+	case permission.ResourceTypeDatasource:
+		return permission.ResourceTypeDatasource
+	default:
+		return ""
+	}
 }
 
 func (h *ExportHandler) Retry(c *gin.Context) {

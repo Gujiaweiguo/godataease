@@ -241,10 +241,17 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	staticService := service.NewStaticService(staticRepo, storeRepo, typefaceRepo)
 	staticHandler := handler.NewStaticHandler(staticService)
 
+	// Permission middleware initialization
+	resourcePermRepo := repository.NewResourcePermissionRepository(db)
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{1}) // User ID 1 is admin
+	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
+	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
+
 	// Export module initialization
 	exportRepo := repository.NewExportRepository(db)
 	exportService := service.NewExportService(exportRepo)
-	exportHandler := handler.NewExportHandler(exportService)
+	exportHandler := handler.NewExportHandler(exportService, exportPermService, adminChecker)
 
 	// Engine module initialization
 	engineRepo := repository.NewEngineRepository(db)
@@ -262,13 +269,6 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateHandler := handler.NewTemplateHandler(templateService)
 
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService)
-
-	// Permission middleware initialization
-	resourcePermRepo := repository.NewResourcePermissionRepository(db)
-	adminChecker := middleware.NewDefaultAdminChecker([]int64{1}) // User ID 1 is admin
-	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
-	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
-	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 
 	return &Router{
 		engine:                engine,
