@@ -11,7 +11,10 @@
     "build:lib": "vite build --mode lib",
     "lint": "eslint . --ext .vue,.js,.ts,.jsx,.tsx --fix",
     "lint:stylelint": "stylelint --fix \"**/*.{vue,less,postcss,css,scss}\" --cache --cache-location node_modules/.cache/stylelint/",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@antv/g2plot": "^2.4.29",
@@ -116,6 +119,11 @@
     "vite-plugin-svg-icons": "^2.0.1",
     "vite-svg-loader": "^5.1.0",
     "vue-tsc": "^1.0.24",
+    "vitest": "^2.0.0",
+    "@vue/test-utils": "^2.4.0",
+    "happy-dom": "^15.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "lint-staged": "^15.0.0",
     "xss": "^1.0.14"
   },
   "overrides": {
