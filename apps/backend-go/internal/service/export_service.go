@@ -19,10 +19,11 @@ var (
 )
 
 type ExportService struct {
-	repo *repository.ExportRepository
+	repo repository.ExportRepositoryInterface
 }
 
-func NewExportService(repo *repository.ExportRepository) *ExportService {
+
+func NewExportService(repo repository.ExportRepositoryInterface) *ExportService {
 	return &ExportService{repo: repo}
 }
 

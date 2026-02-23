@@ -27,6 +27,20 @@ func (coreExportTask) TableName() string {
 	return "core_export_task"
 }
 
+type ExportRepositoryInterface interface {
+	Create(task *export.ExportTask) error
+	GetByID(id string) (*export.ExportTask, error)
+	List(page, pageSize int, status string) ([]export.ExportTask, int64, error)
+	UpdateStatus(id string, status string) error
+	Delete(id string) error
+	DeleteBatch(ids []string) error
+	DeleteAllByType(exportFromType string) error
+	CountByStatus() (map[string]int64, error)
+}
+
+var _ ExportRepositoryInterface = (*ExportRepository)(nil)
+
+
 type ExportRepository struct {
 	db *gorm.DB
 }
