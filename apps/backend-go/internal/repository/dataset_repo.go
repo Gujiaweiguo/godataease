@@ -174,6 +174,39 @@ func (r *DatasetRepository) PreviewRows(tableName string, limit int) ([]map[stri
 	return rows, nil
 }
 
+func (r *DatasetRepository) PreviewRowsWithFilter(tableName string, selectColumns string, whereClause string, whereArgs []interface{}, limit int) ([]map[string]interface{}, error) {
+	if !tableNamePattern.MatchString(tableName) {
+		return nil, fmt.Errorf("invalid table name")
+	}
+	if limit < 1 {
+		limit = 100
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	if selectColumns == "" {
+		selectColumns = "*"
+	}
+
+	rows := make([]map[string]interface{}, 0)
+	sql := fmt.Sprintf("SELECT %s FROM `%s`", selectColumns, tableName)
+	args := make([]interface{}, 0)
+
+	if whereClause != "" {
+		sql += " WHERE " + whereClause
+		args = append(args, whereArgs...)
+	}
+
+	sql += " LIMIT ?"
+	args = append(args, limit)
+
+	if err := r.db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
 func (r *DatasetRepository) QueryDistinctValues(tableName string, columnName string, filters []dataset.EnumFilterClause, limit int) ([]string, error) {
 	if !tableNamePattern.MatchString(tableName) {
 		return nil, fmt.Errorf("invalid table name")

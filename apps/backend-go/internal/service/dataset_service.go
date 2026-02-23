@@ -18,8 +18,11 @@ import (
 )
 
 type DatasetService struct {
-	repo *repository.DatasetRepository
+	repo                 *repository.DatasetRepository
+	rowPermissionService *RowPermissionService
 }
+
+
 
 type sqlVariableDetailRaw struct {
 	VariableName string        `json:"variableName"`
@@ -30,6 +33,12 @@ type sqlVariableDetailRaw struct {
 func NewDatasetService(repo *repository.DatasetRepository) *DatasetService {
 	return &DatasetService{repo: repo}
 }
+
+func NewDatasetServiceWithPermission(repo *repository.DatasetRepository, rowPermSvc *RowPermissionService) *DatasetService {
+	return &DatasetService{repo: repo, rowPermissionService: rowPermSvc}
+}
+
+
 
 func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, error) {
 	groups, err := s.repo.ListGroups(req.Keyword)
@@ -121,6 +130,55 @@ func (s *DatasetService) Preview(req *dataset.PreviewRequest) (*dataset.PreviewR
 		Total:   total,
 	}, nil
 }
+
+func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, userID int64) (*dataset.PreviewResponse, error) {
+	limit := req.Limit
+	if limit < 1 {
+		limit = 100
+	}
+
+	tableName, err := s.repo.FindPrimaryTableName(req.DatasetGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	var selectColumns = "*"
+	var whereClause string
+	var whereArgs []interface{}
+
+	if s.rowPermissionService != nil {
+		selectColumns, _ = s.rowPermissionService.BuildSelectColumns(req.DatasetGroupID, userID)
+		whereResult, _ := s.rowPermissionService.BuildWhereClause(req.DatasetGroupID, userID)
+		if whereResult != nil {
+			whereClause = whereResult.Clause
+			whereArgs = whereResult.Args
+		}
+	}
+
+	rows, err := s.repo.PreviewRowsWithFilter(tableName, selectColumns, whereClause, whereArgs, limit)
+	if err != nil {
+		return nil, err
+	}
+	total, err := s.repo.CountRows(tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	columns := make([]string, 0)
+	if len(rows) > 0 {
+		for k := range rows[0] {
+			columns = append(columns, k)
+		}
+		sort.Strings(columns)
+	}
+
+	return &dataset.PreviewResponse{
+		Columns: columns,
+		Rows:    rows,
+		Total:   total,
+	}, nil
+}
+
 
 func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]interface{}, error) {
 	empty := map[string]interface{}{
