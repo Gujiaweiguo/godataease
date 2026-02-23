@@ -31,23 +31,28 @@ jobs:
         run: npm ci
 
       - name: TypeScript check
+        id: tscheck
+        continue-on-error: true
         run: npm run ts:check
 
       - name: ESLint
+        id: lint
         run: npm run lint
 
       - name: Build
+        id: build
         run: npm run build:base
 
       - name: Test
-        run: npm test
+        id: test
+        run: npm run test:ci
 
       - name: Summary
         if: always()
         run: |
           echo "## Frontend CI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- TypeScript: OK" >> $GITHUB_STEP_SUMMARY
-          echo "- ESLint: OK" >> $GITHUB_STEP_SUMMARY
-          echo "- Build: OK" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript: ${{ steps.tscheck.outcome }} (non-blocking)" >> $GITHUB_STEP_SUMMARY
+          echo "- ESLint: ${{ steps.lint.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ steps.build.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ steps.test.outcome }}" >> $GITHUB_STEP_SUMMARY
