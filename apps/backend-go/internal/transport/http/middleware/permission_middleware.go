@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"dataease/backend/internal/domain/permission"
@@ -10,6 +11,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"go.uber.org/zap"
 )
 
@@ -57,19 +59,9 @@ func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey str
 			return
 		}
 
-		resourceIDStr := c.Param("id")
-		if resourceIDStr == "" {
-			resourceIDStr = c.Query("id")
-		}
-		if resourceIDStr == "" {
-			response.BadRequest(c, "resource id is required")
-			c.Abort()
-			return
-		}
-
-		resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
+		resourceID, err := extractResourceID(c)
 		if err != nil {
-			response.BadRequest(c, "invalid resource id")
+			response.BadRequest(c, err.Error())
 			c.Abort()
 			return
 		}
@@ -153,22 +145,9 @@ func (m *PermissionMiddleware) CheckExportPermission(resourceType string) gin.Ha
 			return
 		}
 
-		resourceIDStr := c.Param("id")
-		if resourceIDStr == "" {
-			resourceIDStr = c.Query("resourceId")
-		}
-		if resourceIDStr == "" {
-			resourceIDStr = c.Query("id")
-		}
-		if resourceIDStr == "" {
-			response.BadRequest(c, "resource id is required for export permission check")
-			c.Abort()
-			return
-		}
-
-		resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
+		resourceID, err := extractResourceID(c)
 		if err != nil {
-			response.BadRequest(c, "invalid resource id")
+			response.BadRequest(c, err.Error())
 			c.Abort()
 			return
 		}
@@ -202,6 +181,54 @@ func (m *PermissionMiddleware) CheckExportPermission(resourceType string) gin.Ha
 
 		c.Next()
 	}
+}
+
+func extractResourceID(c *gin.Context) (int64, error) {
+	if id := c.Param("id"); id != "" {
+		return parseResourceID(id)
+	}
+
+	if id := c.Query("resourceId"); id != "" {
+		return parseResourceID(id)
+	}
+
+	if id := c.Query("id"); id != "" {
+		return parseResourceID(id)
+	}
+
+	var payload map[string]interface{}
+	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err == nil {
+		for _, key := range []string{"id", "resourceId", "datasetGroupId", "datasetId"} {
+			if v, ok := payload[key]; ok {
+				return parseResourceIDFromAny(v)
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("resource id is required")
+}
+
+func parseResourceIDFromAny(v interface{}) (int64, error) {
+	switch value := v.(type) {
+	case float64:
+		return int64(value), nil
+	case int64:
+		return value, nil
+	case int:
+		return int64(value), nil
+	case string:
+		return parseResourceID(value)
+	default:
+		return 0, fmt.Errorf("invalid resource id")
+	}
+}
+
+func parseResourceID(raw string) (int64, error) {
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid resource id")
+	}
+	return id, nil
 }
 
 func (m *PermissionMiddleware) CheckBatchExportPermission(resourceType string) gin.HandlerFunc {

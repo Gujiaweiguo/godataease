@@ -176,3 +176,9 @@ func (r *UserPermRepository) GetByUserID(userID int64) ([]*user.SysUserPerm, err
 	err := r.db.Where("user_id = ?", userID).Find(&perms).Error
 	return perms, err
 }
+
+func (r *UserRoleRepository) GetRoleIDsByUserID(userID int64) ([]int64, error) {
+	var roleIDs []int64
+	err := r.db.Model(&user.SysUserRole{}).Where("user_id = ?", userID).Pluck("role_id", &roleIDs).Error
+	return roleIDs, err
+}

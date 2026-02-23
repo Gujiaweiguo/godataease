@@ -97,6 +97,7 @@ type Router struct {
 	engine                *gin.Engine
 	app                   *app.Application
 	db                    *gorm.DB
+	permMiddleware        *middleware.PermissionMiddleware
 	auditHandler          *handler.AuditHandler
 	userHandler           *handler.UserHandler
 	orgHandler            *handler.OrgHandler
@@ -191,8 +192,13 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	datasourceHandler := handler.NewDatasourceHandler(datasourceService)
 
+	// Dataset with row permission integration
 	datasetRepo := repository.NewDatasetRepository(db)
-	datasetService := service.NewDatasetService(datasetRepo)
+	rowPermRepo := repository.NewRowPermissionRepository(db)
+	columnPermRepo := repository.NewColumnPermissionRepository(db)
+	// adminChecker is defined later for permission middleware, pass nil for now
+	rowPermService := service.NewRowPermissionService(rowPermRepo, columnPermRepo, userRoleRepo, nil)
+	datasetService := service.NewDatasetServiceWithPermission(datasetRepo, rowPermService)
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 
 	chartRepo := repository.NewChartRepository(db)
@@ -257,10 +263,18 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService)
 
+	// Permission middleware initialization
+	resourcePermRepo := repository.NewResourcePermissionRepository(db)
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{1}) // User ID 1 is admin
+	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
+	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
+
 	return &Router{
 		engine:                engine,
 		app:                   application,
 		db:                    db,
+		permMiddleware:        permMiddleware,
 		auditHandler:          auditHandler,
 		userHandler:           userHandler,
 		orgHandler:            orgHandler,
@@ -362,9 +376,9 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterMenuRoutes(api, r.menuHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
 		handler.RegisterDatasourceRoutes(api, r.datasourceHandler)
-		handler.RegisterDatasetRoutes(api, r.datasetHandler)
+		r.registerDatasetRoutes(api)
 		handler.RegisterChartRoutes(api, r.chartHandler)
-		handler.RegisterVisualizationRoutes(api, r.visualHandler)
+		r.registerVisualizationRoutes(api)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)
 		handler.RegisterLicenseRoutes(api, r.licenseHandler)
 		handler.RegisterMsgCenterRoutes(api, r.msgCenterHandler)
@@ -377,6 +391,37 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
+	}
+}
+
+func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
+	datasetGroup := api.Group("/dataset")
+	{
+		datasetGroup.POST("/tree", r.datasetHandler.Tree)
+		datasetGroup.POST("/fields", r.datasetHandler.Fields)
+		datasetGroup.POST("/preview", r.datasetHandler.Preview)
+		if r.permMiddleware != nil {
+			datasetGroup.POST("/previewWithPerm", r.permMiddleware.CheckDatasetView(), r.datasetHandler.PreviewWithPermission)
+		} else {
+			datasetGroup.POST("/previewWithPerm", r.datasetHandler.PreviewWithPermission)
+		}
+	}
+}
+
+func (r *Router) registerVisualizationRoutes(api *gin.RouterGroup) {
+	visualGroup := api.Group("/dataVisualization")
+	{
+		if r.permMiddleware != nil {
+			visualGroup.POST("/findById", r.permMiddleware.CheckDashboardView(), r.visualHandler.FindByID)
+			visualGroup.POST("/updateCanvas", r.permMiddleware.CheckDashboardEdit(), r.visualHandler.UpdateCanvas)
+			visualGroup.POST("/deleteLogic/:id", r.permMiddleware.CheckDashboardEdit(), r.visualHandler.DeleteLogic)
+		} else {
+			visualGroup.POST("/findById", r.visualHandler.FindByID)
+			visualGroup.POST("/updateCanvas", r.visualHandler.UpdateCanvas)
+			visualGroup.POST("/deleteLogic/:id", r.visualHandler.DeleteLogic)
+		}
+		visualGroup.POST("/list", r.visualHandler.List)
+		visualGroup.POST("/saveCanvas", r.visualHandler.SaveCanvas)
 	}
 }
 
