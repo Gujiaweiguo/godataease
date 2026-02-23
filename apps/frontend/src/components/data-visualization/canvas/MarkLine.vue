@@ -179,7 +179,7 @@ const chooseTheTrueLine = (needToShow, isDownward, isRightward) => {
       lineStatus.value.yl = true
     }
   } else {
-    // eslint-disable-next-line no-lonely-if
+     
     if (needToShow.includes('yl')) {
       lineStatus.value.yl = true
     } else if (needToShow.includes('yc')) {
@@ -198,7 +198,7 @@ const chooseTheTrueLine = (needToShow, isDownward, isRightward) => {
       lineStatus.value.xt = true
     }
   } else {
-    // eslint-disable-next-line no-lonely-if
+     
     if (needToShow.includes('xt')) {
       lineStatus.value.xt = true
     } else if (needToShow.includes('xc')) {
