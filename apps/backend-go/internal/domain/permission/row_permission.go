@@ -14,6 +14,8 @@ const (
 	OperatorNotIn   = "not_in"
 	OperatorNull    = "null"
 	OperatorNotNull = "not_null"
+	OperatorEmpty    = "empty"
+	OperatorNotEmpty = "not_empty"
 )
 
 // 逻辑操作符常量
