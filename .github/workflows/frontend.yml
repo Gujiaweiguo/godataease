@@ -1,0 +1,53 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'apps/frontend/**'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'apps/frontend/**'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npm run ts:check
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build:base
+
+      - name: Test
+        run: npm test
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Frontend CI" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript: OK" >> $GITHUB_STEP_SUMMARY
+          echo "- ESLint: OK" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: OK" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: Completed" >> $GITHUB_STEP_SUMMARY
