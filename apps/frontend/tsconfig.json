@@ -36,5 +36,8 @@
     "dist",
     "lib",
     "node_modules"
-  ]
+  ],
+  "vueCompilerOptions": {
+    "strictTemplates": false
+  }
 }

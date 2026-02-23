@@ -3,6 +3,7 @@ ser = "ser"
 Referer = "Referer"
 Encryp = "Encryp"
 OT = "OT"
+RTO = "RTO"
 Wheres = "Wheres"
 ws = "ws"
 guid = "guid"
@@ -10,4 +11,4 @@ yoy = "yoy"
 Ein = "Ein"
 Datas = "Datas"
 [files]
-extend-exclude = ["mapFiles/**", "docs"]
+extend-exclude = ["mapFiles/**", "docs", "legacy/**", "openspec/changes/archive/**"]

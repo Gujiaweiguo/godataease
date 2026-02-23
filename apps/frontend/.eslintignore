@@ -1,8 +1,0 @@
-/dist/
-/*.js
-/node_modules/*
-/dist*
-/src/main.ts
-/flushbonading/
-/src/assets/fsSvg.js
-
