@@ -12,7 +12,7 @@ type DataPermRow struct {
 	DatasetID      int64  `gorm:"column:dataset_id;not null;comment:数据集ID" json:"dataset_id"`                                                       // 数据集ID
 	AuthTargetType string `gorm:"column:auth_target_type;not null;comment:授权对象类型：user-用户，role-角色" json:"auth_target_type"`                          // 授权对象类型：user-用户，role-角色
 	AuthTargetID   int64  `gorm:"column:auth_target_id;not null;comment:授权对象ID（用户ID或角色ID）" json:"auth_target_id"`                                   // 授权对象ID（用户ID或角色ID）
-	ExpressionTree string `gorm:"column:expression_tree;not null;comment:权限表达式树：JSON格式 { logic: "or"|"and", items: [...] }" json:"expression_tree"` // 权限表达式树：JSON格式 { logic: "or"|"and", items: [...] }
+	ExpressionTree string `gorm:"column:expression_tree;not null;comment:权限表达式树(JSON格式)" json:"expression_tree"` // 权限表达式树：JSON格式 { logic: or|and, items: [...] }
 	Status         bool   `gorm:"column:status;not null;default:1;comment:状态：0-禁用，1-启用" json:"status"`                                              // 状态：0-禁用，1-启用
 	CreateBy       string `gorm:"column:create_by;comment:创建人" json:"create_by"`                                                                    // 创建人
 	CreateTime     int64  `gorm:"column:create_time;not null;comment:创建时间" json:"create_time"`                                                      // 创建时间
