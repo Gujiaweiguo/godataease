@@ -180,7 +180,7 @@ service.interceptors.response.use(
     } else if (response.data.code === result_code || response.data.code === 50002) {
       return response.data
     } else if (response.config.url.match(/^\/map|geo\/\d{3}\/\d+\.json$/)) {
-      //   TODO 处理静态文件
+      // 处理静态地图文件
       return response
     } else if (
       response.config.url.includes('DEXPack.umd.js') ||

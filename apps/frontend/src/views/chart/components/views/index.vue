@@ -1043,7 +1043,7 @@ const pluginLoaded = computed(() => {
   })
   return result
 })
-// TODO 统一加载
+
 const loadPluginCategory = data => {
   data.forEach(item => {
     const { category, title, render, chartValue, chartTitle, icon, staticMap } = item

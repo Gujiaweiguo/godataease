@@ -49,8 +49,8 @@ const handleActions = (action: ImageViewerAction, options = {}) => {
   }
 }
 
-const mousewheelHandler = throttle((e: WheelEvent | any /* TODO: wheelDelta is deprecated */) => {
-  const delta = e.wheelDelta ? e.wheelDelta : -e.detail
+const mousewheelHandler = throttle((e: WheelEvent) => {
+  const delta = -e.deltaY
   if (delta > 0) {
     handleActions('zoomIn', {
       zoomRate: 1.2,
