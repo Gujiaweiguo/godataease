@@ -218,6 +218,7 @@ func (s *RowPermissionService) buildItemCondition(item *permission.DatasetRowPer
 	return s.buildLogicCondition(field, item.Term, item.Value)
 }
 
+//nolint:gocyclo
 func (s *RowPermissionService) buildLogicCondition(field, term, value string) (string, []interface{}) {
 	if value == "" && term != permission.OperatorNull && term != permission.OperatorNotNull &&
 		term != permission.OperatorEmpty && term != permission.OperatorNotEmpty {
