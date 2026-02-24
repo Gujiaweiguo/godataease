@@ -41,6 +41,31 @@ type SyncTask struct {
 	Progress int
 }
 
+const (
+	StatusPending   = "pending"
+	StatusRunning   = "running"
+	StatusSuccess   = "success"
+	StatusFailed    = "failed"
+	StatusCancelled = "cancelled"
+)
+
+func NormalizeStatus(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "created", "submitted", "queued", "waiting", "scheduled", "initializing", "initialized", "pending":
+		return StatusPending
+	case "running", "in_progress", "processing", "executing", "active":
+		return StatusRunning
+	case "success", "succeeded", "completed", "finished", "done":
+		return StatusSuccess
+	case "failed", "error", "errored", "timeout", "timed_out", "terminated":
+		return StatusFailed
+	case "cancelled", "canceled", "aborted", "abort", "stopped":
+		return StatusCancelled
+	default:
+		return StatusPending
+	}
+}
+
 func NewClient(cfg *Config) (*Client, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("seatunnel config is required")
@@ -101,7 +126,7 @@ func (c *Client) SubmitTask(ctx context.Context, task *SyncTask) (string, error)
 		Name:     task.Name,
 		Source:   task.Source,
 		Target:   task.Target,
-		Status:   task.Status,
+		Status:   NormalizeStatus(task.Status),
 		Progress: int32(task.Progress),
 	}})
 	if err != nil {
@@ -133,7 +158,7 @@ func (c *Client) GetTaskStatus(ctx context.Context, taskID string) (*SyncTask, e
 		Name:     item.GetName(),
 		Source:   item.GetSource(),
 		Target:   item.GetTarget(),
-		Status:   item.GetStatus(),
+		Status:   NormalizeStatus(item.GetStatus()),
 		Progress: int(item.GetProgress()),
 	}, nil
 }

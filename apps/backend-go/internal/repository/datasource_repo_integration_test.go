@@ -289,3 +289,87 @@ func int64Ptr(v int64) *int64 {
 func strPtr(v string) *string {
 	return &v
 }
+
+func TestDatasourceRepository_CreateSyncTaskLog(t *testing.T) {
+	if testDB == nil {
+		t.Skip("Test database not available")
+	}
+	repo := NewDatasourceRepository(testDB)
+	cleanupTables("core_datasource_task_log")
+
+	now := time.Now().UnixMilli()
+	record := &datasource.SyncRecord{
+		DsID:        100,
+		TaskID:      200,
+		StartTime:   now,
+		TaskStatus:  "running",
+		TableName:   "test_table",
+		CreateTime:  now,
+		TriggerType: "table",
+	}
+
+	err := repo.CreateSyncTaskLog(record)
+	if err != nil {
+		t.Fatalf("CreateSyncTaskLog failed: %v", err)
+	}
+	if record.ID == 0 {
+		t.Error("Expected ID to be set after creation")
+	}
+}
+
+func TestDatasourceRepository_ListSyncTaskLogs(t *testing.T) {
+	if testDB == nil {
+		t.Skip("Test database not available")
+	}
+	repo := NewDatasourceRepository(testDB)
+	cleanupTables("core_datasource_task_log")
+
+	// 准备测试数据: 15条记录, 验证分页
+	for i := 1; i <= 15; i++ {
+		now := time.Now().UnixMilli() + int64(i)
+		record := &datasource.SyncRecord{
+			DsID:        100,
+			TaskID:      int64(i),
+			StartTime:   now,
+			TaskStatus:  "success",
+			TableName:   fmt.Sprintf("table_%d", i),
+			CreateTime:  now,
+			TriggerType: "table",
+		}
+		_ = repo.CreateSyncTaskLog(record)
+	}
+
+	// 第一页
+	records, total, err := repo.ListSyncTaskLogs(100, 1, 10)
+	if err != nil {
+		t.Fatalf("ListSyncTaskLogs failed: %v", err)
+	}
+	if total != 15 {
+		t.Errorf("Expected total 15, got %d", total)
+	}
+	if len(records) != 10 {
+		t.Errorf("Expected 10 records on page 1, got %d", len(records))
+	}
+
+	// 第二页
+	records2, _, err := repo.ListSyncTaskLogs(100, 2, 10)
+	if err != nil {
+		t.Fatalf("ListSyncTaskLogs page 2 failed: %v", err)
+	}
+	if len(records2) != 5 {
+		t.Errorf("Expected 5 records on page 2, got %d", len(records2))
+	}
+
+	// 验证排序 (start_time DESC)
+	if len(records) >= 2 {
+		if records[0].StartTime < records[1].StartTime {
+			t.Error("Expected records sorted by start_time DESC")
+		}
+	}
+
+	// 验证过滤 (不同 dsID 返回空)
+	otherRecords, otherTotal, _ := repo.ListSyncTaskLogs(999, 1, 10)
+	if otherTotal != 0 || len(otherRecords) != 0 {
+		t.Errorf("Expected empty result for different dsID, got total=%d, len=%d", otherTotal, len(otherRecords))
+	}
+}

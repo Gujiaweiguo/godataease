@@ -1,4 +1,4 @@
-.PHONY: build test lint run run-local clean fmt vet test-integration
+.PHONY: build test lint run run-local clean fmt vet test-integration drift-check sync-whitelist
 
 # Go parameters
 GOCMD?=$(shell command -v go 2>/dev/null)
@@ -71,6 +71,17 @@ tidy:
 
 # All checks
 check: fmt vet lint test
+
+# Check endpoint status drift (CI gate)
+drift-check:
+	@chmod +x scripts/check-status-drift.sh
+	@./scripts/check-status-drift.sh
+
+# Sync whitelist from endpoint inventory
+sync-whitelist:
+	@echo "Syncing whitelist from endpoint inventory..."
+	@echo "Run manually: update testdata/contract-diff/critical-whitelist.yaml"
+	@echo "Based on: openspec/changes/update-api-compatibility-parity-governance/endpoint-inventory.md"
 
 # Build for production
 build-prod:

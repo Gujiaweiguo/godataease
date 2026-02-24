@@ -711,7 +711,7 @@ func (s *DatasourceService) submitSyncTask(req map[string]string, syncType strin
 		Name:     taskName,
 		Source:   strings.TrimSpace(req["source"]),
 		Target:   strings.TrimSpace(req["target"]),
-		Status:   "pending",
+		Status:   seatunnel.StatusPending,
 		Progress: 0,
 	}
 
@@ -723,13 +723,13 @@ func (s *DatasourceService) submitSyncTask(req map[string]string, syncType strin
 			TaskID:      parseTaskID(taskID),
 			StartTime:   now,
 			CreateTime:  now,
-			TaskStatus:  "running",
+			TaskStatus:  seatunnel.StatusRunning,
 			TableName:   tableName,
 			Name:        taskName,
 			TriggerType: syncType,
 		}
 		if submitErr != nil {
-			logRecord.TaskStatus = "failed"
+			logRecord.TaskStatus = seatunnel.StatusFailed
 			logRecord.EndTime = now
 			logRecord.Info = submitErr.Error()
 		}
@@ -742,7 +742,7 @@ func (s *DatasourceService) submitSyncTask(req map[string]string, syncType strin
 
 	return map[string]interface{}{
 		"taskId":       taskID,
-		"status":       "running",
+		"status":       seatunnel.StatusRunning,
 		"datasourceId": dsID,
 		"syncType":     syncType,
 	}, nil

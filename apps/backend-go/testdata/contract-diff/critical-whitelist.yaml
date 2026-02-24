@@ -19,8 +19,8 @@
 metadata:
   version: "1.0.2"
   changeId: "add-go-shadow-validation-cutover-gate"
-  lastUpdated: "2026-02-20"
-  sourceMatrix: "openspec/changes/add-go-security-compatibility-readiness/compatibility-matrix.md"
+  lastUpdated: "2026-02-24"
+  sourceMatrix: "openspec/changes/add-calcite-sql-integration/compatibility-matrix.md"
 
 # Default thresholds for gate evaluation
 thresholds:
@@ -257,6 +257,40 @@ highPriorityApis:
     goStatus: "full"
     notes: "Datasource types - implemented with type list"
 
+  # Datasource Sync (SeaTunnel-dependent)
+  - path: "/datasource/syncApiTable"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "partial"
+    gaps:
+      - "Requires SeaTunnel gRPC integration"
+      - "Returns error when SeaTunnel unavailable"
+    notes: "API table sync - partial until SeaTunnel integration complete"
+
+  - path: "/datasource/syncApiDs"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "partial"
+    gaps:
+      - "Requires SeaTunnel gRPC integration"
+      - "Returns error when SeaTunnel unavailable"
+    notes: "API datasource sync - partial until SeaTunnel integration complete"
+
+  - path: "/datasource/listSyncRecord/:dsId/:page/:limit"
+    method: "POST"
+    owner: "datasource-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "full"
+    notes: "Sync record listing - fully implemented with persisted records"
+
   # Dataset
   - path: "/datasetTree/get/:id"
     method: "POST"
@@ -266,6 +300,19 @@ highPriorityApis:
     javaStatus: "exists"
     goStatus: "full"
     notes: "Get dataset by ID - implemented via buildDatasetDetail"
+
+  # Dataset SQL (Calcite-dependent)
+  - path: "/datasetData/previewSql"
+    method: "POST"
+    owner: "dataset-team"
+    priority: "P1"
+    blockingLevel: "high"
+    javaStatus: "exists"
+    goStatus: "partial"
+    gaps:
+      - "Optional Calcite SQL validation when enabled"
+      - "Falls back to local validation when Calcite unavailable"
+    notes: "SQL preview - partial until Calcite integration complete"
 
   # Share
   - path: "/share/create"

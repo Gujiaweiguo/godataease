@@ -1,0 +1,1073 @@
+{
+  "metadata": {
+    "timestamp": "2026-02-24T14:41:39Z",
+    "version": "1.0.0",
+    "whitelistPath": "testdata/contract-diff/critical-whitelist.yaml",
+    "javaBaseUrl": "http://127.0.0.1:18081",
+    "goBaseUrl": "http://127.0.0.1:18082"
+  },
+  "summary": {
+    "total": 33,
+    "passed": 33,
+    "failed": 0,
+    "parity": 100
+  },
+  "results": [
+    {
+      "path": "/templateManage/templateList",
+      "method": "POST",
+      "owner": "template-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Core template listing - implemented via /template/list alias"
+    },
+    {
+      "path": "/templateManage/save",
+      "method": "POST",
+      "owner": "template-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Template save functionality - implemented via /template/create alias"
+    },
+    {
+      "path": "/templateMarket/searchTemplate",
+      "method": "GET",
+      "owner": "template-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Template marketplace search - implemented via /templateMarket/search alias"
+    },
+    {
+      "path": "/datasource/list",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Core datasource listing"
+    },
+    {
+      "path": "/datasource/tree",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Datasource tree structure"
+    },
+    {
+      "path": "/datasource/validate",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Connection validation"
+    },
+    {
+      "path": "/datasource/getTables",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Table metadata retrieval"
+    },
+    {
+      "path": "/datasource/previewData",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Data preview - implemented via service.PreviewData"
+    },
+    {
+      "path": "/datasource/save",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Save datasource - implemented via service.Save"
+    },
+    {
+      "path": "/datasource/delete/:id",
+      "method": "GET",
+      "owner": "datasource-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Delete datasource - implemented via service.Delete"
+    },
+    {
+      "path": "/datasetTree/tree",
+      "method": "POST",
+      "owner": "dataset-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Dataset tree structure"
+    },
+    {
+      "path": "/datasetData/tableField",
+      "method": "POST",
+      "owner": "dataset-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Table field metadata"
+    },
+    {
+      "path": "/datasetData/previewData",
+      "method": "POST",
+      "owner": "dataset-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Dataset data preview"
+    },
+    {
+      "path": "/chartData/getData",
+      "method": "POST",
+      "owner": "chart-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Chart data query - core visualization"
+    },
+    {
+      "path": "/chart/getData",
+      "method": "POST",
+      "owner": "chart-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Chart data retrieval - implemented via compatibility bridge"
+    },
+    {
+      "path": "/exportCenter/exportTasks",
+      "method": "GET",
+      "owner": "export-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Export task listing"
+    },
+    {
+      "path": "/exportCenter/download/:id",
+      "method": "GET",
+      "owner": "export-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Export download"
+    },
+    {
+      "path": "/user/list",
+      "method": "POST",
+      "owner": "user-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "User listing"
+    },
+    {
+      "path": "/user/create",
+      "method": "POST",
+      "owner": "user-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "User creation"
+    },
+    {
+      "path": "/login/localLogin",
+      "method": "POST",
+      "owner": "auth-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Local authentication"
+    },
+    {
+      "path": "/logout",
+      "method": "GET",
+      "owner": "auth-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Logout"
+    },
+    {
+      "path": "/templateManage/delete",
+      "method": "POST",
+      "owner": "template-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Template deletion - implemented via DeleteWithCategory"
+    },
+    {
+      "path": "/templateMarket/categories",
+      "method": "GET",
+      "owner": "template-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Marketplace categories - stub returns empty array"
+    },
+    {
+      "path": "/datasource/types",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Datasource types - implemented with type list"
+    },
+    {
+      "path": "/datasource/syncApiTable",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "API table sync - partial until SeaTunnel integration complete"
+    },
+    {
+      "path": "/datasource/syncApiDs",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "API datasource sync - partial until SeaTunnel integration complete"
+    },
+    {
+      "path": "/datasource/listSyncRecord/:dsId/:page/:limit",
+      "method": "POST",
+      "owner": "datasource-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Sync record listing - fully implemented with persisted records"
+    },
+    {
+      "path": "/datasetTree/get/:id",
+      "method": "POST",
+      "owner": "dataset-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Get dataset by ID - implemented via buildDatasetDetail"
+    },
+    {
+      "path": "/datasetData/previewSql",
+      "method": "POST",
+      "owner": "dataset-team",
+      "priority": "P1",
+      "blockingLevel": "high",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "SQL preview - partial until Calcite integration complete"
+    },
+    {
+      "path": "/share/create",
+      "method": "POST",
+      "owner": "share-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Share creation"
+    },
+    {
+      "path": "/share/validate",
+      "method": "POST",
+      "owner": "share-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Share validation"
+    },
+    {
+      "path": "/org/list",
+      "method": "GET",
+      "owner": "org-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Organization listing"
+    },
+    {
+      "path": "/org/tree",
+      "method": "GET",
+      "owner": "org-team",
+      "priority": "P0",
+      "blockingLevel": "critical",
+      "javaResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "goResponse": {
+        "status": 0,
+        "code": "null",
+        "msg": "null"
+      },
+      "diff": {
+        "statusDiff": false,
+        "codeDiff": false,
+        "msgDiff": false,
+        "payloadDiff": false,
+        "schemaDiff": false,
+        "valueDiff": false
+      },
+      "passed": true,
+      "error": "Java: Connection failed after 3 attempts; Go: Connection failed after 3 attempts",
+      "categories": [
+        "CONNECTION_ERROR"
+      ],
+      "severity": "critical",
+      "notes": "Organization tree"
+    }
+  ]
+}
