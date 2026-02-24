@@ -1,17 +1,21 @@
 package service
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/integration/seatunnel"
 	"dataease/backend/internal/repository"
 
 	"gorm.io/gorm"
@@ -28,11 +32,40 @@ var repeatCheckSchemaTypes = map[string]struct{}{
 }
 
 type DatasourceService struct {
-	repo *repository.DatasourceRepository
+	repo             *repository.DatasourceRepository
+	excelService     *ExcelService
+	seatunnelAddress string
+	seatunnelTimeout time.Duration
+	seatunnelRetries int
+	seatunnelClient  *seatunnel.Client
+	seatunnelMu      sync.Mutex
 }
 
 func NewDatasourceService(repo *repository.DatasourceRepository) *DatasourceService {
-	return &DatasourceService{repo: repo}
+	return &DatasourceService{
+		repo:             repo,
+		excelService:     NewExcelService(),
+		seatunnelAddress: "",
+		seatunnelTimeout: 15 * time.Second,
+		seatunnelRetries: 1,
+	}
+}
+
+func (s *DatasourceService) SetSeatunnelConfig(address string, timeout time.Duration, retries int) {
+	s.seatunnelAddress = strings.TrimSpace(address)
+	if timeout > 0 {
+		s.seatunnelTimeout = timeout
+	}
+	if retries >= 0 {
+		s.seatunnelRetries = retries
+	}
+
+	s.seatunnelMu.Lock()
+	if s.seatunnelClient != nil {
+		_ = s.seatunnelClient.Close()
+		s.seatunnelClient = nil
+	}
+	s.seatunnelMu.Unlock()
 }
 
 func (s *DatasourceService) List(req *datasource.ListRequest) (*datasource.ListResponse, error) {
@@ -582,4 +615,214 @@ func pingTCP(host string, port int, timeout time.Duration) error {
 	}
 	_ = conn.Close()
 	return nil
+}
+
+func (s *DatasourceService) UploadFile(file multipart.File, header *multipart.FileHeader, datasourceID int64, editType int) (*datasource.ExcelFileData, error) {
+	return s.excelService.UploadFile(file, header, datasourceID, editType)
+}
+
+func (s *DatasourceService) LoadRemoteFile(url, userName, password string, datasourceID int64) (*datasource.ExcelFileData, error) {
+	return s.excelService.LoadRemoteFile(&RemoteExcelRequest{
+		URL:          url,
+		UserName:     userName,
+		Password:     password,
+		DatasourceID: datasourceID,
+	})
+}
+
+func (s *DatasourceService) CheckAPIDatasource(req map[string]string) (map[string]interface{}, error) {
+	if len(req) == 0 {
+		return nil, fmt.Errorf("request is required")
+	}
+	dataRaw := strings.TrimSpace(req["data"])
+	if dataRaw == "" {
+		return nil, fmt.Errorf("data is required")
+	}
+
+	apiDefinition, err := decodeMaybeBase64JSONMap(dataRaw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid api definition: %w", err)
+	}
+
+	apiDefinition["type"] = "table"
+	apiDefinition["showApiStructure"] = strings.EqualFold(strings.TrimSpace(req["type"]), "apiStructure")
+	if _, ok := apiDefinition["name"]; !ok {
+		apiDefinition["name"] = "api_table"
+	}
+
+	return apiDefinition, nil
+}
+
+func (s *DatasourceService) SyncAPITable(req map[string]string) (map[string]interface{}, error) {
+	return s.submitSyncTask(req, "table")
+}
+
+func (s *DatasourceService) SyncAPIDs(req map[string]string) (map[string]interface{}, error) {
+	return s.submitSyncTask(req, "datasource")
+}
+
+func (s *DatasourceService) ListSyncRecord(dsID int64, page int, limit int) (*datasource.SyncRecordPage, error) {
+	if dsID <= 0 {
+		return nil, fmt.Errorf("invalid datasource id")
+	}
+	if s.repo == nil {
+		return nil, fmt.Errorf("datasource repository is unavailable")
+	}
+
+	records, total, err := s.repo.ListSyncTaskLogs(dsID, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	return &datasource.SyncRecordPage{
+		Records:      records,
+		Total:        total,
+		Current:      page,
+		Size:         limit,
+		DatasourceID: dsID,
+	}, nil
+}
+
+func (s *DatasourceService) submitSyncTask(req map[string]string, syncType string) (map[string]interface{}, error) {
+	dsID, err := parseDatasourceID(req)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := s.ensureSeatunnelClient()
+	if err != nil {
+		return nil, err
+	}
+
+	taskName := strings.TrimSpace(req["name"])
+	if taskName == "" {
+		taskName = fmt.Sprintf("%s-sync-%d", syncType, dsID)
+	}
+	tableName := strings.TrimSpace(req["tableName"])
+	now := time.Now().UnixMilli()
+
+	task := &seatunnel.SyncTask{
+		Name:     taskName,
+		Source:   strings.TrimSpace(req["source"]),
+		Target:   strings.TrimSpace(req["target"]),
+		Status:   "pending",
+		Progress: 0,
+	}
+
+	taskID, submitErr := client.SubmitTask(context.Background(), task)
+
+	if s.repo != nil {
+		logRecord := &datasource.SyncRecord{
+			DsID:        dsID,
+			TaskID:      parseTaskID(taskID),
+			StartTime:   now,
+			CreateTime:  now,
+			TaskStatus:  "running",
+			TableName:   tableName,
+			Name:        taskName,
+			TriggerType: syncType,
+		}
+		if submitErr != nil {
+			logRecord.TaskStatus = "failed"
+			logRecord.EndTime = now
+			logRecord.Info = submitErr.Error()
+		}
+		_ = s.repo.CreateSyncTaskLog(logRecord)
+	}
+
+	if submitErr != nil {
+		return nil, submitErr
+	}
+
+	return map[string]interface{}{
+		"taskId":       taskID,
+		"status":       "running",
+		"datasourceId": dsID,
+		"syncType":     syncType,
+	}, nil
+}
+
+func (s *DatasourceService) ensureSeatunnelClient() (*seatunnel.Client, error) {
+	s.seatunnelMu.Lock()
+	defer s.seatunnelMu.Unlock()
+
+	if s.seatunnelClient != nil {
+		return s.seatunnelClient, nil
+	}
+	if s.seatunnelAddress == "" {
+		return nil, fmt.Errorf("seatunnel grpc address is not configured")
+	}
+
+	timeout := s.seatunnelTimeout
+	if timeout <= 0 {
+		timeout = 15 * time.Second
+	}
+	retries := s.seatunnelRetries
+	if retries < 0 {
+		retries = 0
+	}
+
+	client, err := seatunnel.NewClient(&seatunnel.Config{Address: s.seatunnelAddress, Timeout: timeout, MaxRetries: retries})
+	if err != nil {
+		return nil, err
+	}
+	s.seatunnelClient = client
+	return s.seatunnelClient, nil
+}
+
+func decodeMaybeBase64JSONMap(raw string) (map[string]interface{}, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, fmt.Errorf("json payload is empty")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	if err == nil {
+		trimmed = strings.TrimSpace(string(decoded))
+	}
+
+	result := make(map[string]interface{})
+	if err = json.Unmarshal([]byte(trimmed), &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func parseDatasourceID(req map[string]string) (int64, error) {
+	if len(req) == 0 {
+		return 0, fmt.Errorf("request is required")
+	}
+	for _, key := range []string{"dsId", "datasourceId", "id"} {
+		value := strings.TrimSpace(req[key])
+		if value == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid datasource id")
+		}
+		if id <= 0 {
+			return 0, fmt.Errorf("invalid datasource id")
+		}
+		return id, nil
+	}
+	return 0, fmt.Errorf("datasource id is required")
+}
+
+func parseTaskID(raw string) int64 {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0
+	}
+	id, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
 }

@@ -1,8 +1,17 @@
 package service
 
 import (
+	"context"
+	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	"dataease/backend/internal/domain/dataset"
+	calcitev1 "dataease/backend/proto/calcite/v1"
+
+	"google.golang.org/grpc"
 )
 
 func TestInferSQLVariableDeType(t *testing.T) {
@@ -66,5 +75,60 @@ func TestNormalizeEnumValueScientific(t *testing.T) {
 	}
 	if strings.ContainsAny(strings.ToUpper(normalized), "E") {
 		t.Fatalf("expected non scientific notation, got %s", normalized)
+	}
+}
+
+type mockCalciteValidateServer struct {
+	calcitev1.UnimplementedCalciteServiceServer
+	validateCalls int32
+}
+
+func (m *mockCalciteValidateServer) ParseSQL(context.Context, *calcitev1.ParseSQLRequest) (*calcitev1.ParseSQLResponse, error) {
+	return &calcitev1.ParseSQLResponse{NormalizedSql: "SELECT 1"}, nil
+}
+
+func (m *mockCalciteValidateServer) ValidateSQL(context.Context, *calcitev1.ValidateSQLRequest) (*calcitev1.ValidateSQLResponse, error) {
+	atomic.AddInt32(&m.validateCalls, 1)
+	return &calcitev1.ValidateSQLResponse{Valid: false, Message: "invalid sql"}, nil
+}
+
+func startMockCalciteServer(t *testing.T, srv calcitev1.CalciteServiceServer) (string, func()) {
+	t.Helper()
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	calcitev1.RegisterCalciteServiceServer(grpcServer, srv)
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+
+	cleanup := func() {
+		grpcServer.Stop()
+		_ = lis.Close()
+	}
+
+	return lis.Addr().String(), cleanup
+}
+
+func TestPreviewSQL_ValidateWithCalciteFirstWhenEnabled(t *testing.T) {
+	mock := &mockCalciteValidateServer{}
+	addr, cleanup := startMockCalciteServer(t, mock)
+	defer cleanup()
+
+	svc := NewDatasetService(nil)
+	svc.SetCalciteConfig(addr, 2*time.Second, 0)
+
+	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "SELECT 1"})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(err.Error(), "sql validation failed") {
+		t.Fatalf("expected validation failure, got: %v", err)
+	}
+	if atomic.LoadInt32(&mock.validateCalls) == 0 {
+		t.Fatal("expected calcite validate to be called")
 	}
 }

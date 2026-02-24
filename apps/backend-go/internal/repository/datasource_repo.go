@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/datasource"
 
 	"gorm.io/gorm"
@@ -294,6 +295,74 @@ func (r *DatasourceRepository) ExistsFinishPageRecord(userID int64) (bool, error
 
 func (r *DatasourceRepository) CreateFinishPageRecord(userID int64) error {
 	return r.db.Exec("INSERT IGNORE INTO core_ds_finish_page (id) VALUES (?)", userID).Error
+}
+
+func (r *DatasourceRepository) CreateSyncTaskLog(record *datasource.SyncRecord) error {
+	if record == nil {
+		return fmt.Errorf("sync record is required")
+	}
+
+	row := &auto.CoreDatasourceTaskLog{
+		DsID:              record.DsID,
+		TaskID:            record.TaskID,
+		StartTime:         record.StartTime,
+		EndTime:           record.EndTime,
+		TaskStatus:        record.TaskStatus,
+		PhysicalTableName: record.TableName,
+		Info:              record.Info,
+		CreateTime:        record.CreateTime,
+		TriggerType:       record.TriggerType,
+	}
+
+	if err := r.db.Create(row).Error; err != nil {
+		return err
+	}
+	record.ID = row.ID
+	return nil
+}
+
+func (r *DatasourceRepository) ListSyncTaskLogs(dsID int64, page int, size int) ([]datasource.SyncRecord, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 10
+	}
+	if size > 200 {
+		size = 200
+	}
+	offset := (page - 1) * size
+
+	query := r.db.Model(&auto.CoreDatasourceTaskLog{}).Where("ds_id = ?", dsID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	rows := make([]auto.CoreDatasourceTaskLog, 0)
+	if err := query.Order("start_time DESC").Offset(offset).Limit(size).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]datasource.SyncRecord, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, datasource.SyncRecord{
+			ID:          row.ID,
+			DsID:        row.DsID,
+			TaskID:      row.TaskID,
+			StartTime:   row.StartTime,
+			EndTime:     row.EndTime,
+			TaskStatus:  row.TaskStatus,
+			TableName:   row.PhysicalTableName,
+			Name:        row.PhysicalTableName,
+			Info:        row.Info,
+			CreateTime:  row.CreateTime,
+			TriggerType: row.TriggerType,
+		})
+	}
+
+	return result, total, nil
 }
 
 func inferDeType(t string) int {

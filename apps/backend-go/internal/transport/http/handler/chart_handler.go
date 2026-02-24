@@ -9,11 +9,12 @@ import (
 )
 
 type ChartHandler struct {
-	service *service.ChartService
+	service       *service.ChartService
+	exportService *service.ChartExportService
 }
 
-func NewChartHandler(service *service.ChartService) *ChartHandler {
-	return &ChartHandler{service: service}
+func NewChartHandler(svc *service.ChartService) *ChartHandler {
+	return &ChartHandler{service: svc, exportService: service.NewChartExportService(svc)}
 }
 
 func (h *ChartHandler) Query(c *gin.Context) {

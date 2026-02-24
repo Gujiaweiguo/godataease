@@ -149,3 +149,23 @@ type EnumObjectColumn struct {
 	Column string
 	Alias  string
 }
+
+type BarInfo struct {
+	ID                int64            `json:"id"`
+	Name              string           `json:"name"`
+	NodeType          string           `json:"nodeType"`
+	CreateBy          string           `json:"createBy"`
+	CreateTime        int64            `json:"createTime"`
+	Creator           string           `json:"creator"`
+	LastUpdateTime    int64            `json:"lastUpdateTime"`
+	UpdateBy          string           `json:"updateBy"`
+	Updater           string           `json:"updater"`
+	DatasourceDTOList []DatasourceInfo `json:"datasourceDTOList"`
+	IsCross           bool             `json:"isCross"`
+}
+
+type DatasourceInfo struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}

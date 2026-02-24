@@ -10,12 +10,13 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
-	JWT       JWTConfig       `mapstructure:"jwt"`
-	Log       LogConfig       `mapstructure:"log"`
-	Telemetry TelemetryConfig `mapstructure:"telemetry"`
+	Server      ServerConfig      `mapstructure:"server"`
+	Database    DatabaseConfig    `mapstructure:"database"`
+	Redis       RedisConfig       `mapstructure:"redis"`
+	JWT         JWTConfig         `mapstructure:"jwt"`
+	Log         LogConfig         `mapstructure:"log"`
+	Telemetry   TelemetryConfig   `mapstructure:"telemetry"`
+	Integration IntegrationConfig `mapstructure:"integration"`
 }
 
 type ServerConfig struct {
@@ -56,6 +57,17 @@ type TelemetryConfig struct {
 	Endpoint string `mapstructure:"endpoint"`
 }
 
+type IntegrationConfig struct {
+	Calcite   GRPCIntegrationConfig `mapstructure:"calcite"`
+	Seatunnel GRPCIntegrationConfig `mapstructure:"seatunnel"`
+}
+
+type GRPCIntegrationConfig struct {
+	Address    string `mapstructure:"address"`
+	TimeoutSec int    `mapstructure:"timeout_sec"`
+	MaxRetries int    `mapstructure:"max_retries"`
+}
+
 // LoadConfig 加载配置
 func LoadConfig() (*Config, error) {
 	configPath := os.Getenv("CONFIG_PATH")
@@ -92,26 +104,32 @@ func LoadConfig() (*Config, error) {
 
 func bindEnvKeys() error {
 	keys := map[string]string{
-		"server.port":             "SERVER_PORT",
-		"server.mode":             "SERVER_MODE",
-		"database.host":           "DATABASE_HOST",
-		"database.port":           "DATABASE_PORT",
-		"database.name":           "DATABASE_NAME",
-		"database.user":           "DATABASE_USER",
-		"database.password":       "DATABASE_PASSWORD",
-		"database.max_open_conns": "DATABASE_MAX_OPEN_CONNS",
-		"database.max_idle_conns": "DATABASE_MAX_IDLE_CONNS",
-		"redis.host":              "REDIS_HOST",
-		"redis.port":              "REDIS_PORT",
-		"redis.password":          "REDIS_PASSWORD",
-		"redis.db":                "REDIS_DB",
-		"redis.pool_size":         "REDIS_POOL_SIZE",
-		"jwt.secret":              "JWT_SECRET",
-		"jwt.expire":              "JWT_EXPIRE",
-		"log.level":               "LOG_LEVEL",
-		"log.format":              "LOG_FORMAT",
-		"telemetry.enabled":       "TELEMETRY_ENABLED",
-		"telemetry.endpoint":      "TELEMETRY_ENDPOINT",
+		"server.port":                       "SERVER_PORT",
+		"server.mode":                       "SERVER_MODE",
+		"database.host":                     "DATABASE_HOST",
+		"database.port":                     "DATABASE_PORT",
+		"database.name":                     "DATABASE_NAME",
+		"database.user":                     "DATABASE_USER",
+		"database.password":                 "DATABASE_PASSWORD",
+		"database.max_open_conns":           "DATABASE_MAX_OPEN_CONNS",
+		"database.max_idle_conns":           "DATABASE_MAX_IDLE_CONNS",
+		"redis.host":                        "REDIS_HOST",
+		"redis.port":                        "REDIS_PORT",
+		"redis.password":                    "REDIS_PASSWORD",
+		"redis.db":                          "REDIS_DB",
+		"redis.pool_size":                   "REDIS_POOL_SIZE",
+		"jwt.secret":                        "JWT_SECRET",
+		"jwt.expire":                        "JWT_EXPIRE",
+		"log.level":                         "LOG_LEVEL",
+		"log.format":                        "LOG_FORMAT",
+		"telemetry.enabled":                 "TELEMETRY_ENABLED",
+		"telemetry.endpoint":                "TELEMETRY_ENDPOINT",
+		"integration.calcite.address":       "CALCITE_GRPC_ADDR",
+		"integration.calcite.timeout_sec":   "CALCITE_GRPC_TIMEOUT_SEC",
+		"integration.calcite.max_retries":   "CALCITE_GRPC_MAX_RETRIES",
+		"integration.seatunnel.address":     "SEATUNNEL_GRPC_ADDR",
+		"integration.seatunnel.timeout_sec": "SEATUNNEL_GRPC_TIMEOUT_SEC",
+		"integration.seatunnel.max_retries": "SEATUNNEL_GRPC_MAX_RETRIES",
 	}
 
 	for key, envName := range keys {

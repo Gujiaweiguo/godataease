@@ -190,6 +190,14 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	datasourceRepo := repository.NewDatasourceRepository(db)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
+	if application != nil && application.Config != nil {
+		seatunnelCfg := application.Config.Integration.Seatunnel
+		datasourceService.SetSeatunnelConfig(
+			seatunnelCfg.Address,
+			time.Duration(seatunnelCfg.TimeoutSec)*time.Second,
+			seatunnelCfg.MaxRetries,
+		)
+	}
 	datasourceHandler := handler.NewDatasourceHandler(datasourceService)
 	adminChecker := middleware.NewDefaultAdminChecker([]int64{1})
 
@@ -199,6 +207,14 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	columnPermRepo := repository.NewColumnPermissionRepository(db)
 	rowPermService := service.NewRowPermissionService(rowPermRepo, columnPermRepo, userRoleRepo, adminChecker)
 	datasetService := service.NewDatasetServiceWithPermission(datasetRepo, rowPermService)
+	if application != nil && application.Config != nil {
+		calciteCfg := application.Config.Integration.Calcite
+		datasetService.SetCalciteConfig(
+			calciteCfg.Address,
+			time.Duration(calciteCfg.TimeoutSec)*time.Second,
+			calciteCfg.MaxRetries,
+		)
+	}
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 
 	chartRepo := repository.NewChartRepository(db)

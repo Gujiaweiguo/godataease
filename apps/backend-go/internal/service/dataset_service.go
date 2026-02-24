@@ -9,9 +9,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"dataease/backend/internal/domain/dataset"
+	calciteintegration "dataease/backend/internal/integration/calcite"
 	"dataease/backend/internal/repository"
 
 	"gorm.io/gorm"
@@ -20,9 +22,12 @@ import (
 type DatasetService struct {
 	repo                 *repository.DatasetRepository
 	rowPermissionService *RowPermissionService
+	calciteAddress       string
+	calciteTimeout       time.Duration
+	calciteRetries       int
+	calciteClient        *calciteintegration.Client
+	calciteMu            sync.Mutex
 }
-
-
 
 type sqlVariableDetailRaw struct {
 	VariableName string        `json:"variableName"`
@@ -31,14 +36,40 @@ type sqlVariableDetailRaw struct {
 }
 
 func NewDatasetService(repo *repository.DatasetRepository) *DatasetService {
-	return &DatasetService{repo: repo}
+	return &DatasetService{
+		repo:           repo,
+		calciteAddress: "",
+		calciteTimeout: 10 * time.Second,
+		calciteRetries: 1,
+	}
 }
 
 func NewDatasetServiceWithPermission(repo *repository.DatasetRepository, rowPermSvc *RowPermissionService) *DatasetService {
-	return &DatasetService{repo: repo, rowPermissionService: rowPermSvc}
+	return &DatasetService{
+		repo:                 repo,
+		rowPermissionService: rowPermSvc,
+		calciteAddress:       "",
+		calciteTimeout:       10 * time.Second,
+		calciteRetries:       1,
+	}
 }
 
+func (s *DatasetService) SetCalciteConfig(address string, timeout time.Duration, retries int) {
+	s.calciteAddress = strings.TrimSpace(address)
+	if timeout > 0 {
+		s.calciteTimeout = timeout
+	}
+	if retries >= 0 {
+		s.calciteRetries = retries
+	}
 
+	s.calciteMu.Lock()
+	if s.calciteClient != nil {
+		_ = s.calciteClient.Close()
+		s.calciteClient = nil
+	}
+	s.calciteMu.Unlock()
+}
 
 func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, error) {
 	groups, err := s.repo.ListGroups(req.Keyword)
@@ -90,6 +121,10 @@ func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, err
 		roots = append(roots, *r)
 	}
 	return roots, nil
+}
+
+func (s *DatasetService) GetGroupByID(id int64) (*dataset.CoreDatasetGroup, error) {
+	return s.repo.GetGroupByID(id)
 }
 
 func (s *DatasetService) Fields(req *dataset.FieldsRequest) ([]*dataset.CoreDatasetTableField, error) {
@@ -179,7 +214,6 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 	}, nil
 }
 
-
 func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]interface{}, error) {
 	empty := map[string]interface{}{
 		"data": dataset.SQLPreviewData{
@@ -206,6 +240,10 @@ func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]
 	}
 
 	if err := validatePreviewSQL(rawSQL); err != nil {
+		return nil, err
+	}
+
+	if err := s.validateWithCalciteIfEnabled(rawSQL); err != nil {
 		return nil, err
 	}
 
@@ -938,6 +976,52 @@ func validatePreviewSQL(rawSQL string) error {
 		}
 	}
 	return nil
+}
+
+func (s *DatasetService) validateWithCalciteIfEnabled(rawSQL string) error {
+	if strings.TrimSpace(s.calciteAddress) == "" {
+		return nil
+	}
+
+	client, err := s.ensureCalciteClient()
+	if err != nil {
+		return fmt.Errorf("calcite client unavailable: %w", err)
+	}
+
+	valid, err := client.ValidateSQL(nil, rawSQL)
+	if err != nil {
+		return fmt.Errorf("calcite validate sql failed: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("sql validation failed")
+	}
+
+	return nil
+}
+
+func (s *DatasetService) ensureCalciteClient() (*calciteintegration.Client, error) {
+	s.calciteMu.Lock()
+	defer s.calciteMu.Unlock()
+
+	if s.calciteClient != nil {
+		return s.calciteClient, nil
+	}
+
+	timeout := s.calciteTimeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	retries := s.calciteRetries
+	if retries < 0 {
+		retries = 0
+	}
+
+	client, err := calciteintegration.NewClient(&calciteintegration.Config{Address: s.calciteAddress, Timeout: timeout, MaxRetries: retries})
+	if err != nil {
+		return nil, err
+	}
+	s.calciteClient = client
+	return s.calciteClient, nil
 }
 
 func buildPreviewFields(rows []map[string]interface{}) []dataset.SQLPreviewField {

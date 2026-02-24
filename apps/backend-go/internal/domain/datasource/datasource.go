@@ -103,3 +103,64 @@ type ConnectionConfig struct {
 	Database string `json:"dataBase"`
 	Schema   string `json:"schema"`
 }
+
+type SyncRecord struct {
+	ID          int64  `json:"id"`
+	DsID        int64  `json:"dsId"`
+	TaskID      int64  `json:"taskId"`
+	StartTime   int64  `json:"startTime"`
+	EndTime     int64  `json:"endTime"`
+	TaskStatus  string `json:"taskStatus"`
+	TableName   string `json:"tableName"`
+	Name        string `json:"name"`
+	Info        string `json:"info"`
+	CreateTime  int64  `json:"createTime"`
+	TriggerType string `json:"triggerType"`
+}
+
+type SyncRecordPage struct {
+	Records      []SyncRecord `json:"records"`
+	Total        int64        `json:"total"`
+	Current      int          `json:"current"`
+	Size         int          `json:"size"`
+	DatasourceID int64        `json:"datasourceId"`
+}
+
+// ExcelFileData represents uploaded Excel file metadata
+type ExcelFileData struct {
+	ID         string            `json:"id"`
+	ExcelLabel string            `json:"excelLabel"`
+	Sheets     []*ExcelSheetData `json:"sheets"`
+	Path       string            `json:"path"`
+	IsSheet    bool              `json:"isSheet"`
+}
+
+// ExcelSheetData represents a single Excel sheet
+type ExcelSheetData struct {
+	ExcelLabel     string                   `json:"excelLabel"`
+	Data           [][]string               `json:"data"`
+	Fields         []*ExcelTableField       `json:"fields"`
+	TableName      string                   `json:"tableName"`
+	FileName       string                   `json:"fileName"`
+	Size           string                   `json:"size"`
+	DeTableName    string                   `json:"deTableName"`
+	LastUpdateTime int64                    `json:"lastUpdateTime"`
+	Path           string                   `json:"path"`
+	IsSheet        bool                     `json:"isSheet"`
+	SheetID        string                   `json:"sheetId"`
+	SheetExcelID   string                   `json:"sheetExcelId"`
+	JSONArray      []map[string]interface{} `json:"jsonArray"`
+	NewSheet       bool                     `json:"newSheet"`
+}
+
+// ExcelTableField represents a field in Excel sheet
+type ExcelTableField struct {
+	OriginName    string `json:"originName"`
+	Name          string `json:"name"`
+	FieldType     string `json:"fieldType"`
+	DeType        int    `json:"deType"`
+	DeExtractType int    `json:"deExtractType"`
+	Checked       bool   `json:"checked"`
+	PrimaryKey    bool   `json:"primaryKey"`
+	Length        int    `json:"length"`
+}

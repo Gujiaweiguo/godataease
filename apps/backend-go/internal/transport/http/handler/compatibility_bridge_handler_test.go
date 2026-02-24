@@ -1,17 +1,22 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"net"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/service"
+	seatunnelv1 "dataease/backend/proto/seatunnel/v1"
 
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
 )
 
 type bridgeResp struct {
@@ -34,6 +39,44 @@ type bridgeFieldListResp struct {
 		DimensionList []map[string]interface{} `json:"dimensionList"`
 		QuotaList     []map[string]interface{} `json:"quotaList"`
 	} `json:"data"`
+}
+
+type mockSeatunnelSyncService struct {
+	seatunnelv1.UnimplementedSyncServiceServer
+	taskID string
+}
+
+func (m *mockSeatunnelSyncService) SubmitTask(context.Context, *seatunnelv1.SubmitTaskRequest) (*seatunnelv1.SubmitTaskResponse, error) {
+	return &seatunnelv1.SubmitTaskResponse{TaskId: m.taskID}, nil
+}
+
+func (m *mockSeatunnelSyncService) GetTaskStatus(context.Context, *seatunnelv1.GetTaskStatusRequest) (*seatunnelv1.GetTaskStatusResponse, error) {
+	return &seatunnelv1.GetTaskStatusResponse{Task: &seatunnelv1.SyncTask{Id: m.taskID, Status: "running", Progress: 50}}, nil
+}
+
+func (m *mockSeatunnelSyncService) CancelTask(context.Context, *seatunnelv1.CancelTaskRequest) (*seatunnelv1.CancelTaskResponse, error) {
+	return &seatunnelv1.CancelTaskResponse{Success: true}, nil
+}
+
+func startMockSeatunnelServer(t *testing.T, taskID string) (string, func()) {
+	t.Helper()
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	seatunnelv1.RegisterSyncServiceServer(grpcServer, &mockSeatunnelSyncService{taskID: taskID})
+
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+
+	cleanup := func() {
+		grpcServer.Stop()
+		_ = lis.Close()
+	}
+	return lis.Addr().String(), cleanup
 }
 
 type fakeBridgeChartRepo struct {
@@ -714,5 +757,90 @@ func TestApiAliasChartDataGetData(t *testing.T) {
 
 	if w.Code != 404 {
 		t.Logf("Route /api/chartData/getData registered, status: %d", w.Code)
+	}
+}
+
+func TestDatasourceSyncRouteReturnsErrorWhenSeatunnelUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+
+	dsHandler := NewDatasourceHandler(service.NewDatasourceService(nil))
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+
+	req := httptest.NewRequest("POST", "/datasource/syncApiDs", strings.NewReader(`{"datasourceId":"1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	resp := bridgeCodeResp{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000 when seatunnel unavailable, got %s", resp.Code)
+	}
+}
+
+func TestDatasourceSyncRouteReturnsSuccessWhenSeatunnelAvailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	addr, cleanup := startMockSeatunnelServer(t, "task-123")
+	defer cleanup()
+
+	r := gin.New()
+	dsService := service.NewDatasourceService(nil)
+	dsService.SetSeatunnelConfig(addr, 2*time.Second, 0)
+	dsHandler := NewDatasourceHandler(dsService)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+
+	req := httptest.NewRequest("POST", "/datasource/syncApiDs", strings.NewReader(`{"datasourceId":"1","name":"sync-job"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	resp := bridgeAnyResp{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "000000" {
+		t.Fatalf("expected code 000000, got %s", resp.Code)
+	}
+	if resp.Data["taskId"] != "task-123" {
+		t.Fatalf("expected taskId task-123, got %#v", resp.Data["taskId"])
+	}
+	if resp.Data["status"] != "running" {
+		t.Fatalf("expected status running, got %#v", resp.Data["status"])
+	}
+}
+
+func TestDatasourceListSyncRecordReturnsErrorWithoutRepository(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+
+	dsHandler := NewDatasourceHandler(service.NewDatasourceService(nil))
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+
+	req := httptest.NewRequest("POST", "/datasource/listSyncRecord/1/1/10", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	resp := bridgeCodeResp{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000 when repository unavailable, got %s", resp.Code)
 	}
 }

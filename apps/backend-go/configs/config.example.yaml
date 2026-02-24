@@ -29,3 +29,13 @@ log:
 telemetry:
   enabled: false
   endpoint: ""
+
+integration:
+  calcite:
+    address: ${CALCITE_GRPC_ADDR:-}
+    timeout_sec: ${CALCITE_GRPC_TIMEOUT_SEC:-10}
+    max_retries: ${CALCITE_GRPC_MAX_RETRIES:-1}
+  seatunnel:
+    address: ${SEATUNNEL_GRPC_ADDR:-}
+    timeout_sec: ${SEATUNNEL_GRPC_TIMEOUT_SEC:-15}
+    max_retries: ${SEATUNNEL_GRPC_MAX_RETRIES:-1}

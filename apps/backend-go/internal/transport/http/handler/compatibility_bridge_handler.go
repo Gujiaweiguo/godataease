@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/pkg/response"
+	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -301,22 +303,111 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, result)
 			})
 			datasourceGroup.POST("/checkApiDatasource", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: checkApiDatasource")
+				var req map[string]string
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+
+				result, err := datasourceHandler.service.CheckAPIDatasource(req)
+				if err != nil {
+					response.Error(c, "500000", "Failed to check api datasource: "+err.Error())
+					return
+				}
+
+				response.Success(c, result)
 			})
 			datasourceGroup.POST("/loadRemoteFile", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: loadRemoteFile")
+				var req struct {
+					URL          string `json:"url"`
+					UserName     string `json:"userName"`
+					Password     string `json:"passwd"`
+					DatasourceID int64  `json:"datasourceId"`
+				}
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+
+				result, err := datasourceHandler.service.LoadRemoteFile(req.URL, req.UserName, req.Password, req.DatasourceID)
+				if err != nil {
+					response.Error(c, "500000", "Failed to load remote file: "+err.Error())
+					return
+				}
+				response.Success(c, result)
 			})
 			datasourceGroup.POST("/syncApiTable", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: syncApiTable")
+				var req map[string]string
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+				result, err := datasourceHandler.service.SyncAPITable(req)
+				if err != nil {
+					response.Error(c, "500000", "Failed to sync api table: "+err.Error())
+					return
+				}
+				response.Success(c, result)
 			})
 			datasourceGroup.POST("/syncApiDs", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: syncApiDs")
+				var req map[string]string
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+				result, err := datasourceHandler.service.SyncAPIDs(req)
+				if err != nil {
+					response.Error(c, "500000", "Failed to sync api datasource: "+err.Error())
+					return
+				}
+				response.Success(c, result)
 			})
 			datasourceGroup.POST("/uploadFile", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: uploadFile")
+				file, header, err := c.Request.FormFile("file")
+				if err != nil {
+					response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
+					return
+				}
+				defer file.Close()
+
+				var datasourceID int64
+				if idStr := c.PostForm("id"); idStr != "" {
+					datasourceID, _ = strconv.ParseInt(idStr, 10, 64)
+				}
+
+				var editType int
+				if editTypeStr := c.PostForm("editType"); editTypeStr != "" {
+					editType, _ = strconv.Atoi(editTypeStr)
+				}
+
+				result, err := datasourceHandler.service.UploadFile(file, header, datasourceID, editType)
+				if err != nil {
+					response.Error(c, "500000", "Failed to process file: "+err.Error())
+					return
+				}
+				response.Success(c, result)
 			})
 			datasourceGroup.POST("/listSyncRecord/:dsId/:page/:limit", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: listSyncRecord")
+				dsID, err := strconv.ParseInt(c.Param("dsId"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid datasource ID")
+					return
+				}
+				page, _ := strconv.Atoi(c.Param("page"))
+				if page < 1 {
+					page = 1
+				}
+				limit, _ := strconv.Atoi(c.Param("limit"))
+				if limit < 1 {
+					limit = 10
+				}
+
+				result, err := datasourceHandler.service.ListSyncRecord(dsID, page, limit)
+				if err != nil {
+					response.Error(c, "500000", "Failed to list sync records: "+err.Error())
+					return
+				}
+				response.Success(c, result)
 			})
 			datasourceGroup.GET("/delete/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -504,10 +595,59 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, result)
 			})
 			datasetTreeGroup.GET("/barInfo/:id", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: barInfo")
+				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid dataset ID")
+					return
+				}
+
+				group, err := datasetHandler.service.GetGroupByID(id)
+				if err != nil {
+					response.Error(c, "500000", "Failed to get dataset: "+err.Error())
+					return
+				}
+
+				barInfo := &dataset.BarInfo{
+					ID:             group.ID,
+					Name:           group.Name,
+					CreateTime:     0,
+					LastUpdateTime: 0,
+					IsCross:        false,
+				}
+				if group.NodeType != nil {
+					barInfo.NodeType = *group.NodeType
+				}
+
+				response.Success(c, barInfo)
 			})
 			datasetTreeGroup.POST("/exportDataset", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: exportDataset")
+				var req struct {
+					ID       int64           `json:"id"`
+					ViewName string          `json:"viewName"`
+					Header   []string        `json:"header"`
+					Details  [][]interface{} `json:"details"`
+				}
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+
+				buf, err := chartHandler.exportService.InnerExportDetails(&service.ExportChartRequest{
+					ViewName: req.ViewName,
+					Header:   req.Header,
+					Details:  req.Details,
+				})
+				if err != nil {
+					response.Error(c, "500000", "Failed to export: "+err.Error())
+					return
+				}
+
+				filename := service.GenerateExcelFilename(req.ViewName)
+				c.Header("Content-Description", "File Transfer")
+				c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+				c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+				c.Header("Content-Transfer-Encoding", "binary")
+				c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 			})
 		}
 
@@ -624,10 +764,44 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, result)
 			})
 			chartDataGroup.POST("/innerExportDetails", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: innerExportDetails")
+				var req service.ExportChartRequest
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+
+				buf, err := chartHandler.exportService.InnerExportDetails(&req)
+				if err != nil {
+					response.Error(c, "500000", "Failed to export: "+err.Error())
+					return
+				}
+
+				filename := service.GenerateExcelFilename(req.ViewName)
+				c.Header("Content-Description", "File Transfer")
+				c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+				c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+				c.Header("Content-Transfer-Encoding", "binary")
+				c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 			})
 			chartDataGroup.POST("/innerExportDataSetDetails", func(c *gin.Context) {
-				response.Error(c, "501000", "Not implemented: innerExportDataSetDetails")
+				var req service.ExportChartRequest
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+
+				buf, err := chartHandler.exportService.InnerExportDetails(&req)
+				if err != nil {
+					response.Error(c, "500000", "Failed to export: "+err.Error())
+					return
+				}
+
+				filename := service.GenerateExcelFilename(req.ViewName)
+				c.Header("Content-Description", "File Transfer")
+				c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+				c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+				c.Header("Content-Transfer-Encoding", "binary")
+				c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 			})
 		}
 
