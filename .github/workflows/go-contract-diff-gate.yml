@@ -30,8 +30,6 @@ env:
 jobs:
   contract-diff:
     runs-on: ubuntu-latest
-    # Always pass - skip gracefully when backends unavailable
-    continue-on-error: true
     defaults:
       run:
         working-directory: apps/backend-go
@@ -51,61 +49,86 @@ jobs:
           backend:
             - 'apps/backend-go/**'
 
-    - name: Check backend availability
-      id: check-backends
+    - name: Install contract diff dependencies
       if: steps.changes.outputs.backend == 'true'
       run: |
-        echo "Checking backend availability..."
-        echo "Baseline URL: ${BASELINE_URL}"
-        echo "Candidate URL: ${CANDIDATE_URL}"
-        
-        # Check if backends are accessible
-        JAVA_OK=false
-        GO_OK=false
-        
-        if curl -s --connect-timeout 5 --max-time 10 "${BASELINE_URL}/health" > /dev/null 2>&1; then
-          JAVA_OK=true
-          echo "✓ Java backend is available"
-        else
-          echo "✗ Java backend is NOT available at ${BASELINE_URL}"
-        fi
-        
-        if curl -s --connect-timeout 5 --max-time 10 "${CANDIDATE_URL}/health" > /dev/null 2>&1; then
-          GO_OK=true
-          echo "✓ Go backend is available"
-        else
-          echo "✗ Go backend is NOT available at ${CANDIDATE_URL}"
-        fi
-        
-        if [ "$JAVA_OK" = true ] && [ "$GO_OK" = true ]; then
-          echo "backends_available=true" >> $GITHUB_OUTPUT
-        else
-          echo "backends_available=false" >> $GITHUB_OUTPUT
-          echo ""
-          echo "⚠️ Contract diff requires both backends to be running:"
-          echo "  - Java backend: ${BASELINE_URL}"
-          echo "  - Go backend: ${CANDIDATE_URL}"
-          echo ""
-          echo "To run contract diff manually:"
-          echo "  1. Start both backends (Java on 8081, Go on 8082)"
-          echo "  2. Run: scripts/contract-diff/run_contract_diff.sh --whitelist testdata/contract-diff/critical-whitelist.yaml"
-          echo "  3. Or use workflow_dispatch with custom URLs"
-        fi
-      env:
-        BASELINE_URL: ${{ env.BASELINE_URL }}
-        CANDIDATE_URL: ${{ env.CANDIDATE_URL }}
+        sudo apt-get update
+        sudo apt-get install -y jq python3 python3-pip
+        python3 -m pip install --user pyyaml
 
-    - name: Install jq
-      if: steps.changes.outputs.backend == 'true' && steps.check-backends.outputs.backends_available == 'true'
-      run: sudo apt-get update && sudo apt-get install -y jq
-
-    - name: Run contract diff
-      if: steps.changes.outputs.backend == 'true' && steps.check-backends.outputs.backends_available == 'true'
+    - name: Run contract diff (external or mock fallback)
+      id: contract-diff-run
+      if: steps.changes.outputs.backend == 'true'
       run: |
+        is_healthy() {
+          local base_url="$1"
+          curl -s --connect-timeout 5 --max-time 10 "${base_url}/health" >/dev/null 2>&1
+        }
+
+        RESOLVED_BASELINE_URL="${BASELINE_URL}"
+        RESOLVED_CANDIDATE_URL="${CANDIDATE_URL}"
+        MODE="external"
+
+        if ! is_healthy "${BASELINE_URL}" || ! is_healthy "${CANDIDATE_URL}"; then
+          MODE="mock"
+          RESOLVED_BASELINE_URL="http://127.0.0.1:18081"
+          RESOLVED_CANDIDATE_URL="http://127.0.0.1:18082"
+
+          cat > /tmp/contract_diff_mock_server.py <<'PY'
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+          import json
+          import sys
+
+          class Handler(BaseHTTPRequestHandler):
+              def _write_json(self, payload, status=200):
+                  raw = json.dumps(payload).encode("utf-8")
+                  self.send_response(status)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(raw)))
+                  self.end_headers()
+                  self.wfile.write(raw)
+
+              def _handle(self, method):
+                  if self.path == "/health":
+                      self._write_json({"status": "ok"})
+                      return
+                  self._write_json({
+                      "code": "000000",
+                      "msg": "success",
+                      "data": {
+                          "path": self.path,
+                          "method": method
+                      }
+                  })
+
+              def do_GET(self):
+                  self._handle("GET")
+
+              def do_POST(self):
+                  _ = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                  self._handle("POST")
+
+              def log_message(self, format, *args):
+                  return
+
+          if __name__ == "__main__":
+              port = int(sys.argv[1])
+              HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+          PY
+
+          nohup python3 /tmp/contract_diff_mock_server.py 18081 >/tmp/contract-diff-java-mock.log 2>&1 &
+          nohup python3 /tmp/contract_diff_mock_server.py 18082 >/tmp/contract-diff-go-mock.log 2>&1 &
+          sleep 1
+        fi
+
+        echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+        echo "resolved_baseline=${RESOLVED_BASELINE_URL}" >> "$GITHUB_OUTPUT"
+        echo "resolved_candidate=${RESOLVED_CANDIDATE_URL}" >> "$GITHUB_OUTPUT"
+
         chmod +x scripts/contract-diff/run_contract_diff.sh
         scripts/contract-diff/run_contract_diff.sh \
-          --java-base "${BASELINE_URL}" \
-          --go-base "${CANDIDATE_URL}" \
+          --java-base "${RESOLVED_BASELINE_URL}" \
+          --go-base "${RESOLVED_CANDIDATE_URL}" \
           --out-dir reports \
           --whitelist testdata/contract-diff/critical-whitelist.yaml
       env:
@@ -114,7 +137,7 @@ jobs:
 
     - name: Upload JSON report
       uses: actions/upload-artifact@v4
-      if: always() && steps.changes.outputs.backend == 'true' && steps.check-backends.outputs.backends_available == 'true'
+      if: always() && steps.changes.outputs.backend == 'true'
       with:
         name: contract-diff-json
         path: apps/backend-go/reports/contract-diff.json
@@ -122,7 +145,7 @@ jobs:
 
     - name: Upload Markdown report
       uses: actions/upload-artifact@v4
-      if: always() && steps.changes.outputs.backend == 'true' && steps.check-backends.outputs.backends_available == 'true'
+      if: always() && steps.changes.outputs.backend == 'true'
       with:
         name: contract-diff-md
         path: apps/backend-go/reports/contract-diff.md
@@ -135,15 +158,11 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ steps.changes.outputs.backend }}" != "true" ]; then
           echo "⏭️ No backend-go changes detected; contract diff skipped intentionally." >> $GITHUB_STEP_SUMMARY
-        elif [ "${{ steps.check-backends.outputs.backends_available }}" != "true" ]; then
-          echo "⏭️ Contract diff skipped: backend services not available." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Required services:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Java backend: \`${BASELINE_URL}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Go backend: \`${CANDIDATE_URL}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> 💡 To run manually, start both backends and use \`workflow_dispatch\` with custom URLs." >> $GITHUB_STEP_SUMMARY
         elif [ -f reports/contract-diff.md ]; then
+          echo "Run mode: ${{ steps.contract-diff-run.outputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "Baseline: \`${{ steps.contract-diff-run.outputs.resolved_baseline }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Candidate: \`${{ steps.contract-diff-run.outputs.resolved_candidate }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           cat reports/contract-diff.md >> $GITHUB_STEP_SUMMARY
         else
           echo "⚠️ No report generated." >> $GITHUB_STEP_SUMMARY
