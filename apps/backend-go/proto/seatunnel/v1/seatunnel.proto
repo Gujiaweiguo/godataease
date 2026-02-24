@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package seatunnel.v1;
+
+option go_package = "dataease/backend/proto/seatunnel/v1;seatunnelv1";
+
+service SyncService {
+  rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
+  rpc GetTaskStatus(GetTaskStatusRequest) returns (GetTaskStatusResponse);
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+}
+
+message SyncTask {
+  string id = 1;
+  string name = 2;
+  string source = 3;
+  string target = 4;
+  string status = 5;
+  int32 progress = 6;
+}
+
+message SubmitTaskRequest {
+  SyncTask task = 1;
+}
+
+message SubmitTaskResponse {
+  string task_id = 1;
+}
+
+message GetTaskStatusRequest {
+  string task_id = 1;
+}
+
+message GetTaskStatusResponse {
+  SyncTask task = 1;
+}
+
+message CancelTaskRequest {
+  string task_id = 1;
+}
+
+message CancelTaskResponse {
+  bool success = 1;
+  string message = 2;
+}

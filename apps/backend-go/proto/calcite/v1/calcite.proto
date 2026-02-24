@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package calcite.v1;
+
+option go_package = "dataease/backend/proto/calcite/v1;calcitev1";
+
+service CalciteService {
+  rpc ParseSQL(ParseSQLRequest) returns (ParseSQLResponse);
+  rpc ValidateSQL(ValidateSQLRequest) returns (ValidateSQLResponse);
+}
+
+message ParseSQLRequest {
+  string sql = 1;
+}
+
+message ParseSQLResponse {
+  string normalized_sql = 1;
+  string raw_sql = 2;
+}
+
+message ValidateSQLRequest {
+  string sql = 1;
+}
+
+message ValidateSQLResponse {
+  bool valid = 1;
+  string message = 2;
+  string normalized_sql = 3;
+}
