@@ -83,6 +83,11 @@ make run-local
 
 For more development guides, see [development_guide.md](../development_guide.md).
 
+## Latest Release Notes
+
+- [2026-02-24: gRPC Integration Config Unification](./release-notes/2026-02-24-grpc-integration-config.md)
+- [2026-02-20: Go Shadow Validation Gate](./release-notes/2026-02-20-go-shadow-gate.md)
+
 ## Technology Stack
 
 -   Frontend: [Vue.js](https://vuejs.org/), [Element](https://element.eleme.cn/)

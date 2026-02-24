@@ -32,3 +32,20 @@ You can also override hosts/ports explicitly:
 ```bash
 DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 REDIS_HOST=127.0.0.1 REDIS_PORT=6379 make run-local
 ```
+
+## Integration Config (Optional)
+
+The backend supports optional gRPC integrations for Calcite and SeaTunnel.
+
+```env
+CALCITE_GRPC_ADDR=
+CALCITE_GRPC_TIMEOUT_SEC=10
+CALCITE_GRPC_MAX_RETRIES=1
+SEATUNNEL_GRPC_ADDR=
+SEATUNNEL_GRPC_TIMEOUT_SEC=15
+SEATUNNEL_GRPC_MAX_RETRIES=1
+```
+
+- Keep `CALCITE_GRPC_ADDR` empty to disable Calcite SQL validation integration.
+- Keep `SEATUNNEL_GRPC_ADDR` empty to disable SeaTunnel sync orchestration integration.
+- These values are loaded through `integration.calcite` and `integration.seatunnel` in `configs/config.yaml`.

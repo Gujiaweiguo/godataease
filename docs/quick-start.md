@@ -59,10 +59,17 @@ DB_PASSWORD=your-password
 REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_EXTERNAL_PORT=16379
+CALCITE_GRPC_ADDR=
+CALCITE_GRPC_TIMEOUT_SEC=10
+CALCITE_GRPC_MAX_RETRIES=1
+SEATUNNEL_GRPC_ADDR=
+SEATUNNEL_GRPC_TIMEOUT_SEC=15
+SEATUNNEL_GRPC_MAX_RETRIES=1
 ```
 
 说明：当前开发编排默认启动 `dataease-app + redis`，MySQL 需提前可用，并且在 `my-net` 网络里可通过主机名 `mysql8` 访问。
 若你的 MySQL 主机名不是 `mysql8`，请调整 `infra/compose/docker-compose.yml` 中 `dataease-app.environment.DATABASE_HOST`。
+`CALCITE_GRPC_ADDR` 与 `SEATUNNEL_GRPC_ADDR` 为空时，对应能力默认关闭；配置后将启用 SQL 校验与同步编排的 gRPC 集成。
 
 服务启动后访问：`http://localhost:8080`
 
