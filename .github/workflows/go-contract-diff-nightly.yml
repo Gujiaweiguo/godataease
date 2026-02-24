@@ -1,0 +1,99 @@
+name: Go Contract Diff Nightly External
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      baseline-url:
+        description: 'Baseline backend URL (optional override)'
+        required: false
+        default: ''
+        type: string
+      candidate-url:
+        description: 'Candidate backend URL (optional override)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-contract-diff-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BASELINE_URL: ${{ github.event.inputs.baseline-url || secrets.CONTRACT_DIFF_BASELINE_URL || '' }}
+  CANDIDATE_URL: ${{ github.event.inputs.candidate-url || secrets.CONTRACT_DIFF_CANDIDATE_URL || '' }}
+
+jobs:
+  contract-diff-nightly:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend-go
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install contract diff dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3 python3-pip
+          python3 -m pip install --user pyyaml
+
+      - name: Validate external endpoints configuration
+        run: |
+          if [ -z "$BASELINE_URL" ] || [ -z "$CANDIDATE_URL" ]; then
+            echo "Missing CONTRACT_DIFF_BASELINE_URL or CONTRACT_DIFF_CANDIDATE_URL secret" >&2
+            exit 1
+          fi
+
+      - name: Verify external endpoints health
+        run: |
+          curl -fsS --connect-timeout 10 --max-time 20 "${BASELINE_URL}/health" >/dev/null
+          curl -fsS --connect-timeout 10 --max-time 20 "${CANDIDATE_URL}/health" >/dev/null
+
+      - name: Run contract diff (external only)
+        run: |
+          chmod +x scripts/contract-diff/run_contract_diff.sh
+          scripts/contract-diff/run_contract_diff.sh \
+            --java-base "${BASELINE_URL}" \
+            --go-base "${CANDIDATE_URL}" \
+            --out-dir reports \
+            --whitelist testdata/contract-diff/critical-whitelist.yaml
+
+      - name: Upload JSON report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-contract-diff-json
+          path: apps/backend-go/reports/contract-diff.json
+          retention-days: 30
+
+      - name: Upload Markdown report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-contract-diff-md
+          path: apps/backend-go/reports/contract-diff.md
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Nightly External Contract Diff" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Baseline: \`${BASELINE_URL}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Candidate: \`${CANDIDATE_URL}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f reports/contract-diff.md ]; then
+            cat reports/contract-diff.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No report generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
