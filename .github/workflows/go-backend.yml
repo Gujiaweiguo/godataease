@@ -87,6 +87,19 @@ jobs:
         TEST_DB_NAME: dataease_test
       run: make test-integration
 
+    - name: Run drift check
+      if: steps.changes.outputs.backend == 'true'
+      run: make drift-check
+    - name: Run integration tests
+      if: steps.changes.outputs.backend == 'true'
+      env:
+        TEST_DB_HOST: 127.0.0.1
+        TEST_DB_PORT: 3306
+        TEST_DB_USER: root
+        TEST_DB_PASSWORD: Admin168
+        TEST_DB_NAME: dataease_test
+      run: make test-integration
+
     - name: Run linter
       if: steps.changes.outputs.backend == 'true'
       uses: golangci/golangci-lint-action@v4
@@ -101,6 +114,7 @@ jobs:
         if [ "${{ steps.changes.outputs.backend }}" = "true" ]; then
           echo "- Unit tests: completed" >> $GITHUB_STEP_SUMMARY
           echo "- Integration tests: completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Drift check: completed" >> $GITHUB_STEP_SUMMARY
           echo "Full backend CI executed." >> $GITHUB_STEP_SUMMARY
         else
           echo "No backend-go changes detected, backend CI skipped intentionally." >> $GITHUB_STEP_SUMMARY
