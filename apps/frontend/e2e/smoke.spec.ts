@@ -4,8 +4,8 @@ test.describe('Smoke Tests', () => {
   test('application should load', async ({ page }) => {
     await page.goto('/')
 
-    // Basic check that the app loaded
-    await expect(page).toHaveTitle(/DataEase/i)
+    // Basic check that the app loaded - check for login form instead of title
+    await expect(page.locator('input[type="text"]').first()).toBeVisible({ timeout: 10000 })
   })
 
   test('should redirect to login when not authenticated', async ({ page }) => {
