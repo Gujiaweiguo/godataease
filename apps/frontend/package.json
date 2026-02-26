@@ -15,8 +15,16 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ci": "vitest run tests/unit/example.test.ts",
+    "test:core": "vitest run tests/unit tests/integration src/tests/unit",
+    "test:affected:embedding": "vitest run tests/unit/events tests/integration/parent-child-communication.test.ts src/tests/unit/services/TokenManager.test.ts src/tests/unit/utils/embedding-utils.test.ts",
+    "test:affected:datasource": "vitest run tests/unit/datasource tests/unit/example.test.ts",
     "test:watch": "vitest",
-    "test:coverage": "vitest run tests/unit/example.test.ts --coverage"
+    "test:coverage": "vitest run tests/unit/example.test.ts --coverage",
+    "test:coverage:core": "vitest run tests/unit tests/integration src/tests/unit --coverage",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:debug": "playwright test --debug",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@antv/g2plot": "^2.4.29",
@@ -129,7 +137,8 @@
     "happy-dom": "^15.0.0",
     "@vitest/coverage-v8": "^2.0.0",
     "lint-staged": "^15.0.0",
-    "xss": "^1.0.14"
+    "xss": "^1.0.14",
+    "@playwright/test": "^1.48.0"
   },
   "overrides": {
     "@intlify/message-compiler": "9.14.5",
