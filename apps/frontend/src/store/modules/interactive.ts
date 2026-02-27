@@ -119,30 +119,15 @@ export const interactiveStore = defineStore('interactive', {
 
 export const interactiveStoreWithOut = () => interactiveStore(store)
 
-const normalizeTreeNodes = (list: BusiTreeNode[] = []): BusiTreeNode[] => {
-  return list.map(node => {
-    const normalized: BusiTreeNode = {
-      ...node,
-      id: String(node.id),
-      pid: String(node.pid)
-    }
-    if (node.children?.length) {
-      normalized.children = normalizeTreeNodes(node.children)
-    }
-    return normalized
-  })
-}
-
 const convertInteractive = (list): InnerInteractive => {
-  const normalizedList = normalizeTreeNodes((list as BusiTreeNode[]) || [])
   const result: InnerInteractive = {
-    rootManage: normalizedList.length > 0 && normalizedList[0]['weight'] >= 7,
+    rootManage: list[0]['weight'] >= 7,
     anyManage: false,
-    treeNodes: normalizedList,
+    treeNodes: (list as unknown as BusiTreeNode[]) || [],
     leafNodeCount: 0,
     menuAuth: true
   }
-  const stack = [...normalizedList]
+  const stack = [...list]
   let leafNodeCount = 0
   while (stack.length) {
     const node = stack.pop()
@@ -154,9 +139,7 @@ const convertInteractive = (list): InnerInteractive => {
       ++leafNodeCount
     }
     if (node?.children?.length) {
-      node.children.forEach(kid => {
-        stack.push(kid)
-      })
+      node.children.forEach(kid => stack.push(kid))
     }
   }
   result.leafNodeCount = leafNodeCount
@@ -190,9 +173,7 @@ const convertLocalStorage = (data?: InnerInteractive) => {
       result[id] = weight
     }
     if (node.children?.length) {
-      node.children.forEach(kid => {
-        stack.push(kid)
-      })
+      node.children.forEach(kid => stack.push(kid))
     }
   }
   return result

@@ -7,8 +7,8 @@
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
       @click="
-        (e: Event) => {
-          (e.target as HTMLInputElement).value = ''
+        e => {
+          e.target.value = ''
         }
       "
       @change="reUpload"
@@ -191,21 +191,11 @@ const state = reactive({
   predefineColors: COLOR_PANEL
 })
 
-interface WatermarkInfoSetting {
-  enable?: boolean
-  enablePanelCustom?: boolean
-}
-
-interface WatermarkInfo {
-  settingContent?: WatermarkInfoSetting
-}
-
 const showWatermarkSetting = computed(() => {
-  const watermarkInfo = dvInfo.value.watermarkInfo as WatermarkInfo | undefined
   return (
-    watermarkInfo &&
-    watermarkInfo.settingContent?.enable &&
-    watermarkInfo.settingContent?.enablePanelCustom
+    dvInfo.value.watermarkInfo &&
+    dvInfo.value.watermarkInfo?.settingContent?.enable &&
+    dvInfo.value.watermarkInfo?.settingContent?.enablePanelCustom
   )
 })
 

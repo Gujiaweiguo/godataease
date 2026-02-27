@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import { DualAxes, Plot } from '@antv/g2plot'
 
 /**

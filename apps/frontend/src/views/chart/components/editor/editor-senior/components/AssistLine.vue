@@ -1,6 +1,4 @@
 <script lang="tsx" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import icon_edit_outlined from '@/assets/svg/icon_edit_outlined.svg'
 import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
 import { onMounted, reactive, watch, computed, PropType } from 'vue'

@@ -28,8 +28,6 @@
 </template>
 
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import TemplateMarketV2Item from '@/views/template-market/component/TemplateMarketV2Item.vue'
 import { computed } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'

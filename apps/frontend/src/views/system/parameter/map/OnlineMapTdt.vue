@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const domId = ref('de-map-container')

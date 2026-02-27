@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import noLic from './nolic.vue'
-
 import { ref, useAttrs, onMounted } from 'vue'
 import { execute, randomKey, formatArray } from './convert'
 import { load, loadDistributed, xpackModelApi } from '@/api/plugin'
@@ -8,32 +7,13 @@ import configGlobal from '@/components/config-global/src/ConfigGlobal.vue'
 import { useCache } from '@/hooks/web/useCache'
 import { i18n } from '@/plugins/vue-i18n'
 import * as Vue from 'vue'
-import axios, { type AxiosStatic } from 'axios'
+import axios from 'axios'
 import * as Pinia from 'pinia'
 import * as echarts from 'echarts'
 import router from '@/router'
 import tinymce from 'tinymce/tinymce'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { isNull } from '@/utils/utils'
-
-type XpackModule = { default: unknown }
-type XpackMappingValue = XpackModule | Promise<XpackModule>
-
-// Window 扩展类型声明
-declare global {
-  interface Window {
-    _de_xpack_not_loaded?: boolean
-    tinymce?: typeof tinymce
-    DEXPack?: { mapping: Record<string, XpackMappingValue> }
-    VueDe?: typeof Vue
-    AxiosDe?: AxiosStatic
-    PiniaDe?: typeof Pinia
-    vueRouterDe?: typeof router
-    MittAllDe?: unknown
-    I18nDe?: typeof i18n
-    EchartsDE?: typeof echarts
-  }
-}
 
 const { wsCache } = useCache()
 
@@ -43,22 +23,6 @@ const loading = ref(false)
 
 const attrs = useAttrs()
 
-const getJsName = (): string | null => {
-  return typeof attrs.jsname === 'string' && attrs.jsname ? attrs.jsname : null
-}
-
-const resolveXpack = async () => {
-  const jsName = getJsName()
-  if (!jsName || !window.DEXPack) {
-    return null
-  }
-  const xpack = window.DEXPack.mapping[jsName]
-  if (!xpack) {
-    return null
-  }
-  return await Promise.resolve(xpack)
-}
-
 const showNolic = () => {
   plugin.value = noLic
   loading.value = false
@@ -66,7 +30,7 @@ const showNolic = () => {
 const generateRamStr = (len: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let randomStr = ''
-  for (let i = 0; i < len; i++) {
+  for (var i = 0; i < len; i++) {
     randomStr += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return randomStr
@@ -89,8 +53,8 @@ const importProxy = (bytesArray: any[]) => {
 }
 
 const loadXpack = async () => {
-  const xpack = await resolveXpack()
-  if (xpack) {
+  if (window['DEXPack']) {
+    const xpack = await window['DEXPack'].mapping[attrs.jsname]
     plugin.value = xpack.default
   }
 }
@@ -162,8 +126,8 @@ onMounted(async () => {
     return
   }
   if (distributed) {
-    const xpack = await resolveXpack()
-    if (xpack) {
+    if (window['DEXPack']) {
+      const xpack = await window['DEXPack'].mapping[attrs.jsname]
       plugin.value = xpack.default
     } else if (!window._de_xpack_not_loaded) {
       window._de_xpack_not_loaded = true

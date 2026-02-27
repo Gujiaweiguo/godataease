@@ -230,12 +230,11 @@ const handleComposeMouseDown = e => {
 }
 
 const composeDivider = computed(() => {
-  const current = curComponent.value
   return !(
-    !current ||
-    current['isLock'] ||
-    current['component'] !== 'Group' ||
-    current.category === 'hidden'
+    !curComponent ||
+    curComponent['isLock'] ||
+    curComponent['component'] != 'Group' ||
+    curComponent.category === 'hidden'
   )
 })
 

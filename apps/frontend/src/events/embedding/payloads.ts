@@ -5,7 +5,7 @@
  * in parent-child communication for embedding scenarios.
  */
 
-import { EmbeddingEventType } from './types'
+import type { EmbeddingEventType } from './types'
 
 /**
  * Base interface for all embedding event payloads.
@@ -346,7 +346,7 @@ export const validatePayload = (
     return false
   }
 
-  const p = payload as Record<string, unknown>
+  const p = payload as Partial<EmbeddingEventPayload>
 
   switch (eventType) {
     case EmbeddingEventType.INIT_READY:

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { toRefs } from 'vue'
 import CanvasCore from '@/components/data-visualization/canvas/CanvasCore.vue'
 import GroupPreview from '@/custom-component/group/GroupPreview.vue'

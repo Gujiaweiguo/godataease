@@ -154,7 +154,7 @@ const shiftDataPush = curClickIndex => {
   dvMainStore.setCurComponent({ component: null, index: null })
 }
 
-const hiddenAreaOnClick = (_e, element) => {
+const hiddenAreaOnClick = (e, element) => {
   let indexResult
   componentData.value.forEach((component, index) => {
     if (element.id === component.id) {
@@ -602,7 +602,7 @@ const canvasChange = () => {
                     effect="dark"
                     :hide-timeout="0"
                   >
-                    <span :class="'dropdownMore-' + index" @click="onClick($event, transformIndex(index))">
+                    <span :class="'dropdownMore-' + index" @click="onClick(transformIndex(index))">
                       <el-icon class="component-base">
                         <Icon name="dv-more"><dvMore class="svg-icon opt-icon" /></Icon>
                       </el-icon>

@@ -182,8 +182,8 @@ const baseComponentData = computed(() =>
       (!ele?.dashboardHidden || (ele?.dashboardHidden && isMobile()))
   )
 )
-const canvasStyle = computed<Record<string, string | number>>(() => {
-  let style: Record<string, string | number> = {}
+const canvasStyle = computed(() => {
+  let style = {}
   if (isMainCanvas(canvasId.value) && !isDashboard()) {
     style['overflowY'] = 'hidden !important'
   }

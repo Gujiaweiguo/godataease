@@ -59,7 +59,7 @@ interface Form {
 }
 
 interface ExcelRemoteConfiguration {
-  datasourceId?: string
+  datasourceId?: number | string
   editType?: number
   userName: string
   passwd: string
@@ -414,7 +414,7 @@ const doValidateDs = request => {
   dsLoading.value = true
   if (currentDsType.value === 'ExcelRemote') {
     let excelRequest = JSON.parse(JSON.stringify(form2.configuration)) as ExcelRemoteConfiguration
-    excelRequest.datasourceId = form2.id || ''
+    excelRequest.datasourceId = form2.id || 0
     excelRequest.editType = form2.editType
     excelRequest.userName = Base64.encode(excelRequest.userName)
     excelRequest.passwd = Base64.encode(excelRequest.passwd)
@@ -425,7 +425,7 @@ const doValidateDs = request => {
           ElMessage.warning(res.msg)
           return
         }
-        if (res?.code !== 0 && res?.code !== '000000') {
+        if (res?.code !== 0) {
           ElMessage.warning(res.msg)
           return
         }
@@ -698,10 +698,10 @@ const init = (nodeInfo: Form | Param, id?: string, res?: object, supportSetKey?:
     } else {
       Object.assign(form, cloneDeep(nodeInfo))
       Object.assign(origin, cloneDeep(nodeInfo))
-      if (form.hasOwnProperty('configuration') && form.configuration.urlType === undefined) {
+      if (form.hasOwnProperty('configuration') && form.configuration.urlType == undefined) {
         form.configuration.urlType = 'hostName'
       }
-      if (form.hasOwnProperty('configuration') && form.configuration.sshType === undefined) {
+      if (form.hasOwnProperty('configuration') && form.configuration.sshType == undefined) {
         form.configuration.sshType = 'password'
       }
     }
@@ -743,10 +743,10 @@ const init = (nodeInfo: Form | Param, id?: string, res?: object, supportSetKey?:
 
 const drawTitle = computed(() => {
   const { id, editType, creator } = form2
-  if (creator && id && currentDsType.value === 'Excel') {
+  if (creator && id && currentDsType.value == 'Excel') {
     return editType === 1 ? t('data_source.append_data') : t('data_source.replace_data')
   }
-  if (currentDsType.value === 'ExcelRemote') {
+  if (currentDsType.value == 'ExcelRemote') {
     return editDs.value
       ? !form2.id
         ? t('data_source.copy_data_source')

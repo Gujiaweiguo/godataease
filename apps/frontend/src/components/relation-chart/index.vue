@@ -12,7 +12,7 @@ const chartSize = reactive({
   width: 0
 })
 const getChartSize = () => {
-  const dom = document.querySelector('.relation-drawer_content') as HTMLElement | null
+  const dom = document.querySelector('.relation-drawer_content')
   if (!dom) return
   Object.assign(chartSize, {
     height: dom.offsetHeight + 'px',

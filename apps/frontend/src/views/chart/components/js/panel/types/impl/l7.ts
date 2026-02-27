@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import type { Scene } from '@antv/l7-scene'
 import {
   AntVAbstractChartView,

@@ -14,17 +14,6 @@ import RealTimeGroup from '@/components/data-visualization/RealTimeGroup.vue'
 import eventBus from '@/utils/eventBus'
 import { syncViewTitle } from '@/utils/canvasUtils'
 import { useI18n } from '@/hooks/web/useI18n'
-import type { PropType } from 'vue'
-
-interface TabComponentItem {
-  id?: string
-  name?: string
-  title?: string
-  expand?: boolean
-  component?: string
-  componentData?: any[]
-  [key: string]: any
-}
 
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
@@ -41,18 +30,15 @@ const props = defineProps({
     default: 'main'
   },
   componentData: {
-    type: Array as PropType<TabComponentItem[]>,
+    type: Array,
     default: () => []
   },
-  tabElement: {
-    type: Object as PropType<TabComponentItem>,
-    default: () => ({})
-  }
+  tabElement: {}
 })
 
 const { componentData, tabElement } = toRefs(props)
 
-const getComponent = (index: number): TabComponentItem | undefined => {
+const getComponent = index => {
   return componentData.value[index]
 }
 const onClick = item => {

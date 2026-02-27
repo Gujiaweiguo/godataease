@@ -1,6 +1,4 @@
 <script lang="tsx" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { ref, watch, onMounted, computed } from 'vue'
 import { customMergeColor } from '@/custom-component/de-decoration/component_details/config'
 import { cloneDeep } from 'lodash-es'

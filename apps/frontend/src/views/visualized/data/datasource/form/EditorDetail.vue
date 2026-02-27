@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import icon_calendar_outlined from '@/assets/svg/icon_calendar_outlined.svg'
 import icon_rename_outlined from '@/assets/svg/icon_rename_outlined.svg'
 import icon_down_outlined from '@/assets/svg/icon_down_outlined.svg'

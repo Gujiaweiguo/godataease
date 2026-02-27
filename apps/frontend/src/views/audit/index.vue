@@ -123,8 +123,6 @@
 </template>
 
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { queryAuditLogsApi, exportAuditLogsApi } from '@/api/audit'

@@ -72,8 +72,6 @@
 </template>
 
 <script lang="ts" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { save, nameCheck, findOne, categoryTemplateNameCheck } from '@/api/template'
 import { computed, reactive, ref } from 'vue'
 import { imgUrlTrans } from '@/utils/imgUtils'

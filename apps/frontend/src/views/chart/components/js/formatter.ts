@@ -13,11 +13,9 @@ export const formatterItem = {
   unit: 1, // 换算单位
   suffix: '', // 单位后缀
   decimalCount: 2, // 小数位数
-  thousandSeparator: true, // 千分符
-  showTotalPercent: false // 显示总占比
+  thousandSeparator: true // 千分符
 }
 
-// 单位list
 // 单位list
 export const unitType = [
   { name: t('chart.unit_none'), value: 1 },

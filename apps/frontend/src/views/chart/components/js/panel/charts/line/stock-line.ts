@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import {
   G2PlotChartView,
   G2PlotDrawOptions

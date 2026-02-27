@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { useI18n } from '@/hooks/web/useI18n'
 import { PropType, toRefs, nextTick, watch, ref, computed } from 'vue'
 import MiscSelector from '@/views/chart/components/editor/editor-style/components/MiscSelector.vue'

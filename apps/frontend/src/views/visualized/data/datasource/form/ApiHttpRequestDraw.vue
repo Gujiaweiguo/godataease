@@ -1,7 +1,4 @@
 <script lang="tsx" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
-import icon_expandRight_filled from '@/assets/svg/icon_expand-right_filled.svg'
 import icon_expandRight_filled from '@/assets/svg/icon_expand-right_filled.svg'
 import { nextTick, reactive, ref, shallowRef, provide } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'

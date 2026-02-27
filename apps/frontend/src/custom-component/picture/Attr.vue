@@ -107,8 +107,8 @@ onBeforeUnmount(() => {
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
       @click="
-        (e: Event) => {
-          (e.target as HTMLInputElement).value = ''
+        e => {
+          e.target.value = ''
         }
       "
       @change="reUpload"

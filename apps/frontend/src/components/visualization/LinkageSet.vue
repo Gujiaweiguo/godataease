@@ -497,7 +497,7 @@ const init = viewItem => {
     state.tableId = chartDetails.tableId
     // 获取当前数据集信息
     getDatasetDetails(chartDetails.tableId).then(res => {
-      state.curDatasetInfo = res || { name: '' }
+      state.curDatasetInfo = res || {}
     })
   }
   customLinkageActive.value = curComponent.value.actionSelection

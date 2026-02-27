@@ -1,5 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { cloneDeep } from 'lodash-es'
 import componentList, {
   ACTION_SELECTION,
@@ -359,7 +357,7 @@ export function refreshOtherComponent(dvId, busiFlag) {
   )
   if (refreshComponentList && refreshComponentList.length > 0) {
     const refreshIdList = refreshComponentList.map(ele => ele.id)
-    findById(dvId, busiFlag, { source: 'main', taskId: null }).then(rsp => {
+    findById(dvId, busiFlag, {}).then(rsp => {
       const canvasInfo = rsp.data
       const canvasDataResult = JSON.parse(canvasInfo.componentData)
       const canvasDataResultMap = canvasDataResult.reduce((acc, comp) => {
@@ -398,7 +396,7 @@ export function initCanvasDataPrepare(dvId, params, callBack) {
   const copyFlag = busiFlag != null && busiFlag.includes('-copy')
   const busiFlagCustom = copyFlag ? busiFlag.split('-')[0] : busiFlag
   const method = copyFlag ? findCopyResource : findById
-  let attachInfo: Record<string, any> = { source: params.source ? params.source : 'main' }
+  let attachInfo = { source: params.source ? params.source : 'main' }
   if (dvMainStore.canvasAttachInfo && !!dvMainStore.canvasAttachInfo.taskId) {
     attachInfo = { source: 'report', taskId: dvMainStore.canvasAttachInfo.taskId }
     const showWatermarkExist =

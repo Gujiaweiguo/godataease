@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import icon_admin_outlined from '@/assets/svg/icon_admin_outlined.svg'
 import { ElColorPicker, ElPopover } from 'element-plus-secondary'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
@@ -25,8 +23,8 @@ const props = withDefaults(
       customColor: any
       colorIndex: number
     }
-    propertyInner?: Array<string>
-    chart?: ChartObj
+    propertyInner: Array<string>
+    chart: ChartObj
     sub?: boolean
   }>(),
   {

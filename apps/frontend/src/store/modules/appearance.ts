@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import { defineStore } from 'pinia'
 import { store } from '@/store/index'
 import { defaultFont, list } from '@/api/font'

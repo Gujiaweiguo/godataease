@@ -41,8 +41,6 @@
 </template>
 
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { useI18n } from '@/hooks/web/useI18n'
 import { computed, reactive } from 'vue'
 import NoneImage from '@/assets/none.png'

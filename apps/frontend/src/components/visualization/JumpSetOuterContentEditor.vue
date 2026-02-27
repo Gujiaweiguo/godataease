@@ -12,26 +12,9 @@ import { onBeforeUnmount, reactive, ref, toRefs } from 'vue'
 import CodeMirror from '@/views/visualized/data/dataset/form/CodeMirror.vue'
 const myCm = ref(null)
 const mirror = ref(null)
-
-interface LinkJumpInfoItem {
-  sourceFieldName?: string
-  sourceFieldId?: string
-  [key: string]: string | number | undefined
-}
-
-interface LinkJumpInfo {
-  content?: string
-}
-
 const props = defineProps({
-  linkJumpInfoArray: {
-    type: Array as () => LinkJumpInfoItem[],
-    default: () => []
-  },
-  linkJumpInfo: {
-    type: Object as () => LinkJumpInfo,
-    default: () => ({})
-  }
+  linkJumpInfoArray: Array,
+  linkJumpInfo: Object
 })
 
 const { linkJumpInfo } = toRefs(props)
@@ -53,12 +36,8 @@ const setNameIdTrans = (from, to, originName, name2Auto?: string[]) => {
     return originName
   }
   let name2Id = originName
-  const nameIdMap = props.linkJumpInfoArray.reduce<Record<string, string>>((pre, next) => {
-    const key = next[from]
-    const value = next[to]
-    if (typeof key === 'string' && typeof value === 'string') {
-      pre[key] = value
-    }
+  const nameIdMap = props.linkJumpInfoArray.reduce((pre, next) => {
+    pre[next[from]] = next[to]
     return pre
   }, {})
   const on = originName.match(/\[(.+?)\]/g) || []
@@ -66,11 +45,9 @@ const setNameIdTrans = (from, to, originName, name2Auto?: string[]) => {
     on.forEach(itm => {
       const ele = itm.slice(1, -1)
       if (name2Auto) {
-        if (nameIdMap[ele]) {
-          name2Auto.push(nameIdMap[ele])
-        }
+        name2Auto.push(nameIdMap[ele])
       }
-      name2Id = name2Id.replace(`[${ele}]`, `[${nameIdMap[ele] ?? ''}]`)
+      name2Id = name2Id.replace(`[${ele}]`, `[${nameIdMap[ele]}]`)
     })
   }
   return name2Id

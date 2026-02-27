@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import { ref, reactive, inject, type Ref } from 'vue'
 import UnionFieldList from './UnionFieldList.vue'
 import UnionItemEdit from './UnionItemEdit.vue'

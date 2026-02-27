@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import type { DatePickType } from 'element-plus-secondary'
 import { toRefs, computed, watch } from 'vue'
 import { type TimeRange } from './time-format'

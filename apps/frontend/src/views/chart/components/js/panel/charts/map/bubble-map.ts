@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
 import { useI18n } from '@/hooks/web/useI18n'
 import {
   L7PlotChartView,
