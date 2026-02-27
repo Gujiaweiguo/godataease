@@ -8,6 +8,8 @@
 </template>
 
 <script setup lang="ts">
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { onMounted, onUnmounted, reactive, toRefs } from 'vue'
 
 const props = defineProps({

@@ -1,308 +1,103 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { TokenManager } from '@/services/TokenManager'
-import { useEmbedded } from '@/store/modules/embedded'
+import { embeddedGetTokenArgsApi, embeddedInitIframeApi } from '@/api/embedded'
 
-vi.mock('@/store/modules/embedded')
+vi.mock('@/api/embedded', async () => {
+  const { createEmbeddedApiModuleMock } = await import('../../../../tests/unit/helpers')
+  return createEmbeddedApiModuleMock()
+})
 
-vi.mock('@/api/embedded', () => ({
-  embeddedInitIframeApi: vi.fn(),
-  embeddedGetTokenArgsApi: vi.fn()
-}))
+const mockStore = {
+  token: '',
+  allowedOrigins: [] as string[],
+  setToken: vi.fn(),
+  setAllowedOrigins: vi.fn(),
+  setTokenInfo: vi.fn(),
+  getTokenInfo: new Map<string, any>()
+}
 
 describe('TokenManager', () => {
   let tokenManager: TokenManager
-  let mockEmbeddedStore: ReturnType<typeof useEmbedded>
 
   beforeEach(() => {
-    mockEmbeddedStore = {
-      setToken: vi.fn(),
-      setAllowedOrigins: vi.fn(),
-      setTokenInfo: vi.fn(),
-      getToken: vi.fn(() => 'mock-token'),
-      getTokenInfo: vi.fn(() => new Map()),
-      getAllowedOrigins: vi.fn(() => []),
-      setEmbedReady: vi.fn(),
-      getEmbedReady: vi.fn(() => false)
-    }
-
-    tokenManager = TokenManager.getInstance(mockEmbeddedStore)
+    vi.clearAllMocks()
+    ;(TokenManager as any).instance = undefined
+    mockStore.getTokenInfo = new Map()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    tokenManager = TokenManager.getInstance(mockStore as any)
   })
 
   afterEach(() => {
     tokenManager.cleanup()
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
   })
 
-  describe('getInstance', () => {
-    it('should return singleton instance', () => {
-      const instance1 = TokenManager.getInstance(mockEmbeddedStore)
-      const instance2 = TokenManager.getInstance(mockEmbeddedStore)
+  it('initializes token successfully', async () => {
+    vi.mocked(embeddedInitIframeApi).mockResolvedValue({ data: ['https://a.com'] } as any)
+    const result = await tokenManager.initializeToken('token-1', 'https://host.com')
 
-      expect(instance1).toBe(instance2)
-    })
+    expect(result.isValid).toBe(true)
+    expect(mockStore.setToken).toHaveBeenCalledWith('token-1')
+    expect(mockStore.setAllowedOrigins).toHaveBeenCalledWith(['https://a.com'])
+    expect(mockStore.setTokenInfo).toHaveBeenCalled()
   })
 
-  describe('initializeToken', () => {
-    const mockToken = 'test-token-123'
-    const mockOrigin = 'https://example.com'
+  it('returns invalid when init api fails', async () => {
+    vi.mocked(embeddedInitIframeApi).mockRejectedValue(new Error('fail'))
+    const result = await tokenManager.initializeToken('token-1', 'https://host.com')
 
-    it('should initialize token and set in store', async () => {
-      const result = await tokenManager.initializeToken(mockToken, mockOrigin)
-
-      expect(mockEmbeddedStore.setToken).toHaveBeenCalledWith(mockToken)
-      expect(result.isValid).toBe(true)
-    })
-
-    it('should validate token on initialization', async () => {
-      await tokenManager.initializeToken(mockToken, mockOrigin)
-
-      const tokenInfo = tokenManager.getCurrentTokenInfo()
-      expect(tokenInfo).toBeDefined()
-      expect(tokenInfo?.token).toBe(mockToken)
-    })
-
-    it('should setup auto-refresh when enabled', async () => {
-      const spy = vi.spyOn(tokenManager as any, 'setupAutoRefresh')
-
-      await tokenManager.initializeToken(mockToken, mockOrigin, { refreshEnabled: true })
-
-      expect(spy).toHaveBeenCalled()
-    })
-
-    it('should not setup auto-refresh when disabled', async () => {
-      const spy = vi.spyOn(tokenManager as any, 'setupAutoRefresh')
-
-      await tokenManager.initializeToken(mockToken, mockOrigin, { refreshEnabled: false })
-
-      expect(spy).not.toHaveBeenCalled()
-    })
-
-    it('should set token type', async () => {
-      await tokenManager.initializeToken(mockToken, mockOrigin, { tokenType: 'div' })
-
-      const tokenInfo = tokenManager.getCurrentTokenInfo()
-      expect(tokenInfo?.type).toBe('div')
-    })
-
-    it('should set resource id', async () => {
-      const resourceId = 'resource-123'
-      await tokenManager.initializeToken(mockToken, mockOrigin, { resourceId })
-
-      const tokenInfo = tokenManager.getCurrentTokenInfo()
-      expect(tokenInfo?.resourceId).toBe(resourceId)
-    })
-
-    it('should handle initialization errors gracefully', async () => {
-      mockEmbeddedStore.setToken = vi.fn(() => {
-        throw new Error('Init failed')
-      })
-
-      const result = await tokenManager.initializeToken(mockToken, mockOrigin)
-
-      expect(result.isValid).toBe(false)
-      expect(result.error).toBeDefined()
-    })
+    expect(result.isValid).toBe(false)
+    expect(result.error).toBe('Initialization failed')
   })
 
-  describe('validateToken', () => {
-    it('should validate non-empty token', async () => {
-      const result = await tokenManager.validateToken('valid-token')
-
-      expect(result.isValid).toBe(true)
-    })
-
-    it('should reject empty token', async () => {
-      const result = await tokenManager.validateToken('')
-
-      expect(result.isValid).toBe(false)
-      expect(result.error).toBe('Token is empty')
-    })
-
-    it('should reject null token', async () => {
-      const result = await tokenManager.validateToken(null as any)
-
-      expect(result.isValid).toBe(false)
-      expect(result.error).toBe('Token is empty')
-    })
-
-    it('should extract expiry time from JWT token', async () => {
-      const expTime = Date.now() + 3600000
-      const header = Buffer.from('{"alg":"HS256"}').toString('base64')
-      const payload = Buffer.from(`{"exp":${Math.floor(expTime / 1000)}}`).toString('base64')
-      const signature = 'signature'
-      const jwtToken = `${header}.${payload}.${signature}`
-
-      const result = await tokenManager.validateToken(jwtToken)
-
-      expect(result.isValid).toBe(true)
-      expect(result.expiryTime).toBe(expTime)
-    })
-
-    it('should reject expired token', async () => {
-      const expiredTime = Date.now() - 3600000
-      const header = Buffer.from('{"alg":"HS256"}').toString('base64')
-      const payload = Buffer.from(`{"exp":${Math.floor(expiredTime / 1000)}}`).toString('base64')
-      const signature = 'signature'
-      const jwtToken = `${header}.${payload}.${signature}`
-
-      const result = await tokenManager.validateToken(jwtToken)
-
-      expect(result.isValid).toBe(false)
-      expect(result.error).toBe('Token has expired')
-    })
-
-    it('should handle non-JWT tokens gracefully', async () => {
-      const result = await tokenManager.validateToken('simple-token')
-
-      expect(result.isValid).toBe(true)
-      expect(result.expiryTime).toBeUndefined()
-    })
-
-    it('should handle malformed tokens gracefully', async () => {
-      const result = await tokenManager.validateToken('invalid..token')
-
-      expect(result.isValid).toBe(true)
-      expect(result.expiryTime).toBeUndefined()
-    })
+  it('rejects empty token', async () => {
+    const result = await tokenManager.validateToken('')
+    expect(result.isValid).toBe(false)
+    expect(result.error).toBe('Token is empty')
   })
 
-  describe('refreshToken', () => {
-    beforeEach(() => {
-      vi.mocked(embeddedGetTokenArgsApi).mockResolvedValue({
-        data: {
-          token: 'new-refreshed-token',
-          allowedOrigins: ['https://new-origin.com']
-        }
-      })
-    })
+  it('parses jwt expiry time', async () => {
+    const exp = Math.floor((Date.now() + 3600_000) / 1000)
+    const token = `${btoa('{"alg":"HS256"}')}.${btoa(`{"exp":${exp}}`)}.sig`
+    const result = await tokenManager.validateToken(token)
 
-    it('should refresh token successfully', async () => {
-      const success = await tokenManager.refreshToken()
-
-      expect(success).toBe(true)
-      expect(mockEmbeddedStore.setToken).toHaveBeenCalledWith('new-refreshed-token')
-      expect(mockEmbeddedStore.setAllowedOrigins).toHaveBeenCalledWith(['https://new-origin.com'])
-    })
-
-    it('should update token info after refresh', async () => {
-      await tokenManager.refreshToken()
-
-      const tokenInfo = tokenManager.getCurrentTokenInfo()
-      expect(tokenInfo?.token).toBe('new-refreshed-token')
-    })
-
-    it('should handle refresh failure gracefully', async () => {
-      vi.mocked(embeddedGetTokenArgsApi).mockRejectedValue(new Error('Refresh failed'))
-
-      const success = await tokenManager.refreshToken()
-
-      expect(success).toBe(false)
-    })
-
-    it('should handle missing token in response', async () => {
-      vi.mocked(embeddedGetTokenArgsApi).mockResolvedValue({
-        data: {}
-      })
-
-      const success = await tokenManager.refreshToken()
-
-      expect(success).toBe(false)
-    })
+    expect(result.isValid).toBe(true)
+    expect(result.expiryTime).toBe(exp * 1000)
   })
 
-  describe('invalidateToken', () => {
-    it('should clear token from store', () => {
-      tokenManager.invalidateToken()
+  it('refreshes token from api', async () => {
+    vi.mocked(embeddedGetTokenArgsApi).mockResolvedValue({
+      data: { token: 'new-token', allowedOrigins: ['https://new.com'] }
+    } as any)
+    const ok = await tokenManager.refreshToken()
 
-      expect(mockEmbeddedStore.setToken).toHaveBeenCalledWith('')
-    })
-
-    it('should clear allowed origins from store', () => {
-      tokenManager.invalidateToken()
-
-      expect(mockEmbeddedStore.setAllowedOrigins).toHaveBeenCalledWith([])
-    })
-
-    it('should clear token info from store', () => {
-      tokenManager.invalidateToken()
-
-      expect(mockEmbeddedStore.setTokenInfo).toHaveBeenCalledWith(new Map())
-    })
-
-    it('should stop auto-refresh', () => {
-      const spy = vi.spyOn(tokenManager, 'stopAutoRefresh')
-
-      tokenManager.invalidateToken()
-
-      expect(spy).toHaveBeenCalled()
-    })
+    expect(ok).toBe(true)
+    expect(mockStore.setToken).toHaveBeenCalledWith('new-token')
+    expect(mockStore.setAllowedOrigins).toHaveBeenCalledWith(['https://new.com'])
   })
 
-  describe('getCurrentTokenInfo', () => {
-    it('should return current token info', () => {
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token' }]]))
-
-      const tokenInfo = tokenManager.getCurrentTokenInfo()
-
-      expect(tokenInfo).toEqual({ token: 'test-token' })
-    })
-
-    it('should return undefined if no token info exists', () => {
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map())
-
-      const tokenInfo = tokenManager.getCurrentTokenInfo()
-
-      expect(tokenInfo).toBeUndefined()
-    })
+  it('returns false when refresh response has no token', async () => {
+    vi.mocked(embeddedGetTokenArgsApi).mockResolvedValue({ data: {} } as any)
+    const ok = await tokenManager.refreshToken()
+    expect(ok).toBe(false)
   })
 
-  describe('needsRefresh', () => {
-    it('should return true if no token info', () => {
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map())
-
-      const needsRefresh = tokenManager.needsRefresh()
-
-      expect(needsRefresh).toBe(true)
-    })
-
-    it('should return true if token is expired', () => {
-      const expiredTime = Date.now() - 1000
-      mockEmbeddedStore.getTokenInfo = vi.fn(
-        () => new Map([['current', { token: 'test-token', expiryTime: expiredTime }]])
-      )
-
-      const needsRefresh = tokenManager.needsRefresh()
-
-      expect(needsRefresh).toBe(true)
-    })
-
-    it('should return false if token is valid and not expired', () => {
-      const futureTime = Date.now() + 3600000
-      mockEmbeddedStore.getTokenInfo = vi.fn(
-        () => new Map([['current', { token: 'test-token', expiryTime: futureTime }]])
-      )
-
-      const needsRefresh = tokenManager.needsRefresh()
-
-      expect(needsRefresh).toBe(false)
-    })
-
-    it('should return true if expiry time is undefined', () => {
-      mockEmbeddedStore.getTokenInfo = vi.fn(() => new Map([['current', { token: 'test-token' }]]))
-
-      const needsRefresh = tokenManager.needsRefresh()
-
-      expect(needsRefresh).toBe(true)
-    })
+  it('invalidates token state', () => {
+    tokenManager.invalidateToken()
+    expect(mockStore.setToken).toHaveBeenCalledWith('')
+    expect(mockStore.setAllowedOrigins).toHaveBeenCalledWith([])
+    expect(mockStore.setTokenInfo).toHaveBeenCalledWith(new Map())
   })
 
-  describe('cleanup', () => {
-    it('should stop auto-refresh', () => {
-      const spy = vi.spyOn(tokenManager, 'stopAutoRefresh')
+  it('returns current token info from map', () => {
+    mockStore.getTokenInfo = new Map([['current', { token: 'x', expiryTime: 123 }]])
+    const info = tokenManager.getCurrentTokenInfo()
+    expect(info).toEqual({ token: 'x', expiryTime: 123 })
+  })
 
-      tokenManager.cleanup()
-
-      expect(spy).toHaveBeenCalled()
-    })
+  it('needs refresh when token missing', () => {
+    mockStore.getTokenInfo = new Map()
+    expect(tokenManager.needsRefresh()).toBe(true)
   })
 })

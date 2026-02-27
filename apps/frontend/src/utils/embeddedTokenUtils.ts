@@ -17,7 +17,7 @@ export function encodeOuterParams(
 export function decodeOuterParams(
   encodedParams: string,
   options: OuterParamsOptions = {}
-): DecodedOuterParams | { params: Record<string, any> } {
+): { params: DecodedOuterParams | Record<string, any>; isValid: boolean; error?: string } {
   const format = options.format || 'json'
   const paramsStr = format === 'base64' ? Base64.decode(encodedParams) : encodedParams
 

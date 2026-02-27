@@ -1,10 +1,10 @@
 <script lang="ts" setup>
-import language from '@/assets/svg/language.svg'
+import LanguageIcon from '@/assets/svg/language.svg'
 import { ref, onMounted } from 'vue'
 import { Icon } from '@/components/icon-custom'
 import { useUserStoreWithOut } from '@/store/modules/user'
 const userStore = useUserStoreWithOut()
-const language = ref(null)
+const language = ref<string | null>(null)
 const handleSetLanguage = lang => lang
 onMounted(() => {
   language.value = userStore.getLanguage
@@ -18,7 +18,7 @@ onMounted(() => {
     @command="handleSetLanguage"
   >
     <el-icon>
-      <Icon name="language"><language class="svg-icon" /></Icon>
+      <Icon name="language"><LanguageIcon class="svg-icon" /></Icon>
     </el-icon>
     <template #dropdown>
       <el-dropdown-menu>

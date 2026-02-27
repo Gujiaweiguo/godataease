@@ -23,8 +23,8 @@
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
       @click="
-        e => {
-          e.target.value = ''
+        (e: Event) => {
+          (e.target as HTMLInputElement).value = ''
         }
       "
       v-on:change="reUpload"

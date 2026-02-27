@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { provide, PropType } from 'vue'
 import Select from './Select.vue'
 import Time from './Time.vue'

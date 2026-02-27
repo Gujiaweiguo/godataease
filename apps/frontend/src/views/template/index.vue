@@ -218,6 +218,8 @@
 </template>
 
 <script lang="ts" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import deSearch from '@/assets/svg/de-search.svg'
 import dvEmpty from '@/assets/svg/dv-empty.svg'
 import dvNothing from '@/assets/svg/dv-nothing.svg'

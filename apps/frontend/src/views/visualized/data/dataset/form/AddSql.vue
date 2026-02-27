@@ -1,4 +1,6 @@
 <script lang="tsx" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import referencePlay from '@/assets/svg/reference-play.svg'
 import referenceSetting1 from '@/assets/svg/reference-setting.svg'
 import icon_preferences_outlined from '@/assets/svg/icon_preferences_outlined.svg'

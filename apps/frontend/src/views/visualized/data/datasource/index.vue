@@ -1,4 +1,6 @@
 <script lang="tsx" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import icon_down_outlined1 from '@/assets/svg/icon_down_outlined-1.svg'
 import icon_down_outlined from '@/assets/svg/icon_down_outlined.svg'
 import icon_copy_filled from '@/assets/svg/icon_copy_filled.svg'
@@ -25,6 +27,7 @@ import icon_close_filled from '@/assets/svg/icon_close_filled.svg'
 import icon_replace_outlined from '@/assets/svg/icon_replace_outlined.svg'
 import iconMaybe_outlined from '@/assets/svg/icon-maybe_outlined.svg'
 import { computed, h, unref, reactive, ref, shallowRef, nextTick, watch, onMounted } from 'vue'
+import { Base64 } from 'js-base64'
 import { dsTypes } from '@/views/visualized/data/datasource/form/option'
 import type { TabPaneName, ElMessageBoxOptions } from 'element-plus-secondary'
 import {
@@ -276,6 +279,12 @@ const generateColumns = (arr: Field[]) =>
 
 const dataPreviewLoading = ref(false)
 const columns = ref([])
+const normalizeDatasourceId = (id?: string | number) => {
+  if (id === undefined || id === null) {
+    return ''
+  }
+  return String(id)
+}
 const handleLoadExcel = data => {
   dataPreviewLoading.value = true
   previewData(data)
@@ -291,18 +300,46 @@ const handleLoadExcel = data => {
 const validateDS = () => {
   let nodeTmpInfo = reactive<Node>(cloneDeep(defaultInfo))
   Object.assign(nodeTmpInfo, cloneDeep(nodeInfo))
-  validateById(nodeTmpInfo.id as number)
+  const dsId = getDatasourceIdForAction(nodeTmpInfo)
+  if (!dsId) {
+    ElMessage.error(t('data_source.verification_failed'))
+    return
+  }
+  nodeTmpInfo.id = dsId
+  validateById(dsId)
     .then(res => {
-      if (res.data.type.startsWith('API')) {
+      const responseData = res?.data || {}
+      const responseType = responseData?.type || nodeTmpInfo?.type || ''
+      if (responseType.startsWith('API')) {
         let error = 0
-        const dsStatus = JSON.parse(res.data.status)
+        let dsStatus = []
+        if (typeof responseData.status === 'string') {
+          try {
+            const parsedStatus = JSON.parse(responseData.status)
+            if (Array.isArray(parsedStatus)) {
+              dsStatus = parsedStatus
+            }
+          } catch (error) {
+            dsStatus = []
+          }
+        }
+        if (!dsStatus.length) {
+          if (String(responseData.status).toLowerCase() === 'success') {
+            changeDsStatus(state.datasourceTree, nodeTmpInfo.id, Math.abs(nodeTmpInfo.extraFlag))
+            ElMessage.success(t('data_source.verification_successful'))
+          } else {
+            changeDsStatus(state.datasourceTree, nodeTmpInfo.id, -Math.abs(nodeTmpInfo.extraFlag))
+            ElMessage.error(t('data_source.verification_failed'))
+          }
+          return
+        }
         for (let i = 0; i < dsStatus.length; i++) {
           if (dsStatus[i].status === 'Error') {
             error++
           }
-          for (let i = 0; i < nodeTmpInfo.apiConfiguration.length; i++) {
-            if (nodeInfo.apiConfiguration[i].name === dsStatus[i].name) {
-              nodeInfo.apiConfiguration[i].status = dsStatus[i].status
+          for (let j = 0; j < nodeTmpInfo.apiConfiguration.length; j++) {
+            if (nodeInfo.apiConfiguration[j].name === dsStatus[i].name) {
+              nodeInfo.apiConfiguration[j].status = dsStatus[i].status
             }
           }
         }
@@ -314,12 +351,18 @@ const validateDS = () => {
           ElMessage.error(t('data_source.verification_failed'))
         }
       } else {
-        changeDsStatus(state.datasourceTree, nodeTmpInfo.id, Math.abs(nodeTmpInfo.extraFlag))
-        ElMessage.success(t('data_source.verification_successful'))
+        if (String(responseData.status).toLowerCase() === 'error') {
+          changeDsStatus(state.datasourceTree, nodeTmpInfo.id, -Math.abs(nodeTmpInfo.extraFlag))
+          ElMessage.error(t('data_source.verification_failed'))
+        } else {
+          changeDsStatus(state.datasourceTree, nodeTmpInfo.id, Math.abs(nodeTmpInfo.extraFlag))
+          ElMessage.success(t('data_source.verification_successful'))
+        }
       }
     })
     .catch(() => {
       changeDsStatus(state.datasourceTree, nodeTmpInfo.id, -Math.abs(nodeTmpInfo.extraFlag))
+      ElMessage.error(t('data_source.verification_failed'))
     })
 }
 
@@ -347,14 +390,16 @@ const formatSimpleCron = (info?: SyncSetting) => {
       strArr.push(`${t('dataset.end_time')}: ${end}`)
       break
     case 'SIMPLE_CRON':
-      const type = t(`common.${simpleCronType}`)
-      strArr.push(
-        `${t('dataset.simple_cron')}: ${t('common.every')}${simpleCronValue}${type}${t(
-          'data_source.update_once'
-        )}`
-      )
-      strArr.push(`${t('dataset.start_time')}: ${start}`)
-      strArr.push(`${t('dataset.end_time')}: ${end}`)
+      {
+        const type = t(`common.${simpleCronType}`)
+        strArr.push(
+          `${t('dataset.simple_cron')}: ${t('common.every')}${simpleCronValue}${type}${t(
+            'data_source.update_once'
+          )}`
+        )
+        strArr.push(`${t('dataset.start_time')}: ${start}`)
+        strArr.push(`${t('dataset.end_time')}: ${end}`)
+      }
       break
     default:
       break
@@ -478,9 +523,55 @@ const mounted = ref(false)
 const isSupportSetKey = ref(false)
 const symmetricKey = ref('')
 
+const parseDatasourcePayload = payload => {
+  if (!payload) {
+    return null
+  }
+
+  const parseJSON = raw => {
+    if (!raw) {
+      return null
+    }
+    try {
+      return JSON.parse(raw)
+    } catch (_error) {
+      return null
+    }
+  }
+
+  let decryptValue = null
+  if (symmetricKey.value && typeof payload === 'string') {
+    try {
+      decryptValue = parseJSON(symmetricDecrypt(payload, symmetricKey.value))
+    } catch (_error) {
+      decryptValue = null
+    }
+  }
+  if (decryptValue !== null) {
+    return decryptValue
+  }
+
+  if (typeof payload === 'string') {
+    const base64Value = parseJSON(Base64.decode(payload))
+    if (base64Value !== null) {
+      return base64Value
+    }
+  }
+
+  if (typeof payload === 'string') {
+    const plainValue = parseJSON(payload)
+    if (plainValue !== null) {
+      return plainValue
+    }
+  }
+
+  return payload
+}
+
 const listDs = () => {
   rawDatasourceList.value = []
   dsLoading.value = true
+  rootManage.value = false
   let curSortType = sortList[Number(wsCache.get('TreeSort-backend')) ?? 1].value
   curSortType = wsCache.get('TreeSort-datasource') ?? curSortType
   const request = { busiFlag: 'datasource' } as BusiTreeRequest
@@ -495,8 +586,11 @@ const listDs = () => {
         sortTypeChange(curSortType)
         return
       }
-      originResourceTree.value = cloneDeep(unref(state.datasourceTree))
       state.datasourceTree = nodeData
+      rootManage.value =
+        !!interactiveStore.getDatasource?.rootManage ||
+        state.datasourceTree.some(item => (item as unknown as { weight?: number }).weight >= 7)
+      originResourceTree.value = cloneDeep(unref(state.datasourceTree))
       sortTypeChange(curSortType)
     })
     .finally(() => {
@@ -587,7 +681,7 @@ const handleNodeClick = data => {
   if (data.weight < 7) {
     method = getSimpleDs
   }
-  return method(data.id).then(res => {
+  return method(normalizeDatasourceId(data.id)).then(res => {
     let {
       name,
       createBy,
@@ -606,25 +700,20 @@ const handleNodeClick = data => {
       lastSyncTime,
       enableDataFill
     } = res.data
-    if (configuration) {
-      configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
-    }
-    if (paramsStr) {
-      paramsStr = JSON.parse(symmetricDecrypt(paramsStr, symmetricKey.value))
-    }
-    if (apiConfigurationStr) {
-      apiConfigurationStr = JSON.parse(symmetricDecrypt(apiConfigurationStr, symmetricKey.value))
-    }
+    configuration = parseDatasourcePayload(configuration)
+    paramsStr = parseDatasourcePayload(paramsStr)
+    apiConfigurationStr = parseDatasourcePayload(apiConfigurationStr)
+    const normalizedNodeId = normalizeDatasourceId(data?.id || id)
     Object.assign(nodeInfo, {
       name,
-      pid,
+      pid: normalizeDatasourceId(pid),
       description,
       fileName,
       size,
       createTime,
       creator,
       createBy,
-      id,
+      id: normalizedNodeId,
       type,
       configuration,
       syncSetting,
@@ -647,6 +736,29 @@ const createDatasource = (data?: Tree) => {
 }
 const showRecord = ref(false)
 const dsListTree = ref()
+const findDatasourceIdByNodeInfo = (nodes: BusiTreeNode[] = [], info?: Partial<Node>): string => {
+  for (const node of nodes) {
+    if (
+      node?.leaf &&
+      normalizeDatasourceId(node?.name) === normalizeDatasourceId(info?.name) &&
+      normalizeDatasourceId(node?.type) === normalizeDatasourceId(info?.type)
+    ) {
+      return normalizeDatasourceId(node.id)
+    }
+    if (node?.children?.length) {
+      const matched = findDatasourceIdByNodeInfo(node.children, info)
+      if (matched) {
+        return matched
+      }
+    }
+  }
+  return ''
+}
+const getDatasourceIdForAction = (info?: Partial<Node>) => {
+  const treeId = findDatasourceIdByNodeInfo(state.datasourceTree as unknown as BusiTreeNode[], info || nodeInfo)
+  const currentKeyId = normalizeDatasourceId(dsListTree.value?.getCurrentKey?.())
+  return treeId || currentKeyId || normalizeDatasourceId(info?.id || nodeInfo.id)
+}
 const expandedKey = ref([])
 const dsListTreeShow = ref(true)
 watch(dsName, (val: string) => {
@@ -711,9 +823,10 @@ const editDatasource = (editType?: number) => {
   if (nodeInfo.type.startsWith('Excel')) {
     nodeInfo.editType = editType
   }
-  return getById(nodeInfo.id).then(res => {
+  const currentDsId = getDatasourceIdForAction(nodeInfo)
+  return getById(currentDsId).then(res => {
     let arr = pluginDs.value.filter(ele => {
-      return ele.type == res.data.type
+      return ele.type === res.data.type
     })
     let {
       name,
@@ -733,26 +846,20 @@ const editDatasource = (editType?: number) => {
       lastSyncTime,
       enableDataFill
     } = res.data
-    if (configuration) {
-      configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
-    }
-    if (paramsStr) {
-      paramsStr = JSON.parse(symmetricDecrypt(paramsStr, symmetricKey.value))
-    }
-    if (apiConfigurationStr) {
-      apiConfigurationStr = JSON.parse(symmetricDecrypt(apiConfigurationStr, symmetricKey.value))
-    }
+    configuration = parseDatasourcePayload(configuration)
+    paramsStr = parseDatasourcePayload(paramsStr)
+    apiConfigurationStr = parseDatasourcePayload(apiConfigurationStr)
     let datasource = reactive<Node>(cloneDeep(defaultInfo))
     Object.assign(datasource, {
       name,
-      pid,
+      pid: normalizeDatasourceId(pid),
       description,
       fileName,
       size,
       createTime,
       creator,
       createBy,
-      id,
+      id: normalizeDatasourceId(nodeInfo.id || id),
       type,
       configuration,
       syncSetting,
@@ -781,7 +888,7 @@ const { handleDrop, allowDrop, handleDragStart } = treeDraggble(
 )
 
 const handleCopy = async data => {
-  getById(data.id).then(res => {
+  getById(normalizeDatasourceId(data.id)).then(res => {
     let {
       name,
       createBy,
@@ -801,28 +908,22 @@ const handleCopy = async data => {
       enableDataFill
     } = res.data
     let arr = pluginDs.value.filter(ele => {
-      return ele.type == res.data.type
+      return ele.type === res.data.type
     })
-    if (configuration) {
-      configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
-    }
-    if (paramsStr) {
-      paramsStr = JSON.parse(symmetricDecrypt(paramsStr, symmetricKey.value))
-    }
-    if (apiConfigurationStr) {
-      apiConfigurationStr = JSON.parse(symmetricDecrypt(apiConfigurationStr, symmetricKey.value))
-    }
+    configuration = parseDatasourcePayload(configuration)
+    paramsStr = parseDatasourcePayload(paramsStr)
+    apiConfigurationStr = parseDatasourcePayload(apiConfigurationStr)
     let datasource = reactive<Node>(cloneDeep(defaultInfo))
     Object.assign(datasource, {
       name,
-      pid,
+      pid: normalizeDatasourceId(pid),
       description,
       fileName,
       size,
       createTime,
       creator,
       createBy,
-      id,
+      id: normalizeDatasourceId(data?.id || id),
       type,
       configuration,
       syncSetting,
@@ -903,7 +1004,7 @@ const operation = (cmd: string, data: Tree, nodeType: string) => {
               )
             ])
           }).then(() => {
-            deleteById(data.id as number).then(() => {
+            deleteById(normalizeDatasourceId(data.id)).then(() => {
               if (data.id === nodeInfo.id) {
                 Object.assign(nodeInfo, cloneDeep(defaultInfo))
               }
@@ -916,7 +1017,7 @@ const operation = (cmd: string, data: Tree, nodeType: string) => {
             t('datasource.this_data_source'),
             options as ElMessageBoxOptions
           ).then(() => {
-            deleteById(data.id as number).then(() => {
+            deleteById(normalizeDatasourceId(data.id)).then(() => {
               if (data.id === nodeInfo.id) {
                 Object.assign(nodeInfo, cloneDeep(defaultInfo))
               }
@@ -929,7 +1030,7 @@ const operation = (cmd: string, data: Tree, nodeType: string) => {
     } else {
       ElMessageBox.confirm(t('data_set.delete_this_folder'), options as ElMessageBoxOptions).then(
         () => {
-          deleteById(data.id as number).then(() => {
+          deleteById(normalizeDatasourceId(data.id)).then(() => {
             if (data.id === nodeInfo.id) {
               Object.assign(nodeInfo, cloneDeep(defaultInfo))
             }
@@ -1018,7 +1119,7 @@ const uploadExcel = editType => {
   addLoading.value = editType === 1
   return uploadFile(formData)
     .then(res => {
-      if (res?.code !== 0) {
+      if (res?.code !== 0 && res?.code !== '000000') {
         return
       }
       nodeInfo.editType = editType

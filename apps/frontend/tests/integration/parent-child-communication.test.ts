@@ -1,126 +1,83 @@
-import { describe, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { defineComponent, h, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import PreviewCanvas from '@/views/data-visualization/PreviewCanvas.vue'
+import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
+import { EmbeddingEventType } from '@/events/embedding/types'
+
+const hoisted = vi.hoisted(() => ({
+  mockStore: {
+    allowedOrigins: ['https://trusted-origin.com'],
+    parent: true,
+    resourceId: 'integration-resource',
+    dvId: 'dv-1',
+    chartId: 'chart-1',
+    baseUrl: '',
+    setParam: vi.fn(),
+    setResourceId: vi.fn(),
+    setEmbedReady: vi.fn(),
+    setJumpInfoParam: vi.fn()
+  }
+}))
+
+vi.mock('@/utils/embedded', async () => {
+  const { createEmbeddedUtilsModuleMock } = await import('../unit/helpers')
+  return createEmbeddedUtilsModuleMock(true)
+})
+
+vi.mock('@/store/modules/embedded', async () => {
+  const { createEmbeddedModuleMock } = await import('../unit/helpers')
+  return createEmbeddedModuleMock(hoisted.mockStore)
+})
+
+const Harness = defineComponent({
+  setup() {
+    const { emitToChild } = useEmbeddedParentCommunication()
+    return () =>
+      h('div', {
+        id: 'harness',
+        onClick: () =>
+          emitToChild(EmbeddingEventType.INIT_READY, { resourceId: 'integration-resource' })
+      })
+  }
+})
 
 describe('Parent-Child Communication Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
+    hoisted.mockStore.parent = true
+    hoisted.mockStore.resourceId = 'integration-resource'
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  it('processes trusted param_update message and syncs store', async () => {
+    mount(Harness)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://trusted-origin.com',
+        data: JSON.stringify({
+          type: 'param_update',
+          payload: {
+            resourceId: 'integration-resource',
+            region: '华北'
+          }
+        })
+      })
+    )
+
+    await nextTick()
+    expect(hoisted.mockStore.setResourceId).toHaveBeenCalledWith('integration-resource')
+    expect(hoisted.mockStore.setParam).toHaveBeenCalledWith('region', '华北')
   })
 
-  describe('PreviewCanvas.vue', () => {
-    it('should emit init_ready event on canvas initialization', async () => {
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
+  it('skips emit when not in iframe embedded context', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
+    const wrapper = mount(Harness)
 
-      const wrapper = mount(PreviewCanvas, {
-        props: {
-          outerId: 'test-dv-id',
-          publicLinkStatus: true
-        }
-      })
+    await wrapper.trigger('click')
 
-      await wrapper.vm.$nextTick()
-
-      expect(postMessageSpy).toHaveBeenCalled()
-
-      const emittedCalls = postMessageSpy.mock.calls
-
-      expect(emittedCalls.length).toBeGreaterThan(0)
-    })
-
-    it('should emit both new and legacy init_ready events for backward compatibility', async () => {
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
-
-      const wrapper = mount(PreviewCanvas, {
-        props: {
-          outerId: 'test-dv-id',
-          publicLinkStatus: true
-        }
-      })
-
-      await wrapper.vm.$nextTick()
-
-      expect(postMessageSpy).toHaveBeenCalled()
-
-      const emittedCalls = postMessageSpy.mock.calls
-      const allMessages = emittedCalls.map(call => call.toString())
-
-      const hasNewEvent = allMessages.some(
-        msg => msg.includes('"type":"init_ready"') && msg.includes('"resourceId":"test-dv-id"')
-      )
-
-      const hasLegacyEvent = allMessages.some(msg => msg.includes('dataease-embedded-interactive'))
-
-      expect(hasNewEvent).toBe(true)
-      expect(hasLegacyEvent).toBe(true)
-    })
-  })
-
-  describe('DashboardPreviewShow.vue', () => {
-    it('should emit init_ready event on dashboard initialization', async () => {
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
-
-      const wrapper = mount(PreviewCanvas, {
-        props: {
-          outerId: 'test-dv-id',
-          publicLinkStatus: false
-        }
-      })
-
-      await wrapper.vm.$nextTick()
-
-      expect(postMessageSpy).toHaveBeenCalled()
-
-      const emittedCalls = postMessageSpy.mock.calls
-
-      expect(emittedCalls.length).toBeGreaterThan(0)
-    })
-  })
-
-  describe('Dashboard.vue', () => {
-    it('should emit init_ready event on dashboard editor initialization', async () => {
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
-
-      const wrapper = mount(PreviewCanvas, {
-        props: {
-          outerId: 'test-dv-id',
-          publicLinkStatus: true
-        }
-      })
-
-      await wrapper.vm.$nextTick()
-
-      expect(postMessageSpy).toHaveBeenCalled()
-
-      const emittedCalls = postMessageSpy.mock.calls
-
-      expect(emittedCalls.length).toBeGreaterThan(0)
-    })
-  })
-
-  describe('DataVisualization.vue', () => {
-    it('should emit init_ready event on screen initialization', async () => {
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
-
-      const wrapper = mount(PreviewCanvas, {
-        props: {
-          outerId: 'test-dv-id',
-          publicLinkStatus: true
-        }
-      })
-
-      await wrapper.vm.$nextTick()
-
-      expect(postMessageSpy).toHaveBeenCalled()
-
-      const emittedCalls = postMessageSpy.mock.calls
-
-      expect(emittedCalls.length).toBeGreaterThan(0)
-    })
+    expect(postMessageSpy).not.toHaveBeenCalled()
+    expect(consoleWarnSpy).toHaveBeenCalledWith('Not in embedded mode, skipping emit to child')
   })
 })

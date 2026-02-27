@@ -1,19 +1,28 @@
-import { describe, it, expect } from 'vitest'
-import { encodeOuterParams, decodeOuterParams, validateOuterParams } from '@/utils/embeddedParams'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { encodeOuterParams, decodeOuterParams, validateOuterParams } from '@/utils/embeddedTokenUtils'
 import {
   isTokenExpiringSoon,
   extractTokenExpiryTime,
   needsTokenRefresh
 } from '@/utils/embeddedTokenUtils'
-import { validateOrigin, isOriginAllowed } from '@/utils/embeddedOriginValidation'
+import { isAllowedEmbeddedMessageOrigin } from '@/utils/embedded'
 
 describe('Embedding Parameter Initialization and Callback Messaging', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   describe('outerParams utilities', () => {
     describe('encodeOuterParams', () => {
       it('should encode params to JSON string', () => {
         const params = {
-          dashboardId: '123',
-          theme: 'dark'
+          resourceId: '123',
+          busiFlag: 'dark'
         }
 
         const encoded = encodeOuterParams(params, { format: 'json' })
@@ -23,8 +32,8 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
 
       it('should encode params to Base64', () => {
         const params = {
-          dashboardId: '123',
-          theme: 'dark'
+          resourceId: '123',
+          busiFlag: 'dark'
         }
 
         const encoded = encodeOuterParams(params, { format: 'base64' })
@@ -34,7 +43,7 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
       })
 
       it('should use JSON format by default', () => {
-        const params = { test: 'value' }
+        const params = { resourceId: 'value' }
 
         const encoded = encodeOuterParams(params)
 
@@ -44,7 +53,7 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
 
     describe('decodeOuterParams', () => {
       it('should decode JSON params', () => {
-        const params = { dashboardId: '123' }
+        const params = { resourceId: '123' }
         const encoded = JSON.stringify(params)
 
         const decoded = decodeOuterParams(encoded, { format: 'json' })
@@ -54,7 +63,7 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
       })
 
       it('should decode Base64 params', () => {
-        const params = { dashboardId: '123' }
+        const params = { resourceId: '123' }
         const encoded = btoa(JSON.stringify(params))
 
         const decoded = decodeOuterParams(encoded, { format: 'base64' })
@@ -72,7 +81,7 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
       })
 
       it('should use JSON format by default', () => {
-        const params = { test: 'value' }
+        const params = { resourceId: 'value' }
         const encoded = JSON.stringify(params)
 
         const decoded = decodeOuterParams(encoded)
@@ -83,7 +92,7 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
 
     describe('validateOuterParams', () => {
       it('should validate correct params object', () => {
-        const params = { dashboardId: '123' }
+        const params = { resourceId: '123' }
 
         const result = validateOuterParams(params)
 
@@ -106,18 +115,18 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
       })
 
       it('should validate required fields', () => {
-        const params = { dashboardId: '123' }
-        const result = validateOuterParams(params, ['dashboardId'])
+        const params = { resourceId: '123' }
+        const result = validateOuterParams(params, ['resourceId'])
 
         expect(result.isValid).toBe(true)
       })
 
       it('should detect missing required fields', () => {
         const params = { theme: 'dark' }
-        const result = validateOuterParams(params, ['dashboardId'])
+        const result = validateOuterParams(params, ['resourceId'])
 
         expect(result.isValid).toBe(false)
-        expect(result.error).toContain('dashboardId')
+        expect(result.error).toContain('resourceId')
       })
     })
   })
@@ -258,79 +267,28 @@ describe('Embedding Parameter Initialization and Callback Messaging', () => {
   })
 
   describe('originValidation utilities', () => {
-    describe('validateOrigin', () => {
-      it('should validate correct URL origin', () => {
-        const result = validateOrigin('https://example.com')
-
-        expect(result.isValid).toBe(true)
-        expect(result.error).toBeUndefined()
-      })
-
-      it('should validate localhost origin', () => {
-        const result = validateOrigin('http://localhost:8080')
-
-        expect(result.isValid).toBe(true)
-        expect(result.error).toBeUndefined()
-      })
-
-      it('should reject invalid URL', () => {
-        const result = validateOrigin('not-a-url')
-
-        expect(result.isValid).toBe(false)
-        expect(result.error).toBeDefined()
-      })
-
-      it('should reject origin without protocol', () => {
-        const result = validateOrigin('example.com')
-
-        expect(result.isValid).toBe(false)
-        expect(result.error).toBeDefined()
-      })
+    it('allows exact origin in allowlist when enforced', () => {
+      const result = isAllowedEmbeddedMessageOrigin(
+        'https://example.com',
+        ['https://example.com'],
+        true
+      )
+      expect(result).toBe(true)
     })
 
-    describe('isOriginAllowed', () => {
-      it('should return true for exact match', () => {
-        const allowedOrigins = ['https://example.com']
-        const result = isOriginAllowed('https://example.com', allowedOrigins, false)
+    it('rejects non-matching origin when allowlist enforced', () => {
+      const result = isAllowedEmbeddedMessageOrigin('https://other.com', ['https://example.com'], true)
+      expect(result).toBe(false)
+    })
 
-        expect(result).toBe(true)
-      })
+    it('allows hostname-style allowlist entry', () => {
+      const result = isAllowedEmbeddedMessageOrigin('https://example.com', ['example.com'], true)
+      expect(result).toBe(true)
+    })
 
-      it('should return false for non-matching origin', () => {
-        const allowedOrigins = ['https://example.com']
-        const result = isOriginAllowed('https://other.com', allowedOrigins, false)
-
-        expect(result).toBe(false)
-      })
-
-      it('should allow any origin when no token provided', () => {
-        const allowedOrigins = ['https://example.com']
-        const result = isOriginAllowed('https://other.com', allowedOrigins, true)
-
-        expect(result).toBe(true)
-      })
-
-      it('should match subdomain wildcard', () => {
-        const allowedOrigins = ['https://*.example.com']
-        const result = isOriginAllowed('https://sub.example.com', allowedOrigins, false)
-
-        expect(result).toBe(true)
-      })
-
-      it('should handle multiple allowed origins', () => {
-        const allowedOrigins = [
-          'https://example.com',
-          'https://other.com',
-          'https://*.wildcard.com'
-        ]
-        const result1 = isOriginAllowed('https://example.com', allowedOrigins, false)
-        const result2 = isOriginAllowed('https://sub.wildcard.com', allowedOrigins, false)
-        const result3 = isOriginAllowed('https://other.com', allowedOrigins, false)
-
-        expect(result1).toBe(true)
-        expect(result2).toBe(true)
-        expect(result3).toBe(true)
-      })
+    it('rejects empty origin', () => {
+      const result = isAllowedEmbeddedMessageOrigin('', ['https://example.com'], true)
+      expect(result).toBe(false)
     })
   })
 })

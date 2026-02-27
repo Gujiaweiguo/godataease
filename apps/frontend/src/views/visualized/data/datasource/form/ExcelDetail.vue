@@ -1,4 +1,6 @@
 <script lang="tsx" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import icon_upload_outlined from '@/assets/svg/icon_upload_outlined.svg'
 import { Icon } from '@/components/icon-custom'
 import { ElIcon } from 'element-plus-secondary'

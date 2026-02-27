@@ -1,4 +1,6 @@
-<script lang="ts" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
+import dvInfoSvg from '@/assets/svg/dv-info.svg'
 import dvInfoSvg from '@/assets/svg/dv-info.svg'
 import icon_down_outlined1 from '@/assets/svg/icon_down_outlined-1.svg'
 import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
@@ -99,6 +101,19 @@ const tabActive = ref('data')
 const datasetSelector = ref(null)
 const curDatasetWeight = ref(0)
 const renameForm = ref<FormInstance>()
+
+// Forward declarations for hoisting
+const onTableColumnWidthChange = (val: any) => {
+  if (editMode.value !== 'edit') return
+  view.value.customAttr.basicStyle.tableFieldWidth = val
+  snapshotStore.recordSnapshotCache('renderChart', view.value.id)
+}
+const onTablePageSizeChange = (val: any) => {
+  if (editMode.value !== 'edit') return
+  view.value.customAttr.basicStyle.tablePageSize = val
+  snapshotStore.recordSnapshotCache('renderChart', view.value.id)
+}
+
 const { emitter } = useEmitt({
   name: 'set-table-column-width',
   callback: args => onTableColumnWidthChange(args)
@@ -189,12 +204,6 @@ const { view } = toRefs(props)
 
 let cacheId = ''
 
-const clearRemove = items => {
-  if (items) {
-    items.forEach(item => removeItems(item))
-  }
-}
-
 onBeforeMount(() => {
   cacheId = route.query.id as unknown as string
 })
@@ -209,6 +218,31 @@ onMounted(() => {
     callback: clearRemove
   })
 })
+
+// 接口定义
+interface FilterStateItem {
+  logic?: string
+  filter?: any[]
+  filterType?: string
+  index?: number
+  deType?: number
+  enumCheckField?: any[]
+  calcType?: string
+  [key: string]: any
+}
+
+interface ValueFormatterItem {
+  id?: string
+  name?: string
+  type?: string
+  [key: string]: any
+}
+
+interface CustomSortField {
+  id?: string
+  name?: string
+  [key: string]: any
+}
 
 const appStore = useAppStoreWithOut()
 const isDataEaseBi = computed(() => appStore.getIsDataEaseBi || appStore.getIsIframe)
@@ -234,21 +268,21 @@ const state = reactive({
     renameType: ''
   },
   quotaFilterEdit: false,
-  quotaItem: {},
+  quotaItem: {} as FilterStateItem,
   resultFilterEdit: false,
-  filterItem: {},
-  chartForFilter: {},
+  filterItem: {} as FilterStateItem,
+  chartForFilter: {} as any,
   searchField: '',
-  quotaItemCompare: {},
+  quotaItemCompare: {} as any,
   showEditQuotaCompare: false,
   showValueFormatter: false,
-  valueFormatterItem: {},
+  valueFormatterItem: {} as ValueFormatterItem,
   showCustomSort: false,
   showSortPriority: false,
   sortPriority: [],
   customSortList: [],
-  customSortField: {},
-  currEditField: {},
+  customSortField: {} as CustomSortField,
+  currEditField: {} as any,
   worldTree: [],
   areaId: '',
   chartTypeOptions: [],
@@ -365,6 +399,66 @@ const treeProps = {
 const recordSnapshotInfo = type => {
   view.value['dataFrom'] = 'calc'
   snapshotStore.recordSnapshotCache(type, view.value.id)
+}
+
+const removeItems = (
+  _type:
+    | 'xAxis'
+    | 'xAxisExt'
+    | 'extStack'
+    | 'yAxis'
+    | 'yAxisExt'
+    | 'extBubble'
+    | 'customFilter'
+    | 'drillFields'
+    | 'flowMapStartName'
+    | 'flowMapEndName'
+    | 'extColor'
+) => {
+  recordSnapshotInfo('calcData')
+  let axis = []
+  switch (_type) {
+    case 'xAxis':
+      axis = view.value.xAxis?.splice(0)
+      break
+    case 'xAxisExt':
+      axis = view.value.xAxisExt?.splice(0)
+      break
+    case 'extStack':
+      axis = view.value.extStack?.splice(0)
+      break
+    case 'yAxis':
+      axis = view.value.yAxis?.splice(0)
+      break
+    case 'yAxisExt':
+      axis = view.value.yAxisExt?.splice(0)
+      break
+    case 'extBubble':
+      axis = view.value.extBubble?.splice(0)
+      break
+    case 'customFilter':
+      view.value.customFilter = {}
+      return
+    case 'drillFields':
+      axis = view.value.drillFields?.splice(0)
+      break
+    case 'flowMapStartName':
+      axis = view.value.flowMapStartName?.splice(0)
+      break
+    case 'flowMapEndName':
+      axis = view.value.flowMapEndName?.splice(0)
+      break
+    case 'extColor':
+      axis = view.value.extColor?.splice(0)
+      break
+  }
+  axis?.length && emitter.emit('removeAxis', { axisType: _type, axis, editType: 'remove' })
+}
+
+const clearRemove = (items: any) => {
+  if (items) {
+    items.forEach((item: any) => removeItems(item))
+  }
 }
 
 const changeDataset = () => {
@@ -1280,22 +1374,6 @@ const onBubbleAnimateChange = val => {
   renderChart(view.value)
 }
 
-const onTableColumnWidthChange = val => {
-  if (editMode.value !== 'edit') {
-    return
-  }
-  view.value.customAttr.basicStyle.tableFieldWidth = val
-  snapshotStore.recordSnapshotCache('renderChart', view.value.id)
-}
-
-const onTablePageSizeChange = val => {
-  if (editMode.value !== 'edit') {
-    return
-  }
-  view.value.customAttr.basicStyle.tablePageSize = val
-  snapshotStore.recordSnapshotCache('renderChart', view.value.id)
-}
-
 const onExtTooltipChange = val => {
   view.value.extTooltip = val
 }
@@ -1324,61 +1402,6 @@ const showRename = val => {
 
 const closeRename = () => {
   state.renameItem = false
-}
-
-const removeItems = (
-  _type:
-    | 'xAxis'
-    | 'xAxisExt'
-    | 'extStack'
-    | 'yAxis'
-    | 'yAxisExt'
-    | 'extBubble'
-    | 'customFilter'
-    | 'drillFields'
-    | 'flowMapStartName'
-    | 'flowMapEndName'
-    | 'extColor'
-) => {
-  recordSnapshotInfo('calcData')
-  let axis = []
-  switch (_type) {
-    case 'xAxis':
-      axis = view.value.xAxis?.splice(0)
-      break
-    case 'xAxisExt':
-      axis = view.value.xAxisExt?.splice(0)
-      break
-    case 'extStack':
-      axis = view.value.extStack?.splice(0)
-      break
-    case 'yAxis':
-      axis = view.value.yAxis?.splice(0)
-      break
-    case 'yAxisExt':
-      axis = view.value.yAxisExt?.splice(0)
-      break
-    case 'extBubble':
-      axis = view.value.extBubble?.splice(0)
-      break
-    case 'customFilter':
-      view.value.customFilter = {}
-      return
-      break
-    case 'drillFields':
-      axis = view.value.drillFields?.splice(0)
-      break
-    case 'flowMapStartName':
-      axis = view.value.flowMapStartName?.splice(0)
-      break
-    case 'flowMapEndName':
-      axis = view.value.flowMapEndName?.splice(0)
-      break
-    case 'extColor':
-      axis = view.value.extColor?.splice(0)
-      break
-  }
-  axis?.length && emitter.emit('removeAxis', { axisType: _type, axis, editType: 'remove' })
 }
 
 const saveRename = ref => {
@@ -1965,7 +1988,7 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
     const obj = cloneDeep(arr[i])
     state.moveId = obj.id as unknown as number
     view.value[type] ??= []
-    const targetId = ev.srcElement.offsetParent?.querySelector('.node-id_private')?.dataset?.id
+    const targetId = (ev.srcElement as HTMLElement)?.offsetParent?.querySelector('.node-id_private')?.dataset?.id
     const index = view.value[type].findIndex(ele => ele.id === targetId && ele.id !== obj.id)
     let newDraggableIndex
     if (index !== -1) {

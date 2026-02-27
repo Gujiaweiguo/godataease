@@ -14,23 +14,37 @@
 </template>
 
 <script lang="ts" setup>
+import type { PropType } from 'vue'
 import { toRefs } from 'vue'
 import { useEmitt } from '@/hooks/web/useEmitt'
 
+interface FieldItem {
+  id: string | number
+  name: string
+  [key: string]: unknown
+}
+
+interface ElementInfo {
+  id?: string | number
+}
+
 const props = defineProps({
   fields: {
-    type: Array,
-    default: () => []
+    type: Array as PropType<FieldItem[]>,
+    default: () => [] as FieldItem[]
   },
   element: {
-    type: Object,
+    type: Object as PropType<ElementInfo | null>,
     default: null
   }
 })
 
 const { fields, element } = toRefs(props)
 
-const fieldSelect = field => {
+const fieldSelect = (field: FieldItem) => {
+  if (!element.value?.id) {
+    return
+  }
   useEmitt().emitter.emit('fieldSelect-' + element.value.id, field)
 }
 

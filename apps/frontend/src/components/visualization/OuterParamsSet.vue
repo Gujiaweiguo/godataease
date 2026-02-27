@@ -349,7 +349,7 @@
                   type="textarea"
                   :autosize="{ minRows: 4, maxRows: 8 }"
                   @change="
-                    val =>
+                    (_val) =>
                       validateArgs(
                         state.outerParamsInfo.defaultValue,
                         state.outerParamsInfo.paramsInfoId
@@ -437,6 +437,8 @@ const state = reactive({
     required: false,
     enabledDefault: false,
     defaultValue: null,
+    filterInfo: [],
+    datasetInfo: [],
     targetViewInfoList: [],
     paramsInfoId: null
   },
@@ -447,6 +449,8 @@ const state = reactive({
     required: false,
     enabledDefault: false,
     defaultValue: null,
+    filterInfo: [],
+    datasetInfo: [],
     targetViewInfoList: []
   },
   defaultTargetViewInfo: {

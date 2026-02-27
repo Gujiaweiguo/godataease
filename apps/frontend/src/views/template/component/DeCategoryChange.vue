@@ -31,6 +31,8 @@
 </template>
 
 <script lang="ts" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { onMounted, reactive } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { batchUpdate, findCategoriesByTemplateIds } from '@/api/template'

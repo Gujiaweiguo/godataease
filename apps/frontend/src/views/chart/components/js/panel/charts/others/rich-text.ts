@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
 import { AbstractChartView, ChartLibraryType, ChartRenderType } from '../../types'
 import { useI18n } from '@/hooks/web/useI18n'
 

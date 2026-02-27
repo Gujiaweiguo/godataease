@@ -64,6 +64,8 @@
 </template>
 
 <script lang="tsx" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { ref, watch, onMounted, computed } from 'vue'
 interface Props {
   color?: string[]

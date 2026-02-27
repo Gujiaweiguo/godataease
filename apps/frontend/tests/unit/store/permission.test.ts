@@ -2,42 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { usePermissionStore, pathValid, getFirstAuthMenu } from '@/store/modules/permission'
 
-vi.mock('@/router', () => ({
-  default: {
-    beforeEach: vi.fn(),
-    afterEach: vi.fn(),
-    addRoute: vi.fn(),
-    push: vi.fn()
-  },
-  routes: [
-    {
-      path: '/',
-      name: 'Root',
-      children: []
-    },
-    {
-      path: '/login',
-      name: 'Login',
-      children: []
-    }
-  ]
-}))
+vi.mock('@/router', async () => {
+  const { createRouterModuleMock } = await import('../helpers')
+  return createRouterModuleMock()
+})
 
-vi.mock('@/router/establish', () => ({
-  generateRoutesFn2: vi.fn((routers) => {
-    return routers.map((router: any) => ({
-      path: router.path,
-      name: router.name,
-      hidden: router.hidden,
-      children: router.children?.map((child: any) => ({
-        path: child.path,
-        name: child.name,
-        hidden: child.hidden,
-        children: child.children || []
-      })) || []
-    }))
-  })
-}))
+vi.mock('@/router/establish', async () => {
+  const { createRouterEstablishModuleMock } = await import('../helpers')
+  return createRouterEstablishModuleMock()
+})
 
 vi.mock('@/views/404/index.vue', () => ({
   default: {}

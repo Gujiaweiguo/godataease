@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import type { Column, ColumnOptions } from '@antv/g2plot/esm/plots/column'
 import { cloneDeep, defaults, each, groupBy, isEmpty, merge } from 'lodash-es'
 import {

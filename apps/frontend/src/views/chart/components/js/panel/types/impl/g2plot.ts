@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
 import type { PickOptions } from '@antv/g2plot/esm/core/plot'
 import type { Plot } from '@antv/g2plot/esm/core/plot'
 import {

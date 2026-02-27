@@ -7,8 +7,8 @@
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
       @click="
-        e => {
-          e.target.value = ''
+        (e: Event) => {
+          (e.target as HTMLInputElement).value = ''
         }
       "
       @change="reUpload"
@@ -466,6 +466,13 @@ const cornerModes = Object.values(ShorthandMode).map(item => ({
   value: item
 })) as { label: string; value: ShorthandMode }[]
 
+const buildUploadFile = (url: string) => ({
+  name: 'background-image',
+  status: 'success' as const,
+  uid: Date.now(),
+  url
+})
+
 const goFile = () => {
   files.value.click()
 }
@@ -482,7 +489,7 @@ const reUpload = e => {
   }
   uploadFileResult(file, fileUrl => {
     state.commonBackground.outerImage = fileUrl
-    state.fileList = [{ url: imgUrlTrans(state.commonBackground.outerImage) }]
+    state.fileList = [buildUploadFile(imgUrlTrans(state.commonBackground.outerImage))]
     onBackgroundChange()
   })
 }
@@ -519,7 +526,7 @@ const init = () => {
   updateInnerPadding()
   updateBorderRadius()
   if (state.commonBackground.outerImage) {
-    state.fileList = [{ url: imgUrlTrans(state.commonBackground.outerImage) }]
+    state.fileList = [buildUploadFile(imgUrlTrans(state.commonBackground.outerImage))]
   } else {
     state.fileList = []
   }

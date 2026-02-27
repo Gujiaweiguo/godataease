@@ -11,14 +11,25 @@
 <script setup lang="ts">
 import { computed, toRefs } from 'vue'
 
-const props = defineProps({
-  positionBox: {
-    type: Array
-  },
-  matrixStyle: {
-    type: Object
+interface GridCell {
+  el?: boolean
+}
+
+interface MatrixStyle {
+  width: number
+  height: number
+}
+
+const props = withDefaults(
+  defineProps<{
+    positionBox: GridCell[][]
+    matrixStyle: MatrixStyle
+  }>(),
+  {
+    positionBox: () => [],
+    matrixStyle: () => ({ width: 0, height: 0 })
   }
-})
+)
 
 const { positionBox, matrixStyle } = toRefs(props)
 

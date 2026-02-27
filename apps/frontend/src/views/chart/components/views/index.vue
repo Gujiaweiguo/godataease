@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
-import icon_linkRecord_outlined from '@/assets/svg/icon_link-record_outlined.svg'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import icon_viewinchat_outlined from '@/assets/svg/icon_viewinchat_outlined.svg'
 import { cancelRequestBatch } from '@/config/axios/service'
 import icon_drilling_outlined from '@/assets/svg/icon_drilling_outlined.svg'

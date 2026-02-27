@@ -1,24 +1,31 @@
 <script lang="ts" setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, type PropType } from 'vue'
 import { ElDrawer, ElButton } from 'element-plus-secondary'
-import { propTypes } from '@/utils/propTypes'
 import DrawerFilter from '@/components/drawer-filter/src/DrawerFilter.vue'
 import DrawerEnumFilter from '@/components/drawer-filter/src/DrawerEnumFilter.vue'
 import DrawerTimeFilter from '@/components/drawer-filter/src/DrawerTimeFilter.vue'
 import DrawerTreeFilter from '@/components/drawer-filter/src/DrawerTreeFilter.vue'
 import { useI18n } from '@/hooks/web/useI18n'
+
+interface FilterOption {
+  type: string
+  field: string
+  option?: any[]
+  title?: string
+  property?: any
+  operator?: string
+}
+
 const { t } = useI18n()
 const props = defineProps({
-  filterOptions: propTypes.arrayOf(
-    propTypes.shape({
-      type: propTypes.string,
-      field: propTypes.string,
-      option: propTypes.array,
-      title: propTypes.string,
-      property: propTypes.shape({})
-    })
-  ),
-  title: propTypes.string
+  filterOptions: {
+    type: Array as PropType<FilterOption[]>,
+    default: () => []
+  },
+  title: {
+    type: String,
+    default: ''
+  }
 })
 const myRefs = ref([])
 const componentList = computed(() => {

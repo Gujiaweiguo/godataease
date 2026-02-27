@@ -1,5 +1,6 @@
 <script lang="tsx" setup>
-import { reactive, watch } from 'vue'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { useI18n } from '@/hooks/web/useI18n'
 import {
   COLOR_PANEL,

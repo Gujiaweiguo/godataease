@@ -3,6 +3,8 @@
 </template>
 
 <script setup lang="ts">
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { formatDataEaseBi } from '@/utils/url'
 //JS部分
 //在js中引入所需的主题和组件

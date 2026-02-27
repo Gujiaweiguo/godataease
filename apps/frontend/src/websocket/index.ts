@@ -4,9 +4,33 @@ import { useCache } from '@/hooks/web/useCache'
 import { useEmitt } from '@/hooks/web/useEmitt'
 const { wsCache } = useCache()
 let stompClient: Stomp.Client
+let websocketEnabled: boolean | null = null
 import dev from '../../config/dev'
 const env = import.meta.env
 const basePath = env.VITE_API_BASEPATH
+
+const resolveWebSocketEnabled = async (prefix: string): Promise<boolean> => {
+  if (websocketEnabled !== null) {
+    return websocketEnabled
+  }
+  try {
+    const response = await fetch(prefix + 'websocket/info', {
+      method: 'GET',
+      credentials: 'include'
+    })
+    if (!response.ok) {
+      websocketEnabled = false
+      return websocketEnabled
+    }
+    const info = await response.json()
+    websocketEnabled = info?.websocket === true
+    return websocketEnabled
+  } catch (error) {
+    console.error('获取 websocket 状态失败:', error)
+    websocketEnabled = false
+    return websocketEnabled
+  }
+}
 
 export default {
   install() {
@@ -27,7 +51,7 @@ export default {
       return wsCache.get('user.token') && wsCache.get('user.uid')
     }
 
-    function connection() {
+    async function connection() {
       if (!isLoginStatus()) {
         return
       }
@@ -46,6 +70,11 @@ export default {
       }
       if (!prefix.endsWith('/')) {
         prefix += '/'
+      }
+      const enabled = await resolveWebSocketEnabled(prefix)
+      if (!enabled) {
+        disconnect()
+        return
       }
       const userId = wsCache.get('app.desktop') ? 1 : wsCache.get('user.uid')
       const socket = new SockJS(prefix + 'websocket?userId=' + userId)
@@ -84,14 +113,14 @@ export default {
     }
 
     function initialize() {
-      connection()
+      void connection()
       setInterval(() => {
         if (!isLoginStatus()) {
           disconnect()
           return
         }
         if (!stompClient || !stompClient.connected) {
-          connection()
+          void connection()
         }
       }, 5000)
     }

@@ -36,7 +36,7 @@ import { useCache } from '@/hooks/web/useCache'
 const { wsCache } = useCache()
 const requestStore = useRequestStoreWithOut()
 const embeddedStore = useEmbedded()
-const basePath = import.meta.env.VITE_API_BASEPATH
+const basePath = import.meta.env.VITE_API_BASEPATH || ''
 
 const embeddedBasePath =
   basePath.startsWith('./') && basePath.length > 2 ? basePath.substring(2) : basePath
@@ -50,6 +50,10 @@ export interface AxiosInstanceWithLoading extends AxiosInstance {
 
 const getTimeOut = () => {
   let time = 100
+  // Skip sync XHR in test environment to avoid unhandled ECONNREFUSED
+  if (import.meta.env.MODE === 'test') {
+    return time
+  }
   const url = PATH_URL + '/sysParameter/requestTimeOut'
   const xhr = new XMLHttpRequest()
   xhr.onreadystatechange = () => {
@@ -70,9 +74,16 @@ const getTimeOut = () => {
       }
     }
   }
+  xhr.onerror = () => {
+    // Network error - fallback to default timeout
+  }
 
-  xhr.open('get', url, false)
-  xhr.send()
+  try {
+    xhr.open('get', url, false)
+    xhr.send()
+  } catch (e) {
+    // Sync XHR failed - fallback to default timeout
+  }
   return time
 }
 
@@ -239,6 +250,7 @@ service.interceptors.response.use(
       return
     }
     const header = error.response?.headers as AxiosHeaders
+    const errorData = error.response?.data as { msg?: string } | undefined
     if (
       !error.config.url.startsWith('/xpackComponent/content') &&
       !header.has('DE-FORBIDDEN-FLAG') &&
@@ -246,7 +258,7 @@ service.interceptors.response.use(
     ) {
       ElMessage({
         type: 'error',
-        message: error.response?.data?.msg ? error.response?.data?.msg : error.message,
+        message: errorData?.msg ? errorData.msg : error.message,
         showClose: true
       })
     } else if (error?.config?.url.startsWith('/xpackComponent/content')) {
@@ -316,7 +328,7 @@ const executeVersionHandler = (response: AxiosResponse) => {
   }
 }
 
-const cancelRequestBatch = cancelKey => {
+const cancelRequestBatch = (cancelKey: string) => {
   if (cancelKey) {
     if (cancelKey.indexOf('/**') > -1) {
       const cancelKeyPre = cancelKey.split('/**')[0]

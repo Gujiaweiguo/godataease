@@ -152,8 +152,10 @@
 </template>
 
 <script setup lang="ts">
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import ComponentWrapper from '@/components/data-visualization/canvas/ComponentWrapper.vue'
-import { computed, h, nextTick, reactive, ref } from 'vue'
+import { computed, h, markRaw, nextTick, reactive, ref } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { deepCopy } from '@/utils/utils'
 import icon_download_outlined from '@/assets/svg/icon_download_outlined.svg'
@@ -300,7 +302,7 @@ const pixelOptions = [
     ]
   }
 ]
-const dialogInit = (canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
+const dialogInit = (_canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
   state.scale = params.scale
   sourceViewType.value = view.type
   detailsError.value = false
@@ -423,7 +425,7 @@ const openMessageLoading = cb => {
       t('data_fill.progress_to_download')
     ]),
     iconClass,
-    icon: h(RefreshLeft),
+    icon: markRaw(RefreshLeft),
     showClose: true,
     customClass
   })

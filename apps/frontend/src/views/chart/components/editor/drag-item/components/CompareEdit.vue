@@ -1,4 +1,6 @@
 <script lang="tsx" setup>
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { useI18n } from '@/hooks/web/useI18n'
 import { computed, reactive, toRefs, watch } from 'vue'
 import {

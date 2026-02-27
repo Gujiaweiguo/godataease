@@ -681,8 +681,14 @@ const state = reactive({
   activeCollapse: 'view',
   loading: false,
   showSelected: false,
-  curJumpViewInfo: {},
-  curDatasetInfo: {},
+  curJumpViewInfo: {
+    type: '',
+    title: '',
+    name: ''
+  },
+  curDatasetInfo: {
+    name: ''
+  },
   tempId: null,
   initState: false,
   viewId: null,
@@ -820,10 +826,11 @@ const init = viewItem => {
   const request = { busiFlag: 'dashboard-dataV' } as BusiTreeRequest
   // 获取可关联的仪表板
   queryTreeApi(request).then(rsp => {
-    if (rsp && rsp[0]?.id === '0') {
-      state.panelList = rsp[0].children
+    const treeList = Array.isArray(rsp) ? rsp : []
+    if (treeList && treeList[0]?.id === '0') {
+      state.panelList = treeList[0].children || []
     } else {
-      state.panelList = rsp
+      state.panelList = treeList
     }
     state.panelList = filterEmptyFolderTree(state.panelList)
     const curSortType = wsCache.get(`TreeSort-${dvInfo.value.type}`) || 'time_asc'
@@ -837,7 +844,7 @@ const init = viewItem => {
   if (chartDetails.tableId) {
     // 获取当前数据集信息
     getDatasetDetails(chartDetails.tableId).then(res => {
-      state.curDatasetInfo = res || {}
+      state.curDatasetInfo = res || { name: '' }
     })
     // 获取当前图表的字段信息
     listFieldByDatasetGroup(chartDetails.tableId).then(rsp => {
@@ -885,13 +892,14 @@ const save = () => {
           subCheckCount++
           subCheckCountAll++
         }
-        linkJumpInfo.targetViewInfoList &&
+        if (linkJumpInfo.targetViewInfoList) {
           linkJumpInfo.targetViewInfoList.forEach(function (link) {
             if (!(link.sourceFieldActiveId && link.targetFieldId && link.targetViewId)) {
               subCheckCount++
               subCheckCountAll++
             }
           })
+        }
       }
       if (linkJumpInfo.linkType === 'outer') {
         if (!linkJumpInfo.content) {
@@ -913,7 +921,7 @@ const save = () => {
       snapshotStore.recordSnapshotCache('updateJumpSet')
       ElMessage.success(t('common.save_success'))
       // 刷新跳转信息
-      queryVisualizationJumpInfo(dvInfo.value.id).then(rsp => {
+      queryVisualizationJumpInfo(dvInfo.value.id).then((rsp: { data: unknown }) => {
         dvMainStore.setNowPanelJumpInfo(rsp.data)
         cancel()
       })
@@ -977,21 +985,24 @@ const getPanelViewList = dvId => {
       })
     }
     // 增加过滤组件匹配
-    JSON.parse(rsp.data.bashComponentData).forEach(componentItem => {
-      if (componentItem.component === 'VQuery' && componentItem.propValue instanceof Array) {
-        componentItem.propValue.forEach(filterItem => {
-          state.currentLinkPanelViewArray.push({
-            id: filterItem.id,
-            type: 'filter',
-            name: filterItem.name,
-            title: filterItem.name
+    const bashComponentData = JSON.parse(rsp.data.bashComponentData)
+    if (Array.isArray(bashComponentData)) {
+      bashComponentData.forEach(componentItem => {
+        if (componentItem.component === 'VQuery' && componentItem.propValue instanceof Array) {
+          componentItem.propValue.forEach(filterItem => {
+            state.currentLinkPanelViewArray.push({
+              id: filterItem.id,
+              type: 'filter',
+              name: filterItem.name,
+              title: filterItem.name
+            })
+            state.viewIdFieldArrayMap[filterItem.id] = [
+              { id: '1000001', name: t('visualization.filter_no_select') }
+            ]
           })
-          state.viewIdFieldArrayMap[filterItem.id] = [
-            { id: '1000001', name: t('visualization.filter_no_select') }
-          ]
-        })
-      }
-    })
+        }
+      })
+    }
   })
 }
 

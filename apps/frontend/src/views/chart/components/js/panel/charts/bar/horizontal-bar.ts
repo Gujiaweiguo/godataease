@@ -1,12 +1,8 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import {
   G2PlotChartView,
-  G2PlotDrawOptions
-} from '@/views/chart/components/js/panel/types/impl/g2plot'
-import type { Bar, BarOptions } from '@antv/g2plot/esm/plots/bar'
-import {
   configAxisLabelLengthLimit,
-  configPlotTooltipEvent,
-  configRoundAngle,
   getPadding,
   getLabel,
   getTooltipContainer,

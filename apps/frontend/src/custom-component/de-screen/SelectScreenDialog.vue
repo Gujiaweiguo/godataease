@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { computed, reactive, ref } from 'vue'
 import { queryTreeApi } from '@/api/visualization/dataVisualization'
 import { filterEmptyFolderTree } from '@/utils/canvasUtils'

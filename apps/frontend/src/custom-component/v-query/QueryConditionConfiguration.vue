@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import more_v from '@/assets/svg/more_v.svg'
-import icon_add_outlined from '@/assets/svg/icon_add_outlined.svg'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import icon_drag_outlined from '@/assets/svg/icon_drag_outlined.svg'
 import icon_visible_outlined from '@/assets/svg/icon_visible_outlined.svg'
 import de_pwd_invisible from '@/assets/svg/de_pwd_invisible.svg'

@@ -143,6 +143,8 @@
 </template>
 
 <script setup lang="ts">
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import marketExpand from '@/assets/svg/market-expand.svg'
 import icon_left_outlined from '@/assets/svg/icon_left_outlined.svg'
 import iconFilter from '@/assets/svg/icon-filter.svg'

@@ -138,7 +138,7 @@ const showLoginImage = computed<boolean>(() => {
   return !(loginContainerWidth.value < 889)
 })
 
-const preheat = ref(true)
+const preheat = ref(false)
 const showLoginErrorMsg = () => {
   if (!loginErrorMsg.value) {
     return

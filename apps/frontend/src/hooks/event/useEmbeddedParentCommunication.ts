@@ -1,8 +1,8 @@
 import { ref, onMounted, onBeforeUnmount, Ref } from 'vue'
 import { useEmbedded } from '@/store/modules/embedded'
 import { isAllowedEmbeddedMessageOrigin } from '@/utils/embedded'
+import type { EmbeddingEventType } from '@/events/embedding/types'
 import type {
-  EmbeddingEventType,
   EmbeddingEvent,
   ParamUpdatePayload,
   InteractionPayload,
@@ -16,9 +16,8 @@ import type {
   ModuleInitPayload,
   ModuleUpdatePayload,
   ModuleInteractionPayload,
-  EmbeddingEventPayload
-} from '@/events/embedding/types'
-import type { PayloadForEventType } from '@/events/embedding/payloads'
+  PayloadForEventType
+} from '@/events/embedding/payloads'
 import { validatePayload } from '@/events/embedding/payloads'
 
 /**
@@ -30,6 +29,7 @@ import { validatePayload } from '@/events/embedding/payloads'
 export function useEmbeddedParentCommunication() {
   const store = useEmbedded()
   const messageHandler: Ref<((event: MessageEvent) => void) | null> = ref(null)
+  const isEmbeddedContext = () => window.parent !== window.top
 
   /**
    * Parse and validate incoming message from child frame.
@@ -212,7 +212,7 @@ export function useEmbeddedParentCommunication() {
   const handleError = (payload: ErrorPayload): void => {
     console.error('Child frame error:', payload.message, payload.context)
 
-    if (store.parent && window.parent !== window.top) {
+    if (isEmbeddedContext()) {
       const errorMessage = `${payload.message}${payload.context ? ` (${payload.context})` : ''}`
       const targetPm = `dataease-embedded-host-error:${errorMessage}`
       window.parent.postMessage(targetPm, '*')
@@ -262,7 +262,11 @@ export function useEmbeddedParentCommunication() {
       (payload.dvId && payload.dvId === store.dvId)
     ) {
       if (payload.jumpInfoParam) {
-        store.setJumpInfoParam(payload.jumpInfoParam)
+        const jumpInfoParam =
+          typeof payload.jumpInfoParam === 'string'
+            ? payload.jumpInfoParam
+            : JSON.stringify(payload.jumpInfoParam)
+        store.setJumpInfoParam(jumpInfoParam)
       }
 
       if (payload.targetUrl) {
@@ -324,14 +328,14 @@ export function useEmbeddedParentCommunication() {
     type: T,
     payload: PayloadForEventType<T>
   ): void => {
-    if (!store.parent || window.parent === window.top) {
+    if (!isEmbeddedContext()) {
       console.warn('Not in embedded mode, skipping emit to child')
       return
     }
 
     const event: EmbeddingEvent<PayloadForEventType<T>> = {
       type,
-      payload: payload as EmbeddingEventPayload,
+      payload,
       source: 'parent'
     }
 
@@ -344,7 +348,7 @@ export function useEmbeddedParentCommunication() {
    * Maintains backward compatibility with existing code.
    */
   const postLegacyMessage = (message: string): void => {
-    if (!store.parent || window.parent === window.top) {
+    if (!isEmbeddedContext()) {
       return
     }
 

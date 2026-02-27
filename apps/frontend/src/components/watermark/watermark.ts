@@ -8,11 +8,49 @@ import { isISOMobile } from '@/utils/utils'
 const dvMainStore = dvMainStoreWithOut()
 
 const { dvInfo } = storeToRefs(dvMainStore)
-const userInfo = ref(null)
-export function watermark(settings, domId) {
+interface WatermarkSettings {
+  watermark_txt: string
+  watermark_x: number
+  watermark_y: number
+  watermark_rows: number
+  watermark_cols: number
+  watermark_x_space: number
+  watermark_y_space: number
+  watermark_color: string
+  watermark_alpha: number
+  watermark_fontsize: string
+  watermark_font: string
+  watermark_width: number
+  watermark_height: number
+  watermark_angle: number
+}
+
+interface WatermarkForm {
+  enable?: boolean
+  enablePanelCustom?: boolean
+  type?: 'custom' | 'nickName' | 'ip' | 'time' | 'account'
+  content?: string
+  watermark_color: string
+  watermark_x_space: number
+  watermark_y_space: number
+  watermark_fontsize: number
+}
+
+interface UserLoginInfo {
+  model?: string
+  ip: string
+  account: string
+  name: string
+}
+
+const userInfo = ref<UserLoginInfo | null>(null)
+export function watermark(settings: Partial<WatermarkSettings>, domId: string) {
   const watermarkDom = document.getElementById(domId)
+  if (!watermarkDom) {
+    return
+  }
   // 默认设置
-  const defaultSettings = {
+  const defaultSettings: WatermarkSettings = {
     watermark_txt: '',
     watermark_x: 20, // 水印起始位置x轴坐标
     watermark_y: 20, // 水印起始位置Y轴坐标
@@ -30,19 +68,12 @@ export function watermark(settings, domId) {
   }
   // 根据函数的入参调整设置
   if (settings && typeof settings === 'object') {
-    const src = settings || {}
-    for (const key in src) {
-      if (src[key] && defaultSettings[key] && src[key] === defaultSettings[key]) {
-        continue
-      } else if (src[key]) defaultSettings[key] = src[key]
-    }
+    Object.assign(defaultSettings, settings)
   }
   // 创建虚拟节点对象，在该节点对象中可以放元素，最后只需在页面中添加该节点对象即可。可提高性能
   const oTemp = document.createElement('p')
   // 获取页面最大宽度
-  let page_width = watermarkDom.clientWidth
-  const cutWidth = page_width * 0.015
-  page_width = page_width - cutWidth
+  const page_width = watermarkDom.clientWidth - watermarkDom.clientWidth * 0.015
   // 获取页面最大高度
   let page_height = watermarkDom.scrollHeight - 56
   page_height = page_height < 220 ? 220 : page_height
@@ -91,8 +122,8 @@ export function watermark(settings, domId) {
     defaultSettings.watermark_rows < 2 ? 2 : defaultSettings.watermark_rows
   defaultSettings.watermark_cols =
     defaultSettings.watermark_cols < 2 ? 2 : defaultSettings.watermark_cols
-  let x
-  let y
+  let x = 0
+  let y = 0
   for (let i = 0; i < defaultSettings.watermark_rows; i++) {
     y =
       defaultSettings.watermark_y +
@@ -107,9 +138,6 @@ export function watermark(settings, domId) {
       mask_div.appendChild(document.createTextNode(defaultSettings.watermark_txt))
       // 设置水印div倾斜显示
       mask_div.style.webkitTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
-      mask_div.style.MozTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
-      mask_div.style.msTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
-      mask_div.style.OTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
       mask_div.style.transform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
       mask_div.style.visibility = ''
       mask_div.style.position = 'absolute'
@@ -119,7 +147,7 @@ export function watermark(settings, domId) {
       mask_div.style.zIndex = '10'
       // 让水印不遮挡页面的点击事件
       mask_div.style.pointerEvents = 'none'
-      mask_div.style.opacity = defaultSettings.watermark_alpha
+      mask_div.style.opacity = String(defaultSettings.watermark_alpha)
       mask_div.style.fontSize = defaultSettings.watermark_fontsize
       mask_div.style.fontFamily = defaultSettings.watermark_font
       mask_div.style.color = defaultSettings.watermark_color
@@ -142,7 +170,7 @@ export function getNow() {
   const hour = change(d.getHours())
   const minute = change(d.getMinutes())
 
-  function change(t) {
+  function change(t: number) {
     if (t < 10) {
       return '0' + t
     } else {
@@ -153,11 +181,12 @@ export function getNow() {
   const time = year + '-' + month + '-' + day + ' ' + hour + ':' + minute
   return time
 }
-export function activeWatermarkCheckUser(domId, canvasId, scale = 1) {
-  if (dvInfo.value.watermarkInfo) {
+export function activeWatermarkCheckUser(domId: string, canvasId: string, scale = 1) {
+  const watermarkInfo = dvInfo.value.watermarkInfo as { settingContent?: WatermarkForm } | undefined
+  if (watermarkInfo?.settingContent) {
     if (userInfo.value && userInfo.value.model !== 'lose') {
       activeWatermark(
-        dvInfo.value.watermarkInfo.settingContent,
+        watermarkInfo.settingContent,
         userInfo.value,
         domId,
         canvasId,
@@ -165,11 +194,11 @@ export function activeWatermarkCheckUser(domId, canvasId, scale = 1) {
         scale
       )
     } else {
-      ipInfoApi().then(res => {
+      ipInfoApi().then((res: { data: UserLoginInfo }) => {
         userInfo.value = res.data
         if (userInfo.value && userInfo.value.model !== 'lose') {
           activeWatermark(
-            dvInfo.value.watermarkInfo.settingContent,
+            watermarkInfo.settingContent,
             userInfo.value,
             domId,
             canvasId,
@@ -182,7 +211,7 @@ export function activeWatermarkCheckUser(domId, canvasId, scale = 1) {
   }
 }
 
-export function removeActiveWatermark(domId) {
+export function removeActiveWatermark(domId: string) {
   const historyWatermarkDom = document.getElementById(domId + '-de-watermark-server')
   if (historyWatermarkDom) {
     historyWatermarkDom.remove()
@@ -190,11 +219,11 @@ export function removeActiveWatermark(domId) {
 }
 
 export function activeWatermark(
-  watermarkForm,
-  userLoginInfo,
-  domId,
-  canvasId,
-  selfWatermarkStatus,
+  watermarkForm: WatermarkForm,
+  userLoginInfo: UserLoginInfo,
+  domId: string,
+  canvasId: string,
+  selfWatermarkStatus: boolean,
   scale = 1
 ) {
   // 清理历史水印
@@ -208,7 +237,7 @@ export function activeWatermark(
   ) {
     return
   }
-  let watermark_txt
+  let watermark_txt = ''
   let watermark_width = 120
   if (watermarkForm.type === 'custom') {
     watermark_txt = watermarkForm.content

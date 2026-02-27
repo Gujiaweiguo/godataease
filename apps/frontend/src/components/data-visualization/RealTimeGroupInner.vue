@@ -77,6 +77,19 @@ import circlePackingOrigin from '@/assets/svg/circle-packing-origin.svg'
 import bulletGraphOrigin from '@/assets/svg/bullet-graph-origin.svg'
 import { syncViewTitle } from '@/utils/canvasUtils'
 import { useI18n } from '@/hooks/web/useI18n'
+import type { PropType } from 'vue'
+
+interface ComponentItem {
+  id: string
+  name: string
+  component: string
+  isShow: boolean
+  isLock: boolean
+  expand?: boolean
+  propValue?: ComponentItem[]
+  [key: string]: any
+}
+
 const dropdownMore = ref(null)
 const lockStore = lockStoreWithOut()
 const { t } = useI18n()
@@ -96,14 +109,14 @@ const props = defineProps({
     default: 'main'
   },
   componentData: {
-    type: Array,
+    type: Array as PropType<ComponentItem[]>,
     default: () => []
   }
 })
 
 const { componentData } = toRefs(props)
 
-const getComponent = index => {
+const getComponent = (index: number): ComponentItem | undefined => {
   return componentData.value[componentData.value.length - 1 - index]
 }
 const transformIndex = index => {

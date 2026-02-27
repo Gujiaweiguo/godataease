@@ -90,7 +90,7 @@ export const latestUse = async (data = {}) => {
   return request.post({ url: '/datasource/latestUse', data })
 }
 
-export const validateById = (id: number) => request.get({ url: '/datasource/validate/' + id })
+export const validateById = (id: number | string) => request.get({ url: '/datasource/validate/' + id })
 
 export const save = async (data = {}): Promise<Dataset> => {
   nameTrim(data)
@@ -160,13 +160,13 @@ export const getDsTree = async (data = {}): Promise<IResponse> => {
     })
 }
 
-export const deleteById = (id: number) => request.get({ url: '/datasource/delete/' + id })
+export const deleteById = (id: number | string) => request.get({ url: '/datasource/delete/' + id })
 
-export const getById = (id: number) => request.get({ url: '/datasource/get/' + id })
+export const getById = (id: number | string) => request.get({ url: '/datasource/get/' + id })
 
-export const getHidePwById = (id: number) => request.get({ url: '/datasource/hidePw/' + id })
+export const getHidePwById = (id: number | string) => request.get({ url: '/datasource/hidePw/' + id })
 
-export const getSimpleDs = (id: number) => request.get({ url: '/datasource/getSimpleDs/' + id })
+export const getSimpleDs = (id: number | string) => request.get({ url: '/datasource/getSimpleDs/' + id })
 
 export const uploadFile = async (data): Promise<IResponse> => {
   return request

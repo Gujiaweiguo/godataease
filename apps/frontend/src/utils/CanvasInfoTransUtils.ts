@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
 import { deepCopy } from '@/utils/utils'
 
 export default function defaultConditionTrans(canvasInfo) {

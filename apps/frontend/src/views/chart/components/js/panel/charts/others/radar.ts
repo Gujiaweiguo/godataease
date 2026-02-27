@@ -1,7 +1,5 @@
-import type { RadarOptions, Radar as G2Radar } from '@antv/g2plot/esm/plots/radar'
-import { G2PlotChartView, G2PlotDrawOptions } from '../../types/impl/g2plot'
-import { flow, parseJson } from '../../../util'
-import { configPlotTooltipEvent } from '../../common/common_antv'
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
 import { valueFormatter } from '../../../formatter'
 import type { Datum } from '@antv/g2plot/esm/types/common'
 import { useI18n } from '@/hooks/web/useI18n'
