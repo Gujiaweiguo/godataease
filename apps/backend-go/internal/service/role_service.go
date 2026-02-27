@@ -104,6 +104,9 @@ func (s *RoleService) QueryRoles(req *role.RoleQueryRequest) ([]*role.RoleVO, er
 		result = append(result, &role.RoleVO{
 			ID:       rle.RoleID,
 			Name:     rle.RoleName,
+			Code:     rle.RoleCode,
+			Desc:     rle.RoleDesc,
+			Status:   rle.Status,
 			ReadOnly: false,
 			Root:     rle.ParentID == nil || *rle.ParentID == 0,
 		})

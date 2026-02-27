@@ -59,12 +59,43 @@ Run in `/opt/code/godataease/apps/frontend`:
 - Lint (ESLint): `npm run lint`
 - Lint (Stylelint): `npm run lint:stylelint`
 - Type check: `npm run ts:check`
+- Unit test (Vitest): `npm run test -- --run`
+- Test (CI smoke): `npm run test:ci`
+- Test (core suite): `npm run test:core`
+- Coverage: `npm run test:coverage`
+- Coverage (core suite): `npm run test:coverage:core`
 - Preview build: `npm run preview`
 
 Notes:
 - Build scripts set `NODE_OPTIONS` memory in `apps/frontend/package.json`.
 - NPM registry is configured in `apps/frontend/.npmrc`.
-- There is no standard `npm test` script currently; use lint + ts check as quality gates.
+- Frontend has Vitest configured; current `test:ci` is a lightweight smoke entry and does not represent full feature coverage.
+
+## 测试策略（AI 执行约定）
+
+### 分层测试策略（推荐）
+- L0 静态质量层（必须）：Frontend `lint + ts:check`；Backend `golangci-lint + go test`。
+- L1 单元测试层（核心逻辑）：优先覆盖纯函数、store/composable、service/domain 逻辑。
+- L2 集成/契约层（接口与数据）：Backend 仓储/HTTP 集成测试、契约差异检查（contract diff / drift-check）。
+- L3 端到端冒烟层（关键流程）：登录、权限、数据源创建/编辑/校验等关键用户路径。
+
+### AI 最低验证要求（提交前）
+- 修改 Frontend 代码至少执行：`npm run lint`、`npm run ts:check`。
+- 若修改 Frontend 业务逻辑（store/composable/utils/api 处理），应补充或执行对应 Vitest 用例（`npm run test -- --run`）。
+- 修改 Backend 代码至少执行：`make test`。
+- 若修改 Repository/SQL/迁移/持久化逻辑，增加执行 `make test-integration`（环境不满足时需在结论中明确说明未执行原因与风险）。
+- 若修改 API 兼容相关逻辑，增加执行 `make drift-check`（必要时结合 contract diff workflow）。
+
+### 按改动路径触发测试矩阵（Frontend）
+- 变更 `events/embedding`、`hooks/event`、`embedded store/token utils`：执行 `npm run test:affected:embedding`。
+- 变更 `views/visualized/data/datasource`、`api/datasource`、`interactive store`：执行 `npm run test:affected:datasource`（数据源专属最小测试集）。
+- 变更 `config/axios`、`store`、`utils` 等共享基础模块：执行 `npm run test:core`。
+- 其他普通前端变更：至少执行 `npm run test:ci`（smoke）。
+
+### CI 与门禁建议（当前仓库适配）
+- Frontend `ts:check` 建议尽快改为阻断（当前工作流为 non-blocking）。
+- Frontend `test:ci` 建议从示例测试扩展为“变更影响范围测试”或“核心模块测试集合”。
+- Backend 保持 `make test` 阻断；`integration` 标签测试建议加入夜间定时任务或手动门禁流程。
 
 ### Legacy (Read Only)
 - `legacy/backend-java/` 与 `legacy/sdk/` 为只读备份，不承接常规功能开发。

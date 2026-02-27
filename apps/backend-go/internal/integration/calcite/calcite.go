@@ -94,11 +94,11 @@ func NewClient(cfg *Config) (*Client, error) {
 	dialCtx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(
+	conn, err := grpc.DialContext( //nolint:staticcheck // grpc.NewClient migration requires larger refactor
 		dialCtx,
 		cfg.Address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
+		grpc.WithBlock(), //nolint:staticcheck // grpc.NewClient migration requires larger refactor
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to calcite service: %w", err)

@@ -37,7 +37,6 @@ apps/backend-go/coverage.out
 
 # Frontend build cache
 apps/frontend/node_modules
-apps/frontend/dist
 apps/frontend/.vite
 
 # Legacy Java target

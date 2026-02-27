@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -94,36 +95,37 @@ func determineRouteSource(path string) string {
 }
 
 type Router struct {
-	engine                *gin.Engine
-	app                   *app.Application
-	db                    *gorm.DB
-	permMiddleware        *middleware.PermissionMiddleware
-	auditHandler          *handler.AuditHandler
-	userHandler           *handler.UserHandler
-	orgHandler            *handler.OrgHandler
-	permHandler           *handler.PermHandler
-	embeddedHandler       *handler.EmbeddedHandler
-	roleHandler           *handler.RoleHandler
-	roleMenuHandler       *handler.RoleMenuHandler
-	menuHandler           *handler.MenuHandler
-	mapHandler            *handler.MapHandler
-	authHandler           *handler.AuthHandler
-	datasourceHandler     *handler.DatasourceHandler
-	datasetHandler        *handler.DatasetHandler
-	chartHandler          *handler.ChartHandler
-	visualHandler         *handler.VisualizationHandler
-	systemParamHandler    *handler.SystemParamHandler
-	licenseHandler        *handler.LicenseHandler
-	msgCenterHandler      *handler.MsgCenterHandler
-	shareHandler          *handler.ShareHandler
-	ticketHandler         *handler.TicketHandler
-	geoHandler            *handler.GeoHandler
-	staticHandler         *handler.StaticHandler
-	exportHandler         *handler.ExportHandler
-	engineHandler         *handler.EngineHandler
-	driverHandler         *handler.DriverHandler
-	templateHandler       *handler.TemplateHandler
-	frontendCompatHandler *handler.FrontendCompatHandler
+	engine                  *gin.Engine
+	app                     *app.Application
+	db                      *gorm.DB
+	permMiddleware          *middleware.PermissionMiddleware
+	auditHandler            *handler.AuditHandler
+	userHandler             *handler.UserHandler
+	orgHandler              *handler.OrgHandler
+	permHandler             *handler.PermHandler
+	embeddedHandler         *handler.EmbeddedHandler
+	roleHandler             *handler.RoleHandler
+	roleMenuHandler         *handler.RoleMenuHandler
+	menuHandler             *handler.MenuHandler
+	mapHandler              *handler.MapHandler
+	authHandler             *handler.AuthHandler
+	datasourceHandler       *handler.DatasourceHandler
+	datasetHandler          *handler.DatasetHandler
+	chartHandler            *handler.ChartHandler
+	visualHandler           *handler.VisualizationHandler
+	systemParamHandler      *handler.SystemParamHandler
+	licenseHandler          *handler.LicenseHandler
+	msgCenterHandler        *handler.MsgCenterHandler
+	shareHandler            *handler.ShareHandler
+	ticketHandler           *handler.TicketHandler
+	geoHandler              *handler.GeoHandler
+	staticHandler           *handler.StaticHandler
+	exportHandler           *handler.ExportHandler
+	engineHandler           *handler.EngineHandler
+	driverHandler           *handler.DriverHandler
+	templateHandler         *handler.TemplateHandler
+	frontendCompatHandler   *handler.FrontendCompatHandler
+	permissionCompatHandler *handler.PermissionCompatHandler
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -262,6 +264,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
+	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
 
 	// Export module initialization
 	exportRepo := repository.NewExportRepository(db)
@@ -286,36 +289,37 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService)
 
 	return &Router{
-		engine:                engine,
-		app:                   application,
-		db:                    db,
-		permMiddleware:        permMiddleware,
-		auditHandler:          auditHandler,
-		userHandler:           userHandler,
-		orgHandler:            orgHandler,
-		permHandler:           permHandler,
-		embeddedHandler:       embeddedHandler,
-		roleHandler:           roleHandler,
-		roleMenuHandler:       roleMenuHandler,
-		menuHandler:           menuHandler,
-		mapHandler:            mapHandler,
-		authHandler:           authHandler,
-		datasourceHandler:     datasourceHandler,
-		datasetHandler:        datasetHandler,
-		chartHandler:          chartHandler,
-		visualHandler:         visualHandler,
-		systemParamHandler:    systemParamHandler,
-		licenseHandler:        licenseHandler,
-		msgCenterHandler:      msgCenterHandler,
-		shareHandler:          shareHandler,
-		ticketHandler:         ticketHandler,
-		geoHandler:            geoHandler,
-		staticHandler:         staticHandler,
-		exportHandler:         exportHandler,
-		engineHandler:         engineHandler,
-		driverHandler:         driverHandler,
-		templateHandler:       templateHandler,
-		frontendCompatHandler: frontendCompatHandler,
+		engine:                  engine,
+		app:                     application,
+		db:                      db,
+		permMiddleware:          permMiddleware,
+		auditHandler:            auditHandler,
+		userHandler:             userHandler,
+		orgHandler:              orgHandler,
+		permHandler:             permHandler,
+		embeddedHandler:         embeddedHandler,
+		roleHandler:             roleHandler,
+		roleMenuHandler:         roleMenuHandler,
+		menuHandler:             menuHandler,
+		mapHandler:              mapHandler,
+		authHandler:             authHandler,
+		datasourceHandler:       datasourceHandler,
+		datasetHandler:          datasetHandler,
+		chartHandler:            chartHandler,
+		visualHandler:           visualHandler,
+		systemParamHandler:      systemParamHandler,
+		licenseHandler:          licenseHandler,
+		msgCenterHandler:        msgCenterHandler,
+		shareHandler:            shareHandler,
+		ticketHandler:           ticketHandler,
+		geoHandler:              geoHandler,
+		staticHandler:           staticHandler,
+		exportHandler:           exportHandler,
+		engineHandler:           engineHandler,
+		driverHandler:           driverHandler,
+		templateHandler:         templateHandler,
+		frontendCompatHandler:   frontendCompatHandler,
+		permissionCompatHandler: permissionCompatHandler,
 	}
 }
 
@@ -389,6 +393,7 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterRoleRoutes(api, r.roleHandler)
 		handler.RegisterRoleMenuRoutes(api, r.roleMenuHandler)
 		handler.RegisterMenuRoutes(api, r.menuHandler)
+		handler.RegisterPermissionCompatRoutes(api, r.permissionCompatHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
 		handler.RegisterDatasourceRoutes(api, r.datasourceHandler)
 		r.registerDatasetRoutes(api)
@@ -407,6 +412,73 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
 	}
+
+	frontendDir := os.Getenv("FRONTEND_DIST_PATH")
+	if frontendDir == "" {
+		frontendDir = "/opt/module/dataease2.0/frontend"
+	}
+
+	r.engine.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		if strings.HasPrefix(path, "/de2api/") {
+			mappedPath := strings.TrimPrefix(path, "/de2api")
+			if mappedPath == "" {
+				mappedPath = "/"
+			}
+			if !strings.HasPrefix(mappedPath, "/") {
+				mappedPath = "/" + mappedPath
+			}
+			if !strings.HasPrefix(mappedPath, "/api/") {
+				mappedPath = "/api" + mappedPath
+			}
+			c.Request.URL.Path = mappedPath
+			r.engine.HandleContext(c)
+			return
+		}
+
+		if strings.HasPrefix(path, "/login/websocket/") {
+			c.Request.URL.Path = strings.TrimPrefix(path, "/login")
+			r.engine.HandleContext(c)
+			return
+		}
+
+		if path == "/websocket" || path == "/websocket/" || strings.HasPrefix(path, "/websocket/") {
+			c.Status(http.StatusNoContent)
+			return
+		}
+
+		switch path {
+		case "/login", "/login/":
+			c.Redirect(http.StatusFound, "/#/login")
+			return
+		case "/admin-login", "/admin-login/":
+			c.Redirect(http.StatusFound, "/#/admin-login")
+			return
+		}
+
+		if strings.HasPrefix(path, "/api/") || path == "/health" || path == "/ready" || path == "/metrics" {
+			c.String(http.StatusNotFound, "404 page not found")
+			return
+		}
+
+		cleanPath := strings.TrimPrefix(filepath.Clean(path), "/")
+		if cleanPath == "" || cleanPath == "." {
+			c.Header("Cache-Control", "no-store")
+			c.File(filepath.Join(frontendDir, "index.html"))
+			return
+		}
+
+		assetPath := filepath.Join(frontendDir, cleanPath)
+		if info, err := os.Stat(assetPath); err == nil && !info.IsDir() {
+			c.Header("Cache-Control", "no-store")
+			c.File(assetPath)
+			return
+		}
+
+		c.Header("Cache-Control", "no-store")
+		c.File(filepath.Join(frontendDir, "index.html"))
+	})
 }
 
 func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
@@ -426,6 +498,7 @@ func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
 func (r *Router) registerVisualizationRoutes(api *gin.RouterGroup) {
 	visualGroup := api.Group("/dataVisualization")
 	{
+		visualGroup.POST("/tree", r.visualHandler.Tree)
 		if r.permMiddleware != nil {
 			visualGroup.POST("/findById", r.permMiddleware.CheckDashboardView(), r.visualHandler.FindByID)
 			visualGroup.POST("/updateCanvas", r.permMiddleware.CheckDashboardEdit(), r.visualHandler.UpdateCanvas)

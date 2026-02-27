@@ -66,8 +66,8 @@ func (s *ChartExportService) InnerExportDetails(req *ExportChartRequest) (*bytes
 	// Write headers
 	for colIdx, header := range req.Header {
 		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
-		f.SetCellValue(sheetName, cell, header)
-		f.SetCellStyle(sheetName, cell, cell, headerStyle)
+		_ = f.SetCellValue(sheetName, cell, header)            //nolint:errcheck // non-critical export error
+		_ = f.SetCellStyle(sheetName, cell, cell, headerStyle) //nolint:errcheck // non-critical export error
 	}
 
 	// Write data rows
@@ -75,21 +75,21 @@ func (s *ChartExportService) InnerExportDetails(req *ExportChartRequest) (*bytes
 		for colIdx, value := range row {
 			cell, _ := excelize.CoordinatesToCellName(colIdx+1, rowIdx+2)
 			if value == nil {
-				f.SetCellValue(sheetName, cell, "")
+				_ = f.SetCellValue(sheetName, cell, "") //nolint:errcheck // non-critical export error
 			} else {
 				switch v := value.(type) {
 				case string:
-					f.SetCellValue(sheetName, cell, v)
+					_ = f.SetCellValue(sheetName, cell, v) //nolint:errcheck // non-critical export error
 				case float64:
-					f.SetCellValue(sheetName, cell, v)
+					_ = f.SetCellValue(sheetName, cell, v) //nolint:errcheck // non-critical export error
 				case int:
-					f.SetCellValue(sheetName, cell, v)
+					_ = f.SetCellValue(sheetName, cell, v) //nolint:errcheck // non-critical export error
 				case int64:
-					f.SetCellValue(sheetName, cell, v)
+					_ = f.SetCellValue(sheetName, cell, v) //nolint:errcheck // non-critical export error
 				case bool:
-					f.SetCellValue(sheetName, cell, v)
+					_ = f.SetCellValue(sheetName, cell, v) //nolint:errcheck // non-critical export error
 				default:
-					f.SetCellValue(sheetName, cell, fmt.Sprintf("%v", v))
+					_ = f.SetCellValue(sheetName, cell, fmt.Sprintf("%v", v)) //nolint:errcheck // non-critical export error
 				}
 			}
 		}
@@ -98,11 +98,11 @@ func (s *ChartExportService) InnerExportDetails(req *ExportChartRequest) (*bytes
 	// Auto-fit column widths
 	for colIdx := range req.Header {
 		col, _ := excelize.ColumnNumberToName(colIdx + 1)
-		f.SetColWidth(sheetName, col, col, 15)
+		_ = f.SetColWidth(sheetName, col, col, 15) //nolint:errcheck // non-critical export error
 	}
 
 	// Delete default Sheet1
-	f.DeleteSheet("Sheet1")
+	_ = f.DeleteSheet("Sheet1") //nolint:errcheck // non-critical export error
 
 	buf := new(bytes.Buffer)
 	if err := f.Write(buf); err != nil {

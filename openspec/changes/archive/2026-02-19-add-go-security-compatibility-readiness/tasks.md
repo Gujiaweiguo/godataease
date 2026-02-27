@@ -118,7 +118,7 @@
   - **Rollback Plan**:
     - Revert latest parity-affecting changes in reverse dependency order until diff gates recover
 
-- [ ] **SEC-COMP-008** Staging shadow validation and cutover gate
+- [x] **SEC-COMP-008** Staging shadow validation and cutover gate (superseded by 2026-02-20-add-go-shadow-validation-cutover-gate)
   - **Risk**: Medium
   - **Depends On**: SEC-COMP-007
   - **Input**:
@@ -136,7 +136,7 @@
   - **Execution Record (Plan v1)**:
     - Runbook: `openspec/changes/add-go-security-compatibility-readiness/shadow-validation-runbook.md`
     - Report: `openspec/changes/add-go-security-compatibility-readiness/shadow-validation-report.md`
-    - Current state: blocked by missing staging prerequisites (tooling + env + gateway access)
+    - Current state: **COMPLETED** via superseding change `2026-02-20-add-go-shadow-validation-cutover-gate` (SHADOW-001~006 all done, Go/No-Go decision: GO)
 
 ## Execution Notes
 
@@ -146,7 +146,7 @@
 
 ## Completion Summary
 
-**Completed: 7/8 tasks**
+**Completed: 8/8 tasks**
 
 | Task | Status | Key Deliverables |
 |------|--------|------------------|
@@ -157,6 +157,6 @@
 | SEC-COMP-005 | ✅ | Column masking integrated with row_permission |
 | SEC-COMP-006 | ✅ | Export auth checks, error codes "403001"/"404001" |
 | SEC-COMP-007 | ✅ | compatibility_contract_test.go stub |
-| SEC-COMP-008 | ⏸️ | Requires staging infrastructure |
+| SEC-COMP-008 | ✅ | Superseded by 2026-02-20-add-go-shadow-validation-cutover-gate |
 
-**Remaining**: SEC-COMP-008 (operational - requires staging environment)
+**All tasks completed.**

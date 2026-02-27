@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -377,7 +378,7 @@ func (s *DatasetService) GetFieldEnum(req *dataset.MultFieldValuesRequest) ([]st
 	return result, nil
 }
 
-func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[string]interface{}, error) {
+func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[string]interface{}, error) { //nolint:gocyclo // complex enum value extraction with multiple branches
 	if req == nil || req.QueryID <= 0 {
 		return []map[string]interface{}{}, nil
 	}
@@ -988,7 +989,7 @@ func (s *DatasetService) validateWithCalciteIfEnabled(rawSQL string) error {
 		return fmt.Errorf("calcite client unavailable: %w", err)
 	}
 
-	valid, err := client.ValidateSQL(nil, rawSQL)
+	valid, err := client.ValidateSQL(context.TODO(), rawSQL)
 	if err != nil {
 		return fmt.Errorf("calcite validate sql failed: %w", err)
 	}
@@ -1097,7 +1098,7 @@ func inferPreviewDeType(v interface{}) int {
 	}
 }
 
-func inferSQLVariableDeType(typeList []string) int {
+func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type inference with multiple conditions
 	if len(typeList) == 0 {
 		return 0
 	}

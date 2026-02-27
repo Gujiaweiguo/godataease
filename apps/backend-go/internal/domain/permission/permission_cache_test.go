@@ -137,8 +137,7 @@ func TestPermissionCacheService_ResourcePermission(t *testing.T) {
 	resourceID := int64(789)
 	permKey := "export"
 
-	hasPerm, found := svc.GetResourcePermission(ctx, resourceType, resourceID, permKey)
-	if found {
+	if _, found := svc.GetResourcePermission(ctx, resourceType, resourceID, permKey); found {
 		t.Error("Should not find permission before setting")
 	}
 
@@ -147,7 +146,7 @@ func TestPermissionCacheService_ResourcePermission(t *testing.T) {
 		t.Errorf("Failed to set resource permission: %v", err)
 	}
 
-	hasPerm, found = svc.GetResourcePermission(ctx, resourceType, resourceID, permKey)
+	hasPerm, found := svc.GetResourcePermission(ctx, resourceType, resourceID, permKey)
 	if !found {
 		t.Error("Should find permission after setting")
 	}
@@ -160,8 +159,7 @@ func TestPermissionCacheService_ResourcePermission(t *testing.T) {
 		t.Errorf("Failed to update resource permission: %v", err)
 	}
 
-	hasPerm, _ = svc.GetResourcePermission(ctx, resourceType, resourceID, permKey)
-	if hasPerm {
+	if perm, _ := svc.GetResourcePermission(ctx, resourceType, resourceID, permKey); perm {
 		t.Error("Permission should be false after update")
 	}
 }
@@ -208,7 +206,9 @@ func TestPermissionCacheService_InvalidateByUserID(t *testing.T) {
 
 	userID := int64(123)
 
-	svc.SetUserPermissions(ctx, userID, []int64{1, 2, 3})
+	if err := svc.SetUserPermissions(ctx, userID, []int64{1, 2, 3}); err != nil {
+		t.Errorf("Failed to set user permissions: %v", err)
+	}
 
 	err := svc.InvalidateByUserID(ctx, userID)
 	if err != nil {
@@ -228,7 +228,9 @@ func TestPermissionCacheService_InvalidateByRoleID(t *testing.T) {
 
 	roleID := int64(456)
 
-	svc.SetRolePermissions(ctx, roleID, []int64{4, 5, 6})
+	if err := svc.SetRolePermissions(ctx, roleID, []int64{4, 5, 6}); err != nil {
+		t.Errorf("Failed to set role permissions: %v", err)
+	}
 
 	err := svc.InvalidateByRoleID(ctx, roleID)
 	if err != nil {

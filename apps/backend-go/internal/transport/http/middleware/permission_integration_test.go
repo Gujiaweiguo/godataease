@@ -14,7 +14,6 @@ import (
 
 type mockResourcePermRepo struct {
 	hasPermission bool
-	reason        string
 }
 
 func (m *mockResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, error) {
@@ -78,25 +77,6 @@ func (m *mockResourcePermRepo) GrantPermToRole(roleID, permID int64) error {
 
 func (m *mockResourcePermRepo) RevokePermFromRole(roleID, permID int64) error {
 	return nil
-}
-
-// mockExportPermSvc is a mock for ExportPermissionService
-type mockExportPermSvc struct {
-	hasPermission bool
-}
-
-func (m *mockExportPermSvc) CheckExportPermission(ctx interface{}, req *service.ExportCheckRequest) *service.ExportCheckResult {
-	return &service.ExportCheckResult{
-		CanExport: m.hasPermission,
-	}
-}
-
-func (m *mockExportPermSvc) CheckBatchExportPermission(ctx interface{}, userID int64, resourceType string, resourceIDs []int64) map[int64]bool {
-	results := make(map[int64]bool)
-	for _, id := range resourceIDs {
-		results[id] = m.hasPermission
-	}
-	return results
 }
 
 func TestDatasetPreviewWithPerm_401_Unauthenticated(t *testing.T) {

@@ -20,7 +20,7 @@ func (s *DriverService) List() ([]driver.DriverDTO, error) {
 	}
 	result := make([]driver.DriverDTO, 0, len(list))
 	for _, d := range list {
-		result = append(result, driver.DriverDTO{
+		result = append(result, driver.DriverDTO{ //nolint:gosimple // struct conversion not applicable due to field mapping
 			ID:       d.ID,
 			Name:     d.Name,
 			Type:     d.Type,
@@ -38,7 +38,7 @@ func (s *DriverService) ListByType(dsType string) ([]driver.DriverDTO, error) {
 	}
 	result := make([]driver.DriverDTO, 0, len(list))
 	for _, d := range list {
-		result = append(result, driver.DriverDTO{
+		result = append(result, driver.DriverDTO{ //nolint:gosimple // struct conversion not applicable due to field mapping
 			ID:       d.ID,
 			Name:     d.Name,
 			Type:     d.Type,

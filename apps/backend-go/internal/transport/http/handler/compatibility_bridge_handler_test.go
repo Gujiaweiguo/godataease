@@ -705,16 +705,7 @@ func TestApiAliasDatasetTree(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != 404 {
-		t.Logf("Route /api/datasetTree/tree registered, status: %d", w.Code)
 	}
-}
-
-type bridgePaginationResp struct {
-	Code    string                   `json:"code"`
-	Data    []map[string]interface{} `json:"data"`
-	Total   int64                    `json:"total"`
-	Current int                      `json:"current"`
-	Size    int                      `json:"size"`
 }
 
 func TestPaginationResponseFormat(t *testing.T) {

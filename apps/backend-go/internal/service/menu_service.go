@@ -4,10 +4,9 @@ import (
 	"strings"
 
 	"dataease/backend/internal/domain/menu"
-	"errors"
 	"dataease/backend/internal/repository"
-	)
-
+	"errors"
+)
 
 type MenuService struct {
 	repo         *repository.MenuRepository

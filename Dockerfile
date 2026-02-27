@@ -53,7 +53,8 @@ RUN addgroup -g 1000 dataease && \
 # Create directories with proper permissions
 RUN mkdir -p /opt/module/dataease2.0/configs \
     /opt/module/dataease2.0/data \
-    /opt/module/dataease2.0/logs && \
+    /opt/module/dataease2.0/logs \
+    /opt/module/dataease2.0/frontend && \
     chown -R dataease:dataease /opt/module/dataease2.0
 
 # Copy binary from builder
@@ -61,6 +62,8 @@ COPY --from=builder --chown=dataease:dataease /build/dataease-backend /opt/modul
 
 # Copy default config
 COPY --chown=dataease:dataease apps/backend-go/configs/config.example.yaml /opt/module/dataease2.0/configs/config.yaml
+
+COPY --chown=dataease:dataease apps/frontend/dist/ /opt/module/dataease2.0/frontend/
 
 # Switch to non-root user
 USER dataease

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/pkg/response"
@@ -46,6 +47,123 @@ func (h *VisualizationHandler) List(c *gin.Context) {
 		return
 	}
 	response.Success(c, result)
+}
+
+type treeRequest struct {
+	BusiFlag string `json:"busiFlag"`
+	Leaf     *bool  `json:"leaf"`
+}
+
+type treeNode struct {
+	ID         string     `json:"id"`
+	PID        string     `json:"pid"`
+	Name       string     `json:"name"`
+	Leaf       bool       `json:"leaf"`
+	Weight     int        `json:"weight"`
+	ExtraFlag  int        `json:"extraFlag"`
+	ExtraFlag1 int        `json:"extraFlag1"`
+	Children   []treeNode `json:"children,omitempty"`
+}
+
+func (h *VisualizationHandler) Tree(c *gin.Context) {
+	var req treeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	types := resolveBusiTypes(req.BusiFlag)
+	all := make([]*visualization.DataVisualizationInfo, 0)
+	for _, typ := range types {
+		t := typ
+		list, err := h.service.List(&visualization.ListRequest{Type: &t, Current: 1, Size: 2000})
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+		all = append(all, list.List...)
+	}
+
+	nodes := buildVisualizationTree(all, req.Leaf)
+	root := treeNode{
+		ID:         "0",
+		PID:        "-1",
+		Name:       "root",
+		Leaf:       false,
+		Weight:     9,
+		ExtraFlag:  0,
+		ExtraFlag1: 0,
+		Children:   nodes,
+	}
+
+	response.Success(c, []treeNode{root})
+}
+
+func resolveBusiTypes(busiFlag string) []string {
+	flag := strings.TrimSpace(busiFlag)
+	if flag == "" || flag == "dashboard-dataV" {
+		return []string{"dashboard", "dataV"}
+	}
+	if flag == "panel" {
+		return []string{"dashboard"}
+	}
+	if flag == "screen" {
+		return []string{"dataV"}
+	}
+	return []string{flag}
+}
+
+func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFilter *bool) []treeNode {
+	childrenMap := make(map[string][]treeNode)
+	roots := make([]treeNode, 0)
+
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		nodeType := ""
+		if item.NodeType != nil {
+			nodeType = *item.NodeType
+		}
+		leaf := nodeType != "folder"
+		if leafFilter != nil && *leafFilter != leaf {
+			continue
+		}
+
+		pid := "0"
+		if item.PID != nil {
+			pid = strconv.FormatInt(*item.PID, 10)
+		}
+
+		node := treeNode{
+			ID:         strconv.FormatInt(item.ID, 10),
+			PID:        pid,
+			Name:       item.Name,
+			Leaf:       leaf,
+			Weight:     9,
+			ExtraFlag:  0,
+			ExtraFlag1: 0,
+			Children:   []treeNode{},
+		}
+
+		childrenMap[pid] = append(childrenMap[pid], node)
+	}
+
+	var attach func(parentID string) []treeNode
+	attach = func(parentID string) []treeNode {
+		nodes := childrenMap[parentID]
+		for idx := range nodes {
+			kids := attach(nodes[idx].ID)
+			if len(kids) > 0 {
+				nodes[idx].Children = kids
+				nodes[idx].Leaf = false
+			}
+		}
+		return nodes
+	}
+
+	roots = attach("0")
+	return roots
 }
 
 func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
@@ -112,6 +230,7 @@ func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
 func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler) {
 	vg := r.Group("/dataVisualization")
 	{
+		vg.POST("/tree", h.Tree)
 		vg.POST("/findById", h.FindByID)
 		vg.POST("/list", h.List)
 		vg.POST("/saveCanvas", h.SaveCanvas)

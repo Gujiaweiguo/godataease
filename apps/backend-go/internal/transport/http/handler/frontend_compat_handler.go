@@ -80,9 +80,11 @@ func (h *FrontendCompatHandler) GetXpackPluginStaticInfo(c *gin.Context) {
 }
 
 func (h *FrontendCompatHandler) GetWebSocketInfo(c *gin.Context) {
-	c.JSON(501, gin.H{
-		"code": "501000",
-		"msg":  "Not Implemented: WebSocket endpoint",
+	c.JSON(200, gin.H{
+		"websocket":     false,
+		"origins":       []string{"*:*"},
+		"cookie_needed": false,
+		"entropy":       1,
 	})
 }
 

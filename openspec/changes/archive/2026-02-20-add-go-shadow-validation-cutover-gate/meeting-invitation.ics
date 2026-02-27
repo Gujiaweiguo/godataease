@@ -1,0 +1,33 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//DataEase//Go-NoGo Approval Meeting//CN
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+DTSTART:20260226T100000
+DTEND:20260226T103000
+DTSTAMP:20260225T075000
+ORGANIZER;CN=DataEase Team:mailto:team@dataease.io
+UID:20260225-gonogo-approval-meeting@dataease.io
+SUMMARY:[审批会议] Java → Go 后端迁移生产切换 - Go/No-Go 决策
+DESCRIPTION:Java → Go 后端迁移项目已完成所有技术验证\n\n关键指标:\n- Shadow 验证: ✅ PASS (0.30% mismatch)\n- 安全事件: ✅ 0 critical\n- Sev-1/Sev-2 回归: ✅ 0\n\n待决事项:\n- 三方审批签署\n- 真实回滚演练\n\n文档: openspec/changes/archive/2026-02-20-add-go-shadow-validation-cutover-gate/
+LOCATION:Online Meeting (TBD)
+STATUS:CONFIRMED
+PRIORITY:1
+CLASS:PUBLIC
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Engineering Manager:mailto:engineering-manager@example.com
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Release Manager:mailto:release-manager@example.com
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Observability Engineer:mailto:observability-engineer@example.com
+BEGIN:VALARM
+TRIGGER:-P1D
+ACTION:EMAIL
+DESCRIPTION:Reminder: Go/No-Go approval meeting tomorrow
+SUMMARY:[提醒] 明天 Go/No-Go 审批会议
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-PT1H
+ACTION:DISPLAY
+DESCRIPTION:Go/No-Go approval meeting in 1 hour
+END:VALARM
+END:VEVENT
+END:VCALENDAR
