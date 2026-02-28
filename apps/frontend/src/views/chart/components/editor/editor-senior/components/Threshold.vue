@@ -53,7 +53,7 @@ const state = reactive({
   editTableThresholdDialog: false,
   tableThresholdArr: [],
   editLineThresholdDialog: false,
-  lineThresholdArr: []
+  lineThreshold: []
 })
 
 const init = () => {
@@ -66,7 +66,7 @@ const init = () => {
     state.textThresholdArr = JSON.parse(JSON.stringify(state.thresholdForm.textLabelThreshold))
     state.thresholdArr = JSON.parse(JSON.stringify(state.thresholdForm.labelThreshold))
     state.tableThresholdArr = JSON.parse(JSON.stringify(state.thresholdForm.tableThreshold))
-    state.lineThresholdArr = JSON.parse(JSON.stringify(state.thresholdForm.lineThreshold ?? []))
+    state.lineThreshold = JSON.parse(JSON.stringify(state.thresholdForm.lineThreshold ?? []))
   }
 }
 const changeThreshold = () => {
@@ -269,7 +269,7 @@ const changeTableThreshold = () => {
 }
 
 const lineThresholdChange = val => {
-  state.lineThresholdArr = val
+  state.lineThreshold = val
 }
 const editLineThreshold = () => {
   state.editLineThresholdDialog = true
@@ -279,8 +279,8 @@ const closeLineThreshold = () => {
 }
 const changeLineThreshold = () => {
   // check line config
-  for (let i = 0; i < state.lineThresholdArr?.length; i++) {
-    const field = state.lineThresholdArr[i]
+  for (let i = 0; i < state.lineThreshold?.length; i++) {
+    const field = state.lineThreshold[i]
     if (!field.fieldId) {
       ElMessage.error(t('chart.field_can_not_empty'))
       return
@@ -333,7 +333,7 @@ const changeLineThreshold = () => {
       }
     }
   }
-  state.thresholdForm.lineThreshold = JSON.parse(JSON.stringify(state.lineThresholdArr ?? []))
+  state.thresholdForm.lineThreshold = JSON.parse(JSON.stringify(state.lineThreshold ?? []))
   changeThreshold()
   closeLineThreshold()
 }
@@ -805,7 +805,7 @@ init()
             <span
               class="set-text-info"
               :class="{ 'set-text-info-dark': themes === 'dark' }"
-              v-if="state.thresholdForm?.lineThresholdArr?.length > 0"
+              v-if="state.thresholdForm?.lineThreshold?.length > 0"
             >
               $t('visualization.already_setting')
             </span>

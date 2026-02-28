@@ -280,11 +280,11 @@ onMounted(() => {
               >
                 <el-input-number
                   :effect="themes"
-                  v-model="state.basicStyleForm.leftLineWidth"
+                  v-model="state.basicStyleForm.lineWidth"
                   :min="0"
                   :max="10"
                   controls-position="right"
-                  @change="changeBasicStyle('leftLineWidth')"
+                  @change="changeBasicStyle('lineWidth')"
                 />
               </el-form-item>
             </el-col>
@@ -299,9 +299,9 @@ onMounted(() => {
               >
                 <el-select
                   :effect="themes"
-                  v-model="state.basicStyleForm.leftLineSymbol"
+                  v-model="state.basicStyleForm.lineSymbol"
                   :placeholder="t('chart.line_symbol')"
-                  @change="changeBasicStyle('leftLineSymbol')"
+                  @change="changeBasicStyle('lineSymbol')"
                 >
                   <el-option
                     v-for="item in symbolOptions"
@@ -321,11 +321,11 @@ onMounted(() => {
               >
                 <el-input-number
                   :effect="themes"
-                  v-model="state.basicStyleForm.leftLineSymbolSize"
+                  v-model="state.basicStyleForm.lineSymbolSize"
                   :min="0"
                   :max="20"
                   controls-position="right"
-                  @change="changeBasicStyle('leftLineSymbolSize')"
+                  @change="changeBasicStyle('lineSymbolSize')"
                 />
               </el-form-item>
             </el-col>
@@ -338,8 +338,8 @@ onMounted(() => {
             <el-checkbox
               size="small"
               :effect="themes"
-              v-model="state.basicStyleForm.leftLineSmooth"
-              @change="changeBasicStyle('leftLineSmooth')"
+              v-model="state.basicStyleForm.lineSmooth"
+              @change="changeBasicStyle('lineSmooth')"
             >
               {{ t('chart.line_smooth') }}
             </el-checkbox>

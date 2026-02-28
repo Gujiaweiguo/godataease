@@ -397,10 +397,10 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
         tmp.forEach((c, i) => {
           const curAxisColor = seriesMap[c as string]
           if (curAxisColor) {
-            if (i + 1 > basicStyle.subColors.length) {
-              basicStyle.subColors.push(curAxisColor.color)
+            if (i + 1 > basicStyle.colors.length) {
+              basicStyle.colors.push(curAxisColor.color)
             } else {
-              basicStyle.subColors[i] = curAxisColor.color
+              basicStyle.colors[i] = curAxisColor.color
             }
           }
         })
@@ -408,16 +408,16 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
         yAxisExt?.forEach((axis, index) => {
           const curAxisColor = seriesMap[axis.id]
           if (curAxisColor) {
-            if (index + 1 > basicStyle.subColors.length) {
-              basicStyle.subColors.push(curAxisColor.color)
+            if (index + 1 > basicStyle.colors.length) {
+              basicStyle.colors.push(curAxisColor.color)
             } else {
-              basicStyle.subColors[index] = curAxisColor.color
+              basicStyle.colors[index] = curAxisColor.color
             }
           }
         })
       }
     }
-    const subColor = basicStyle.subColors.map(c => {
+    const subColor = basicStyle.colors.map(c => {
       const cc = hexColorToRGBA(c, basicStyle.subAlpha)
       return cc
     })
@@ -429,7 +429,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
   public setupSubSeriesColor(chart: ChartObj, data?: any[]): ChartBasicStyle['seriesColor'] {
     const result: ChartBasicStyle['seriesColor'] = []
     const seriesSet = new Set<string>()
-    const colors = chart.customAttr.basicStyle.subColors ?? CHART_MIX_DEFAULT_BASIC_STYLE.subColors
+    const colors = chart.customAttr.basicStyle.colors ?? CHART_MIX_DEFAULT_BASIC_STYLE.colors
     const { yAxisExt, extBubble } = chart
     if (extBubble?.length) {
       data?.forEach(d => {
