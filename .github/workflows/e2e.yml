@@ -81,9 +81,7 @@ jobs:
         run: npm run build:base
 
       - name: Start frontend preview
-        run: npm run preview &
-        env:
-          PORT: 8080
+        run: npm run preview -- --host 0.0.0.0 --port 8080 &
 
       - name: Wait for services
         run: |
