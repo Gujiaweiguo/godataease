@@ -57,11 +57,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
+      - name: Prepare backend config
+        run: |
+          mkdir -p configs
+          cp configs/config.example.yaml configs/config.yaml
+
       - name: Build backend
         run: make build
 
       - name: Start backend
         env:
+          SERVER_PORT: 8080
           DATABASE_HOST: 127.0.0.1
           DATABASE_PORT: 3306
           DATABASE_USER: root
