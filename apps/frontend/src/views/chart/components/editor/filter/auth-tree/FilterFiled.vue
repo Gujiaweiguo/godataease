@@ -2,7 +2,7 @@
 import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
 import icon_close_outlined from '@/assets/svg/icon_close_outlined.svg'
 import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
-import { ref, inject, computed, watch, onBeforeMount, toRefs } from 'vue'
+import { ref, inject, computed, watch, onBeforeMount, toRefs, type Ref } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { multFieldValuesForPermissions } from '@/api/dataset'
 import {

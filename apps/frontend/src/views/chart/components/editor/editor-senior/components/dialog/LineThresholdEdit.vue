@@ -8,6 +8,8 @@ import { COLOR_PANEL } from '../../../util/chart'
 import { fieldType } from '@/utils/attr'
 import { iconFieldMap } from '@/components/icon-group/field-list'
 
+type LineThreshold = TableThreshold
+
 const { t } = useI18n()
 
 const props = defineProps({

@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
+// 天地图 API 全局类型声明
+declare global {
+  interface Window {
+    T: typeof T
+    AMap: any
+  }
+  const T: {
+    Map: new (container: string) => any
+    LngLat: new (lng: number, lat: number) => any
+  }
+}
+
 const domId = ref('de-map-container')
 const center: [number, number] = [116.397428, 39.90923]
 const mapInstance = ref(null)

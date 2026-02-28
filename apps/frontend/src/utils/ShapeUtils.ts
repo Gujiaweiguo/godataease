@@ -1,4 +1,5 @@
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
+import { isMainCanvas } from '@/utils/canvasUtils'
 import { storeToRefs } from 'pinia'
 
 const dvMainStore = dvMainStoreWithOut()
