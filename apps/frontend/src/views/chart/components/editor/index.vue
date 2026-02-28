@@ -75,6 +75,55 @@ import {
 import { useCache } from '@/hooks/web/useCache'
 import { canvasSave } from '@/utils/canvasUtils'
 
+
+// Type definitions for chart editor state
+interface QuotaFilterItem {
+  logic?: 'and' | 'or'
+  filter?: AxisFilter[]
+  filterType?: string
+  index?: number
+  deType?: number
+}
+
+interface ResultFilterItem {
+  deType?: number
+  filterType?: string
+  filter?: AxisFilter[]
+  logic?: 'and' | 'or'
+  index?: number
+  enumCheckField?: string[]
+}
+
+interface QuotaCompareItem {
+  calcType?: string
+  index?: number
+  compareCalc?: CompareCalc
+}
+
+interface CustomSortFieldItem {
+  id?: string
+  name?: string
+  sort?: string
+  customSort?: string[]
+}
+
+interface ValueFormatterItem {
+  formatterCfg?: BaseFormatter
+  formatterType?: string
+  index?: number
+  id?: string
+  originName?: string
+  name?: string
+}
+
+interface CurrEditFieldItem {
+  id?: string
+  name?: string
+  deType?: number
+  chartId?: string
+  originName?: string
+}
+
 const { wsCache } = useCache('localStorage')
 const embeddedStore = useEmbedded()
 const snapshotStore = snapshotStoreWithOut()
@@ -234,21 +283,21 @@ const state = reactive({
     renameType: ''
   },
   quotaFilterEdit: false,
-  quotaItem: {},
+  quotaItem: {} as QuotaFilterItem,
   resultFilterEdit: false,
-  filterItem: {},
+  filterItem: {} as ResultFilterItem,
   chartForFilter: {},
   searchField: '',
-  quotaItemCompare: {},
+  quotaItemCompare: {} as QuotaCompareItem,
   showEditQuotaCompare: false,
   showValueFormatter: false,
-  valueFormatterItem: {},
+  valueFormatterItem: {} as ValueFormatterItem,
   showCustomSort: false,
   showSortPriority: false,
   sortPriority: [],
   customSortList: [],
-  customSortField: {},
-  currEditField: {},
+  customSortField: {} as CustomSortFieldItem,
+  currEditField: {} as CurrEditFieldItem,
   worldTree: [],
   areaId: '',
   chartTypeOptions: [],
@@ -333,7 +382,7 @@ watch(
       if (!state.worldTree?.length) {
         getWorldTree().then(async res => {
           const customAreaList = (await listCustomGeoArea()).data
-          const customRoot = {
+          const customRoot: { id: string; name: string; disabled: boolean; children?: unknown[] } = {
             id: 'customRoot',
             name: '自定义区域',
             disabled: true
@@ -1468,7 +1517,7 @@ const saveQuotaFilter = () => {
       ElMessage.error(t('chart.filter_value_can_null'))
       return
     }
-    if (!f.term.includes('null') && !f.term.includes('empty') && isNaN(f.value)) {
+    if (!f.term.includes('null') && !f.term.includes('empty') && isNaN(f.value as number)) {
       ElMessage.error(t('chart.filter_value_can_not_str'))
       return
     }
@@ -1508,7 +1557,7 @@ const saveResultFilter = () => {
         return
       }
       if (state.filterItem.deType === 2 || state.filterItem.deType === 3) {
-        if (!f.term.includes('null') && !f.term.includes('empty') && isNaN(f.value)) {
+        if (!f.term.includes('null') && !f.term.includes('empty') && isNaN(f.value as number)) {
           ElMessage.error(t('chart.filter_value_can_not_str'))
           return
         }
@@ -1646,9 +1695,9 @@ const saveValueFormatter = () => {
   if (
     ele === undefined ||
     ele.toString().indexOf('.') > -1 ||
-    parseInt(ele).toString() === 'NaN' ||
-    parseInt(ele) < 0 ||
-    parseInt(ele) > 10
+    parseInt(String(ele)).toString() === 'NaN' ||
+    parseInt(String(ele)) < 0 ||
+    parseInt(String(ele)) > 10
   ) {
     ElMessage.error(t('chart.formatter_decimal_count_error'))
     return
@@ -1965,7 +2014,7 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
     const obj = cloneDeep(arr[i])
     state.moveId = obj.id as unknown as number
     view.value[type] ??= []
-    const targetId = ev.srcElement.offsetParent?.querySelector('.node-id_private')?.dataset?.id
+    const targetId = ((ev.srcElement as HTMLElement).offsetParent?.querySelector('.node-id_private') as HTMLElement | null)?.dataset?.id
     const index = view.value[type].findIndex(ele => ele.id === targetId && ele.id !== obj.id)
     let newDraggableIndex
     if (index !== -1) {

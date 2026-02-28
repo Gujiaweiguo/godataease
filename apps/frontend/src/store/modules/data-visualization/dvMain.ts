@@ -33,10 +33,16 @@ import {
 import { formatterItem } from '@/views/chart/components/js/formatter'
 const { t } = useI18n()
 
+interface CanvasAttachInfo {
+  taskId?: string
+  showWatermark?: string | boolean
+  source?: string
+}
+
 export const dvMainStore = defineStore('dataVisualization', {
   state: () => {
     return {
-      canvasAttachInfo: {}, // 仪表板附加信息
+      canvasAttachInfo: {} as CanvasAttachInfo, // 仪表板附加信息
       fullscreenFlag: false, // 全屏启用标识
       staticResourcePath: '/static-resource/',
       canvasCollapse: {
@@ -88,7 +94,13 @@ export const dvMainStore = defineStore('dataVisualization', {
         selfWatermarkStatus: null,
         watermarkInfo: {},
         type: null,
-        mobileLayout: false
+        mobileLayout: false,
+        datasetFolderPid: null as string | null,
+        datasetFolderName: null as string | null,
+        creatorName: null as string | null,
+        updateName: null as string | null,
+        createTime: null as number | null,
+        updateTime: null as number | null
       },
       // 图表信息
       canvasViewInfo: {},
@@ -1678,7 +1690,7 @@ export const dvMainStore = defineStore('dataVisualization', {
         this.canvasState[key] = value
       }
     },
-    createInit(dvType, resourceId?, pid?, watermarkInfo?, preName) {
+    createInit(dvType, resourceId?, pid?, watermarkInfo?, preName?) {
       const optName =
         dvType === 'dashboard' ? t('visualization.new_dashboard') : t('visualization.new_screen')
       const name = preName ? preName : optName

@@ -43,7 +43,7 @@ declare interface Chart {
   extBubble?: Axis[]
   extLabel?: Axis[]
   extTooltip?: Axis[]
-  customFilter: {}
+  customFilter: { items?: { fieldId?: string }[] }
   senior: CustomSenior
   customAttr: CustomAttr
   customAttrMobile: CustomAttr
@@ -118,7 +118,7 @@ declare interface BaseFormatter {
   /**
    * 显示总出占比
    */
-  showTotalPercent: boolean
+  showTotalPercent?: boolean
 }
 
 /**
@@ -227,10 +227,11 @@ declare interface Axis extends ChartViewField {
    * 数据集表ID
    */
   datasetTableId?: number | string
-  /**
-   * 数据集组ID
-   */
   datasetGroupId?: number | string
+  /**
+   * 图表ID（用于计算字段）
+   */
+  chartId?: string
 }
 declare interface ChartViewField {
   /**
@@ -259,13 +260,19 @@ declare interface ChartViewField {
   groupType: 'q' | 'd'
 }
 
-declare interface Filter {
-  datasetTableField: ChartViewField
-  fieldId: string
+declare interface AxisFilter {
+  term?: string
+  value?: string | number
 }
 
 declare interface PageInfo {
   currentPage: number
   pageSize: number
   total: number
+}
+
+declare interface CompareCalc {
+  type?: string
+  field?: string
+  custom?: string
 }

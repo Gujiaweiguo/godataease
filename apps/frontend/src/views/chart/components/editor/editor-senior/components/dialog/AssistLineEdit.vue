@@ -20,11 +20,11 @@ const props = defineProps({
     required: true
   },
   quotaFields: {
-    type: Array,
+    type: Array as PropType<{ id: string; name: string }[]>,
     required: true
   },
   quotaExtFields: {
-    type: Array,
+    type: Array as PropType<{ id: string; name: string }[]>,
     required: true
   },
   useQuotaExt: {
