@@ -68,9 +68,16 @@ export function useTokenLifecycle() {
   /**
    * Check if token needs refresh.
    */
-  const needsRefresh = (origin: string): boolean => {
+  const needsRefresh = (origin: string, _thresholdMinutes?: number): boolean => {
     void origin
     return tokenManager.needsRefresh()
+  }
+
+  /**
+   * Get current token info.
+   */
+  const getCurrentTokenInfo = () => {
+    return tokenManager.getCurrentTokenInfo()
   }
 
   /**
@@ -108,9 +115,10 @@ export function useTokenLifecycle() {
     refresh,
     invalidate,
     needsRefresh,
+    getCurrentTokenInfo,
     getValidationStatus,
     isInitialized,
     tokenValidationResult,
     lastRefreshTime
-  }
+}
 }

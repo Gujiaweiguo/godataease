@@ -1,14 +1,18 @@
 <script lang="ts" setup>
-import language from '@/assets/svg/language.svg'
+import languageSvg from '@/assets/svg/language.svg'
 import { ref, onMounted } from 'vue'
 import { Icon } from '@/components/icon-custom'
 import { useUserStoreWithOut } from '@/store/modules/user'
 const userStore = useUserStoreWithOut()
 const language = ref(null)
-const handleSetLanguage = lang => lang
 onMounted(() => {
   language.value = userStore.getLanguage
 })
+
+const handleSetLanguage = (lang: string) => {
+  userStore.setLanguage(lang)
+}
+
 </script>
 <template>
   <el-dropdown
@@ -18,8 +22,7 @@ onMounted(() => {
     @command="handleSetLanguage"
   >
     <el-icon>
-      <Icon name="language"><language class="svg-icon" /></Icon>
-    </el-icon>
+      <Icon name="language"><languageSvg class="svg-icon" /></Icon>
     <template #dropdown>
       <el-dropdown-menu>
         <el-dropdown-item :disabled="language === 'zh-CN'" command="zh-CN"

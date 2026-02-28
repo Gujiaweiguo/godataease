@@ -5,7 +5,7 @@ interface RequestState {
   loadingMap: {
     [key: string]: number
   }
-  cachedRequestList: []
+  cachedRequestList: Array<(token: string | null) => void>
 }
 
 export const useRequestStore = defineStore('request', {
@@ -16,12 +16,12 @@ export const useRequestStore = defineStore('request', {
     }
   },
   getters: {
-    getRequestList(): string {
+    getRequestList(): Array<(token: string | null) => void> {
       return this.cachedRequestList
     }
   },
   actions: {
-    setLoadingMap(value: object) {
+    setLoadingMap(value: Record<string, number>) {
       this.loadingMap = value
     },
     resetLoadingMap() {
@@ -35,7 +35,7 @@ export const useRequestStore = defineStore('request', {
         map[key] += 1
         this.loadingMap = map
       } else {
-        const nMap = {}
+        const nMap: Record<string, number> = {}
         nMap[key] = 1
         this.loadingMap = nMap
       }
@@ -47,7 +47,7 @@ export const useRequestStore = defineStore('request', {
         this.loadingMap = map
       }
     },
-    addCacheRequest(fun) {
+    addCacheRequest(fun: (token: string | null) => void) {
       this.cachedRequestList.push(fun)
     },
     cleanCacheRequest() {

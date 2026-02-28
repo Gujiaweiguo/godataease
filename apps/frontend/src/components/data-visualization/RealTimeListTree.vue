@@ -130,8 +130,8 @@ const baseAreaActive = computed(
 // 2.获取当前index curClickIndex;
 // 3.比较laterIndex 和 curClickIndex之间的大小;
 // 4.将[laterIndex,curClickIndex] 或者 [curClickIndex,laterIndex]区域的图层加入areaData.value.components(已包含的不再重复加入);
-const shiftDataPush = curClickIndex => {
-  const areaDataIdArray = areaData.value.components.map(com => com.id)
+const shiftDataPush = (curClickIndex: number) => {
+  const areaDataIdArray = areaData.value.components.map((com: { id: string }) => com.id)
   let indexBegin, indexEnd
   const laterIndexTrans = laterIndex.value === null ? componentData.value.length : laterIndex.value
   if (laterIndexTrans < curClickIndex) {
@@ -154,9 +154,9 @@ const shiftDataPush = curClickIndex => {
   dvMainStore.setCurComponent({ component: null, index: null })
 }
 
-const hiddenAreaOnClick = (e, element) => {
+const hiddenAreaOnClick = (_e: MouseEvent, element: { id: string }) => {
   let indexResult
-  componentData.value.forEach((component, index) => {
+  componentData.value.forEach((component: { id: string }, index: number) => {
     if (element.id === component.id) {
       indexResult = index
     }
@@ -164,7 +164,7 @@ const hiddenAreaOnClick = (e, element) => {
   dvMainStore.setCurComponent({ component: element, index: indexResult })
 }
 
-const onClick = (e, index) => {
+const onClick = (e: MouseEvent, index: number) => {
   contextmenuStore.hideContextMenu()
   // 初始化点击是 laterIndex=0
   if (!curComponent.value) {
@@ -602,7 +602,7 @@ const canvasChange = () => {
                     effect="dark"
                     :hide-timeout="0"
                   >
-                    <span :class="'dropdownMore-' + index" @click="onClick(transformIndex(index))">
+                    <span :class="'dropdownMore-' + index" @click="onClick($event, transformIndex(index))">
                       <el-icon class="component-base">
                         <Icon name="dv-more"><dvMore class="svg-icon opt-icon" /></Icon>
                       </el-icon>

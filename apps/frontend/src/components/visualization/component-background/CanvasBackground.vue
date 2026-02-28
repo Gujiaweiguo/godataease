@@ -7,12 +7,11 @@
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
       @click="
-        e => {
-          e.target.value = ''
+        (e: MouseEvent) => {
+          ;(e.target as HTMLInputElement).value = ''
         }
       "
       @change="reUpload"
-    />
     <el-form size="small" label-position="top" style="width: 100%; margin-bottom: 16px">
       <el-form-item class="form-item" :class="'form-item-' + themes" v-if="showWatermarkSetting">
         <el-checkbox

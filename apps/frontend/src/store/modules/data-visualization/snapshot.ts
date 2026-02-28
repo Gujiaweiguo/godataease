@@ -32,6 +32,13 @@ let defaultCanvasInfo = {
   }
 }
 
+interface SnapshotDvInfo {
+  id?: unknown
+  pid?: unknown
+  dataState?: unknown
+  contentId?: unknown
+}
+
 // 存储快照结构 {componentData:[],canvasStyleData:{},canvasViewInfo:{}}
 export const snapshotStore = defineStore('snapshot', {
   state: () => {
@@ -99,10 +106,12 @@ export const snapshotStore = defineStore('snapshot', {
         this.snapshotIndex--
         const componentSnapshot =
           deepCopy(this.snapshotData[this.snapshotIndex]) || getDefaultCanvasInfo()
-        componentSnapshot.dvInfo.id = dvInfo.value.id
-        componentSnapshot.dvInfo.pid = dvInfo.value.pid
-        componentSnapshot.dvInfo.dataState = dvInfo.value.dataState
-        componentSnapshot.dvInfo.contentId = dvInfo.value.contentId
+        const snapshotDvInfo = componentSnapshot.dvInfo as SnapshotDvInfo
+        const currentDvInfo = dvInfo.value as SnapshotDvInfo
+        snapshotDvInfo.id = currentDvInfo.id
+        snapshotDvInfo.pid = currentDvInfo.pid
+        snapshotDvInfo.dataState = currentDvInfo.dataState
+        snapshotDvInfo.contentId = currentDvInfo.contentId
         // undo 是当前没有记录
         this.snapshotPublish(componentSnapshot)
         this.styleChangeTimes++
@@ -114,10 +123,12 @@ export const snapshotStore = defineStore('snapshot', {
       if (this.snapshotIndex < this.snapshotData.length - 1) {
         this.snapshotIndex++
         const snapshotInfo = deepCopy(this.snapshotData[this.snapshotIndex])
-        snapshotInfo.dvInfo.id = dvInfo.value.id
-        snapshotInfo.dvInfo.pid = dvInfo.value.pid
-        snapshotInfo.dvInfo.dataState = dvInfo.value.dataState
-        snapshotInfo.dvInfo.contentId = dvInfo.value.contentId
+        const snapshotDvInfo = snapshotInfo.dvInfo as SnapshotDvInfo
+        const currentDvInfo = dvInfo.value as SnapshotDvInfo
+        snapshotDvInfo.id = currentDvInfo.id
+        snapshotDvInfo.pid = currentDvInfo.pid
+        snapshotDvInfo.dataState = currentDvInfo.dataState
+        snapshotDvInfo.contentId = currentDvInfo.contentId
         this.snapshotPublish(snapshotInfo)
         this.styleChangeTimes++
         this.snapshotDisableTime = Date.now() + 3000

@@ -349,7 +349,7 @@
                   type="textarea"
                   :autosize="{ minRows: 4, maxRows: 8 }"
                   @change="
-                    val =>
+                    () =>
                       validateArgs(
                         state.outerParamsInfo.defaultValue,
                         state.outerParamsInfo.paramsInfoId

@@ -37,7 +37,7 @@ const emits = defineEmits(['trackClick'])
 
 const props = defineProps({
   trackMenu: {
-    type: Array,
+    type: Array as () => string[],
     required: true
   },
   isDataVMobile: {
@@ -84,7 +84,7 @@ const trackButtonClick = (id?: string) => {
   }, 50)
 }
 
-const trackMenuClick = menu => {
+const trackMenuClick = (menu: string) => {
   emits('trackClick', menu)
 }
 

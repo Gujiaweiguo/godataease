@@ -26,6 +26,13 @@ export interface Item {
   timeType?: string
 }
 
+interface FieldItem {
+  id: string
+  name: string
+  deType: number
+  authTargetType?: string
+}
+
 type Props = {
   index: number
   item: Item
@@ -61,8 +68,8 @@ const textareaValue = ref('')
 
 const { item } = toRefs(props)
 
-const getAuthTargetType = inject('getAuthTargetType')
-const filedList = inject('filedList')
+const getAuthTargetType = inject<Ref<{ authTargetType: string }>>('getAuthTargetType')
+const filedList = inject<Ref<Record<string, FieldItem>>>('filedList')
 
 const checkListWithFilter = computed(() => {
   if (!filterFiled.value) return enumList.value
@@ -102,7 +109,7 @@ const dimensions = computed(() => {
   return computedFiledList.value.filter(ele => ele.name.includes(keywords.value))
 })
 const computedFiledList = computed(() => {
-  return Object.values(filedList.value || {})
+  return Object.values(filedList.value || {}) as FieldItem[]
 })
 
 const authTargetType = ref('')
