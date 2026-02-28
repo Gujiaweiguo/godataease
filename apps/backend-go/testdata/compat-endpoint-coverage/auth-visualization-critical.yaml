@@ -1,0 +1,47 @@
+metadata:
+  changeId: add-go-auth-visualization-compat-endpoints
+  owner: backend-go
+  lastUpdated: '2026-02-28'
+
+criticalFlows:
+  - flow: role-menu-permission-management
+    endpoints:
+      - path: /auth/menuPermission
+        method: POST
+        owner: permission
+        goStatus: full
+      - path: /auth/busiPermission
+        method: POST
+        owner: permission
+        goStatus: full
+      - path: /auth/saveMenuPer
+        method: POST
+        owner: permission
+        goStatus: full
+      - path: /auth/saveBusiPer
+        method: POST
+        owner: permission
+        goStatus: full
+      - path: /system/role/permission/save
+        method: POST
+        owner: permission
+        goStatus: full
+      - path: /system/role/create
+        method: POST
+        owner: role
+        goStatus: full
+      - path: /system/role/update
+        method: POST
+        owner: role
+        goStatus: full
+      - path: /system/role/delete/:roleId
+        method: POST
+        owner: role
+        goStatus: full
+
+  - flow: dashboard-screen-tree-operations
+    endpoints:
+      - path: /dataVisualization/tree
+        method: POST
+        owner: visualization
+        goStatus: full
