@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 
@@ -75,6 +76,40 @@ func (r *DatasourceRepository) GetByID(id int64) (*datasource.CoreDatasource, er
 		return nil, err
 	}
 	return &ds, nil
+}
+
+func (r *DatasourceRepository) FindNearestIDInWindow(id int64, window int64) (*int64, error) {
+	if window <= 0 {
+		window = 100
+	}
+	minID := id - window
+	if minID < 0 {
+		minID = 0
+	}
+	maxID := id + window
+
+	var ids []int64
+	err := r.db.Model(&datasource.CoreDatasource{}).
+		Where("id >= ? AND id <= ? AND COALESCE(del_flag, 0) = 0", minID, maxID).
+		Pluck("id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	closest := ids[0]
+	bestDistance := math.Abs(float64(ids[0] - id))
+	for _, current := range ids[1:] {
+		distance := math.Abs(float64(current - id))
+		if distance < bestDistance {
+			closest = current
+			bestDistance = distance
+		}
+	}
+
+	return &closest, nil
 }
 
 func (r *DatasourceRepository) Create(ds *datasource.CoreDatasource) error {
@@ -271,7 +306,7 @@ func (r *DatasourceRepository) ListLatestTypesByCreator(createBy string, limit i
 
 	var types []string
 	err := r.db.Model(&datasource.CoreDatasource{}).
-		Select("DISTINCT type").
+		Select("DISTINCT type, create_time").
 		Where("create_by = ? AND COALESCE(del_flag, 0) = 0 AND type <> ?", createBy, "folder").
 		Order("create_time DESC").
 		Limit(limit).

@@ -20,6 +20,7 @@ import (
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/domain/visualization"
+	"dataease/backend/internal/domain/auto"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -69,6 +70,7 @@ func TestMain(m *testing.M) {
 		&visualization.DataVisualizationInfo{},
 		&coreShare{}, &coreShareTicket{},
 		&coreVisualizationTemplate{},
+		&auto.CoreDatasourceTaskLog{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}

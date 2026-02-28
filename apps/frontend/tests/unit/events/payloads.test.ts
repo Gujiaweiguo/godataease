@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { validatePayload, EmbeddingEventType } from '@/events/embedding/payloads'
+import { validatePayload } from '@/events/embedding/payloads'
+import { EmbeddingEventType } from '@/events/embedding/types'
 import type { InitReadyPayload, ErrorPayload } from '@/events/embedding/payloads'
 
 describe('validatePayload', () => {

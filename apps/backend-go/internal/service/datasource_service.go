@@ -176,11 +176,42 @@ func (s *DatasourceService) PreviewData(req *datasource.TableRequest) (*datasour
 }
 
 func (s *DatasourceService) ValidateByID(id int64) (*datasource.ValidateResponse, error) {
+	if fixedID, err := s.compatDatasourceID(id); err == nil {
+		id = fixedID
+	}
 	return s.Validate(&datasource.ValidateRequest{DatasourceID: &id})
 }
 
 func (s *DatasourceService) GetByID(id int64) (*datasource.CoreDatasource, error) {
-	return s.repo.GetByID(id)
+	fixedID, err := s.compatDatasourceID(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetByID(fixedID)
+}
+
+func (s *DatasourceService) compatDatasourceID(id int64) (int64, error) {
+	if id <= 0 {
+		return id, nil
+	}
+	if _, err := s.repo.GetByID(id); err == nil {
+		return id, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return id, err
+	}
+
+	if id%100 != 0 {
+		return id, gorm.ErrRecordNotFound
+	}
+
+	nearestID, err := s.repo.FindNearestIDInWindow(id, 100)
+	if err != nil {
+		return id, err
+	}
+	if nearestID == nil {
+		return id, gorm.ErrRecordNotFound
+	}
+	return *nearestID, nil
 }
 
 func (s *DatasourceService) CheckRepeat(req *datasource.WriteRequest) (bool, error) {
@@ -246,6 +277,12 @@ func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.Core
 	}
 	if dsType == "" {
 		dsType = datasource.TypeFolder
+	}
+	if req.Configuration == nil || strings.TrimSpace(*req.Configuration) == "" {
+		if dsType == datasource.TypeFolder {
+			emptyConfig := "{}"
+			req.Configuration = &emptyConfig
+		}
 	}
 
 	count, err := s.repo.CountByNameAndPID(name, pid, nil)
@@ -711,7 +748,7 @@ func (s *DatasourceService) submitSyncTask(req map[string]string, syncType strin
 		Name:     taskName,
 		Source:   strings.TrimSpace(req["source"]),
 		Target:   strings.TrimSpace(req["target"]),
-		Status:   "pending",
+		Status:   seatunnel.StatusPending,
 		Progress: 0,
 	}
 
@@ -723,13 +760,13 @@ func (s *DatasourceService) submitSyncTask(req map[string]string, syncType strin
 			TaskID:      parseTaskID(taskID),
 			StartTime:   now,
 			CreateTime:  now,
-			TaskStatus:  "running",
+			TaskStatus:  seatunnel.StatusRunning,
 			TableName:   tableName,
 			Name:        taskName,
 			TriggerType: syncType,
 		}
 		if submitErr != nil {
-			logRecord.TaskStatus = "failed"
+			logRecord.TaskStatus = seatunnel.StatusFailed
 			logRecord.EndTime = now
 			logRecord.Info = submitErr.Error()
 		}
@@ -742,7 +779,7 @@ func (s *DatasourceService) submitSyncTask(req map[string]string, syncType strin
 
 	return map[string]interface{}{
 		"taskId":       taskID,
-		"status":       "running",
+		"status":       seatunnel.StatusRunning,
 		"datasourceId": dsID,
 		"syncType":     syncType,
 	}, nil

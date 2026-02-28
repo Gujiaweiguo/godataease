@@ -78,6 +78,10 @@ export default {
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.less', '.css'],
     alias: [
       {
+        find: 'vue-router_2',
+        replacement: 'vue-router'
+      },
+      {
         find: '@',
         replacement: `${pathResolve('src')}`
       }

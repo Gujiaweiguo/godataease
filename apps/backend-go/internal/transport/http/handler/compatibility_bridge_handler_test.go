@@ -7,12 +7,14 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/service"
+	calcitev1 "dataease/backend/proto/calcite/v1"
 	seatunnelv1 "dataease/backend/proto/seatunnel/v1"
 
 	"github.com/gin-gonic/gin"
@@ -46,6 +48,11 @@ type mockSeatunnelSyncService struct {
 	taskID string
 }
 
+type mockBridgeCalciteValidateServer struct {
+	calcitev1.UnimplementedCalciteServiceServer
+	validateCalls int32
+}
+
 func (m *mockSeatunnelSyncService) SubmitTask(context.Context, *seatunnelv1.SubmitTaskRequest) (*seatunnelv1.SubmitTaskResponse, error) {
 	return &seatunnelv1.SubmitTaskResponse{TaskId: m.taskID}, nil
 }
@@ -58,6 +65,15 @@ func (m *mockSeatunnelSyncService) CancelTask(context.Context, *seatunnelv1.Canc
 	return &seatunnelv1.CancelTaskResponse{Success: true}, nil
 }
 
+func (m *mockBridgeCalciteValidateServer) ParseSQL(context.Context, *calcitev1.ParseSQLRequest) (*calcitev1.ParseSQLResponse, error) {
+	return &calcitev1.ParseSQLResponse{NormalizedSql: "SELECT 1"}, nil
+}
+
+func (m *mockBridgeCalciteValidateServer) ValidateSQL(context.Context, *calcitev1.ValidateSQLRequest) (*calcitev1.ValidateSQLResponse, error) {
+	atomic.AddInt32(&m.validateCalls, 1)
+	return &calcitev1.ValidateSQLResponse{Valid: false, Message: "invalid sql"}, nil
+}
+
 func startMockSeatunnelServer(t *testing.T, taskID string) (string, func()) {
 	t.Helper()
 
@@ -67,6 +83,27 @@ func startMockSeatunnelServer(t *testing.T, taskID string) (string, func()) {
 	}
 	grpcServer := grpc.NewServer()
 	seatunnelv1.RegisterSyncServiceServer(grpcServer, &mockSeatunnelSyncService{taskID: taskID})
+
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+
+	cleanup := func() {
+		grpcServer.Stop()
+		_ = lis.Close()
+	}
+	return lis.Addr().String(), cleanup
+}
+
+func startMockBridgeCalciteServer(t *testing.T, srv calcitev1.CalciteServiceServer) (string, func()) {
+	t.Helper()
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	calcitev1.RegisterCalciteServiceServer(grpcServer, srv)
 
 	go func() {
 		_ = grpcServer.Serve(lis)
@@ -668,16 +705,7 @@ func TestApiAliasDatasetTree(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != 404 {
-		t.Logf("Route /api/datasetTree/tree registered, status: %d", w.Code)
 	}
-}
-
-type bridgePaginationResp struct {
-	Code    string                   `json:"code"`
-	Data    []map[string]interface{} `json:"data"`
-	Total   int64                    `json:"total"`
-	Current int                      `json:"current"`
-	Size    int                      `json:"size"`
 }
 
 func TestPaginationResponseFormat(t *testing.T) {
@@ -818,6 +846,53 @@ func TestDatasourceSyncRouteReturnsSuccessWhenSeatunnelAvailable(t *testing.T) {
 	if resp.Data["status"] != "running" {
 		t.Fatalf("expected status running, got %#v", resp.Data["status"])
 	}
+	if resp.Data["syncType"] != "datasource" {
+		t.Fatalf("expected syncType datasource, got %#v", resp.Data["syncType"])
+	}
+	if resp.Data["datasourceId"] != float64(1) {
+		t.Fatalf("expected datasourceId 1, got %#v", resp.Data["datasourceId"])
+	}
+}
+
+func TestDatasourceSyncTableRouteReturnsSuccessWhenSeatunnelAvailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	addr, cleanup := startMockSeatunnelServer(t, "task-456")
+	defer cleanup()
+
+	r := gin.New()
+	dsService := service.NewDatasourceService(nil)
+	dsService.SetSeatunnelConfig(addr, 2*time.Second, 0)
+	dsHandler := NewDatasourceHandler(dsService)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+
+	req := httptest.NewRequest("POST", "/datasource/syncApiTable", strings.NewReader(`{"datasourceId":"2","name":"sync-table-job","tableName":"orders"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	resp := bridgeAnyResp{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "000000" {
+		t.Fatalf("expected code 000000, got %s", resp.Code)
+	}
+	if resp.Data["taskId"] != "task-456" {
+		t.Fatalf("expected taskId task-456, got %#v", resp.Data["taskId"])
+	}
+	if resp.Data["status"] != "running" {
+		t.Fatalf("expected status running, got %#v", resp.Data["status"])
+	}
+	if resp.Data["syncType"] != "table" {
+		t.Fatalf("expected syncType table, got %#v", resp.Data["syncType"])
+	}
+	if resp.Data["datasourceId"] != float64(2) {
+		t.Fatalf("expected datasourceId 2, got %#v", resp.Data["datasourceId"])
+	}
 }
 
 func TestDatasourceListSyncRecordReturnsErrorWithoutRepository(t *testing.T) {
@@ -842,5 +917,74 @@ func TestDatasourceListSyncRecordReturnsErrorWithoutRepository(t *testing.T) {
 	}
 	if resp.Code != "500000" {
 		t.Fatalf("expected code 500000 when repository unavailable, got %s", resp.Code)
+	}
+}
+
+func TestDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	calciteMock := &mockBridgeCalciteValidateServer{}
+	addr, cleanup := startMockBridgeCalciteServer(t, calciteMock)
+	defer cleanup()
+
+	datasetService := service.NewDatasetService(nil)
+	datasetService.SetCalciteConfig(addr, 2*time.Second, 0)
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil)
+
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"SELECT 1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "500000" {
+		t.Fatalf("expected code 500000 when calcite validation fails, got %#v", resp["code"])
+	}
+	if atomic.LoadInt32(&calciteMock.validateCalls) == 0 {
+		t.Fatal("expected calcite validate to be called")
+	}
+}
+
+func TestApiAliasDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	calciteMock := &mockBridgeCalciteValidateServer{}
+	addr, cleanup := startMockBridgeCalciteServer(t, calciteMock)
+	defer cleanup()
+
+	datasetService := service.NewDatasetService(nil)
+	datasetService.SetCalciteConfig(addr, 2*time.Second, 0)
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, datasetHandler, nil)
+
+	req := httptest.NewRequest("POST", "/api/datasetData/previewSql", strings.NewReader(`{"sql":"SELECT 1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "500000" {
+		t.Fatalf("expected code 500000 when calcite validation fails, got %#v", resp["code"])
+	}
+	if atomic.LoadInt32(&calciteMock.validateCalls) == 0 {
+		t.Fatal("expected calcite validate to be called")
 	}
 }

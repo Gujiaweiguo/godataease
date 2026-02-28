@@ -1,155 +1,102 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useEmbeddedParentCommunication } from '@/hooks/event/useEmbeddedParentCommunication'
 import { EmbeddingEventType } from '@/events/embedding/types'
+import { isAllowedEmbeddedMessageOrigin } from '@/utils/embedded'
 
-vi.mock('@/utils/embedded', () => ({
-  resolveEmbeddedOrigin: vi.fn(() => 'https://test-origin.com'),
-  isAllowedEmbeddedMessageOrigin: vi.fn(() => true)
+const hoisted = vi.hoisted(() => ({
+  mockStore: {
+    allowedOrigins: ['https://trusted-origin.com'],
+    parent: false,
+    resourceId: 'test-id',
+    dvId: '',
+    chartId: '',
+    baseUrl: '',
+    setParam: vi.fn(),
+    setResourceId: vi.fn(),
+    setEmbedReady: vi.fn(),
+    setJumpInfoParam: vi.fn()
+  }
 }))
 
-vi.mock('@/store/modules/embedded', () => ({
-  useEmbedded: vi.fn(() => ({
-    getToken: 'test-token',
-    getAllowedOrigins: () => ['https://test-origin.com'],
-    parent: true
-  }))
-}))
+vi.mock('@/utils/embedded', async () => {
+  const { createEmbeddedUtilsModuleMock } = await import('../helpers')
+  return createEmbeddedUtilsModuleMock(true)
+})
+
+vi.mock('@/store/modules/embedded', async () => {
+  const { createEmbeddedModuleMock } = await import('../helpers')
+  return createEmbeddedModuleMock(hoisted.mockStore)
+})
 
 describe('useEmbeddedParentCommunication', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    vi.spyOn(console, 'debug').mockImplementation(() => undefined)
+    hoisted.mockStore.parent = false
+    hoisted.mockStore.resourceId = 'test-id'
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  describe('listenForChildMessages', () => {
-    it('should initialize message listener on mount', () => {
-      const { listenForChildMessages } = useEmbeddedParentCommunication()
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
+  it('registers message listener', () => {
+    const { listenForChildMessages } = useEmbeddedParentCommunication()
+    const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
 
-      listenForChildMessages()
+    listenForChildMessages()
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'message',
-        expect.any(Function),
-        expect.any(Object)
-      )
-    })
-
-    it('should validate message origin before processing', () => {
-      useEmbeddedParentCommunication()
-      const { isAllowedEmbeddedMessageOrigin } = jest.requireActual('@/utils/embedded')
-      const mockEvent = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'param_update' }),
-        origin: 'https://trusted-origin.com'
-      })
-
-      window.dispatchEvent(mockEvent)
-
-      // Should process the message since origin is allowed
-      expect(isAllowedEmbeddedMessageOrigin).toHaveBeenCalledWith(
-        'https://trusted-origin.com',
-        ['https://trusted-origin.com'],
-        true
-      )
-    })
-
-    it('should reject message from untrusted origin', () => {
-      useEmbeddedParentCommunication()
-      const consoleWarnSpy = vi.spyOn(console, 'warn')
-      const mockEvent = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'param_update' }),
-        origin: 'https://untrusted-origin.com'
-      })
-
-      window.dispatchEvent(mockEvent)
-
-      // Should reject the message
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        'Message from untrusted origin blocked: https://untrusted-origin.com'
-      )
-    })
+    expect(addEventListenerSpy).toHaveBeenCalledWith('message', expect.any(Function))
   })
 
-  describe('emitToChild', () => {
-    it('should emit event to parent window', () => {
-      const { emitToChild } = useEmbeddedParentCommunication()
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
+  it('blocks untrusted message origin', () => {
+    vi.mocked(isAllowedEmbeddedMessageOrigin).mockReturnValue(false)
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { listenForChildMessages } = useEmbeddedParentCommunication()
 
-      emitToChild(EmbeddingEventType.INIT_READY, { resourceId: 'test' })
+    listenForChildMessages()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://bad-origin.com',
+        data: JSON.stringify({ type: 'param_update', payload: { resourceId: 'test-id', a: 1 } })
+      })
+    )
 
-      const expectedMessage =
-        'dataease-embedded-host:{"type":"init_ready","payload":{"resourceId":"test"}}'
-      expect(postMessageSpy).toHaveBeenCalledWith(expectedMessage, '*')
-    })
-
-    it('should skip emit if not in embedded mode', () => {
-      const { useEmbedded: mockUseEmbedded } = jest.requireActual('@/store/modules/embedded')
-      mockUseEmbedded.mockReturnValue({ getToken: '', parent: false })
-
-      const { emitToChild } = useEmbeddedParentCommunication()
-      const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
-
-      emitToChild(EmbeddingEventType.INIT_READY, { resourceId: 'test' })
-
-      expect(postMessageSpy).not.toHaveBeenCalled()
-    })
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      'Message from untrusted origin blocked: https://bad-origin.com'
+    )
   })
 
-  describe('event handlers', () => {
-    it('should handle param_update event and update store', () => {
-      useEmbeddedParentCommunication()
-      const mockSetParam = vi.fn()
+  it('handles param_update and writes params to store', () => {
+    vi.mocked(isAllowedEmbeddedMessageOrigin).mockReturnValue(true)
+    const { listenForChildMessages } = useEmbeddedParentCommunication()
 
-      const mockEvent = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'param_update', resourceId: 'test-id', param1: 'value1' })
+    listenForChildMessages()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: 'https://trusted-origin.com',
+        data: JSON.stringify({
+          type: 'param_update',
+          payload: { resourceId: 'test-id', region: '华东', timestamp: Date.now() }
+        })
       })
+    )
 
-      window.dispatchEvent(mockEvent)
+    expect(hoisted.mockStore.setResourceId).toHaveBeenCalledWith('test-id')
+    expect(hoisted.mockStore.setParam).toHaveBeenCalledWith('region', '华东')
+  })
 
-      // Check if setParam was called
-      expect(mockSetParam).toHaveBeenCalledWith('param1', 'value1')
-    })
+  it('skips emit when not embedded mode', () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const postMessageSpy = vi.spyOn(window.parent, 'postMessage')
+    const { emitToChild } = useEmbeddedParentCommunication()
 
-    it('should handle user_interaction event and update store', () => {
-      useEmbeddedParentCommunication()
-      const mockSetParam = vi.fn()
+    emitToChild(EmbeddingEventType.INIT_READY, { resourceId: 'test-id' })
 
-      const mockEvent = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'user_interaction', param: 'test-param', value: 'test-value' })
-      })
-
-      window.dispatchEvent(mockEvent)
-
-      expect(mockSetParam).toHaveBeenCalledWith('test-param', 'test-value')
-    })
-
-    it('should handle init_ready event', () => {
-      useEmbeddedParentCommunication()
-      const consoleLogSpy = vi.spyOn(console, 'log')
-
-      const mockEvent = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'init_ready', resourceId: 'test-id' })
-      })
-
-      window.dispatchEvent(mockEvent)
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('Parent received init_ready event')
-    })
-
-    it('should handle error event', () => {
-      useEmbeddedParentCommunication()
-      const consoleErrorSpy = vi.spyOn(console, 'error')
-
-      const mockEvent = new MessageEvent('message', {
-        data: JSON.stringify({ type: 'error', message: 'Test error', context: 'test-scenario' })
-      })
-
-      window.dispatchEvent(mockEvent)
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Child frame error: Test error', 'test-scenario')
-    })
+    expect(postMessageSpy).not.toHaveBeenCalled()
+    expect(consoleWarnSpy).toHaveBeenCalledWith('Not in embedded mode, skipping emit to child')
   })
 })

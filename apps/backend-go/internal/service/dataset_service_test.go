@@ -12,6 +12,8 @@ import (
 	calcitev1 "dataease/backend/proto/calcite/v1"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestInferSQLVariableDeType(t *testing.T) {
@@ -83,6 +85,11 @@ type mockCalciteValidateServer struct {
 	validateCalls int32
 }
 
+type mockCalciteValidateErrorServer struct {
+	calcitev1.UnimplementedCalciteServiceServer
+	validateCalls int32
+}
+
 func (m *mockCalciteValidateServer) ParseSQL(context.Context, *calcitev1.ParseSQLRequest) (*calcitev1.ParseSQLResponse, error) {
 	return &calcitev1.ParseSQLResponse{NormalizedSql: "SELECT 1"}, nil
 }
@@ -90,6 +97,15 @@ func (m *mockCalciteValidateServer) ParseSQL(context.Context, *calcitev1.ParseSQ
 func (m *mockCalciteValidateServer) ValidateSQL(context.Context, *calcitev1.ValidateSQLRequest) (*calcitev1.ValidateSQLResponse, error) {
 	atomic.AddInt32(&m.validateCalls, 1)
 	return &calcitev1.ValidateSQLResponse{Valid: false, Message: "invalid sql"}, nil
+}
+
+func (m *mockCalciteValidateErrorServer) ParseSQL(context.Context, *calcitev1.ParseSQLRequest) (*calcitev1.ParseSQLResponse, error) {
+	return &calcitev1.ParseSQLResponse{NormalizedSql: "SELECT 1"}, nil
+}
+
+func (m *mockCalciteValidateErrorServer) ValidateSQL(context.Context, *calcitev1.ValidateSQLRequest) (*calcitev1.ValidateSQLResponse, error) {
+	atomic.AddInt32(&m.validateCalls, 1)
+	return nil, status.Error(codes.Unavailable, "calcite unavailable")
 }
 
 func startMockCalciteServer(t *testing.T, srv calcitev1.CalciteServiceServer) (string, func()) {
@@ -127,6 +143,26 @@ func TestPreviewSQL_ValidateWithCalciteFirstWhenEnabled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "sql validation failed") {
 		t.Fatalf("expected validation failure, got: %v", err)
+	}
+	if atomic.LoadInt32(&mock.validateCalls) == 0 {
+		t.Fatal("expected calcite validate to be called")
+	}
+}
+
+func TestPreviewSQL_BlockExecutionWhenCalciteUnavailable(t *testing.T) {
+	mock := &mockCalciteValidateErrorServer{}
+	addr, cleanup := startMockCalciteServer(t, mock)
+	defer cleanup()
+
+	svc := NewDatasetService(nil)
+	svc.SetCalciteConfig(addr, 2*time.Second, 0)
+
+	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "SELECT 1"})
+	if err == nil {
+		t.Fatal("expected calcite error")
+	}
+	if !strings.Contains(err.Error(), "calcite validate sql failed") {
+		t.Fatalf("expected calcite failure, got: %v", err)
 	}
 	if atomic.LoadInt32(&mock.validateCalls) == 0 {
 		t.Fatal("expected calcite validate to be called")

@@ -12,10 +12,24 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend-go
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Admin168
+          MYSQL_DATABASE: dataease_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
     - uses: actions/checkout@v4
 
-    - name: Detect backend-go changes
       id: changes
       uses: dorny/paths-filter@v3
       with:
@@ -63,6 +77,29 @@ jobs:
       if: steps.changes.outputs.backend == 'true'
       run: make test
 
+    - name: Run integration tests
+      if: steps.changes.outputs.backend == 'true'
+      env:
+        TEST_DB_HOST: 127.0.0.1
+        TEST_DB_PORT: 3306
+        TEST_DB_USER: root
+        TEST_DB_PASSWORD: Admin168
+        TEST_DB_NAME: dataease_test
+      run: make test-integration
+
+    - name: Run drift check
+      if: steps.changes.outputs.backend == 'true'
+      run: make drift-check
+    - name: Run integration tests
+      if: steps.changes.outputs.backend == 'true'
+      env:
+        TEST_DB_HOST: 127.0.0.1
+        TEST_DB_PORT: 3306
+        TEST_DB_USER: root
+        TEST_DB_PASSWORD: Admin168
+        TEST_DB_NAME: dataease_test
+      run: make test-integration
+
     - name: Run linter
       if: steps.changes.outputs.backend == 'true'
       uses: golangci/golangci-lint-action@v4
@@ -75,7 +112,10 @@ jobs:
         echo "## Go Backend CI" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ steps.changes.outputs.backend }}" = "true" ]; then
-          echo "Detected backend-go changes, full backend CI executed." >> $GITHUB_STEP_SUMMARY
+          echo "- Unit tests: completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration tests: completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Drift check: completed" >> $GITHUB_STEP_SUMMARY
+          echo "Full backend CI executed." >> $GITHUB_STEP_SUMMARY
         else
           echo "No backend-go changes detected, backend CI skipped intentionally." >> $GITHUB_STEP_SUMMARY
         fi

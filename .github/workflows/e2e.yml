@@ -1,0 +1,123 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'apps/frontend/**'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'apps/frontend/**'
+  workflow_dispatch:
+    inputs:
+      baseline-url:
+        description: 'Base URL for E2E tests'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Admin168
+          MYSQL_DATABASE: dataease_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build backend
+        working-directory: apps/backend-go
+        run: make build
+
+      - name: Start backend
+        working-directory: apps/backend-go
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_USER: root
+          DATABASE_PASSWORD: Admin168
+          DATABASE_NAME: dataease_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: |
+          ./dataease-backend &
+          sleep 5
+
+      - name: Build frontend
+        run: npm run build:base
+
+      - name: Start frontend preview
+        run: npm run preview -- --host 0.0.0.0 --port 8080 &
+
+      - name: Wait for services
+        run: |
+          npx wait-on http://localhost:8080 -t 60000
+          sleep 5
+
+      - name: Run E2E tests
+        run: npm run e2e
+        env:
+          E2E_BASE_URL: ${{ github.event.inputs.baseline-url || 'http://localhost:8080' }}
+          E2E_USERNAME: admin
+          E2E_PASSWORD: DataEase123456
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: apps/frontend/test-results/
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## E2E Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f playwright-report/results.json ]; then
+            echo "Test results available in artifacts." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No test results generated." >> $GITHUB_STEP_SUMMARY
+          fi

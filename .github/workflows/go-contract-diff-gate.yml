@@ -56,6 +56,10 @@ jobs:
         sudo apt-get install -y jq python3 python3-pip
         python3 -m pip install --user pyyaml
 
+    - name: Run compatibility status drift check
+      if: steps.changes.outputs.backend == 'true'
+      run: make drift-check
+
     - name: Run contract diff (external or mock fallback)
       id: contract-diff-run
       if: steps.changes.outputs.backend == 'true'

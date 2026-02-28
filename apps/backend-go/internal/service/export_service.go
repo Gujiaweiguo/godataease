@@ -22,7 +22,6 @@ type ExportService struct {
 	repo repository.ExportRepositoryInterface
 }
 
-
 func NewExportService(repo repository.ExportRepositoryInterface) *ExportService {
 	return &ExportService{repo: repo}
 }

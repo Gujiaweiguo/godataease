@@ -47,10 +47,13 @@ type RoleEditor struct {
 }
 
 type RoleVO struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	ReadOnly bool   `json:"readonly"`
-	Root     bool   `json:"root"`
+	ID       int64   `json:"roleId"`
+	Name     string  `json:"roleName"`
+	Code     string  `json:"roleKey"`
+	Desc     *string `json:"roleDesc"`
+	Status   int     `json:"status"`
+	ReadOnly bool    `json:"readonly"`
+	Root     bool    `json:"root"`
 }
 
 type RoleDetailVO struct {

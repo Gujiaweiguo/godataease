@@ -40,7 +40,6 @@ type ExportRepositoryInterface interface {
 
 var _ ExportRepositoryInterface = (*ExportRepository)(nil)
 
-
 type ExportRepository struct {
 	db *gorm.DB
 }

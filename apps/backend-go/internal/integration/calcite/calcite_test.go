@@ -2,6 +2,7 @@ package calcite
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -117,5 +118,89 @@ func TestClient_ValidateSQLRetryTransientError(t *testing.T) {
 	}
 	if attempt != 2 {
 		t.Fatalf("expected 2 attempts, got %d", attempt)
+	}
+}
+
+func TestClient_ParseSQLClassifiesTransientError(t *testing.T) {
+	c := &Client{
+		timeout:    time.Second,
+		maxRetries: 0,
+		parseFn: func(_ context.Context, _ *calcitev1.ParseSQLRequest, _ ...grpc.CallOption) (*calcitev1.ParseSQLResponse, error) {
+			return nil, status.Error(codes.Unavailable, "temporary unavailable")
+		},
+	}
+
+	_, err := c.ParseSQL(context.Background(), "select 1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !IsErrorKind(err, ErrorKindTransient) {
+		t.Fatalf("expected transient kind, got: %v", err)
+	}
+}
+
+func TestClient_ValidateSQLClassifiesTimeoutError(t *testing.T) {
+	c := &Client{
+		timeout:    time.Second,
+		maxRetries: 0,
+		validateFn: func(_ context.Context, _ *calcitev1.ValidateSQLRequest, _ ...grpc.CallOption) (*calcitev1.ValidateSQLResponse, error) {
+			return nil, context.DeadlineExceeded
+		},
+	}
+
+	_, err := c.ValidateSQL(context.Background(), "SELECT 1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !IsErrorKind(err, ErrorKindTimeout) {
+		t.Fatalf("expected timeout kind, got: %v", err)
+	}
+}
+
+func TestClassifyErrorWrapsUnknownAsInternal(t *testing.T) {
+	err := classifyError("validate", errors.New("boom"))
+	if !IsErrorKind(err, ErrorKindInternal) {
+		t.Fatalf("expected internal kind, got: %v", err)
+	}
+}
+
+func TestClient_ValidateSQLNoRetryOnInvalidArgument(t *testing.T) {
+	attempt := 0
+	c := &Client{
+		timeout:    time.Second,
+		maxRetries: 3,
+		validateFn: func(_ context.Context, _ *calcitev1.ValidateSQLRequest, _ ...grpc.CallOption) (*calcitev1.ValidateSQLResponse, error) {
+			attempt++
+			return nil, status.Error(codes.InvalidArgument, "invalid sql")
+		},
+	}
+
+	valid, err := c.ValidateSQL(context.Background(), "bad")
+	if err != nil {
+		t.Fatalf("expected nil error for invalid argument, got: %v", err)
+	}
+	if valid {
+		t.Fatal("expected invalid result")
+	}
+	if attempt != 1 {
+		t.Fatalf("expected no retry for invalid argument, got %d attempts", attempt)
+	}
+}
+
+func TestClient_ValidateSQLClassifiesUpstreamError(t *testing.T) {
+	c := &Client{
+		timeout:    time.Second,
+		maxRetries: 0,
+		validateFn: func(_ context.Context, _ *calcitev1.ValidateSQLRequest, _ ...grpc.CallOption) (*calcitev1.ValidateSQLResponse, error) {
+			return nil, status.Error(codes.Internal, "upstream internal")
+		},
+	}
+
+	_, err := c.ValidateSQL(context.Background(), "SELECT 1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !IsErrorKind(err, ErrorKindUpstream) {
+		t.Fatalf("expected upstream kind, got: %v", err)
 	}
 }

@@ -65,7 +65,7 @@ func (s *ChartService) QueryData(req *chart.ChartDataRequest) (*chart.ChartDataR
 	}, nil
 }
 
-func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) {
+func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) { //nolint:gocyclo // chart view construction with multiple field types
 	id, ok := int64FromAny(body["id"])
 	if !ok || id <= 0 {
 		return nil, fmt.Errorf("chart id is required")

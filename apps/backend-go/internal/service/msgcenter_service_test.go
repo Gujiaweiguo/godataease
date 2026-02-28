@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"dataease/backend/internal/domain/msgcenter"
-	"dataease/backend/internal/repository"
 )
 
 // MockMsgCenterRepository for testing
@@ -60,15 +59,10 @@ func (m *MockMsgCenterRepository) GetReadStatusMap(msgIDs []string, userID int64
 		key := msgID + "-" + string(rune(userID))
 		result[msgID] = m.readStatus[key]
 	}
-	return result, nil
+return result, nil
 }
 
-func setupMsgCenterServiceWithMock(mockRepo *MockMsgCenterRepository) *MsgCenterService {
-	// Cast to repository.MsgCenterRepository type
-	// We need to use the real repository type, so we'll create a wrapper
-	return &MsgCenterService{repo: (*repository.MsgCenterRepository)(nil)}
-}
-
+// Test using direct service instantiation with mock
 // Test using direct service instantiation with mock
 func setupMsgCenterServiceForTest(mockReadStatus map[string]bool, mockErr error) *testableMsgCenterService {
 	return &testableMsgCenterService{

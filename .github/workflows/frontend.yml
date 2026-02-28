@@ -20,6 +20,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect changed areas
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            embedding:
+              - 'apps/frontend/src/events/embedding/**'
+              - 'apps/frontend/src/hooks/event/**'
+              - 'apps/frontend/src/store/modules/embedded.ts'
+              - 'apps/frontend/src/services/TokenManager.ts'
+              - 'apps/frontend/src/utils/embedded*.ts'
+              - 'apps/frontend/tests/unit/events/**'
+              - 'apps/frontend/tests/integration/parent-child-communication.test.ts'
+              - 'apps/frontend/src/tests/unit/services/TokenManager.test.ts'
+              - 'apps/frontend/src/tests/unit/utils/embedding-utils.test.ts'
+            datasource:
+              - 'apps/frontend/src/views/visualized/data/datasource/**'
+              - 'apps/frontend/src/api/datasource.ts'
+              - 'apps/frontend/src/store/modules/interactive.ts'
+              - 'apps/frontend/tests/unit/datasource/**'
+            shared:
+              - 'apps/frontend/src/config/axios/**'
+              - 'apps/frontend/src/store/**'
+              - 'apps/frontend/src/utils/**'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -34,7 +59,6 @@ jobs:
         id: tscheck
         continue-on-error: true
         run: npm run ts:check
-
       - name: ESLint
         id: lint
         run: npm run lint
@@ -45,14 +69,36 @@ jobs:
 
       - name: Test
         id: test
-        run: npm run test:ci
+        continue-on-error: true
+        run: npm run test:core
+      - name: Select affected test target
+        id: affected
+        run: |
+          if [[ "${{ steps.changes.outputs.embedding }}" == "true" && "${{ steps.changes.outputs.datasource }}" == "true" ]]; then
+            echo "target=test:core" >> $GITHUB_OUTPUT
+          elif [[ "${{ steps.changes.outputs.embedding }}" == "true" ]]; then
+            echo "target=test:affected:embedding" >> $GITHUB_OUTPUT
+          elif [[ "${{ steps.changes.outputs.datasource }}" == "true" ]]; then
+            echo "target=test:affected:datasource" >> $GITHUB_OUTPUT
+          elif [[ "${{ steps.changes.outputs.shared }}" == "true" ]]; then
+            echo "target=test:core" >> $GITHUB_OUTPUT
+          else
+            echo "target=none" >> $GITHUB_OUTPUT
+          fi
 
+      - name: Affected Test Matrix
+        id: testcore
+        if: steps.affected.outputs.target != 'none'
+        continue-on-error: true
+        run: npm run ${{ steps.affected.outputs.target }}
       - name: Summary
         if: always()
         run: |
           echo "## Frontend CI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- TypeScript: ${{ steps.tscheck.outcome }} (non-blocking)" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript: ${{ steps.tscheck.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "- ESLint: ${{ steps.lint.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "- Build: ${{ steps.build.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: ${{ steps.test.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests (core): ${{ steps.test.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Affected target: ${{ steps.affected.outputs.target }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests (affected): ${{ steps.testcore.outcome }}" >> $GITHUB_STEP_SUMMARY

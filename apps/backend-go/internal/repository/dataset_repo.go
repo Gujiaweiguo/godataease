@@ -275,7 +275,7 @@ func (r *DatasetRepository) QueryDistinctValues(tableName string, columnName str
 	return result, nil
 }
 
-func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, searchColumn string, searchText string, sortColumn string, sortDirection string, limit int) ([]map[string]interface{}, error) {
+func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, searchColumn string, searchText string, sortColumn string, sortDirection string, limit int) ([]map[string]interface{}, error) { //nolint:gocyclo // complex query builder with multiple conditions
 	if !tableNamePattern.MatchString(tableName) {
 		return nil, fmt.Errorf("invalid table name")
 	}

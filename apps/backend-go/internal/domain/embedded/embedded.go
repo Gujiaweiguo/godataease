@@ -209,5 +209,6 @@ func formatInt64(n int64) string {
 }
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
+	// rand.Seed is no longer needed in Go 1.20+
+	// The global random generator is automatically seeded
 }

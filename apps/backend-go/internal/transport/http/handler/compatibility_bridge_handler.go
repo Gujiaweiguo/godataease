@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler) {
+func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler) { //nolint:gocyclo // large route registration for API compatibility
 	_ = user
 	_ = org
 	getCurrentUserID := func(c *gin.Context) int64 {
@@ -61,7 +61,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, list)
+				response.Success(c, buildDatasourceTreeResponse(list))
 			})
 			datasourceGroup.POST("/validate", datasourceHandler.Validate)
 			datasourceGroup.GET("/validate/:id", func(c *gin.Context) {
@@ -153,7 +153,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, result)
+				response.Success(c, sanitizeDatasourceResponse(result))
 			})
 			datasourceGroup.GET("/hidePw/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -166,7 +166,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, result)
+				response.Success(c, sanitizeDatasourceResponse(result))
 			})
 			datasourceGroup.GET("/getSimpleDs/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -179,7 +179,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, gin.H{"id": result.ID, "name": result.Name, "type": result.Type})
+				response.Success(c, gin.H{"id": strconv.FormatInt(result.ID, 10), "name": result.Name, "type": result.Type})
 			})
 			datasourceGroup.GET("/showFinishPage", func(c *gin.Context) {
 				userID := getCurrentUserID(c)
@@ -980,6 +980,113 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 	}
 }
 
+type datasourceTreeNode struct {
+	ID        string               `json:"id"`
+	Name      string               `json:"name"`
+	PID       string               `json:"pid,omitempty"`
+	Type      string               `json:"type,omitempty"`
+	Leaf      bool                 `json:"leaf"`
+	Weight    int                  `json:"weight"`
+	ExtraFlag int                  `json:"extraFlag"`
+	Children  []datasourceTreeNode `json:"children,omitempty"`
+}
+
+func buildDatasourceTreeResponse(list []*datasource.CoreDatasource) []datasourceTreeNode {
+	childrenByPID := make(map[int64][]datasourceTreeNode)
+	for _, item := range list {
+		if item == nil {
+			continue
+		}
+		pid := int64(0)
+		if item.PID != nil {
+			pid = *item.PID
+		}
+		leaf := !strings.EqualFold(strings.TrimSpace(item.Type), datasource.TypeFolder)
+		node := datasourceTreeNode{
+			ID:        strconv.FormatInt(item.ID, 10),
+			Name:      item.Name,
+			PID:       strconv.FormatInt(pid, 10),
+			Type:      item.Type,
+			Leaf:      leaf,
+			Weight:    9,
+			ExtraFlag: 1,
+			Children:  []datasourceTreeNode{},
+		}
+		childrenByPID[pid] = append(childrenByPID[pid], node)
+	}
+
+	var attach func(pid int64) []datasourceTreeNode
+	attach = func(pid int64) []datasourceTreeNode {
+		nodes := childrenByPID[pid]
+		for i := range nodes {
+			nodes[i].Children = attach(toInt64ID(nodes[i].ID))
+			nodes[i].Leaf = len(nodes[i].Children) == 0 && !strings.EqualFold(strings.TrimSpace(nodes[i].Type), datasource.TypeFolder)
+		}
+		return nodes
+	}
+
+	root := datasourceTreeNode{
+		ID:        "0",
+		PID:       "0",
+		Name:      "root",
+		Leaf:      false,
+		Weight:    9,
+		ExtraFlag: 1,
+		Children:  attach(0),
+	}
+	return []datasourceTreeNode{root}
+}
+
+func toInt64ID(id interface{}) int64 {
+	switch v := id.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case uint64:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0
+		}
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func sanitizeDatasourceResponse(ds *datasource.CoreDatasource) gin.H {
+	if ds == nil {
+		return gin.H{}
+	}
+	pid := "0"
+	if ds.PID != nil {
+		pid = strconv.FormatInt(*ds.PID, 10)
+	}
+
+	return gin.H{
+		"id":             strconv.FormatInt(ds.ID, 10),
+		"name":           ds.Name,
+		"description":    ds.Description,
+		"type":           ds.Type,
+		"pid":            pid,
+		"editType":       ds.EditType,
+		"configuration":  ds.Configuration,
+		"createTime":     ds.CreateTime,
+		"updateTime":     ds.UpdateTime,
+		"updateBy":       ds.UpdateBy,
+		"createBy":       ds.CreateBy,
+		"status":         ds.Status,
+		"qrtzInstance":   ds.QrtzInstance,
+		"taskStatus":     ds.TaskStatus,
+		"enableDataFill": ds.EnableDataFill,
+		"delFlag":        ds.DelFlag,
+	}
+}
+
 func parseTableRequest(c *gin.Context) (*datasource.TableRequest, bool) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
@@ -1001,7 +1108,7 @@ func parseTableRequest(c *gin.Context) (*datasource.TableRequest, bool) {
 	return request, true
 }
 
-func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.WriteRequest, bool) {
+func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.WriteRequest, bool) { //nolint:gocyclo // complex request parsing with multiple field types
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())

@@ -2,6 +2,7 @@ package calcite
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -31,6 +32,51 @@ type Config struct {
 	MaxRetries int
 }
 
+type ErrorKind string
+
+const (
+	ErrorKindValidation ErrorKind = "validation"
+	ErrorKindTimeout    ErrorKind = "timeout"
+	ErrorKindTransient  ErrorKind = "transient"
+	ErrorKindUpstream   ErrorKind = "upstream"
+	ErrorKindInternal   ErrorKind = "internal"
+)
+
+type Error struct {
+	Op   string
+	Kind ErrorKind
+	Code codes.Code
+	Err  error
+}
+
+func (e *Error) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Err == nil {
+		return fmt.Sprintf("calcite %s failed", e.Op)
+	}
+	if e.Code != codes.OK {
+		return fmt.Sprintf("calcite %s failed [%s]: %v", e.Op, e.Kind, e.Err)
+	}
+	return fmt.Sprintf("calcite %s failed [%s]: %v", e.Op, e.Kind, e.Err)
+}
+
+func (e *Error) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+func IsErrorKind(err error, kind ErrorKind) bool {
+	var calciteErr *Error
+	if !errors.As(err, &calciteErr) {
+		return false
+	}
+	return calciteErr.Kind == kind
+}
+
 func NewClient(cfg *Config) (*Client, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("calcite config is required")
@@ -48,11 +94,11 @@ func NewClient(cfg *Config) (*Client, error) {
 	dialCtx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(
+	conn, err := grpc.DialContext( //nolint:staticcheck // grpc.NewClient migration requires larger refactor
 		dialCtx,
 		cfg.Address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
+		grpc.WithBlock(), //nolint:staticcheck // grpc.NewClient migration requires larger refactor
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to calcite service: %w", err)
@@ -85,7 +131,7 @@ func (c *Client) ParseSQL(ctx context.Context, sql string) (string, error) {
 
 	resp, err := c.callParseWithRetry(ctx, &calcitev1.ParseSQLRequest{Sql: text})
 	if err != nil {
-		return "", fmt.Errorf("calcite parse failed: %w", err)
+		return "", classifyError("parse", err)
 	}
 	if resp == nil {
 		return "", fmt.Errorf("calcite parse response is empty")
@@ -114,7 +160,7 @@ func (c *Client) ValidateSQL(ctx context.Context, sql string) (bool, error) {
 		if ok && st.Code() == codes.InvalidArgument {
 			return false, nil
 		}
-		return false, fmt.Errorf("calcite validate failed: %w", err)
+		return false, classifyError("validate", err)
 	}
 	if resp == nil {
 		return false, fmt.Errorf("calcite validate response is empty")
@@ -218,4 +264,37 @@ func isRetriable(err error) bool {
 	default:
 		return false
 	}
+}
+
+func classifyError(op string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if existing, ok := err.(*Error); ok {
+		if existing.Op == "" {
+			existing.Op = op
+		}
+		return existing
+	}
+
+	if err == context.DeadlineExceeded || errors.Is(err, context.DeadlineExceeded) {
+		return &Error{Op: op, Kind: ErrorKindTimeout, Code: codes.DeadlineExceeded, Err: err}
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		return &Error{Op: op, Kind: ErrorKindInternal, Code: codes.Unknown, Err: err}
+	}
+
+	kind := ErrorKindUpstream
+	switch st.Code() {
+	case codes.InvalidArgument:
+		kind = ErrorKindValidation
+	case codes.Unavailable, codes.ResourceExhausted, codes.Aborted:
+		kind = ErrorKindTransient
+	case codes.DeadlineExceeded:
+		kind = ErrorKindTimeout
+	}
+
+	return &Error{Op: op, Kind: kind, Code: st.Code(), Err: err}
 }

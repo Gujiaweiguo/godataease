@@ -28,7 +28,7 @@ func (h *RoleHandler) Query(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, result)
+	response.Success(c, gin.H{"list": result})
 }
 
 func (h *RoleHandler) Create(c *gin.Context) {
@@ -115,9 +115,20 @@ func RegisterRoleRoutes(r *gin.RouterGroup, h *RoleHandler) {
 	roleGroup := r.Group("/role")
 	{
 		roleGroup.POST("/query", h.Query)
+		roleGroup.POST("/byCurOrg", h.Query)
 		roleGroup.POST("/create", h.Create)
 		roleGroup.POST("/edit", h.Edit)
 		roleGroup.POST("/delete/:id", h.Delete)
 		roleGroup.GET("/detail/:id", h.Detail)
+	}
+
+	systemRoleGroup := r.Group("/system/role")
+	{
+		systemRoleGroup.POST("/create", h.Create)
+		systemRoleGroup.POST("/update", h.Edit)
+		systemRoleGroup.POST("/delete/:roleId", func(c *gin.Context) {
+			c.Params = append(c.Params, gin.Param{Key: "id", Value: c.Param("roleId")})
+			h.Delete(c)
+		})
 	}
 }

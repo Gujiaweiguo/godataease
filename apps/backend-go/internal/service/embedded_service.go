@@ -198,10 +198,7 @@ func (s *EmbeddedService) extractAppIdFromToken(token string) (string, error) {
 }
 
 func splitToken(token string) []string {
-	parts := make([]string, 0)
-	for _, segment := range splitBy(token, '.') {
-		parts = append(parts, segment)
-	}
+	parts := splitBy(token, '.')
 	if len(parts) >= 2 {
 		claims := decodeBase64(parts[1])
 		return splitBy(claims, ',')

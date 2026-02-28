@@ -34,7 +34,7 @@ func TestContractDiffTemplateRoutes(t *testing.T) {
 		assert.Equal(t, 200, w.Code)
 
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 		assert.Equal(t, "000000", resp["code"])
 	})
 
@@ -47,7 +47,7 @@ func TestContractDiffTemplateRoutes(t *testing.T) {
 		assert.Equal(t, 200, w.Code)
 
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 		assert.Equal(t, "000000", resp["code"])
 	})
 }
@@ -65,9 +65,7 @@ func TestNegativePathUnauthorizedAccess(t *testing.T) {
 			c.Abort()
 			return
 		}
-		if strings.HasPrefix(token, "Bearer ") {
-			token = strings.TrimPrefix(token, "Bearer ")
-		}
+		token = strings.TrimPrefix(token, "Bearer ")
 		claims, err := jwtInstance.ParseToken(token)
 		if err != nil {
 			c.JSON(401, gin.H{"code": "20001", "msg": "invalid token"})
@@ -88,7 +86,7 @@ func TestNegativePathUnauthorizedAccess(t *testing.T) {
 
 		assert.Equal(t, 401, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 		assert.Equal(t, "20001", resp["code"])
 	})
 
@@ -100,7 +98,7 @@ func TestNegativePathUnauthorizedAccess(t *testing.T) {
 
 		assert.Equal(t, 401, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 		assert.Equal(t, "20001", resp["code"])
 	})
 
@@ -144,7 +142,7 @@ func TestNegativePathRowPermissionBypass(t *testing.T) {
 
 		assert.Equal(t, 200, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 		assert.Equal(t, "000000", resp["code"])
 	})
 
@@ -155,7 +153,7 @@ func TestNegativePathRowPermissionBypass(t *testing.T) {
 
 		assert.Equal(t, 403, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 		assert.Equal(t, "70001", resp["code"])
 		assert.Nil(t, resp["data"])
 	})
@@ -196,7 +194,7 @@ func TestNegativePathColumnLeakage(t *testing.T) {
 
 		assert.Equal(t, 200, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 
 		data := resp["data"].(map[string]interface{})
 		assert.Equal(t, float64(1), data["id"])
@@ -210,7 +208,7 @@ func TestNegativePathColumnLeakage(t *testing.T) {
 
 		assert.Equal(t, 200, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		json.Unmarshal(w.Body.Bytes(), &resp) //nolint:errcheck // test file, error handling not critical
 
 		data := resp["data"].(map[string]interface{})
 

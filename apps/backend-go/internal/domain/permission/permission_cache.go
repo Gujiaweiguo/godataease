@@ -40,7 +40,7 @@ func NewPermissionCacheService(cache CacheBackend, expiresIn time.Duration) *Per
 }
 
 func (s *PermissionCacheService) buildKey(parts ...string) string {
-	return CacheKeyPrefix + fmt.Sprintf("%s", joinKey(parts...))
+	return CacheKeyPrefix + joinKey(parts...)
 }
 
 func joinKey(parts ...string) string {

@@ -4,7 +4,6 @@ import (
 	"dataease/backend/internal/domain/permission"
 )
 
-
 type ResourcePermRepo interface {
 	GetPermByID(permID int64) (*permission.SysPerm, error)
 	GetPermByKey(permKey string) (*permission.SysPerm, error)
@@ -22,7 +21,6 @@ type ResourcePermRepo interface {
 	GrantPermToRole(roleID, permID int64) error
 	RevokePermFromRole(roleID, permID int64) error
 }
-
 
 type AdminChecker interface {
 	IsAdmin(userID int64) bool

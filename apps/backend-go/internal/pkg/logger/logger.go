@@ -53,14 +53,20 @@ func Init(cfg *Config) error {
 
 func L() *zap.Logger {
 	if globalLogger == nil {
-		Init(nil)
+		if err := Init(nil); err != nil {
+			globalLogger = zap.NewNop()
+			sugar = globalLogger.Sugar()
+		}
 	}
 	return globalLogger
 }
 
 func S() *zap.SugaredLogger {
 	if sugar == nil {
-		Init(nil)
+		if err := Init(nil); err != nil {
+			globalLogger = zap.NewNop()
+			sugar = globalLogger.Sugar()
+		}
 	}
 	return sugar
 }

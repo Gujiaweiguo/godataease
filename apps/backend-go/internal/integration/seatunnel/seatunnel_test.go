@@ -69,8 +69,50 @@ func TestClient_GetTaskStatusSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTaskStatus failed: %v", err)
 	}
-	if task.ID != "task-1" || task.Status != "running" || task.Progress != 60 {
+	if task.ID != "task-1" || task.Status != StatusRunning || task.Progress != 60 {
 		t.Fatalf("unexpected task: %+v", task)
+	}
+}
+
+func TestNormalizeStatus(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{input: "", expected: StatusPending},
+		{input: "queued", expected: StatusPending},
+		{input: "running", expected: StatusRunning},
+		{input: "in_progress", expected: StatusRunning},
+		{input: "completed", expected: StatusSuccess},
+		{input: "finished", expected: StatusSuccess},
+		{input: "error", expected: StatusFailed},
+		{input: "timed_out", expected: StatusFailed},
+		{input: "cancelled", expected: StatusCancelled},
+		{input: "canceled", expected: StatusCancelled},
+		{input: "unknown_status", expected: StatusPending},
+	}
+
+	for _, tc := range cases {
+		if actual := NormalizeStatus(tc.input); actual != tc.expected {
+			t.Fatalf("NormalizeStatus(%q) expected %q, got %q", tc.input, tc.expected, actual)
+		}
+	}
+}
+
+func TestClient_GetTaskStatusNormalizesStatus(t *testing.T) {
+	c := &Client{
+		timeout:    time.Second,
+		maxRetries: 0,
+		statusFn: func(_ context.Context, _ *seatunnelv1.GetTaskStatusRequest, _ ...grpc.CallOption) (*seatunnelv1.GetTaskStatusResponse, error) {
+			return &seatunnelv1.GetTaskStatusResponse{Task: &seatunnelv1.SyncTask{Id: "task-1", Status: "completed", Progress: 100}}, nil
+		},
+	}
+	task, err := c.GetTaskStatus(context.Background(), "task-1")
+	if err != nil {
+		t.Fatalf("GetTaskStatus failed: %v", err)
+	}
+	if task.Status != StatusSuccess {
+		t.Fatalf("expected normalized success status, got %q", task.Status)
 	}
 }
 
