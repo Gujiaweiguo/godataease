@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -72,7 +73,11 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 		return
 	}
 
-	types := resolveBusiTypes(req.BusiFlag)
+	types, err := resolveBusiTypes(req.BusiFlag)
+	if err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 	all := make([]*visualization.DataVisualizationInfo, 0)
 	for _, typ := range types {
 		t := typ
@@ -84,7 +89,11 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 		all = append(all, list.List...)
 	}
 
-	nodes := buildVisualizationTree(all, req.Leaf)
+	nodes, err := buildVisualizationTree(all, req.Leaf)
+	if err != nil {
+		response.Error(c, "500000", "Invalid tree payload: "+err.Error())
+		return
+	}
 	root := treeNode{
 		ID:         "0",
 		PID:        "-1",
@@ -96,24 +105,33 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 		Children:   nodes,
 	}
 
+	if err := validateTreeNodes([]treeNode{root}); err != nil {
+		response.Error(c, "500000", "Invalid tree payload: "+err.Error())
+		return
+	}
+
 	response.Success(c, []treeNode{root})
 }
 
-func resolveBusiTypes(busiFlag string) []string {
+func resolveBusiTypes(busiFlag string) ([]string, error) {
 	flag := strings.TrimSpace(busiFlag)
 	if flag == "" || flag == "dashboard-dataV" {
-		return []string{"dashboard", "dataV"}
+		return []string{"dashboard", "dataV"}, nil
 	}
 	if flag == "panel" {
-		return []string{"dashboard"}
+		return []string{"dashboard"}, nil
 	}
 	if flag == "screen" {
-		return []string{"dataV"}
+		return []string{"dataV"}, nil
 	}
-	return []string{flag}
+	if flag == "dashboard" || flag == "dataV" {
+		return []string{flag}, nil
+	}
+
+	return nil, fmt.Errorf("unsupported busiFlag: %s", flag)
 }
 
-func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFilter *bool) []treeNode {
+func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFilter *bool) ([]treeNode, error) {
 	childrenMap := make(map[string][]treeNode)
 	roots := make([]treeNode, 0)
 
@@ -121,9 +139,18 @@ func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFi
 		if item == nil {
 			continue
 		}
+		if item.ID <= 0 {
+			return nil, fmt.Errorf("node id is required")
+		}
+		if strings.TrimSpace(item.Name) == "" {
+			return nil, fmt.Errorf("node name is required")
+		}
 		nodeType := ""
 		if item.NodeType != nil {
 			nodeType = *item.NodeType
+		}
+		if nodeType != "folder" && nodeType != "panel" {
+			return nil, fmt.Errorf("invalid nodeType: %s", nodeType)
 		}
 		leaf := nodeType != "folder"
 		if leafFilter != nil && *leafFilter != leaf {
@@ -163,7 +190,28 @@ func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFi
 	}
 
 	roots = attach("0")
-	return roots
+	return roots, nil
+}
+
+func validateTreeNodes(nodes []treeNode) error {
+	for _, node := range nodes {
+		if strings.TrimSpace(node.ID) == "" {
+			return fmt.Errorf("node id is empty")
+		}
+		if strings.TrimSpace(node.Name) == "" {
+			return fmt.Errorf("node name is empty")
+		}
+		if node.Leaf && len(node.Children) > 0 {
+			return fmt.Errorf("leaf node cannot have children")
+		}
+		if len(node.Children) > 0 {
+			if err := validateTreeNodes(node.Children); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
