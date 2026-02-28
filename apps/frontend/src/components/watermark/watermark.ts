@@ -106,10 +106,10 @@ export function watermark(settings, domId) {
       mask_div.className = 'mask_div'
       mask_div.appendChild(document.createTextNode(defaultSettings.watermark_txt))
       // 设置水印div倾斜显示
-      mask_div.style.webkitTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
-      mask_div.style.MozTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
-      mask_div.style.msTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
-      mask_div.style.OTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
+      ;(mask_div.style as any).webkitTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
+      ;(mask_div.style as any).MozTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
+      ;(mask_div.style as any).msTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
+      ;(mask_div.style as any).OTransform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
       mask_div.style.transform = 'rotate(-' + defaultSettings.watermark_angle + 'deg)'
       mask_div.style.visibility = ''
       mask_div.style.position = 'absolute'
