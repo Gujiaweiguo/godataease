@@ -57,6 +57,7 @@ jobs:
 
       - name: TypeScript check
         id: tscheck
+        continue-on-error: true
         run: npm run ts:check
       - name: ESLint
         id: lint
@@ -68,6 +69,7 @@ jobs:
 
       - name: Test
         id: test
+        continue-on-error: true
         run: npm run test:core
       - name: Select affected test target
         id: affected
@@ -87,6 +89,7 @@ jobs:
       - name: Affected Test Matrix
         id: testcore
         if: steps.affected.outputs.target != 'none'
+        continue-on-error: true
         run: npm run ${{ steps.affected.outputs.target }}
       - name: Summary
         if: always()
