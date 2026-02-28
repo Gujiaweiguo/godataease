@@ -478,8 +478,7 @@ onMounted(async () => {
     } | null = null
     let preName: string | undefined
     if (createType === 'template') {
-      const templateParamsApply = JSON.parse(Base64.decode(decodeURIComponent(templateParams + '')))
-      deTemplateData = result as {
+      deTemplateData = JSON.parse(Base64.decode(decodeURIComponent(templateParams + ''))) as {
         componentData: unknown
         canvasStyleData: unknown
         canvasViewInfo: unknown

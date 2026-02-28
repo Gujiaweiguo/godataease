@@ -4,6 +4,7 @@ import isEmpty from 'lodash-es/isEmpty'
 import { valueFormatter } from '@/views/chart/components/js/formatter'
 import { parseJson } from '@/views/chart/components/js/util'
 import { Scene } from '@antv/l7-scene'
+import type { L7PlotDrawOptions } from '../../types/impl/l7plot'
 import { deepCopy } from '@/utils/utils'
 
 export const configCarouselTooltip = (chart, view, data, scene, customSubArea?, drawOption?) => {
