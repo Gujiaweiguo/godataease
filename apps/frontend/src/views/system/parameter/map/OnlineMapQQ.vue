@@ -44,16 +44,16 @@ const loadMap = () => {
     })
 }
 const createMapInstance = () => {
-  if (window.TMap) {
-    const center = new window.TMap.LatLng(39.90923, 116.397428)
-    mapInstance.value = new window.TMap.Map(document.getElementById(domId.value), {
+  if ((window as any).TMap) {
+    const center = new (window as any).TMap.LatLng(39.90923, 116.397428)
+    mapInstance.value = new (window as any).TMap.Map(document.getElementById(domId.value), {
       viewMode: '2D',
       zoom: 11,
       center: center
     })
-    mapInstance.value?.removeControl(window.TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
-    mapInstance.value?.removeControl(window.TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
-    mapInstance.value?.removeControl(window.TMap.constants.DEFAULT_CONTROL_ID.SCALE)
+    mapInstance.value?.removeControl((window as any).TMap.constants.DEFAULT_CONTROL_ID.ZOOM)
+    mapInstance.value?.removeControl((window as any).TMap.constants.DEFAULT_CONTROL_ID.ROTATION)
+    mapInstance.value?.removeControl((window as any).TMap.constants.DEFAULT_CONTROL_ID.SCALE)
   }
 }
 const loadScript = (url: string) => {
@@ -63,7 +63,7 @@ const loadScript = (url: string) => {
     if (dom) {
       dom.parentElement?.removeChild(dom)
       dom = null
-      window.TMap = null
+      ;(window as any).TMap = null
     }
     const script = document.createElement('script')
 
@@ -89,7 +89,7 @@ onBeforeUnmount(() => {
   if (dom) {
     dom.parentElement?.removeChild(dom)
     dom = null
-    window.TMap = null
+    ;(window as any).TMap = null
   }
 })
 </script>
