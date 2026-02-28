@@ -19,6 +19,12 @@ export interface Field {
   desensitized: boolean
 }
 
+
+export interface FieldListResponse {
+  dimensionList: Field[]
+  quotaList: Field[]
+}
+
 export interface ComponentInfo {
   id: string
   name: string
@@ -27,12 +33,13 @@ export interface ComponentInfo {
   datasetId: string
 }
 
-export const getFieldByDQ = async (id, chartId, data): Promise<IResponse> => {
+export const getFieldByDQ = async (id, chartId, data): Promise<FieldListResponse> => {
   return request.post({ url: `/chart/listByDQ/${id}/${chartId}`, data: data }).then(res => {
     originNameHandleBackWithArr(res?.data, ['dimensionList', 'quotaList'])
     return res?.data
   })
 }
+
 
 export const copyChartField = async (id, chartId): Promise<IResponse> => {
   return request.post({ url: `/chart/copyField/${id}/${chartId}`, data: {} }).then(res => {

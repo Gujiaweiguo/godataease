@@ -24,8 +24,14 @@ const colorCases = COLOR_CASES
 
 const predefineColors = COLOR_PANEL
 
+interface ColorForm extends ChartColorAttr {
+  value?: string
+  colors?: string[]
+  alpha?: number
+}
+
 const state = reactive({
-  colorForm: JSON.parse(JSON.stringify(DEFAULT_COLOR_CASE)),
+  colorForm: JSON.parse(JSON.stringify(DEFAULT_COLOR_CASE)) as ColorForm,
   customColor: null,
   colorIndex: 0
 })
@@ -39,7 +45,7 @@ watch(
   }
 )
 
-const changeColorOption = () => {
+const changeColorOption = (_value?: string) => {
   const items = colorCases.filter(ele => {
     return ele.value === state.colorForm.value
   })
@@ -64,7 +70,7 @@ const switchColorCase = () => {
   changeColorCase()
 }
 
-const changeColorCase = () => {
+const changeColorCase = (_prop?: string) => {
   emit('onColorChange', state.colorForm)
 }
 

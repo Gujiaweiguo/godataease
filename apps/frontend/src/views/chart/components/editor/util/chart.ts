@@ -389,9 +389,19 @@ export const DEFAULT_LABEL: ChartLabelAttr = {
     show: false,
     color: '#000',
     fontSize: 12,
-    formatterCfg: {
-      decimalCount: 2
-    }
+    formatterCfg: formatterItem,
+    seriesId: '',
+    axisType: '',
+    summary: '',
+    groupType: 'q',
+    sort: 'none',
+    customSort: [],
+    hide: false,
+    name: '',
+    dataeaseName: '',
+    id: '',
+    chartShowName: '',
+    deType: 0
   }
 }
 export const DEFAULT_TOOLTIP: ChartTooltipAttr = {
@@ -438,6 +448,7 @@ export const DEFAULT_TABLE_TOTAL: ChartTableTotalAttr = {
     label: t('chart.total_show'),
     subLabel: t('chart.sub_total_show'),
     subTotalsDimensions: [],
+    subTotalsDimensionsNew: true,
     calcTotals: {
       aggregation: 'SUM',
       cfg: []
@@ -728,6 +739,7 @@ export const DEFAULT_YAXIS_STYLE: ChartAxisStyle = {
 export const DEFAULT_YAXIS_EXT_STYLE: ChartAxisStyle = {
   show: true,
   position: 'right',
+  nameShow: true,
   name: '',
   color: '#333333',
   fontSize: 12,
@@ -736,7 +748,8 @@ export const DEFAULT_YAXIS_EXT_STYLE: ChartAxisStyle = {
     color: '#333333',
     fontSize: 12,
     rotate: 0,
-    formatter: '{value}'
+    formatter: '{value}',
+    lengthLimit: 10
   },
   axisLine: {
     show: false,
@@ -846,7 +859,8 @@ export const DEFAULT_THRESHOLD: ChartThreshold = {
   labelThreshold: [],
   tableThreshold: [],
   textLabelThreshold: [],
-  lineLabelThreshold: []
+  lineThreshold: [],
+  symbolicBubbleThreshold: []
 }
 export const DEFAULT_SCROLL: ScrollCfg = {
   open: false,

@@ -359,7 +359,7 @@ export function refreshOtherComponent(dvId, busiFlag) {
     const refreshIdList = refreshComponentList.map(ele => ele.id)
     findById(dvId, busiFlag, {}).then(rsp => {
       const canvasInfo = rsp.data
-      const canvasDataResult = JSON.parse(canvasInfo.componentData)
+      const canvasDataResult = JSON.parse(canvasInfo.componentData) as { id: string; propValue?: unknown; style?: Record<string, unknown> }[]
       const canvasDataResultMap = canvasDataResult.reduce((acc, comp) => {
         acc[comp.id] = comp
         return acc
@@ -396,7 +396,7 @@ export function initCanvasDataPrepare(dvId, params, callBack) {
   const copyFlag = busiFlag != null && busiFlag.includes('-copy')
   const busiFlagCustom = copyFlag ? busiFlag.split('-')[0] : busiFlag
   const method = copyFlag ? findCopyResource : findById
-  let attachInfo = { source: params.source ? params.source : 'main' }
+  let attachInfo: { source: string; taskId?: string; showWatermark?: boolean; resourceTable?: string } = { source: params.source ? params.source : 'main' }
   if (dvMainStore.canvasAttachInfo && !!dvMainStore.canvasAttachInfo.taskId) {
     attachInfo = { source: 'report', taskId: dvMainStore.canvasAttachInfo.taskId }
     const showWatermarkExist =
@@ -438,7 +438,7 @@ export function initCanvasDataPrepare(dvId, params, callBack) {
     const canvasVersion = canvasInfo.version
 
     const canvasDataResult = JSON.parse(canvasInfo.componentData)
-    const canvasStyleResult = JSON.parse(canvasInfo.canvasStyleData)
+    const canvasStyleResult = JSON.parse(canvasInfo.canvasStyleData) as { fontFamily?: string; dashboard?: { gap?: string; gapSize?: number } }
     const canvasViewInfoPreview = canvasInfo.canvasViewInfo
     historyAdaptor(canvasStyleResult, canvasDataResult, canvasInfo, attachInfo, canvasVersion)
     const curPreviewGap =
@@ -478,7 +478,7 @@ export async function initCanvasData(dvId, params, callBack) {
   )
 }
 
-export async function backCanvasData(dvId, mobileViewInfo, busiFlag, callBack) {
+export async function backCanvasData(dvId, _mobileViewInfo, busiFlag, callBack) {
   initCanvasDataPrepare(
     dvId,
     { busiFlag },
@@ -955,9 +955,9 @@ export async function decompressionPre(params, callBack) {
   await decompression(params)
     .then(response => {
       const deTemplateDataTemp = response.data
-      const sourceComponentData = JSON.parse(deTemplateDataTemp['componentData'])
+      const sourceComponentData = JSON.parse(deTemplateDataTemp['componentData']) as { id?: string; inMobile?: boolean }[]
       const appData = deTemplateDataTemp['appData']
-      const sourceCanvasStyle = JSON.parse(deTemplateDataTemp['canvasStyleData'])
+      const sourceCanvasStyle = JSON.parse(deTemplateDataTemp['canvasStyleData']) as { component?: Record<string, unknown>; scale?: number; scaleHeight?: number }
       sourceComponentData.forEach(componentItem => {
         // 2 为基础版本 此处需要增加仪表板矩阵密度
         if (
