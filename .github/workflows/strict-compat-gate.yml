@@ -1,0 +1,109 @@
+name: Strict Compatibility Gate
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'apps/backend-go/**'
+      - '.github/workflows/strict-compat-gate.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'apps/backend-go/**'
+      - '.github/workflows/strict-compat-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  strict-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/backend-go
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Admin168
+          MYSQL_DATABASE: dataease_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install compatibility check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Build backend
+        run: make build
+
+      - name: Start backend
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_USER: root
+          DATABASE_PASSWORD: Admin168
+          DATABASE_NAME: dataease_test
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+        run: |
+          ./dataease-backend >/tmp/backend.log 2>&1 &
+          echo $! >/tmp/backend.pid
+
+      - name: Wait for backend
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend failed to start"
+          cat /tmp/backend.log || true
+          exit 1
+
+      - name: Run strict compatibility gate
+        env:
+          BASE_URL: http://127.0.0.1:8080
+          SUCCESS_CODE: '000000'
+        run: |
+          chmod +x scripts/compat-checks/run_auth_visualization_compat.sh
+          ./scripts/compat-checks/run_auth_visualization_compat.sh
+
+      - name: Upload strict compatibility report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: strict-compat-report
+          path: apps/backend-go/tmp/compat-checks/auth-visualization-compat-report.txt
+          retention-days: 14
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) || true
+          fi
