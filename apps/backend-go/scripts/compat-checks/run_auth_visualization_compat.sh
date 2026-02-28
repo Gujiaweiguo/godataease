@@ -5,21 +5,21 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 REPORT_DIR="${REPORT_DIR:-./tmp/compat-checks}"
 REPORT_FILE="$REPORT_DIR/auth-visualization-compat-report.txt"
+SUCCESS_CODE="${SUCCESS_CODE:-000000}"
+ROLE_TYPE_CODE="${ROLE_TYPE_CODE:-1}"
 
 mkdir -p "$REPORT_DIR"
 : > "$REPORT_FILE"
 
 echo "[INFO] Base URL: $BASE_URL" | tee -a "$REPORT_FILE"
+echo "[INFO] Strict success code: $SUCCESS_CODE" | tee -a "$REPORT_FILE"
 
 TOTAL=0
 FAILED=0
 
-run_case() {
-  local name="$1"
-  local path="$2"
-  local body="$3"
-
-  TOTAL=$((TOTAL + 1))
+post_json() {
+  local path="$1"
+  local body="$2"
 
   local tmp
   tmp=$(mktemp)
@@ -28,11 +28,29 @@ run_case() {
   status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL$path" -H "Content-Type: application/json" -d "$body") || curl_rc=$?
 
   if [[ "$curl_rc" -ne 0 || "$status" == "000" ]]; then
-    echo "[FAIL] $name: request failed on $path (curl_rc=$curl_rc, status=$status)" | tee -a "$REPORT_FILE"
-    FAILED=$((FAILED + 1))
     rm -f "$tmp"
+    return 1
+  fi
+
+  printf '%s|%s\n' "$status" "$tmp"
+}
+
+run_case_strict() {
+  local name="$1"
+  local path="$2"
+  local body="$3"
+
+  TOTAL=$((TOTAL + 1))
+
+  local result
+  if ! result=$(post_json "$path" "$body"); then
+    echo "[FAIL] $name: request failed on $path" | tee -a "$REPORT_FILE"
+    FAILED=$((FAILED + 1))
     return
   fi
+
+  local status="${result%%|*}"
+  local tmp="${result#*|}"
 
   if [[ "$status" == "404" ]]; then
     echo "[FAIL] $name: returned 404 on $path" | tee -a "$REPORT_FILE"
@@ -42,35 +60,94 @@ run_case() {
   fi
 
   if ! jq -e '.code and .msg' "$tmp" >/dev/null 2>&1; then
-    echo "[FAIL] $name: missing code/msg envelope on $path (status=$status)" | tee -a "$REPORT_FILE"
+    echo "[FAIL] $name: missing code/msg envelope on $path (status=$status, body=$(cat "$tmp"))" | tee -a "$REPORT_FILE"
     FAILED=$((FAILED + 1))
     rm -f "$tmp"
     return
   fi
 
-  echo "[PASS] $name: non-404 and envelope ok (status=$status, code=$(jq -r '.code' "$tmp"))" | tee -a "$REPORT_FILE"
+  local code
+  code=$(jq -r '.code // empty' "$tmp")
+  if [[ "$code" != "$SUCCESS_CODE" ]]; then
+    echo "[FAIL] $name: expected code=$SUCCESS_CODE got code=${code:-N/A} (status=$status, body=$(cat "$tmp"))" | tee -a "$REPORT_FILE"
+    FAILED=$((FAILED + 1))
+    rm -f "$tmp"
+    return
+  fi
+
+  echo "[PASS] $name: strict success (status=$status, code=$code)" | tee -a "$REPORT_FILE"
   rm -f "$tmp"
 }
 
-run_case "api auth menuPermission" "/api/auth/menuPermission" '{"roleId":1}'
-run_case "api auth busiPermission" "/api/auth/busiPermission" '{"roleId":1}'
-run_case "api auth saveMenuPer" "/api/auth/saveMenuPer" '{"roleId":1,"menuIds":[]}'
-run_case "api auth saveBusiPer" "/api/auth/saveBusiPer" '{"roleId":1,"permIds":[]}'
-run_case "api system role permission save" "/api/system/role/permission/save" '{"roleId":1,"permIds":[]}'
-run_case "api system role create" "/api/system/role/create" '{"name":"compat-check-role"}'
-run_case "api system role update" "/api/system/role/update" '{"id":1,"name":"compat-check-role-updated"}'
-run_case "api system role delete" "/api/system/role/delete/1" '{}'
-run_case "api visualization tree" "/api/dataVisualization/tree" '{"busiFlag":"dashboard-dataV","leaf":false}'
+create_role_strict() {
+  local prefix="$1"
+  local label="$2"
+  local role_name="compat-check-${label}-$(date +%s)-$RANDOM"
+  CREATED_ROLE_ID=""
 
-run_case "de2api auth menuPermission" "/de2api/auth/menuPermission" '{"roleId":1}'
-run_case "de2api auth busiPermission" "/de2api/auth/busiPermission" '{"roleId":1}'
-run_case "de2api auth saveMenuPer" "/de2api/auth/saveMenuPer" '{"roleId":1,"menuIds":[]}'
-run_case "de2api auth saveBusiPer" "/de2api/auth/saveBusiPer" '{"roleId":1,"permIds":[]}'
-run_case "de2api system role permission save" "/de2api/system/role/permission/save" '{"roleId":1,"permIds":[]}'
-run_case "de2api system role create" "/de2api/system/role/create" '{"name":"compat-check-role"}'
-run_case "de2api system role update" "/de2api/system/role/update" '{"id":1,"name":"compat-check-role-updated"}'
-run_case "de2api system role delete" "/de2api/system/role/delete/1" '{}'
-run_case "de2api visualization tree" "/de2api/dataVisualization/tree" '{"busiFlag":"dashboard-dataV","leaf":false}'
+  TOTAL=$((TOTAL + 1))
+  local result
+  if ! result=$(post_json "$prefix/system/role/create" "{\"name\":\"$role_name\",\"typeCode\":$ROLE_TYPE_CODE}"); then
+    echo "[FAIL] $label system role create: request failed" | tee -a "$REPORT_FILE"
+    FAILED=$((FAILED + 1))
+    return 1
+  fi
+
+  local status="${result%%|*}"
+  local tmp="${result#*|}"
+  if ! jq -e '.code and .msg' "$tmp" >/dev/null 2>&1; then
+    echo "[FAIL] $label system role create: missing envelope (status=$status, body=$(cat "$tmp"))" | tee -a "$REPORT_FILE"
+    FAILED=$((FAILED + 1))
+    rm -f "$tmp"
+    return 1
+  fi
+
+  local code
+  code=$(jq -r '.code // empty' "$tmp")
+  if [[ "$status" == "404" || "$code" != "$SUCCESS_CODE" ]]; then
+    echo "[FAIL] $label system role create: expected code=$SUCCESS_CODE got status=$status code=${code:-N/A} body=$(cat "$tmp")" | tee -a "$REPORT_FILE"
+    FAILED=$((FAILED + 1))
+    rm -f "$tmp"
+    return 1
+  fi
+
+  local role_id
+  role_id=$(jq -r '.data // empty' "$tmp")
+  if [[ -z "$role_id" || ! "$role_id" =~ ^[0-9]+$ || "$role_id" -le 0 ]]; then
+    echo "[FAIL] $label system role create: invalid role id (data=$(jq -r '.data' "$tmp"))" | tee -a "$REPORT_FILE"
+    FAILED=$((FAILED + 1))
+    rm -f "$tmp"
+    return 1
+  fi
+
+  echo "[PASS] $label system role create: strict success (status=$status, code=$code, roleId=$role_id)" | tee -a "$REPORT_FILE"
+  rm -f "$tmp"
+  CREATED_ROLE_ID="$role_id"
+  return 0
+}
+
+run_flow() {
+  local prefix="$1"
+  local label="$2"
+
+  local role_id
+  if ! create_role_strict "$prefix" "$label"; then
+    return
+  fi
+  role_id="$CREATED_ROLE_ID"
+
+  run_case_strict "$label auth menuPermission" "$prefix/auth/menuPermission" "{\"roleId\":$role_id}"
+  run_case_strict "$label auth busiPermission" "$prefix/auth/busiPermission" "{\"roleId\":$role_id}"
+  run_case_strict "$label auth saveMenuPer" "$prefix/auth/saveMenuPer" "{\"roleId\":$role_id,\"menuIds\":[]}"
+  run_case_strict "$label auth saveBusiPer" "$prefix/auth/saveBusiPer" "{\"roleId\":$role_id,\"permIds\":[]}"
+  run_case_strict "$label system role permission save" "$prefix/system/role/permission/save" "{\"roleId\":$role_id,\"permIds\":[]}"
+  run_case_strict "$label system role update" "$prefix/system/role/update" "{\"id\":$role_id,\"name\":\"compat-check-updated-$role_id\"}"
+  run_case_strict "$label visualization tree" "$prefix/dataVisualization/tree" '{"busiFlag":"dashboard-dataV","leaf":false}'
+  run_case_strict "$label system role delete" "$prefix/system/role/delete/$role_id" '{}'
+}
+
+run_flow "/api" "api"
+run_flow "/de2api" "de2api"
 
 if [[ "$FAILED" -gt 0 ]]; then
   echo "[FAIL] Compatibility checks failed: $FAILED/$TOTAL" | tee -a "$REPORT_FILE"
