@@ -60,7 +60,43 @@ jobs:
       - name: Prepare backend config
         run: |
           mkdir -p configs
-          cp configs/config.example.yaml configs/config.yaml
+          cat > configs/config.yaml <<'EOF'
+          server:
+            port: 8080
+            mode: debug
+          database:
+            host: 127.0.0.1
+            port: 3306
+            name: dataease_test
+            user: root
+            password: Admin168
+            max_open_conns: 100
+            max_idle_conns: 10
+          redis:
+            host: 127.0.0.1
+            port: 6379
+            password: ""
+            db: 0
+            pool_size: 100
+          jwt:
+            secret: ci-strict-compat-secret
+            expire: 86400
+          log:
+            level: info
+            format: console
+          telemetry:
+            enabled: false
+            endpoint: ""
+          integration:
+            calcite:
+              address: ""
+              timeout_sec: 10
+              max_retries: 1
+            seatunnel:
+              address: ""
+              timeout_sec: 15
+              max_retries: 1
+          EOF
 
       - name: Build backend
         run: make build
