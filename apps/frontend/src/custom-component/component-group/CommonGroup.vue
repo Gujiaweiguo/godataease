@@ -85,25 +85,7 @@ const groupActiveChange = category => {
             class="item-top"
             draggable="true"
             :data-id="groupInfo.category + '&' + chartInfo.value"
-            :title="chartInfo.title || ''"
-          >
-            <Icon
-              v-if="['outer_svg', 'graphical'].includes(chartInfo.type)"
-              class-name="item-top-icon"
-              ><component class="svg-icon item-top-icon" :is="chartInfo.icon"></component
-            ></Icon>
-            <DeDecoration
-              :curStyle="{ width: 530, height: 373 }"
-              :element="{ innerType: chartInfo.value }"
-              :scale="0.15"
-              v-else-if="['de_decoration'].includes(chartInfo.type)"
-            ></DeDecoration>
-            <component v-else style="color: #a6a6a6" :is="chartInfo.icon"></component>
-          </div>
-          <div v-if="chartInfo.title" class="item-bottom">
-            <span>{{ chartInfo.title }}</span>
-          </div>
-        </el-col>
+            :title="(chartInfo as any).title || ''"
       </el-row>
     </el-scrollbar>
   </el-row>
