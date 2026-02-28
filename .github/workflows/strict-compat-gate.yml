@@ -55,7 +55,7 @@ jobs:
       - name: Install compatibility check dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq default-mysql-client
 
       - name: Prepare backend config
         run: |
@@ -97,6 +97,49 @@ jobs:
               timeout_sec: 15
               max_retries: 1
           EOF
+
+      - name: Prepare compatibility tables
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot -pAdmin168 dataease_test <<'SQL'
+          CREATE TABLE IF NOT EXISTS core_menu (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            pid BIGINT NOT NULL DEFAULT 0,
+            type INT NOT NULL DEFAULT 0,
+            name VARCHAR(100) NOT NULL DEFAULT '',
+            component VARCHAR(255) NOT NULL DEFAULT '',
+            menu_sort INT NOT NULL DEFAULT 0,
+            icon VARCHAR(100) NOT NULL DEFAULT '',
+            path VARCHAR(255) NOT NULL DEFAULT '',
+            hidden TINYINT(1) NOT NULL DEFAULT 0,
+            in_layout TINYINT(1) NOT NULL DEFAULT 1,
+            auth TINYINT(1) NOT NULL DEFAULT 1
+          );
+
+          CREATE TABLE IF NOT EXISTS data_visualization_info (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255) NOT NULL DEFAULT '',
+            pid BIGINT NULL,
+            org_id BIGINT NULL,
+            level INT NULL,
+            node_type VARCHAR(32) NULL,
+            type VARCHAR(32) NULL,
+            canvas_style_data LONGTEXT NULL,
+            component_data LONGTEXT NULL,
+            mobile_layout TINYINT(1) NULL,
+            status INT NULL,
+            sort INT NULL,
+            create_time BIGINT NULL,
+            create_by VARCHAR(64) NULL,
+            update_time BIGINT NULL,
+            update_by VARCHAR(64) NULL,
+            delete_flag TINYINT(1) NULL,
+            delete_time BIGINT NULL,
+            delete_by VARCHAR(64) NULL,
+            version INT NULL,
+            content_id VARCHAR(255) NULL,
+            check_version VARCHAR(255) NULL
+          );
+          SQL
 
       - name: Build backend
         run: make build
