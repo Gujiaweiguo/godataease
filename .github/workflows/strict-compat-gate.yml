@@ -1,0 +1,194 @@
+name: Strict Compatibility Gate
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'apps/backend-go/**'
+      - '.github/workflows/strict-compat-gate.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'apps/backend-go/**'
+      - '.github/workflows/strict-compat-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  strict-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/backend-go
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Admin168
+          MYSQL_DATABASE: dataease_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install compatibility check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq default-mysql-client
+
+      - name: Prepare backend config
+        run: |
+          mkdir -p configs
+          cat > configs/config.yaml <<'EOF'
+          server:
+            port: 8080
+            mode: debug
+          database:
+            host: 127.0.0.1
+            port: 3306
+            name: dataease_test
+            user: root
+            password: Admin168
+            max_open_conns: 100
+            max_idle_conns: 10
+          redis:
+            host: 127.0.0.1
+            port: 6379
+            password: ""
+            db: 0
+            pool_size: 100
+          jwt:
+            secret: ci-strict-compat-secret
+            expire: 86400
+          log:
+            level: info
+            format: console
+          telemetry:
+            enabled: false
+            endpoint: ""
+          integration:
+            calcite:
+              address: ""
+              timeout_sec: 10
+              max_retries: 1
+            seatunnel:
+              address: ""
+              timeout_sec: 15
+              max_retries: 1
+          EOF
+
+      - name: Prepare compatibility tables
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot -pAdmin168 dataease_test <<'SQL'
+          CREATE TABLE IF NOT EXISTS core_menu (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            pid BIGINT NOT NULL DEFAULT 0,
+            type INT NOT NULL DEFAULT 0,
+            name VARCHAR(100) NOT NULL DEFAULT '',
+            component VARCHAR(255) NOT NULL DEFAULT '',
+            menu_sort INT NOT NULL DEFAULT 0,
+            icon VARCHAR(100) NOT NULL DEFAULT '',
+            path VARCHAR(255) NOT NULL DEFAULT '',
+            hidden TINYINT(1) NOT NULL DEFAULT 0,
+            in_layout TINYINT(1) NOT NULL DEFAULT 1,
+            auth TINYINT(1) NOT NULL DEFAULT 1
+          );
+
+          CREATE TABLE IF NOT EXISTS data_visualization_info (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255) NOT NULL DEFAULT '',
+            pid BIGINT NULL,
+            org_id BIGINT NULL,
+            level INT NULL,
+            node_type VARCHAR(32) NULL,
+            type VARCHAR(32) NULL,
+            canvas_style_data LONGTEXT NULL,
+            component_data LONGTEXT NULL,
+            mobile_layout TINYINT(1) NULL,
+            status INT NULL,
+            sort INT NULL,
+            create_time BIGINT NULL,
+            create_by VARCHAR(64) NULL,
+            update_time BIGINT NULL,
+            update_by VARCHAR(64) NULL,
+            delete_flag TINYINT(1) NULL,
+            delete_time BIGINT NULL,
+            delete_by VARCHAR(64) NULL,
+            version INT NULL,
+            content_id VARCHAR(255) NULL,
+            check_version VARCHAR(255) NULL
+          );
+          SQL
+
+      - name: Build backend
+        run: make build
+
+      - name: Start backend
+        env:
+          SERVER_PORT: 8080
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_USER: root
+          DATABASE_PASSWORD: Admin168
+          DATABASE_NAME: dataease_test
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+        run: |
+          ./dataease-backend >/tmp/backend.log 2>&1 &
+          echo $! >/tmp/backend.pid
+
+      - name: Wait for backend
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend failed to start"
+          cat /tmp/backend.log || true
+          exit 1
+
+      - name: Run strict compatibility gate
+        env:
+          BASE_URL: http://127.0.0.1:8080
+          SUCCESS_CODE: '000000'
+        run: |
+          chmod +x scripts/compat-checks/run_auth_visualization_compat.sh
+          ./scripts/compat-checks/run_auth_visualization_compat.sh
+
+      - name: Upload strict compatibility report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: strict-compat-report
+          path: apps/backend-go/tmp/compat-checks/auth-visualization-compat-report.txt
+          retention-days: 14
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) || true
+          fi
