@@ -1,3 +1,4 @@
+<script setup lang="ts">
 import { computed, nextTick, PropType, ref, toRefs } from 'vue'
 import { ElIcon, ElMessage } from 'element-plus-secondary'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
@@ -11,11 +12,6 @@ interface SidebarElement {
   label?: string
 }
 
-import { ElIcon, ElMessage } from 'element-plus-secondary'
-import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
-import { storeToRefs } from 'pinia'
-import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
-import Icon from '../icon-custom/src/Icon.vue'
 const dvMainStore = dvMainStoreWithOut()
 const { canvasCollapse } = storeToRefs(dvMainStore)
 let componentNameEdit = ref(false)
