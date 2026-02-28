@@ -427,7 +427,9 @@ const operation = (cmd: string, data: BusiTreeNode, nodeType: string) => {
       name: data.name + '-copy',
       type: curCanvasType.value,
       id: data.id,
-      pid: targetPid || '0'
+      pid: targetPid || '0',
+      mobileLayout: false,
+      status: true
     }
 
     copyLoading.value = true
