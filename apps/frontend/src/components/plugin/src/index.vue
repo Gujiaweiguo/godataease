@@ -129,17 +129,17 @@ onMounted(async () => {
     if (window['DEXPack']) {
       const xpack = await window['DEXPack'].mapping[attrs.jsname]
       plugin.value = xpack.default
-    } else if (!window._de_xpack_not_loaded) {
-      window._de_xpack_not_loaded = true
-      window['VueDe'] = Vue
-      window['AxiosDe'] = axios
-      window['PiniaDe'] = Pinia
-      window['vueRouterDe'] = router
-      window['MittAllDe'] = useEmitt().emitter.all
-      window['I18nDe'] = i18n
-      window['EchartsDE'] = echarts
-      if (!window.tinymce) {
-        window.tinymce = tinymce
+    } else if (!(window as any)._de_xpack_not_loaded) {
+      ;(window as any)._de_xpack_not_loaded = true
+      ;(window as any)['VueDe'] = Vue
+      ;(window as any)['AxiosDe'] = axios
+      ;(window as any)['PiniaDe'] = Pinia
+      ;(window as any)['vueRouterDe'] = router
+      ;(window as any)['MittAllDe'] = useEmitt().emitter.all
+      ;(window as any)['I18nDe'] = i18n
+      ;(window as any)['EchartsDE'] = echarts
+      if (!(window as any).tinymce) {
+        ;(window as any).tinymce = tinymce
       }
       loadDistributed().then(async res => {
         new Function(res.data)()
