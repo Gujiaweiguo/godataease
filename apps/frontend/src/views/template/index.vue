@@ -242,7 +242,7 @@ import DeTemplateImport from '@/views/template/component/DeTemplateImport.vue'
 import DeTemplateItem from '@/views/template/component/DeTemplateItem.vue'
 import DeCategoryChange from '@/views/template/component/DeCategoryChange.vue'
 
-const roleValidator = (rule, value, callback) => {
+const roleValidator = (_rule, value, callback) => {
   if (nameRepeat(value)) {
     const { nodeType } = state.templateEditForm || {}
     callback(

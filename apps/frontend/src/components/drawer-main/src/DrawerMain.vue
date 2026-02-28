@@ -33,7 +33,7 @@ const userDrawer = ref(false)
 const init = () => {
   userDrawer.value = true
 }
-const cleanrInnerValue = (index: number) => {
+const cleanrInnerValue = (index?: number) => {
   const field = componentList.value[index]?.field
   if (!field) {
     return
@@ -60,7 +60,7 @@ const clearInnerTag = (index?: number) => {
     }
   }
 }
-const clearFilter = (id?: number) => {
+const clearFilter = (id?: number | null) => {
   clearInnerTag(id)
   if (isNaN(id)) {
     const len = state.conditions.length
