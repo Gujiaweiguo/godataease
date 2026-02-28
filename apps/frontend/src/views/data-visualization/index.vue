@@ -45,6 +45,15 @@ import ChartStyleBatchSet from '@/views/chart/components/editor/editor-style/Cha
 import CustomTabsSort from '@/custom-component/de-tabs/CustomTabsSort.vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { recoverToPublished } from '@/api/visualization/dataVisualization'
+import {
+  changeComponentSizeWithScale
+  } from '@/utils/changeComponentsSizeWithScale'
+import { adaptCurThemeCommonStyle } from '@/utils/canvasStyle'
+import { useEmitt } from '@/hooks/web/useEmitt'
+import { listenGlobalKeyDown, releaseAttachKey } from '@/utils/DeShortcutKey'
+import { isAllowedEmbeddedMessageOrigin, resolveEmbeddedOrigin } from '@/utils/embedded'
+import { embeddedInitIframeApi } from '@/api/embedded'
+import { useEmbedded } from '@/store/modules/embedded'
 const interactiveStore = interactiveStoreWithOut()
 const embeddedStore = useEmbedded()
 const { wsCache } = useCache()
@@ -470,10 +479,14 @@ onMounted(async () => {
     let preName: string | undefined
     if (createType === 'template') {
       const templateParamsApply = JSON.parse(Base64.decode(decodeURIComponent(templateParams + '')))
-      await decompressionPre(templateParamsApply, result => {
-        deTemplateData = result
-        preName = deTemplateData.baseInfo?.preName
-      })
+      deTemplateData = result as {
+        componentData: unknown
+        canvasStyleData: unknown
+        canvasViewInfo: unknown
+        appData: unknown
+        baseInfo?: { preName?: string }
+      }
+      preName = deTemplateData.baseInfo?.preName
     }
     dvMainStore.createInit('dataV', null, pid, watermarkBaseInfo, preName)
     nextTick(() => {

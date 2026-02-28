@@ -7,8 +7,8 @@
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
       @click="
-        e => {
-          e.target.value = ''
+        (e: MouseEvent) => {
+          ;(e.target as HTMLInputElement).value = ''
         }
       "
       @change="reUpload"

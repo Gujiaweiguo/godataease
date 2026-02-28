@@ -64,7 +64,7 @@ import EmptyBackground from '@/components/empty-background/src/EmptyBackground.v
 import DeResourceGroupOpt from '@/views/common/DeResourceGroupOpt.vue'
 import DatasetDetail from './DatasetDetail.vue'
 import { guid } from '@/views/visualized/data/dataset/form/util'
-import { save } from '@/api/visualization/dataVisualization'
+import { save as saveVisualization } from '@/api/visualization/dataVisualization'
 import { cloneDeep } from 'lodash-es'
 import { fieldType } from '@/utils/attr'
 import { useAppStoreWithOut } from '@/store/modules/app'
@@ -80,7 +80,6 @@ import { timestampFormatDate } from './form/util'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { XpackComponent } from '@/components/plugin'
 import { useCache } from '@/hooks/web/useCache'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import { iconFieldMap } from '@/components/icon-group/field-list'
 import { exportPermission, isFreeFolder } from '@/utils/utils'
 const { t } = useI18n()
@@ -110,8 +109,31 @@ const showExport = ref(false)
 const rowAuth = ref()
 const exportDatasetLoading = ref(false)
 const limit = ref(t('data_set.ten_wan'))
-const exportForm = ref({})
-const table = ref({})
+
+interface ExportFormState {
+  name: string
+  expressionTree: string
+}
+
+interface ExportTableState {
+  id: string
+  row: number
+  filename: string
+  dataEaseBi: boolean
+  expressionTree: string
+}
+
+const exportForm = ref<ExportFormState>({
+  name: '',
+  expressionTree: ''
+})
+const table = ref<ExportTableState>({
+  id: '',
+  row: 100000,
+  filename: '',
+  dataEaseBi: false,
+  expressionTree: ''
+})
 const exportFormRef = ref()
 const exportFormRules = {
   name: [
@@ -191,7 +213,7 @@ const resourceCreate = (pid, name) => {
     canvasViewInfo: {},
     ...bashResourceInfo
   }
-  save(canvasInfo).then(() => {
+  saveVisualization(canvasInfo).then(() => {
     const baseUrl = curCanvasType.value === 'dataV' ? '#/dvCanvas?dvId=' : '#/dashboard?resourceId='
     window.open(baseUrl + newResourceId, openType)
   })
@@ -392,7 +414,7 @@ const closeExport = () => {
   showExport.value = false
 }
 
-const save = ({ logic, items, errorMessage }) => {
+const saveExport = ({ logic, items, errorMessage }) => {
   table.value.id = nodeInfo.id
   table.value.row = 100000
   table.value.filename = exportForm.value.name
@@ -448,7 +470,6 @@ const rowClick = (_, __, event) => {
 }
 
 const openMessageLoading = cb => {
-  const iconClass = `el-icon-loading`
   const customClass = `de-message-loading de-message-export`
   ElMessage({
     message: h('p', null, [
@@ -467,8 +488,6 @@ const openMessageLoading = cb => {
       ),
       t('data_set.progress_and_download')
     ]),
-    iconClass,
-    icon: h(RefreshLeft),
     showClose: true,
     customClass
   })
@@ -743,7 +762,7 @@ const loadInit = () => {
 
 const getLimit = () => {
   exportLimit().then(res => {
-    limit.value = res
+    limit.value = String(res)
   })
 }
 
@@ -1153,7 +1172,7 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
       <el-form-item :label="$t('dataset.export_filter')" prop="expressionTree">
         <div class="tree-cont">
           <div class="content">
-            <RowAuth @save="save" ref="rowAuth" />
+            <RowAuth @save="saveExport" ref="rowAuth" />
           </div>
         </div>
       </el-form-item>

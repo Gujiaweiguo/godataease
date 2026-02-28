@@ -300,8 +300,7 @@ const pixelOptions = [
     ]
   }
 ]
-const dialogInit = (canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
-  state.scale = params.scale
+const dialogInit = (_canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
   sourceViewType.value = view.type
   detailsError.value = false
   optType.value = opt

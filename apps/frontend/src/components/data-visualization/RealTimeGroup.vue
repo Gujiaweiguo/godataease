@@ -92,24 +92,51 @@ const { areaData } = storeToRefs(composeStore)
 
 const { curComponent, canvasViewInfo } = storeToRefs(dvMainStore)
 
-const props = defineProps({
-  tabPosition: {
-    type: String,
-    required: false,
-    default: 'main'
-  },
-  componentData: {
-    type: Array,
-    default: () => []
+interface RealTimeComponent {
+  id: string
+  name?: string
+  title?: string
+  icon?: string
+  type?: string
+  component?: string
+  isShow?: boolean
+  isLock?: boolean
+  expand?: boolean
+  propValue?: RealTimeComponent[]
+  componentData?: RealTimeComponent[]
+}
+
+const EMPTY_COMPONENT: RealTimeComponent = {
+  id: '',
+  name: '',
+  title: '',
+  icon: '',
+  type: '',
+  component: '',
+  isShow: true,
+  isLock: false,
+  expand: false,
+  propValue: [],
+  componentData: []
+}
+
+const props = withDefaults(
+  defineProps<{
+    tabPosition?: string
+    componentData: RealTimeComponent[]
+  }>(),
+  {
+    tabPosition: 'main',
+    componentData: () => []
   }
-})
+)
 
 const { componentData } = toRefs(props)
 
-const getComponent = index => {
-  return componentData.value[componentData.value.length - 1 - index]
+const getComponent = (index: number): RealTimeComponent => {
+  return componentData.value[componentData.value.length - 1 - index] || EMPTY_COMPONENT
 }
-const transformIndex = index => {
+const transformIndex = (index: number) => {
   return componentData.value.length - 1 - index
 }
 

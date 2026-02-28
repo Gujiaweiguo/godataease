@@ -67,7 +67,7 @@ import { layerStoreWithOut } from '@/store/modules/data-visualization/layer'
 import { storeToRefs } from 'pinia'
 import { ElIcon, ElMessage, ElRow } from 'element-plus-secondary'
 import Icon from '../icon-custom/src/Icon.vue'
-import { nextTick, ref, toRefs } from 'vue'
+import { nextTick, ref, toRefs, withDefaults } from 'vue'
 import draggable from 'vuedraggable'
 import { lockStoreWithOut } from '@/store/modules/data-visualization/lock'
 import ContextMenuAsideDetails from '@/components/data-visualization/canvas/ContextMenuAsideDetails.vue'
@@ -77,6 +77,35 @@ import circlePackingOrigin from '@/assets/svg/circle-packing-origin.svg'
 import bulletGraphOrigin from '@/assets/svg/bullet-graph-origin.svg'
 import { syncViewTitle } from '@/utils/canvasUtils'
 import { useI18n } from '@/hooks/web/useI18n'
+
+interface RealTimeComponent {
+  id: string
+  name?: string
+  title?: string
+  icon?: string
+  type?: string
+  component?: string
+  isShow?: boolean
+  isLock?: boolean
+  expand?: boolean
+  propValue?: RealTimeComponent[]
+  componentData?: RealTimeComponent[]
+}
+
+const EMPTY_COMPONENT: RealTimeComponent = {
+  id: '',
+  name: '',
+  title: '',
+  icon: '',
+  type: '',
+  component: '',
+  isShow: true,
+  isLock: false,
+  expand: false,
+  propValue: [],
+  componentData: []
+}
+
 const dropdownMore = ref(null)
 const lockStore = lockStoreWithOut()
 const { t } = useI18n()
@@ -89,53 +118,55 @@ const { areaData } = storeToRefs(composeStore)
 
 const { curComponent, canvasViewInfo } = storeToRefs(dvMainStore)
 
-const props = defineProps({
-  tabPosition: {
-    type: String,
-    required: false,
-    default: 'main'
-  },
-  componentData: {
-    type: Array,
-    default: () => []
+const props = withDefaults(
+  defineProps<{
+    tabPosition?: string
+    componentData: RealTimeComponent[]
+  }>(),
+  {
+    tabPosition: 'main',
+    componentData: () => []
   }
-})
+)
 
 const { componentData } = toRefs(props)
 
-const getComponent = index => {
-  return componentData.value[componentData.value.length - 1 - index]
+const getComponent = (index: number): RealTimeComponent => {
+  return componentData.value[componentData.value.length - 1 - index] || EMPTY_COMPONENT
 }
-const transformIndex = index => {
+const transformIndex = (index: number) => {
   return componentData.value.length - 1 - index
 }
 
-const onClick = index => {
+const onClick = (index: number) => {
   setCurComponent(index)
   //其他情况点击清理选择区域
   areaData.value.components.splice(0, areaData.value.components.length)
 }
 
-const setCurComponent = index => {
+const setCurComponent = (index: number) => {
   dvMainStore.setCurComponent({ component: componentData.value[index], index })
 }
 
 let nameEdit = ref(false)
 let editComponentId = ref('')
 let inputName = ref('')
-let nameInput = ref(null)
-let curEditComponent = null
-const editComponentName = item => {
+let nameInput = ref<HTMLInputElement | null>(null)
+let curEditComponent: RealTimeComponent | null = null
+const editComponentName = (item: RealTimeComponent) => {
   curEditComponent = curComponent.value
   editComponentId.value = `#component-label-${item.id}`
   nameEdit.value = true
   inputName.value = item.name
   nextTick(() => {
-    nameInput.value.focus()
+    nameInput.value?.focus()
   })
 }
 const closeEditComponentName = () => {
   nameEdit.value = false
+  if (!curEditComponent) {
+    return
+  }
   if (!inputName.value || !inputName.value.trim()) {
     return
   }
@@ -180,7 +211,7 @@ const showComponent = () => {
   })
 }
 
-const dragOnEnd = ({ oldIndex, newIndex }) => {
+const dragOnEnd = ({ oldIndex, newIndex }: { oldIndex: number; newIndex: number }) => {
   const source = componentData.value[newIndex]
   const comLength = componentData.value.length
   // 还原数组
@@ -254,7 +285,7 @@ const iconMap = {
   'circle-packing-origin': circlePackingOrigin,
   'bullet-graph-origin': bulletGraphOrigin
 }
-const getIconName = item => {
+const getIconName = (item: RealTimeComponent) => {
   if (item.component === 'UserView') {
     const viewInfo = canvasViewInfo.value[item.id]
     return iconMap[`${viewInfo.type}-origin`]
@@ -263,7 +294,7 @@ const getIconName = item => {
   }
 }
 
-const menuAsideClose = (param, index) => {
+const menuAsideClose = (param: { opt?: string } | null, index: number) => {
   const iconDom = document.getElementById('close-button')
   if (iconDom) {
     iconDom.click()
@@ -275,7 +306,7 @@ const menuAsideClose = (param, index) => {
   }
 }
 
-const handleContextMenu = e => {
+const handleContextMenu = (e: MouseEvent) => {
   e.preventDefault()
   // 获取鼠标点击位置
   const x = e.clientX

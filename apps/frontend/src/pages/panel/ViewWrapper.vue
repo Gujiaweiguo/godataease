@@ -16,7 +16,35 @@ import { isAllowedEmbeddedMessageOrigin } from '@/utils/embedded'
 const { wsCache } = useCache()
 const interactiveStore = interactiveStoreWithOut()
 const embeddedStore = useEmbedded()
-const embeddedParamsDiv = inject('embeddedParams') as object
+
+interface EmbeddedParams {
+  dvId: string
+  chartId: string
+  busiFlag: string
+  outerParams: string
+  suffixId: string
+}
+
+interface OuterParamsPayload {
+  attachParams?: Record<string, unknown>
+  callBackFlag?: string
+}
+
+interface CanvasChild {
+  id: string
+}
+
+interface CanvasTab {
+  componentData?: CanvasChild[]
+}
+
+interface CanvasItem {
+  id: string
+  component?: string
+  propValue?: CanvasChild[] | CanvasTab[]
+}
+
+const embeddedParamsDiv = inject<Partial<EmbeddedParams> | undefined>('embeddedParams')
 const config = ref()
 const viewInfo = ref()
 const userViewEnlargeRef = ref()
@@ -33,7 +61,13 @@ const state = reactive({
   initState: true
 })
 
-const embeddedParams = embeddedParamsDiv?.chartId ? embeddedParamsDiv : embeddedStore
+const embeddedParams: EmbeddedParams = {
+  dvId: embeddedParamsDiv?.dvId || embeddedStore.dvId,
+  chartId: embeddedParamsDiv?.chartId || embeddedStore.chartId,
+  busiFlag: embeddedParamsDiv?.busiFlag || embeddedStore.busiFlag,
+  outerParams: embeddedParamsDiv?.outerParams || embeddedStore.outerParams,
+  suffixId: embeddedParamsDiv?.suffixId || embeddedStore.suffixId
+}
 
 // 目标校验： 需要校验targetSourceId 是否是当前可视化资源ID
 const winMsgHandle = event => {
@@ -80,15 +114,15 @@ onBeforeMount(async () => {
   state.suffixId = embeddedParams.suffixId || 'common'
   window.addEventListener('message', winMsgHandle)
 
-  let tokenInfo = null
-  if (embeddedStore.getToken && !Object.keys((tokenInfo = embeddedStore.getTokenInfo)).length) {
+  let tokenInfo = embeddedStore.getTokenInfo
+  if (embeddedStore.getToken && !Object.keys(tokenInfo).length) {
     const res = await exeRequest.get({ url: '/embedded/getTokenArgs' })
     embeddedStore.setTokenInfo(res.data)
     tokenInfo = embeddedStore.getTokenInfo
   }
 
   // 添加外部参数
-  let attachParams
+  let attachParams: Record<string, unknown> | undefined
   await getOuterParamsInfo(embeddedParams.dvId).then(rsp => {
     dvMainStore.setNowPanelOuterParamsInfoV2(rsp.data, embeddedParams.dvId)
   })
@@ -96,7 +130,7 @@ onBeforeMount(async () => {
   // div嵌入
   if (embeddedParams.outerParams) {
     try {
-      const outerPramsParse = JSON.parse(embeddedParams.outerParams)
+      const outerPramsParse = JSON.parse(embeddedParams.outerParams) as OuterParamsPayload
       attachParams = outerPramsParse.attachParams
       dvMainStore.setEmbeddedCallBack(outerPramsParse.callBackFlag || 'no')
     } catch (e) {
@@ -123,18 +157,14 @@ onBeforeMount(async () => {
       state.initState = true
 
       viewInfo.value = canvasViewInfoPreview[chartId]
-      ;(
-        (canvasDataResult as unknown as Array<{
-          id: string
-          component: string
-          propValue: Array<{ id: string }>
-        }>) || []
-      ).some(ele => {
+      const canvasItems = (canvasDataResult as unknown as CanvasItem[]) || []
+      canvasItems.some(ele => {
         if (ele.id === chartId) {
           config.value = ele
           return true
         } else if (ele.component === 'Group') {
-          return (ele.propValue || []).some(itx => {
+          const groupItems = (ele.propValue || []) as CanvasChild[]
+          return groupItems.some(itx => {
             if (itx.id === chartId) {
               config.value = itx
               return true
@@ -142,7 +172,8 @@ onBeforeMount(async () => {
             return false
           })
         } else if (ele.component === 'DeTabs') {
-          ele.propValue.forEach(tabItem => {
+          const tabItems = (ele.propValue || []) as CanvasTab[]
+          return tabItems.some(tabItem => {
             return (tabItem.componentData || []).some(itx => {
               if (itx.id === chartId) {
                 config.value = itx

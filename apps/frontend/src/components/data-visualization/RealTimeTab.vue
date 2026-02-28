@@ -7,13 +7,33 @@ import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapsho
 import { storeToRefs } from 'pinia'
 import { ElIcon, ElMessage, ElRow } from 'element-plus-secondary'
 import Icon from '../icon-custom/src/Icon.vue'
-import { nextTick, ref, toRefs } from 'vue'
+import { nextTick, ref, toRefs, withDefaults } from 'vue'
 import draggable from 'vuedraggable'
 import { composeStoreWithOut } from '@/store/modules/data-visualization/compose'
 import RealTimeGroup from '@/components/data-visualization/RealTimeGroup.vue'
 import eventBus from '@/utils/eventBus'
 import { syncViewTitle } from '@/utils/canvasUtils'
 import { useI18n } from '@/hooks/web/useI18n'
+
+interface RealTimeTabComponent {
+  id: string
+  name?: string
+  title?: string
+  expand?: boolean
+  componentData?: RealTimeTabComponent[]
+}
+
+interface TabElement {
+  id?: string
+}
+
+const EMPTY_COMPONENT: RealTimeTabComponent = {
+  id: '',
+  name: '',
+  title: '',
+  expand: false,
+  componentData: []
+}
 
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
@@ -23,27 +43,27 @@ const { areaData } = storeToRefs(composeStore)
 
 const { curTabName } = storeToRefs(dvMainStore)
 
-const props = defineProps({
-  tabPosition: {
-    type: String,
-    required: false,
-    default: 'main'
-  },
-  componentData: {
-    type: Array,
-    default: () => []
-  },
-  tabElement: {}
-})
+const props = withDefaults(
+  defineProps<{
+    tabPosition?: string
+    componentData: RealTimeTabComponent[]
+    tabElement?: TabElement | null
+  }>(),
+  {
+    tabPosition: 'main',
+    componentData: () => [],
+    tabElement: null
+  }
+)
 
 const { componentData, tabElement } = toRefs(props)
 
-const getComponent = index => {
-  return componentData.value[index]
+const getComponent = (index: number): RealTimeTabComponent => {
+  return componentData.value[index] || EMPTY_COMPONENT
 }
-const onClick = item => {
+const onClick = (item: RealTimeTabComponent | null) => {
   if (item) {
-    dvMainStore.setCurTabName(item.name)
+    dvMainStore.setCurTabName(item.name || null)
   } else {
     dvMainStore.setCurTabName(null)
   }
@@ -54,19 +74,22 @@ const onClick = item => {
 let nameEdit = ref(false)
 let editComponentId = ref('')
 let inputName = ref('')
-let nameInput = ref(null)
-let curEditComponent = null
-const editComponentName = item => {
+let nameInput = ref<HTMLInputElement | null>(null)
+let curEditComponent: RealTimeTabComponent | null = null
+const editComponentName = (item: RealTimeTabComponent) => {
   curEditComponent = item
   editComponentId.value = `#component-label-${item.name}`
   nameEdit.value = true
-  inputName.value = item.title
+  inputName.value = item.title || ''
   nextTick(() => {
-    nameInput.value.focus()
+    nameInput.value?.focus()
   })
 }
 const closeEditComponentName = () => {
   nameEdit.value = false
+  if (!curEditComponent) {
+    return
+  }
   if (!inputName.value || !inputName.value.trim()) {
     return
   }
@@ -83,14 +106,14 @@ const closeEditComponentName = () => {
   curEditComponent = null
 }
 
-const dragOnEnd = ({ newIndex }) => {
+const dragOnEnd = ({ newIndex }: { newIndex: number }) => {
   const source = componentData.value[newIndex]
-  dvMainStore.setCurTabName(source.title)
+  dvMainStore.setCurTabName(source?.title || null)
   eventBus.emit('onTabSortChange-' + tabElement.value?.id)
   snapshotStore.recordSnapshotCache('dragOnEnd')
 }
 
-const handleContextMenu = e => {
+const handleContextMenu = (e: MouseEvent) => {
   e.preventDefault()
   // 获取鼠标点击位置
   const x = e.clientX
@@ -111,8 +134,8 @@ const handleContextMenu = e => {
   })
 }
 
-const expandClick = component => {
-  component['expand'] = !component['expand']
+const expandClick = (component: RealTimeTabComponent) => {
+  component.expand = !component.expand
 }
 </script>
 

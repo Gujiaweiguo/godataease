@@ -17,10 +17,30 @@ import EmptyBackground from '../../components/empty-background/src/EmptyBackgrou
 const { wsCache } = useCache()
 const interactiveStore = interactiveStoreWithOut()
 const embeddedStore = useEmbedded()
-const dashboardPreview = ref(null)
-const embeddedParamsDiv = inject('embeddedParams') as object
 
-const embeddedParams = embeddedParamsDiv?.dvId ? embeddedParamsDiv : embeddedStore
+interface EmbeddedParams {
+  dvId: string
+  busiFlag: string
+  outerParams: string
+}
+
+interface OuterParamsPayload {
+  attachParams?: Record<string, unknown>
+  callBackFlag?: string
+}
+
+interface StatusError {
+  status?: number
+}
+
+const dashboardPreview = ref(null)
+const embeddedParamsDiv = inject<Partial<EmbeddedParams> | undefined>('embeddedParams')
+
+const embeddedParams: EmbeddedParams = {
+  dvId: embeddedParamsDiv?.dvId || embeddedStore.dvId,
+  busiFlag: embeddedParamsDiv?.busiFlag || embeddedStore.busiFlag,
+  outerParams: embeddedParamsDiv?.outerParams || embeddedStore.outerParams
+}
 const { t } = useI18n()
 const state = reactive({
   canvasDataPreview: null,
@@ -60,7 +80,8 @@ onBeforeMount(async () => {
       dvMainStore.setNowPanelOuterParamsInfoV2(rsp.data, embeddedParams.dvId)
     })
   } catch (error) {
-    if (error.status === 401) {
+    const statusError = error as StatusError
+    if (statusError.status === 401) {
       return
     }
   }
@@ -68,7 +89,7 @@ onBeforeMount(async () => {
   // div嵌入
   if (embeddedParams.outerParams) {
     try {
-      const outerPramsParse = JSON.parse(embeddedParams.outerParams)
+      const outerPramsParse = JSON.parse(embeddedParams.outerParams) as OuterParamsPayload
       attachParams = outerPramsParse.attachParams
       dvMainStore.setEmbeddedCallBack(outerPramsParse.callBackFlag || 'no')
     } catch (e) {

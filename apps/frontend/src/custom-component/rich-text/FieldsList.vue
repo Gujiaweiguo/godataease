@@ -19,7 +19,7 @@ import { useEmitt } from '@/hooks/web/useEmitt'
 
 const props = defineProps({
   fields: {
-    type: Array,
+    type: Array as () => Array<{ id: string; name: string }>,
     default: () => []
   },
   element: {
@@ -30,11 +30,11 @@ const props = defineProps({
 
 const { fields, element } = toRefs(props)
 
-const fieldSelect = field => {
+const fieldSelect = (field: { id: string; name: string }) => {
   useEmitt().emitter.emit('fieldSelect-' + element.value.id, field)
 }
 
-const fieldsAreaDown = e => {
+const fieldsAreaDown = (e: MouseEvent) => {
   e.preventDefault()
 }
 </script>
