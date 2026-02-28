@@ -78,14 +78,14 @@ const groupActiveChange = category => {
           :class="'item' + groupInfo.span"
           :span="groupInfo.span"
           v-for="chartInfo in groupInfo.details"
-          :key="chartInfo.title"
+          :key="chartInfo.value"
         >
           <div
             v-on:click="newComponent({ category: groupInfo.category, innerType: chartInfo.value })"
             class="item-top"
             draggable="true"
             :data-id="groupInfo.category + '&' + chartInfo.value"
-            :title="chartInfo.title"
+            :title="chartInfo.title || ''"
           >
             <Icon
               v-if="['outer_svg', 'graphical'].includes(chartInfo.type)"
