@@ -17,6 +17,7 @@ type Config struct {
 	Log         LogConfig         `mapstructure:"log"`
 	Telemetry   TelemetryConfig   `mapstructure:"telemetry"`
 	Integration IntegrationConfig `mapstructure:"integration"`
+	Menu        MenuConfig        `mapstructure:"menu"`
 }
 
 type ServerConfig struct {
@@ -66,6 +67,11 @@ type GRPCIntegrationConfig struct {
 	Address    string `mapstructure:"address"`
 	TimeoutSec int    `mapstructure:"timeout_sec"`
 	MaxRetries int    `mapstructure:"max_retries"`
+}
+
+// MenuConfig 菜单配置
+type MenuConfig struct {
+	HardcodedFallback bool `mapstructure:"hardcoded_fallback"`
 }
 
 // LoadConfig 加载配置
@@ -130,6 +136,7 @@ func bindEnvKeys() error {
 		"integration.seatunnel.address":     "SEATUNNEL_GRPC_ADDR",
 		"integration.seatunnel.timeout_sec": "SEATUNNEL_GRPC_TIMEOUT_SEC",
 		"integration.seatunnel.max_retries": "SEATUNNEL_GRPC_MAX_RETRIES",
+		"menu.hardcoded_fallback":          "MENU_HARDCODED_FALLBACK",
 	}
 
 	for key, envName := range keys {
