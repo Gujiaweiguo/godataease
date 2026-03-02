@@ -90,12 +90,4 @@ jobs:
         run: npm run ${{ steps.affected.outputs.target }}
       - name: Summary
         if: always()
-        run: |
-          echo "## Frontend CI" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- TypeScript: ${{ steps.tscheck.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ESLint: ${{ steps.lint.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Build: ${{ steps.build.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests (core): ${{ steps.test.outcome }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Affected target: ${{ steps.affected.outputs.target }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests (affected): ${{ steps.testcore.outcome }}" >> $GITHUB_STEP_SUMMARY
+        run: npm run quality:report:summary -- --ts=${{ steps.tscheck.outcome }} --lint=${{ steps.lint.outcome }} --build=${{ steps.build.outcome }} --test-core=${{ steps.test.outcome }} --affected-target=${{ steps.affected.outputs.target }} --affected=${{ steps.testcore.outcome }}
