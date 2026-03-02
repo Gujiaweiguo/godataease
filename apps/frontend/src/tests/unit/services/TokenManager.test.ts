@@ -20,6 +20,9 @@ describe('TokenManager', () => {
   let setTokenInfoSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
     mockEmbeddedStore = useEmbedded()
     mockEmbeddedStore.clearState()
 

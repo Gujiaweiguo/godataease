@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { encodeOuterParams, decodeOuterParams, validateOuterParams } from '@/utils/embeddedParams'
 import {
   isTokenExpiringSoon,
@@ -10,6 +10,15 @@ import {
 import { validateOrigin, isOriginAllowed } from '@/utils/embeddedOriginValidation'
 
 describe('Embedding Parameter Initialization and Callback Messaging', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   describe('outerParams utilities', () => {
     describe('encodeOuterParams', () => {
       it('should encode params to JSON string', () => {
