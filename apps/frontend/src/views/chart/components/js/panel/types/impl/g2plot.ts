@@ -139,7 +139,7 @@ export abstract class G2PlotChartView<
   }
 
   protected configAnalyseHorizontal(chart: Chart, options: O): O {
-    const annotations = [...(options.annotations ?? []), ...getAnalyseHorizontal(chart)]
+    const annotations = [...((options as any).annotations ?? []), ...getAnalyseHorizontal(chart)]
     return { ...options, annotations }
   }
 
@@ -167,11 +167,11 @@ export abstract class G2PlotChartView<
     return { ...options, color }
   }
 
-  public setupSeriesColor(chart: ChartObj, data?: any[]): ChartBasicStyle['seriesColor'] {
-    return setupSeriesColor(chart, data)
+  public setupSeriesColor(chart: ChartObj, _data?: any[]): ChartBasicStyle['seriesColor'] {
+    return setupSeriesColor(chart)
   }
    
-  public setupSubSeriesColor(chart: ChartObj, data?: any[]): ChartBasicStyle['seriesColor'] {
+  public setupSubSeriesColor(_chart: ChartObj, _data?: any[]): ChartBasicStyle['seriesColor'] {
     return undefined
   }
 

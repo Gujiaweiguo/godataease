@@ -17,7 +17,6 @@ import {
   TOOLTIP_TPL
 } from '@/views/chart/components/js/panel/common/common_antv'
 import { parseJson, flow, setUpSingleDimensionSeriesColor } from '@/views/chart/components/js/util'
-import { Label } from '@antv/g2plot/lib/types/label'
 import { valueFormatter } from '@/views/chart/components/js/formatter'
 import { Datum } from '@antv/g2plot/esm/types/common'
 import { add } from 'mathjs'
@@ -122,9 +121,10 @@ export class Rose extends G2PlotChartView<RoseOptions, G2Rose> {
     const layout = []
     if (!labelAttr.fullDisplay) {
       const tmpOptions = super.configLabel(chart, options)
-      layout.push(...tmpOptions.label.layout)
+      const baseLayout = (tmpOptions.label as any)?.layout || []
+      layout.push(...baseLayout)
     }
-    const labelOptions: Label = {
+    const labelOptions: any = {
       autoRotate: true,
       layout,
       style: {

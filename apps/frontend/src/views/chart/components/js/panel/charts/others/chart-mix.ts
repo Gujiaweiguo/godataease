@@ -48,6 +48,27 @@ import { extremumEvt } from '@/views/chart/components/js/extremumUitl'
 const { t } = useI18n()
 const DEFAULT_DATA = []
 
+const updateGeometryOption = (
+  options: DualAxesOptions,
+  index: number,
+  patch: Record<string, unknown>
+): DualAxesOptions => {
+  const geometryOptions = [...(options.geometryOptions ?? [])] as unknown as Array<
+    Record<string, unknown>
+  >
+  if (!geometryOptions[index]) {
+    return options
+  }
+  geometryOptions[index] = {
+    ...geometryOptions[index],
+    ...patch
+  }
+  return {
+    ...options,
+    geometryOptions: geometryOptions as unknown as DualAxesOptions['geometryOptions']
+  }
+}
+
 /**
  * 柱线混合图
  */
@@ -63,7 +84,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     ]
   }
   axis: AxisType[] = [...CHART_MIX_AXIS_TYPE, 'xAxisExtRight', 'yAxisExt']
-  axisConfig = {
+  axisConfig: AxisConfig = {
     xAxis: {
       name: `${t('chart.drag_block_type_axis')} / ${t('chart.dimension')}`,
       type: 'd'
@@ -185,12 +206,10 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
 
   protected configLabel(chart: Chart, options: DualAxesOptions): DualAxesOptions {
     const tempLabel = getLabel(chart)
-    const tmpOption = { ...options }
+    let tmpOption = { ...options }
     if (!tempLabel) {
-      if (tmpOption.geometryOptions) {
-        tmpOption.geometryOptions[0].label = false
-        tmpOption.geometryOptions[1].label = false
-      }
+      tmpOption = updateGeometryOption(tmpOption, 0, { label: false })
+      tmpOption = updateGeometryOption(tmpOption, 1, { label: false })
       return tmpOption
     }
 
@@ -243,12 +262,10 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
           return group
         }
       }
-      if (tmpOption.geometryOptions) {
-        if (axisType === 'yAxis') {
-          tmpOption.geometryOptions[0].label = label
-        } else if (axisType === 'yAxisExt') {
-          tmpOption.geometryOptions[1].label = label
-        }
+      if (axisType === 'yAxis') {
+        tmpOption = updateGeometryOption(tmpOption, 0, { label })
+      } else if (axisType === 'yAxisExt') {
+        tmpOption = updateGeometryOption(tmpOption, 1, { label })
       }
     })
 
@@ -284,27 +301,22 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     const leftLineStyle = {
       lineWidth: s.leftLineWidth
     }
-    const tempOption = {
-      ...options,
+    let tempOption: DualAxesOptions = {
+      ...options
+    }
+    tempOption = updateGeometryOption(tempOption, 0, {
+      smooth: leftSmooth,
+      point: leftPoint,
+      lineStyle: leftLineStyle,
+      ...configRoundAngle(chart, 'columnStyle')
+    })
+    tempOption = updateGeometryOption(tempOption, 1, {
       smooth,
       point,
       lineStyle
-    }
-    if (tempOption.geometryOptions) {
-      tempOption.geometryOptions[0].smooth = leftSmooth
-      tempOption.geometryOptions[0].point = leftPoint
-      tempOption.geometryOptions[0].lineStyle = leftLineStyle
+    })
 
-      tempOption.geometryOptions[1].smooth = smooth
-      tempOption.geometryOptions[1].point = point
-      tempOption.geometryOptions[1].lineStyle = lineStyle
-      tempOption.geometryOptions[0] = {
-        ...tempOption.geometryOptions[0],
-        ...configRoundAngle(chart, 'columnStyle')
-      }
-    }
-
-    let columnWidthRatio
+    let columnWidthRatio: number | undefined
     const _v = s.columnWidthRatio ?? DEFAULT_BASIC_STYLE.columnWidthRatio
     if (_v >= 1 && _v <= 100) {
       columnWidthRatio = _v / 100.0
@@ -314,11 +326,11 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
       columnWidthRatio = 1
     }
     if (columnWidthRatio) {
-      tempOption.geometryOptions[0].columnWidthRatio = columnWidthRatio
+      tempOption = updateGeometryOption(tempOption, 0, { columnWidthRatio })
     }
 
     if (super.name !== 'chart-mix-dual-line') {
-      tempOption.geometryOptions[0].appendPadding = getPadding(chart)
+      tempOption = updateGeometryOption(tempOption, 0, { appendPadding: getPadding(chart) })
     }
 
     return tempOption
@@ -327,7 +339,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
   setupDefaultOptions(chart: ChartObj): ChartObj {
     const { senior } = chart
     if (
-      senior.functionCfg.emptyDataStrategy == undefined ||
+      senior.functionCfg.emptyDataStrategy === undefined ||
       senior.functionCfg.emptyDataStrategy === 'ignoreData'
     ) {
       senior.functionCfg.emptyDataStrategy = 'breakLine'
@@ -336,7 +348,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    let tempOption = {
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -368,13 +380,13 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
         return tmp
       }
     })
-    tempOption.geometryOptions[0].color = color
+    tempOption = updateGeometryOption(tempOption, 0, { color })
 
     return tempOption
   }
 
   protected configSubCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    let tempOption = {
       ...options
     }
     const basicStyle = defaultsDeep(
@@ -392,7 +404,11 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
       const { data } = options as unknown as Options
       if (extBubble?.length) {
         const seriesSet = new Set()
-        data[1]?.forEach(d => d.category !== null && seriesSet.add(d.category))
+        data[1]?.forEach(d => {
+          if (d.category !== null) {
+            seriesSet.add(d.category)
+          }
+        })
         const tmp = [...seriesSet]
         tmp.forEach((c, i) => {
           const curAxisColor = seriesMap[c as string]
@@ -421,7 +437,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
       const cc = hexColorToRGBA(c, basicStyle.subAlpha)
       return cc
     })
-    tempOption.geometryOptions[1].color = subColor
+    tempOption = updateGeometryOption(tempOption, 1, { color: subColor })
 
     return tempOption
   }
@@ -608,18 +624,21 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
       }
 
       const customStyle = parseJson(chart.customStyle)
-      let size
+      let size: number
       if (customStyle && customStyle.legend) {
         size = defaults(JSON.parse(JSON.stringify(customStyle.legend)), DEFAULT_LEGEND_STYLE).size
       } else {
         size = DEFAULT_LEGEND_STYLE.size
       }
 
-      o.legend.marker.style = style => {
-        const fill = style.fill ?? style.stroke
-        return {
-          r: size,
-          fill
+      const marker = o.legend.marker
+      if (marker && typeof marker !== 'function') {
+        marker.style = style => {
+          const fill = style.fill ?? style.stroke
+          return {
+            r: size,
+            fill
+          }
         }
       }
     }
@@ -682,7 +701,7 @@ export class GroupColumnLineMix extends ColumnLineMix {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    let tempOption = {
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -697,7 +716,11 @@ export class GroupColumnLineMix extends ColumnLineMix {
       const { data } = options as unknown as Options
       if (xAxisExt?.length) {
         const seriesSet = new Set()
-        data[0]?.forEach(d => d.category !== null && seriesSet.add(d.category))
+        data[0]?.forEach(d => {
+          if (d.category !== null) {
+            seriesSet.add(d.category)
+          }
+        })
         const tmp = [...seriesSet]
         tmp.forEach((c, i) => {
           const curAxisColor = seriesMap[c as string]
@@ -731,7 +754,7 @@ export class GroupColumnLineMix extends ColumnLineMix {
         return tmp
       }
     })
-    tempOption.geometryOptions[0].color = color
+    tempOption = updateGeometryOption(tempOption, 0, { color })
 
     return tempOption
   }
@@ -795,7 +818,7 @@ export class StackColumnLineMix extends ColumnLineMix {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    let tempOption = {
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -810,7 +833,11 @@ export class StackColumnLineMix extends ColumnLineMix {
       const { data } = options as unknown as Options
       if (extStack?.length) {
         const seriesSet = new Set()
-        data[0]?.forEach(d => d.category !== null && seriesSet.add(d.category))
+        data[0]?.forEach(d => {
+          if (d.category !== null) {
+            seriesSet.add(d.category)
+          }
+        })
         const tmp = [...seriesSet]
         tmp.forEach((c, i) => {
           const curAxisColor = seriesMap[c as string]
@@ -844,7 +871,7 @@ export class StackColumnLineMix extends ColumnLineMix {
         return tmp
       }
     })
-    tempOption.geometryOptions[0].color = color
+    tempOption = updateGeometryOption(tempOption, 0, { color })
 
     return tempOption
   }
@@ -913,7 +940,7 @@ export class DualLineMix extends ColumnLineMix {
   }
 
   protected configCustomColors(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tempOption = {
+    let tempOption = {
       ...options
     }
     const basicStyle = parseJson(chart.customAttr).basicStyle as MixChartBasicStyle
@@ -928,7 +955,11 @@ export class DualLineMix extends ColumnLineMix {
       const { data } = options as unknown as Options
       if (xAxisExt?.length) {
         const seriesSet = new Set()
-        data[0]?.forEach(d => d.category !== null && seriesSet.add(d.category))
+        data[0]?.forEach(d => {
+          if (d.category !== null) {
+            seriesSet.add(d.category)
+          }
+        })
         const tmp = [...seriesSet]
         tmp.forEach((c, i) => {
           const curAxisColor = seriesMap[c as string]
@@ -962,7 +993,7 @@ export class DualLineMix extends ColumnLineMix {
         return tmp
       }
     })
-    tempOption.geometryOptions[0].color = color
+    tempOption = updateGeometryOption(tempOption, 0, { color })
 
     return tempOption
   }

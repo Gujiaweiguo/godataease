@@ -295,7 +295,7 @@ const validateDS = () => {
     .then(res => {
       if (res.data.type.startsWith('API')) {
         let error = 0
-        const dsStatus = JSON.parse(res.data.status)
+        const dsStatus = JSON.parse(res.data.status) as Array<{ status: string; name: string }>
         for (let i = 0; i < dsStatus.length; i++) {
           if (dsStatus[i].status === 'Error') {
             error++
@@ -347,14 +347,16 @@ const formatSimpleCron = (info?: SyncSetting) => {
       strArr.push(`${t('dataset.end_time')}: ${end}`)
       break
     case 'SIMPLE_CRON':
-      const type = t(`common.${simpleCronType}`)
-      strArr.push(
-        `${t('dataset.simple_cron')}: ${t('common.every')}${simpleCronValue}${type}${t(
-          'data_source.update_once'
-        )}`
-      )
-      strArr.push(`${t('dataset.start_time')}: ${start}`)
-      strArr.push(`${t('dataset.end_time')}: ${end}`)
+      {
+        const type = t(`common.${simpleCronType}`)
+        strArr.push(
+          `${t('dataset.simple_cron')}: ${t('common.every')}${simpleCronValue}${type}${t(
+            'data_source.update_once'
+          )}`
+        )
+        strArr.push(`${t('dataset.start_time')}: ${start}`)
+        strArr.push(`${t('dataset.end_time')}: ${end}`)
+      }
       break
     default:
       break
@@ -420,6 +422,7 @@ const defaultInfo = {
   name: '',
   createBy: '',
   creator: '',
+  copy: false,
   createTime: '',
   description: '',
   id: 0,
@@ -711,9 +714,9 @@ const editDatasource = (editType?: number) => {
   if (nodeInfo.type.startsWith('Excel')) {
     nodeInfo.editType = editType
   }
-  return getById(nodeInfo.id).then(res => {
+  return getById(Number(nodeInfo.id)).then(res => {
     let arr = pluginDs.value.filter(ele => {
-      return ele.type == res.data.type
+      return ele.type === res.data.type
     })
     let {
       name,
@@ -801,7 +804,7 @@ const handleCopy = async data => {
       enableDataFill
     } = res.data
     let arr = pluginDs.value.filter(ele => {
-      return ele.type == res.data.type
+      return ele.type === res.data.type
     })
     if (configuration) {
       configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
@@ -1740,7 +1743,7 @@ const getMenuList = (val: boolean) => {
             v-if="nodeInfo.type.startsWith('Excel')"
             v-slot="slotProps"
             :name="t('dataset.data_preview')"
-            :time="nodeInfo.lastSyncTime"
+            :time="Number(nodeInfo.lastSyncTime) || 0"
             :showTime="nodeInfo.type === 'ExcelRemote'"
           >
             <template v-if="slotProps.active">
@@ -1780,7 +1783,7 @@ const getMenuList = (val: boolean) => {
             "
             v-slot="slotProps"
             :name="t('dataset.update_setting')"
-            :time="(nodeInfo.lastSyncTime as string)"
+            :time="Number(nodeInfo.lastSyncTime) || 0"
           >
             <template v-if="slotProps.active">
               <el-row :gutter="24">

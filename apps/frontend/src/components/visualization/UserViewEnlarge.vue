@@ -107,16 +107,19 @@
           v-if="optType === 'enlarge'"
           class="enlarge-wrapper"
           :opt-type="optType"
-          :view-info="viewInfo"
+          :view-info="viewInfoAsChartObj"
           :config="config"
           :dv-info="dvInfo"
           :font-family="canvasStyleData?.fontFamily"
           show-position="viewDialog"
+          :index="0"
+          :canvas-style-data="canvasStyleData"
+          :canvas-view-info="canvasViewInfo"
         />
         <template v-if="optType === 'details' && !sourceViewType.includes('chart-mix')">
           <chart-component-s2
             v-if="!detailsError"
-            :view="viewInfo"
+            :view="viewInfoAsChartObj"
             show-position="viewDialog"
             ref="chartComponentDetails"
           />
@@ -134,13 +137,13 @@
           <div style="flex: 1">
             <chart-component-s2
               v-if="activeName === 'left'"
-              :view="viewInfo"
+              :view="viewInfoAsChartObj"
               show-position="viewDialog"
               ref="chartComponentDetails"
             />
             <chart-component-s2
               v-else-if="activeName === 'right'"
-              :view="viewInfo"
+              :view="viewInfoAsChartObj"
               show-position="viewDialog"
               ref="chartComponentDetails2"
             />
@@ -181,13 +184,14 @@ const dialogShow = ref(false)
 const requestStore = useRequestStoreWithOut()
 const permissionStore = usePermissionStoreWithOut()
 let viewInfo = ref<DeepPartial<ChartObj>>(null)
+const viewInfoAsChartObj = computed(() => viewInfo.value as ChartObj)
 const config = ref(null)
 const viewContainer = ref(null)
 const { t } = useI18n()
 const optType = ref(null)
 const chartComponentDetails = ref(null)
 const chartComponentDetails2 = ref(null)
-const { dvInfo, isIframe, canvasStyleData } = storeToRefs(dvMainStore)
+const { dvInfo, isIframe, canvasStyleData, canvasViewInfo } = storeToRefs(dvMainStore)
 const exportLoading = ref(false)
 const sourceViewType = ref()
 const activeName = ref('left')
@@ -300,7 +304,7 @@ const pixelOptions = [
     ]
   }
 ]
-const dialogInit = (_canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
+const dialogInit = (_canvasStyle, view, item, opt, _params = { scale: 0.5 }) => {
   sourceViewType.value = view.type
   detailsError.value = false
   optType.value = opt
@@ -425,7 +429,7 @@ const openMessageLoading = cb => {
     icon: h(RefreshLeft),
     showClose: true,
     customClass
-  })
+  } as any)
 }
 // 地图
 const mapChartTypes = ['bubble-map', 'flow-map', 'heat-map', 'map', 'symbolic-map']

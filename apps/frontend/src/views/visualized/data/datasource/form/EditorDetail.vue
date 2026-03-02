@@ -26,7 +26,6 @@ import Cron from '@/components/cron/src/Cron.vue'
 import { ComponentPublicInstance } from 'vue'
 import { XpackComponent } from '@/components/plugin'
 import { iconFieldMap } from '@/components/icon-group/field-list'
-import { boolean } from 'mathjs'
 const { t } = useI18n()
 const prop = defineProps({
   form: {
@@ -57,12 +56,17 @@ const prop = defineProps({
     default: 1,
     type: Number
   },
+  editDs: {
+    required: false,
+    default: false,
+    type: Boolean
+  },
   isSupportSetKey: {
-    type: boolean,
+    type: Boolean,
     required: true
   },
   pluginDs: {
-    type: [],
+    type: Array,
     required: true
   },
   pluginIndex: {
@@ -70,7 +74,7 @@ const prop = defineProps({
     required: true
   },
   isPlugin: {
-    type: boolean,
+    type: Boolean,
     required: true
   }
 })

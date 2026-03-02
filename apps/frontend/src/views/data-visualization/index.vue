@@ -19,7 +19,7 @@ import { guid } from '@/views/visualized/data/dataset/form/util.js'
 import { getDatasetTree } from '@/api/dataset'
 import { Tree } from '@/views/visualized/data/dataset/form/CreatDsGroup.vue'
 import {
-  decompressionPre,
+  decompressionPre as _decompressionPre,
   findDragComponent,
   findNewComponent,
   initCanvasData,
@@ -437,7 +437,12 @@ onMounted(async () => {
   const pid = embeddedStore.pid || router.currentRoute.value.query.pid
   const templateParams =
     embeddedStore.templateParams || router.currentRoute.value.query.templateParams
-  createType = embeddedStore.createType || router.currentRoute.value.query.createType
+  const queryCreateType = router.currentRoute.value.query.createType
+  createType =
+    embeddedStore.createType ||
+    (Array.isArray(queryCreateType)
+      ? queryCreateType[0]
+      : (queryCreateType as string | undefined) || null)
   const opt = embeddedStore.opt || router.currentRoute.value.query.opt
   const checkDvId = opt && opt === 'copy' ? null : dvId
   const checkResult = await checkPer(checkDvId)
@@ -495,10 +500,10 @@ onMounted(async () => {
       // 从模板新建
       if (createType === 'template') {
         if (deTemplateData) {
-          dvMainStore.setComponentData(deTemplateData.componentData)
-          dvMainStore.setCanvasStyle(deTemplateData.canvasStyleData)
-          dvMainStore.setCanvasViewInfo(deTemplateData.canvasViewInfo)
-          dvMainStore.setAppDataInfo(deTemplateData.appData)
+          dvMainStore.setComponentData(deTemplateData.componentData as any[])
+          dvMainStore.setCanvasStyle(deTemplateData.canvasStyleData as any)
+          dvMainStore.setCanvasViewInfo(deTemplateData.canvasViewInfo as any)
+          dvMainStore.setAppDataInfo(deTemplateData.appData as any)
         }
         setTimeout(() => {
           snapshotStore.recordSnapshotCache('template')

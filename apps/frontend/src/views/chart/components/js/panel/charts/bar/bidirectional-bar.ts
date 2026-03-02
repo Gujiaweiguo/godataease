@@ -226,7 +226,10 @@ export class BidirectionalHorizontalBar extends G2PlotChartView<
       return tmpOptions
     }
     if (tmpOptions.xAxis.label) {
-      delete tmpOptions.xAxis.label.style.textAlign
+      const labelStyle = (tmpOptions.xAxis.label as any).style
+      if (labelStyle && typeof labelStyle === 'object') {
+        delete labelStyle.textAlign
+      }
       const { lengthLimit } = parseJson(chart.customStyle).xAxis.axisLabel
       defaults(tmpOptions.xAxis.label, {
         formatter: value => {
@@ -438,7 +441,8 @@ export class BidirectionalHorizontalBar extends G2PlotChartView<
           const layout = []
           if (!labelAttr.fullDisplay) {
             const tmpOptions = super.configLabel(chart, options)
-            layout.push(...tmpOptions.label.layout)
+            const baseLayout = (tmpOptions.label as any)?.layout || []
+            layout.push(...baseLayout)
           }
           label = {
             position: l.position,

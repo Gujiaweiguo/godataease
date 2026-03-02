@@ -129,6 +129,7 @@ import { queryAuditLogsApi, exportAuditLogsApi } from '@/api/audit'
 
 const loading = ref(false)
 const auditLogList = ref([])
+const userList = ref<any[]>([])
 
 const filterForm = reactive({
   userId: null,
@@ -243,6 +244,17 @@ const getResourceTypeText = (resourceType: string) => {
     DASHBOARD: '仪表板'
   }
   return typeMap[resourceType] || resourceType
+}
+const getOperationText = (operation: string) => {
+  const opMap: Record<string, string> = {
+    CREATE: '创建',
+    UPDATE: '更新',
+    DELETE: '删除',
+    EXPORT: '导出',
+    LOGIN: '登录',
+    LOGOUT: '登出'
+  }
+  return opMap[operation] || operation
 }
 
 const formatDateTime = (dateStr: string) => {

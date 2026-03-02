@@ -278,7 +278,7 @@
                         <div
                           class="view-item"
                           v-for="viewInfo in baseDatasetInfo.datasetViews"
-                          :key="viewInfo"
+                          :key="viewInfo.chartId"
                         >
                           <div>
                             <el-checkbox
@@ -399,6 +399,40 @@ const curEditDataId = ref(null)
 const snapshotStore = snapshotStoreWithOut()
 import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
 
+interface FilterPropValueItem {
+  id?: string
+  name?: string
+  displayType?: string | number
+}
+
+interface FilterInfoItem {
+  id?: string
+  matchMode?: string
+  filterSelected?: string
+  propValue?: FilterPropValueItem[]
+}
+
+interface DatasetInfoItem {
+  id?: string
+  name?: string
+  fieldIdSelected?: string
+  viewExpand?: boolean
+  datasetViews?: DatasetViewItem[]
+  checkAll?: boolean
+  checkAllIsIndeterminate?: boolean
+  activelist?: string
+  datasetFields?: unknown
+}
+
+interface DatasetViewItem {
+  chartId?: string
+  chartType?: string
+  chartName?: string
+  checked?: boolean
+}
+
+
+
 const state = reactive({
   filterExpand: true,
   datasetExpand: true,
@@ -438,7 +472,9 @@ const state = reactive({
     enabledDefault: false,
     defaultValue: null,
     targetViewInfoList: [],
-    paramsInfoId: null
+    paramsInfoId: null,
+    filterInfo: [] as FilterInfoItem[],
+    datasetInfo: [] as DatasetInfoItem[]
   },
   currentFiledTreeNode: null,
   defaultOuterParamsInfo: {

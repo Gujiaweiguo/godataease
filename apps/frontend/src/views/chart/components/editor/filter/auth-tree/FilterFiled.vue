@@ -115,7 +115,7 @@ const computedFiledList = computed(() => {
 const authTargetType = ref('')
 
 watch(
-  () => getAuthTargetType?.authTargetType,
+  () => getAuthTargetType?.value?.authTargetType,
   value => {
     if (authTargetType.value === value || !value) return
     authTargetType.value = value

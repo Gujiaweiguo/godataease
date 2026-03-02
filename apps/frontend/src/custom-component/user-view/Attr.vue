@@ -2,10 +2,10 @@
 import CommonAttr from '@/custom-component/common/CommonAttr.vue'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { storeToRefs } from 'pinia'
-import { toRefs } from 'vue'
+import { toRefs, PropType } from 'vue'
 const props = defineProps({
   themes: {
-    type: String,
+    type: String as PropType<EditorTheme>,
     default: 'dark'
   }
 })

@@ -233,8 +233,8 @@ const composeDivider = computed(() => {
   return !(
     !curComponent ||
     curComponent['isLock'] ||
-    curComponent['component'] != 'Group' ||
-    curComponent.category === 'hidden'
+    curComponent['component'] !== 'Group' ||
+    curComponent.value?.category === 'hidden'
   )
 })
 

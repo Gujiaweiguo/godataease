@@ -40,6 +40,7 @@
       <el-row v-if="state.inputType === 'new_inner_template'" class="preview">
         <el-col :span="8" style="height: 100%; overflow-y: auto">
           <de-template-preview-list
+            :cur-canvas-type="props.curCanvasType"
             :template-list="state.templateList"
             @showCurrentTemplateInfo="showCurrentTemplateInfo"
           />
@@ -195,7 +196,7 @@ const handleFileChange = e => {
   reader.onload = res => {
     state.templateSelected = true
     const result = res.target.result
-    state.importTemplateInfo = JSON.parse(result)
+    state.importTemplateInfo = JSON.parse(String(result))
     state.dvCreateInfo.name = state.importTemplateInfo['name'].name
     state.dvCreateInfo.canvasStyleData = state.importTemplateInfo['canvasStyleData']
     state.dvCreateInfo.componentData = state.importTemplateInfo['componentData']

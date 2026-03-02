@@ -36,6 +36,18 @@ import { DEFAULT_LABEL, DEFAULT_LEGEND_STYLE } from '@/views/chart/components/ed
 import { clearExtremum, extremumEvt } from '@/views/chart/components/js/extremumUitl'
 import { Group } from '@antv/g-canvas'
 
+type LegendDisplayItem = {
+  name: string
+  value: string
+  marker: {
+    symbol: string
+    style: {
+      r: number
+      fill: string
+    }
+  }
+}
+
 const { t } = useI18n()
 const DEFAULT_DATA = []
 
@@ -326,26 +338,27 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
   }
 
   protected configLegend(chart: Chart, options: LineOptions): LineOptions {
-    const optionTmp = super.configLegend(chart, options)
+    let optionTmp = super.configLegend(chart, options)
     if (!optionTmp.legend) {
       return optionTmp
     }
     const xAxisExt = chart.xAxisExt[0]
     if (xAxisExt?.customSort?.length > 0) {
       // 图例自定义排序
-      const sort = xAxisExt.customSort ?? []
-      if (sort?.length) {
+      const customSortValues: string[] = Array.isArray(xAxisExt.customSort) ? xAxisExt.customSort : []
+      if (customSortValues.length) {
         // 用值域限定排序，有可能出现新数据但是未出现在图表上，所以这边要遍历一下子维度，加到后面，让新数据显示出来
         const data = optionTmp.data
-        const cats =
-          data?.reduce((p, n) => {
+        const cats: string[] = []
+        if (Array.isArray(data)) {
+          data.forEach(n => {
             const cat = n['category']
-            if (cat && !p.includes(cat)) {
-              p.push(cat)
+            if (typeof cat === 'string' && !cats.includes(cat)) {
+              cats.push(cat)
             }
-            return p
-          }, []) || []
-        const values = sort.reduce((p, n) => {
+          })
+        }
+        const values: string[] = customSortValues.reduce((p: string[], n: string) => {
           if (cats.includes(n)) {
             const index = cats.indexOf(n)
             if (index !== -1) {
@@ -355,29 +368,47 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
           }
           return p
         }, [])
-        cats.length > 0 && values.push(...cats)
-        optionTmp.meta = {
-          ...optionTmp.meta,
-          category: {
-            type: 'cat',
-            values
+        if (cats.length > 0) {
+          cats.forEach(cat => {
+            values.push(cat)
+          })
+        }
+        optionTmp = {
+          ...optionTmp,
+          meta: {
+            ...optionTmp.meta,
+            category: {
+              type: 'cat',
+              values
+            }
           }
         }
       }
     }
 
     const customStyle = parseJson(chart.customStyle)
-    let size
+    let size: number
     if (customStyle && customStyle.legend) {
       size = defaults(JSON.parse(JSON.stringify(customStyle.legend)), DEFAULT_LEGEND_STYLE).size
     } else {
       size = DEFAULT_LEGEND_STYLE.size
     }
 
-    optionTmp.legend.marker.style = style => {
-      return {
-        r: size,
-        fill: style.stroke
+    if (!optionTmp.legend || typeof optionTmp.legend !== 'object') {
+      return optionTmp
+    }
+    const legend = optionTmp.legend
+
+    if (legend.marker && typeof legend.marker !== 'function') {
+      const marker = legend.marker
+      legend.marker = {
+        ...marker,
+        style: style => {
+          return {
+            r: size,
+            fill: style.stroke
+          }
+        }
       }
     }
     const { sort, customSort, icon } = customStyle.legend
@@ -390,26 +421,28 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
           return p
         }, {}) || {}
       const dupCheck = new Set()
-      const items = optionTmp.data?.reduce((arr, item) => {
-        if (!dupCheck.has(item.category)) {
-          const fill =
-            seriesMap[item.category]?.color ??
-            optionTmp.color[dupCheck.size % optionTmp.color.length]
-          dupCheck.add(item.category)
-          arr.push({
-            name: item.category,
-            value: item.category,
-            marker: {
-              symbol: icon,
-              style: {
-                r: size,
-                fill: isAlphaColor(fill) ? fill : convertToAlphaColor(fill, basicStyle.alpha)
+      const colors = Array.isArray(optionTmp.color) ? optionTmp.color : []
+      const items: LegendDisplayItem[] = []
+      if (Array.isArray(optionTmp.data)) {
+        optionTmp.data.forEach(item => {
+          if (!dupCheck.has(item.category)) {
+            const fill =
+              seriesMap[item.category]?.color ?? colors[dupCheck.size % (colors.length || 1)] ?? '#000'
+            dupCheck.add(item.category)
+            items.push({
+              name: item.category,
+              value: item.category,
+              marker: {
+                symbol: icon,
+                style: {
+                  r: size,
+                  fill: isAlphaColor(fill) ? fill : convertToAlphaColor(fill, basicStyle.alpha)
+                }
               }
-            }
-          })
-        }
-        return arr
-      }, [])
+            })
+          }
+        })
+      }
       if (sort !== 'custom') {
         items.sort((a, b) => {
           return sort !== 'desc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
@@ -425,7 +458,7 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
         })
         items.unshift(...tmp)
       }
-      optionTmp.legend.items = items
+      legend.items = items as unknown as typeof legend.items
       if (xAxisExt?.customSort?.length > 0) {
         delete optionTmp.meta?.category.values
       }

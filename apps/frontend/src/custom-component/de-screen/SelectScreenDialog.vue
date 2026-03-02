@@ -13,7 +13,7 @@ const { t } = useI18n()
 const emits = defineEmits(['selectConfirm'])
 
 const state = reactive({
-  panelList: [],
+  panelList: [] as any[],
   dvSelectProps: {
     label: 'name',
     children: 'children',
@@ -42,7 +42,7 @@ const loadRTree = dvType => {
     if (rsp && rsp[0]?.id === '0') {
       state.panelList = rsp[0].children
     } else {
-      state.panelList = rsp
+      state.panelList = rsp as unknown as any[]
     }
     state.panelList = filterEmptyFolderTree(state.panelList)
   })

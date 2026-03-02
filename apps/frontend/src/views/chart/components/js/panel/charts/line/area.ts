@@ -215,7 +215,7 @@ export class Area extends G2PlotChartView<AreaOptions, G2Area> {
     // custom color
     const { colors, alpha } = customAttr.basicStyle
     const areaColors = [...colors, ...colors]
-    let areaStyle
+    let areaStyle: AreaOptions['areaStyle']
     if (customAttr.basicStyle.gradient) {
       const colorMap = new Map()
       const yAxis = parseJson(chart.customStyle).yAxis
@@ -336,7 +336,12 @@ export class StackArea extends Area {
     const layout = []
     if (!labelAttr.fullDisplay) {
       const tmpOptions = super.configLabel(chart, options)
-      layout.push(...tmpOptions.label.layout)
+      if (tmpOptions.label && typeof tmpOptions.label === 'object') {
+        const tmpLayout = tmpOptions.label.layout
+        if (Array.isArray(tmpLayout)) {
+          layout.push(...tmpLayout)
+        }
+      }
     } else {
       layout.push({ type: 'limit-in-plot' })
     }

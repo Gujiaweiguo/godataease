@@ -125,7 +125,7 @@ const hanedleMessage = event => {
     const targetComponent = findComponentById(event.data.value)
     if (targetComponent) {
       changeTimes.value++
-      let targetViewInfo
+      let targetViewInfo: Record<string, unknown> | undefined
       const sourceViewInfo = canvasViewInfo.value[targetComponent.id]
       if (sourceViewInfo) {
         targetViewInfo = deepCopy(sourceViewInfo)
@@ -230,8 +230,8 @@ onMounted(() => {
   })
   useEmitt({
     name: 'curComponentChange',
-    callback: info => {
-      curComponentChangeHandle(info)
+    callback: () => {
+      curComponentChangeHandle()
     }
   })
   setMobileStyle()

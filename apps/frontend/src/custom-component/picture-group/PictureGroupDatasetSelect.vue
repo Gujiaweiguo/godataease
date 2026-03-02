@@ -44,7 +44,7 @@ const onDatasetUpdate = () => {
         .then(res => {
           view.value.xAxis = []
           res.quotaList.pop()
-          view.value.xAxis.push(...res.dimensionList, ...res.quotaList)
+          ;(view.value.xAxis as any).push(...(res as any).dimensionList, ...(res as any).quotaList)
           const viewTarget = view.value
           useEmitt().emitter.emit('calcData-' + viewTarget.id, viewTarget)
           snapshotStore.recordSnapshotCache('calc', view.value.id)

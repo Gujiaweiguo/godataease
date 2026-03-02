@@ -18,7 +18,6 @@ import { iconFieldMap } from '@/components/icon-group/field-list'
 import { Icon } from '@/components/icon-custom'
 import { ElForm, ElMessage, ElMessageBox } from 'element-plus-secondary'
 import Cron from '@/components/cron/src/Cron.vue'
-import { boolean } from 'mathjs'
 import SheetTabs from '@/views/visualized/data/datasource/SheetTabs.vue'
 import { loadRemoteFile, save, update } from '@/api/datasource'
 import { Base64 } from 'js-base64'
@@ -50,6 +49,11 @@ export interface Field {
 }
 
 const props = defineProps({
+  editDs: {
+    required: false,
+    default: false,
+    type: Boolean
+  },
   form: {
     required: false,
     default() {
@@ -70,7 +74,7 @@ const props = defineProps({
     type: Object
   },
   isSupportSetKey: {
-    type: boolean,
+    type: Boolean,
     required: true
   },
   activeStep: {
@@ -614,7 +618,7 @@ const saveExcelDs = (params, successCb, finallyCb) => {
     return
   }
 
-  let table = {}
+  let table: Record<string, unknown> = {}
   if (params) {
     form.value.name = params.name
   }
@@ -683,7 +687,7 @@ const fieldTypeToStr = {
   2: 'LONG',
   3: 'DOUBLE'
 }
-const saveExcelData = (sheetFileMd5, table, params, successCb, finallyCb) => {
+const saveExcelData = (_sheetFileMd5, table, params, successCb, finallyCb) => {
   for (let i = 0; i < table.configuration.sheets.length; i++) {
     table.configuration.sheets[i].data = []
     table.configuration.sheets[i].jsonArray = []

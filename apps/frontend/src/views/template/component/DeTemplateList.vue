@@ -43,10 +43,23 @@
 <script setup lang="ts">
 import { useI18n } from '@/hooks/web/useI18n'
 import { computed, reactive } from 'vue'
+import type { PropType } from 'vue'
 import NoneImage from '@/assets/none.png'
 import NothingImage from '@/assets/nothing.png'
 import { ElMessageBox } from 'element-plus-secondary'
 const { t } = useI18n()
+
+interface TemplateItem {
+  id: string
+  name: string
+}
+
+const props = defineProps({
+  templateList: {
+    type: Array as PropType<TemplateItem[]>,
+    default: () => []
+  }
+})
 
 const emits = defineEmits([
   'showCurrentTemplate',
@@ -55,19 +68,6 @@ const emits = defineEmits([
   'categoryEdit',
   'templateImport'
 ])
-
-const props = defineProps({
-  templateType: {
-    type: String,
-    default: ''
-  },
-  templateList: {
-    type: Array,
-    default: function () {
-      return []
-    }
-  }
-})
 
 const state = reactive({
   templateFilterText: '',

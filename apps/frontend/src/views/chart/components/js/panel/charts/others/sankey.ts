@@ -23,7 +23,7 @@ const DEFAULT_DATA = []
  * 桑基图
  */
 export class SankeyBar extends G2PlotChartView<SankeyOptions, Sankey> {
-  axisConfig = {
+  axisConfig: AxisConfig = {
     xAxis: {
       name: `${t('chart.drag_block_type_axis_start')} / ${t('chart.dimension')}`,
       limit: 1,

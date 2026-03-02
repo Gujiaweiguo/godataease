@@ -143,7 +143,7 @@ const init = () => {
       if (localeStore.getCurrentLocale.lang !== 'en') {
         name = t('chart.level_label', { num: numberToChineseUnderHundred(i) })
       }
-      tableExpandLevelOptions.push({ name, value: i })
+      tableExpandLevelOptions.push({ name, value: String(i) })
     }
   }
   const lastPageInfo = dvMainStore.getViewPageInfo(props.chart.id)
@@ -247,9 +247,9 @@ const changeFieldColumn = () => {
 }
 const changeFieldColumnWidth = () => {
   const { basicStyleForm, fieldColumnWidth } = state
-  let { width } = fieldColumnWidth
+  let width = fieldColumnWidth.width
   let validate = true
-  width = parseFloat(width)
+  width = parseFloat(String(width))
   if (isNaN(width) || !isNumber(width)) {
     validate = false
   }
@@ -296,7 +296,7 @@ const getMapKey = async () => {
     await queryMapKeyApi().then(res => mapStore.setKey(res.data))
   }
   if (mapStore.mapKey.securityCode) {
-    window._AMapSecurityConfig = {
+    ;(window as any)._AMapSecurityConfig = {
       securityJsCode: mapStore.mapKey.securityCode
     }
   }
@@ -1278,7 +1278,7 @@ onMounted(async () => {
         style="width: 100%"
         :effect="themes"
         controls-position="right"
-        size="middle"
+        size="default"
         :min="0"
         :max="30"
         :disabled="!state.basicStyleForm.radarShowPoint"
@@ -1542,7 +1542,7 @@ onMounted(async () => {
                 :triggerWidth="65"
                 is-custom
                 show-alpha
-                :predefine="state.predefineColors"
+                :predefine="predefineColors"
                 @change="changeBasicStyle('circleBorderColor')"
               >
               </el-color-picker>

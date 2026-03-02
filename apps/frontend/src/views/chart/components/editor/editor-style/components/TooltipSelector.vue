@@ -251,8 +251,8 @@ const changeTooltipAttr = (prop: string, requestData = false, render = true) => 
   emit('onTooltipChange', { data: state.tooltipForm, requestData, render }, prop)
 }
 
-function changeUnitLanguage(cfg: BaseFormatter, lang, prop: string) {
-  onChangeFormatCfgUnitLanguage(cfg, lang)
+function changeUnitLanguage(cfg: DeepPartial<BaseFormatter>, lang, prop: string) {
+  onChangeFormatCfgUnitLanguage(cfg as BaseFormatter, lang)
   changeTooltipAttr(prop)
 }
 

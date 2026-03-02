@@ -123,7 +123,7 @@ const computedFiledList = computed(() => {
 const authTargetType = ref('')
 
 watch(
-  () => getAuthTargetType?.authTargetType,
+  () => getAuthTargetType?.value?.authTargetType,
   value => {
     if (authTargetType.value === value || !value) return
     authTargetType.value = value
@@ -253,10 +253,11 @@ const confirmTimeSelect = () => {
     relativeToCurrent
   } = item.value.dynamicTimeSetting
   if (arbitraryTime) {
-    item.value.dynamicTimeSetting.arbitraryTime =
+    item.value.dynamicTimeSetting.arbitraryTime = new Date(
       formatDate(new Date(arbitraryTime).toLocaleDateString()) +
-      ' ' +
-      new Date(arbitraryTime).toLocaleTimeString()
+        ' ' +
+        new Date(arbitraryTime).toLocaleTimeString()
+    ) as unknown as Date
   }
   if (relativeToCurrent !== 'custom') {
     item.value.timeValue = [

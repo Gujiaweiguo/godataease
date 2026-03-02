@@ -25,7 +25,6 @@ import { cloneDeep, debounce } from 'lodash-es'
 import { uploadFile } from '@/api/datasource'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { iconFieldMap } from '@/components/icon-group/field-list'
-import { boolean } from 'mathjs'
 
 export interface Param {
   editType: number
@@ -51,6 +50,11 @@ export interface Field {
   length: number
 }
 const props = defineProps({
+  editDs: {
+    required: false,
+    default: false,
+    type: Boolean
+  },
   param: {
     required: false,
     default() {
@@ -71,7 +75,7 @@ const props = defineProps({
     type: Object
   },
   isSupportSetKey: {
-    type: boolean,
+    type: Boolean,
     required: true
   }
 })
@@ -324,7 +328,7 @@ const saveExcelDs = (params, successCb, finallyCb) => {
   }
 }
 
-const saveExcelData = (sheetFileMd5, table, params, successCb, finallyCb) => {
+const saveExcelData = (_sheetFileMd5, table, params, successCb, finallyCb) => {
   for (let i = 0; i < table.sheets.length; i++) {
     table.sheets[i].data = []
     table.sheets[i].jsonArray = []

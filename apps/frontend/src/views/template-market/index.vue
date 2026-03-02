@@ -472,7 +472,7 @@ const templateApply = template => {
     state.dvCreateForm.newFrom = 'new_inner_template'
     state.dvCreateForm.templateId = template.id
   }
-  apply(template)
+  apply()
 }
 
 const apply = () => {

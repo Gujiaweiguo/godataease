@@ -1,5 +1,4 @@
 import { Popup } from '@antv/l7'
-import { Plot } from '@antv/l7plot/dist/lib/core/plot'
 import isEmpty from 'lodash-es/isEmpty'
 import { valueFormatter } from '@/views/chart/components/js/formatter'
 import { parseJson } from '@/views/chart/components/js/util'
@@ -33,6 +32,66 @@ export const configCarouselTooltip = (chart, view, data, scene, customSubArea?, 
   }
 }
 export const carouselManagerInstances: { [key: string]: CarouselManager } = {}
+
+interface ViewLike {
+  source: {
+    data: {
+      dataArray?: Array<Record<string, unknown>>
+    }
+  }
+  sourceOption: {
+    data: Array<Record<string, unknown>>
+  }
+  tooltip: {
+    options: {
+      domStyles: Record<string, Record<string, string>>
+    }
+  }
+  currentDistrictData: {
+    features: Array<{
+      properties: Record<string, unknown>
+    }>
+  }
+  scene: Scene
+}
+
+interface LayerWithSource {
+  name?: string
+  type?: string
+  coordCenter?: boolean
+  layerSource?: {
+    data?: {
+      dataArray?: Array<Record<string, unknown>>
+    }
+  }
+  styleAttributeService?: {
+    getLayerStyleAttribute: (field: string) => {
+      scale?: {
+        field?: string | number[]
+      }
+    }
+  }
+  setData?: (data: unknown) => void
+  setActive?: (id: unknown, options: { color: string | number[] }) => void
+  addListener?: (event: string, handler: () => void) => void
+}
+
+const getLayerDataArray = (layer?: LayerWithSource): Array<Record<string, unknown>> => {
+  return layer?.layerSource?.data?.dataArray ?? []
+}
+
+const getLayerActiveColor = (layer?: LayerWithSource): string | number[] => {
+  const colorField = layer?.styleAttributeService?.getLayerStyleAttribute('color')?.scale?.field
+  return Array.isArray(colorField) ? colorField : String(colorField ?? '')
+}
+
+const normalizeActiveId = (id: unknown): number | null => {
+  const parsedId = Number(id)
+  if (Number.isFinite(parsedId)) {
+    return parsedId
+  }
+  return null
+}
 
 /**
  * 轮播管理类
@@ -68,7 +127,7 @@ export class CarouselManager {
    * 轮播弹窗的位置数据
    * @private
    */
-  private view: Plot
+  private view: ViewLike
   private data: any[]
   /**
    * 停留时长
@@ -96,18 +155,9 @@ export class CarouselManager {
    * 渲染参数
    * @private
    */
-  private drawOption: L7PlotDrawOptions
-
-  // 保存事件监听函数的引用
-  private onMouseEnterHandler: () => void
-  private onMouseLeaveHandler: () => void
-  private onVisibilityChangeHandler: () => void
+  private drawOption: L7PlotDrawOptions<ViewLike>
 
   constructor(scene, chart, view, data: any[], customSubArea, drawOption?) {
-    // 绑定事件处理函数
-    this.onMouseEnterHandler = this.pauseCarouselPopups.bind(this)
-    this.onMouseLeaveHandler = this.resumeCarouselPopups.bind(this)
-    this.onVisibilityChangeHandler = this.handleVisibilityChange.bind(this)
     this.clearExistingTimers = this.clearExistingTimers.bind(this)
     this.init(scene, chart, view, data, customSubArea, drawOption)
   }
@@ -142,13 +192,10 @@ export class CarouselManager {
     this.customSubArea = customSubArea
     this.drawOption = drawOption
     this.clearPreviousInstance(this.chart.container)
-    if (
-      this.chart.customAttr?.tooltip?.show &&
-      this.chart.customAttr?.tooltip?.carousel?.enable &&
-      this.data.length > 0
-    ) {
-      this.popup = new Popup({ closeButton: false, maxWidth: 600 })
-      const carousel = this.chart.customAttr?.tooltip?.carousel
+    const customAttr = parseJson(this.chart.customAttr) as DeepPartial<ChartAttr>
+    const carousel = customAttr.tooltip?.carousel
+    if (customAttr.tooltip?.show && carousel?.enable && this.data.length > 0) {
+      this.popup = new Popup({ closeButton: false, maxWidth: '600px' })
       this.stayTime = carousel.stayTime * 1000
       this.intervalTime = carousel.intervalTime * 1000
       this.startCarouselPopups()
@@ -361,8 +408,7 @@ export class CarouselManager {
 
       this.popup.setLngLat({ lng: popupData.centroid[0], lat: popupData.centroid[1] })
       this.popup.setHTML(html)
-      this.popup.closeButton = false
-      this.view.addLayer(this.popup)
+      this.scene.addPopup(this.popup)
       // 地图层高亮
       this.view.scene
         .getLayers()
@@ -370,14 +416,19 @@ export class CarouselManager {
         ?.setData(this.getActiveData(index))
       if (this.chart.type === 'bubble-map') {
         // 气泡地图高亮
-        const { _id } = this.view.scene
+        const bubbleLayer = this.view.scene
           .getLayers()
-          ?.find(i => i.name === 'bubbleLayer')
-          ?.layerSource.data.dataArray.find(i => i.name === this.data[index].name)
-        this.view.scene
-          .getLayers()
-          ?.find(i => i.name === 'bubbleLayer' && i.coordCenter)
-          ?.setActive(_id, { color: 'rgba(30,90,255,1)' })
+          ?.find(i => i.name === 'bubbleLayer') as unknown as LayerWithSource | undefined
+        const activeItem = getLayerDataArray(bubbleLayer).find(
+          i => i.name === this.data[index].name
+        ) as { _id?: string } | undefined
+        const activeId = normalizeActiveId(activeItem?._id)
+        if (activeId !== null) {
+          this.view.scene
+            .getLayers()
+            ?.find(i => i.name === 'bubbleLayer' && i.coordCenter)
+            ?.setActive(activeId, { color: 'rgba(30,90,255,1)' })
+        }
       }
     }
   }
@@ -422,7 +473,7 @@ export class CarouselManager {
       data.name = data.areaName
       return {
         data,
-        centroid: area.centroid
+        centroid: (area as CustomGeoSubArea & { centroid?: [number, number] })?.centroid
       }
     } else {
       return {
@@ -455,40 +506,40 @@ export class CarouselManager {
       ?.find(i => i.name === 'highlightLayer')
       ?.setData({ type: 'FeatureCollection', features: [] })
     if (this.chart.type === 'bubble-map') {
-      const { _id } = this.view.scene
+      const bubbleLayer = this.view.scene
         ?.getLayers()
-        ?.find(i => i.name === 'bubbleLayer')
-        ?.layerSource.data.dataArray.find(i => i.name === this.data[index].name)
-      this.view.scene
-        .getLayers()
-        ?.find(i => i.name === 'bubbleLayer' && i.coordCenter)
-        ?.setActive(_id, {
-          color: this.view.scene
-            .getLayers()
-            .find(i => i.name === 'bubbleLayer')
-            .styleAttributeService.getLayerStyleAttribute('color').scale.field
-        })
+        ?.find(i => i.name === 'bubbleLayer') as unknown as LayerWithSource | undefined
+      const activeItem = getLayerDataArray(bubbleLayer).find(
+        i => i.name === this.data[index].name
+      ) as { _id?: string } | undefined
+      const activeId = normalizeActiveId(activeItem?._id)
+      const bubbleColor = getLayerActiveColor(bubbleLayer)
+      if (activeId !== null) {
+        this.view.scene
+          .getLayers()
+          ?.find(i => i.name === 'bubbleLayer' && i.coordCenter)
+          ?.setActive(activeId, { color: bubbleColor })
+      }
     }
     if (this.chart.type === 'symbolic-map') {
       const lngField = this.chart.xAxis[0].dataeaseName
       const latField = this.chart.xAxis[1].dataeaseName
-      const { _id } = this.scene
+      const pointLayer = this.scene
         ?.getLayers()
-        ?.find(i => i.type === 'PointLayer')
-        ?.layerSource.data.dataArray.find(i => {
-          const targetLng = this.data[index][lngField]
-          const targetLat = this.data[index][latField]
-          return i[lngField] === targetLng && i[latField] === targetLat
-        })
-      this.scene
-        .getLayers()
-        ?.find(i => i.type === 'PointLayer' && i.coordCenter)
-        ?.setActive(_id, {
-          color: this.scene
-            .getLayers()
-            .find(i => i.type === 'PointLayer')
-            .styleAttributeService.getLayerStyleAttribute('color').scale.field
-        })
+        ?.find(i => i.type === 'PointLayer') as unknown as LayerWithSource | undefined
+      const activeItem = getLayerDataArray(pointLayer).find(i => {
+        const targetLng = this.data[index][lngField]
+        const targetLat = this.data[index][latField]
+        return i[lngField] === targetLng && i[latField] === targetLat
+      }) as { _id?: string } | undefined
+      const activeId = normalizeActiveId(activeItem?._id)
+      const pointColor = getLayerActiveColor(pointLayer)
+      if (activeId !== null) {
+        this.scene
+          .getLayers()
+          ?.find(i => i.type === 'PointLayer' && i.coordCenter)
+          ?.setActive(activeId, { color: pointColor })
+      }
     }
   }
 
@@ -576,34 +627,42 @@ export class CarouselManager {
         const latField = this.chart.xAxis[1].dataeaseName
         const htmlPrefix = `<div style='font-size:${tooltip.fontSize}px;color:${tooltip.color};'>`
         const htmlSuffix = '</div>'
-        const data = this.view.sourceOption.data[index]
-        if (data && data.details?.length) {
+        const data = this.view.sourceOption.data[index] as
+          | (Record<string, unknown> & { details?: Array<Record<string, unknown>> })
+          | undefined
+        if (data && Array.isArray(data.details) && data.details.length) {
           const fieldData = {
             ...data,
             ...Object.fromEntries(mergeDetailsToMap(data.details))
           }
           const content = buildTooltipContent(tooltip, fieldData, showFields)
           const html = `${htmlPrefix}${content}${htmlSuffix}`
+          const lng = Number(data[lngField])
+          const lat = Number(data[latField])
+          if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+            return
+          }
           this.popup.setLngLat({
-            lng: data[lngField],
-            lat: data[latField]
+            lng,
+            lat
           })
           this.popup.setHTML(html)
-          this.popup.closeButton = false
           this.scene.addPopup(this.popup)
-          this.popup.addTo(this.scene)
-          const { _id } = this.scene
+          const pointLayer = this.scene
             .getLayers()
-            ?.find(i => i.type === 'PointLayer')
-            ?.layerSource.data.dataArray.find(i => {
-              const targetLng = this.data[index][lngField]
-              const targetLat = this.data[index][latField]
-              return i[lngField] === targetLng && i[latField] === targetLat
-            })
-          this.scene
-            .getLayers()
-            ?.find(i => i.type === 'PointLayer' && i.coordCenter)
-            ?.setActive(_id, { color: 'rgba(30,90,255,1)' })
+            ?.find(i => i.type === 'PointLayer') as unknown as LayerWithSource | undefined
+          const activeItem = getLayerDataArray(pointLayer).find(i => {
+            const targetLng = this.data[index][lngField]
+            const targetLat = this.data[index][latField]
+            return i[lngField] === targetLng && i[latField] === targetLat
+          }) as { _id?: string } | undefined
+          const activeId = normalizeActiveId(activeItem?._id)
+          if (activeId !== null) {
+            this.scene
+              .getLayers()
+              ?.find(i => i.type === 'PointLayer' && i.coordCenter)
+              ?.setActive(activeId, { color: 'rgba(30,90,255,1)' })
+          }
         }
       }
       return undefined

@@ -32,7 +32,7 @@ const DEFAULT_DATA = []
  * 区间条形图
  */
 export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
-  axisConfig = {
+  axisConfig: AxisConfig = {
     xAxis: {
       name: `${t('chart.drag_block_type_axis')} / ${t('chart.dimension')}`,
       type: 'd'
@@ -78,7 +78,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
     data: [],
     xField: 'values',
     yField: 'field',
-    colorField: 'category',
+    seriesField: 'category',
     isGroup: true
   }
 
@@ -96,7 +96,14 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
 
     const ifAggregate = !!chart.aggregate
 
-    const isDate = !!chart.data.isDate
+    const rangeData = chart.data as typeof chart.data & {
+      isDate?: boolean
+      minTime?: number
+      maxTime?: number
+      min?: number
+      max?: number
+    }
+    const isDate = !!rangeData.isDate
 
     const axis = chart.yAxis ?? chart.yAxisExt ?? []
     let dateFormat: string
@@ -127,11 +134,34 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
         dateFormat = 'YYYY-MM-dd HH:mm:ss'
     }
 
-    const minTime = chart.data.minTime
-    const maxTime = chart.data.maxTime
+    const minTime = rangeData.minTime
+    const maxTime = rangeData.maxTime
 
-    const minNumber = chart.data.min
-    const maxNumber = chart.data.max
+    const minNumber = rangeData.min
+    const maxNumber = rangeData.max
+
+    const metaOptions = isDate
+      ? {
+          values: {
+            type: 'time',
+            min: minTime,
+            max: maxTime,
+            mask: dateFormat
+          },
+          tempId: {
+            key: true
+          }
+        }
+      : {
+          values: {
+            min: minNumber,
+            max: maxNumber,
+            mask: dateFormat
+          },
+          tempId: {
+            key: true
+          }
+        }
 
     // options
     const initOptions: BarOptions = {
@@ -141,28 +171,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
       seriesField: isDate ? (ifAggregate ? 'category' : undefined) : 'category',
       isGroup: isDate ? !ifAggregate : false,
       isStack: isDate ? !ifAggregate : false,
-      meta: isDate
-        ? {
-            values: {
-              type: 'time',
-              min: minTime,
-              max: maxTime,
-              mask: dateFormat
-            },
-            tempId: {
-              key: true
-            }
-          }
-        : {
-            values: {
-              min: minNumber,
-              max: maxNumber,
-              mask: dateFormat
-            },
-            tempId: {
-              key: true
-            }
-          }
+      meta: metaOptions as BarOptions['meta']
     }
 
     const options = this.setupOptions(chart, initOptions)
@@ -195,7 +204,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
     }
     const xAxis = parseJson(chart.customStyle).xAxis
     const axisValue = xAxis.axisValue
-    const isDate = !!chart.data.isDate
+    const isDate = !!(chart.data as typeof chart.data & { isDate?: boolean }).isDate
     if (tmpOptions.xAxis.label) {
       tmpOptions.xAxis.label.formatter = value => {
         if (isDate) {
@@ -227,7 +236,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
   }
 
   protected configTooltip(chart: Chart, options: BarOptions): BarOptions {
-    const isDate = !!chart.data.isDate
+    const isDate = !!(chart.data as typeof chart.data & { isDate?: boolean }).isDate
     let tooltip
     let customAttr: DeepPartial<ChartAttr>
     if (chart.customAttr) {
@@ -269,7 +278,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
   }
 
   protected configBasicStyle(chart: Chart, options: BarOptions): BarOptions {
-    const isDate = !!chart.data.isDate
+    const isDate = !!(chart.data as typeof chart.data & { isDate?: boolean }).isDate
     const ifAggregate = !!chart.aggregate
     const basicStyle = parseJson(chart.customAttr).basicStyle
 
@@ -327,7 +336,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
       ...options,
       ...configRoundAngle(chart, 'barStyle')
     }
-    let barWidthRatio
+    let barWidthRatio: number | undefined
     const _v = basicStyle.columnWidthRatio ?? DEFAULT_BASIC_STYLE.columnWidthRatio
     if (_v >= 1 && _v <= 100) {
       barWidthRatio = _v / 100.0
@@ -337,7 +346,10 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
       barWidthRatio = 1
     }
     if (barWidthRatio) {
-      options.barWidthRatio = barWidthRatio
+      options = {
+        ...options,
+        barWidthRatio
+      }
     }
 
     return options
@@ -354,7 +366,7 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
   }
 
   protected configLabel(chart: Chart, options: BarOptions): BarOptions {
-    const isDate = !!chart.data.isDate
+    const isDate = !!(chart.data as typeof chart.data & { isDate?: boolean }).isDate
     const ifAggregate = !!chart.aggregate
 
     const tmpOptions = super.configLabel(chart, options)
@@ -366,17 +378,24 @@ export class RangeBar extends G2PlotChartView<BarOptions, Bar> {
     }
     const labelAttr = parseJson(chart.customAttr).label
 
+    let adjustedLabel = tmpOptions.label
     if (isDate && !ifAggregate) {
-      if (!tmpOptions.label.layout) {
-        tmpOptions.label.layout = []
+      const currentLayout = Array.isArray(tmpOptions.label.layout)
+        ? [...tmpOptions.label.layout]
+        : tmpOptions.label.layout
+          ? [tmpOptions.label.layout]
+          : []
+      currentLayout.push({ type: 'interval-hide-overlap' })
+      currentLayout.push({ type: 'limit-in-plot', cfg: { action: 'hide' } })
+      adjustedLabel = {
+        ...tmpOptions.label,
+        layout: currentLayout
       }
-      tmpOptions.label.layout.push({ type: 'interval-hide-overlap' })
-      tmpOptions.label.layout.push({ type: 'limit-in-plot', cfg: { action: 'hide' } })
     }
 
     const label = {
       fields: [],
-      ...tmpOptions.label,
+      ...adjustedLabel,
       formatter: (param: Datum) => {
         let res
         if (isDate) {

@@ -59,7 +59,7 @@ interface SelectConfig {
     label: string
     value: string
   }[]
-  optionFilter: []
+  optionFilter: string[]
 }
 
 const { t } = useI18n()
@@ -278,7 +278,7 @@ const handleFieldIdDefaultChange = (val: string[]) => {
             ele !== null &&
             ((config.value.optionFilter &&
               config.value.optionFilter.length > 0 &&
-              config.value.optionFilter.includes(ele)) ||
+              config.value.optionFilter.includes(ele as unknown as string)) ||
               !config.value.optionFilter ||
               config.value.optionFilter.length === 0)
           )

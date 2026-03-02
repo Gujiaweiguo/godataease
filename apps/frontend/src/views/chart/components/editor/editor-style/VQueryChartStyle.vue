@@ -295,11 +295,7 @@ const onPlaceholderChange = () => {
       type="file"
       accept=".jpeg,.jpg,.png,.gif,.svg"
       hidden
-      @click="
-        e => {
-          e.target.value = ''
-        }
-      "
+      @click="($event.target as HTMLInputElement).value = ''"
       @change="reUpload"
     />
     <el-row class="de-collapse-style">

@@ -245,7 +245,6 @@ import { useEmitt } from '@/hooks/web/useEmitt'
 import { copyStoreWithOut } from '@/store/modules/data-visualization/copy'
 import { exportExcelDownload } from '@/views/chart/components/js/util'
 import FieldsList from '@/custom-component/rich-text/FieldsList.vue'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElTooltip, ElButton } from 'element-plus-secondary'
 import CustomTabsSort from '@/custom-component/de-tabs/CustomTabsSort.vue'
 import { exportPivotExcel } from '@/views/chart/components/js/panel/common/common_table'
@@ -436,7 +435,6 @@ const showBarTooltipPosition = computed(() => {
 })
 
 const openMessageLoading = cb => {
-  const iconClass = `el-icon-loading`
   const customClass = `de-message-loading de-message-export`
   ElMessage({
     message: h('p', null, [
@@ -455,8 +453,6 @@ const openMessageLoading = cb => {
       ),
       '查看进度，进行下载'
     ]),
-    iconClass,
-    icon: h(RefreshLeft),
     showClose: true,
     customClass
   })
@@ -574,7 +570,7 @@ const linkageChange = item => {
 const existLinkage = computed(() => {
   let linkageFiltersCount = 0
   componentData.value.forEach(item => {
-    if (item.component === 'UserView' && item.innerType != 'VQuery') {
+    if (item.component === 'UserView' && item.innerType !== 'VQuery') {
       if (linkageChange(item)) {
         linkageFiltersCount++
       }

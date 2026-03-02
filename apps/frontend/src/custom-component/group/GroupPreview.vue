@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, toRefs } from 'vue'
+import { ref, toRefs, PropType } from 'vue'
 import ComponentWrapper from '@/components/data-visualization/canvas/ComponentWrapper.vue'
 import { toPercent } from '@/utils/translate'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
@@ -7,9 +7,19 @@ import UserViewEnlarge from '@/components/visualization/UserViewEnlarge.vue'
 const dvMainStore = dvMainStoreWithOut()
 const userViewEnlargeRef = ref(null)
 
+interface GroupItem {
+  id: string
+  groupStyle: {
+    width: number
+    height: number
+    top: number
+    left: number
+  }
+}
+
 const props = defineProps({
   propValue: {
-    type: Array,
+    type: Array as PropType<GroupItem[]>,
     default: () => []
   },
   element: {
@@ -91,6 +101,7 @@ const userViewEnlargeOpen = (opt, item) => {
         :scale="scale"
         :font-family="fontFamily"
         @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
+        :canvas-style-data="dvMainStore.canvasStyleData"
       />
     </div>
     <user-view-enlarge ref="userViewEnlargeRef"></user-view-enlarge>

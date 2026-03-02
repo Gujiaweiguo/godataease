@@ -31,7 +31,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, reactive } from 'vue'
+import { onMounted, reactive, PropType } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { batchUpdate, findCategoriesByTemplateIds } from '@/api/template'
 import { ElMessage } from 'element-plus-secondary'
@@ -39,11 +39,11 @@ const emits = defineEmits(['closeBatchEditTemplateDialog', 'refresh'])
 const { t } = useI18n()
 const props = defineProps({
   templateCategories: {
-    type: Array,
+    type: Array as PropType<Array<{ id: string | number; name: string }>>,
     required: true
   },
   templateIds: {
-    type: Array,
+    type: Array as PropType<Array<string | number>>,
     required: true
   }
 })

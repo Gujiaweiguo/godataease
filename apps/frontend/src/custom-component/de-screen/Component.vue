@@ -288,13 +288,14 @@ const handleMouseLeave = () => {
 }
 const state = reactive({
   activeTabName: '',
-  curItem: {},
+  curItem: {} as { title?: string },
   textarea: '',
   dialogVisible: false,
   tabShow: true,
   hoverFlag: false,
   panelList: []
 })
+
 const tabsAreaScroll = ref(false)
 
 // 无边框
@@ -318,7 +319,7 @@ const calcTabLength = () => {
         'tab-' + element.value.propValue[element.value.propValue.length - 1].name
       )
       tabsAreaScroll.value =
-        containerDom.parentNode.clientWidth > tabComponentRef.value.clientWidth - 100
+        (containerDom.parentNode as HTMLElement).clientWidth > tabComponentRef.value.clientWidth - 100
     } else {
       tabsAreaScroll.value = false
     }

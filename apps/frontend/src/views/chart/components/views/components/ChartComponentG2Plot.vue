@@ -29,6 +29,18 @@ import { L7ChartView } from '@/views/chart/components/js/panel/types/impl/l7'
 import { useI18n } from '@/hooks/web/useI18n'
 import { ExportImage } from '@antv/l7'
 import { configEmptyDataStyle } from '@/views/chart/components/js/panel/common/common_antv'
+
+interface ChartDataResponse {
+  code?: number
+  msg?: string
+  data?: any
+  drillFilters?: any[]
+  drill?: boolean
+  chartExtRequest?: {
+    drill?: any[]
+    linkageFilters?: any[]
+  }
+}
 const { t } = useI18n()
 const dvMainStore = dvMainStoreWithOut()
 const { nowPanelTrackInfo, nowPanelJumpInfo, mobileInPc, embeddedCallBack, inMobile } =
@@ -267,18 +279,19 @@ const calcData = async (view, callback) => {
     const v = JSON.parse(JSON.stringify(view))
     getData(v)
       .then(async res => {
-        if (res.code && res.code !== 0) {
+        const chartRes = res as ChartDataResponse
+        if (chartRes.code && chartRes.code !== 0) {
           isError.value = true
-          errMsg.value = res.msg
+          errMsg.value = chartRes.msg
           callback?.()
         } else {
-          chartData.value = res?.data as Partial<Chart['data']>
-          emit('onDrillFilters', res?.drillFilters)
-          if (!res?.drillFilters?.length) {
+          chartData.value = chartRes?.data as Partial<Chart['data']>
+          emit('onDrillFilters', chartRes?.drillFilters)
+          if (!chartRes?.drillFilters?.length) {
             dynamicAreaId.value = ''
             scope = null
           } else {
-            const extra = view.chartExtRequest?.drill?.[res?.drillFilters?.length - 1].extra
+            const extra = view.chartExtRequest?.drill?.[chartRes?.drillFilters?.length - 1].extra
             dynamicAreaId.value = extra?.adcode + ''
             scope = extra?.scope
             // 地图
@@ -295,14 +308,15 @@ const calcData = async (view, callback) => {
               }
             }
           }
-          dvMainStore.setViewDataDetails(view.id, res)
-          if (!res.drill && !res.chartExtRequest?.linkageFilters?.length) {
+          dvMainStore.setViewDataDetails(view.id, chartRes)
+          if (!chartRes.drill && !chartRes.chartExtRequest?.linkageFilters?.length) {
             dvMainStore.setViewOriginData(view.id, chartData.value)
             emitter.emit('chart-data-change')
           }
-          await renderChart(res, callback)
+          await renderChart(chartRes, callback)
         }
       })
+
       .catch(() => {
         callback?.()
       })
@@ -345,7 +359,7 @@ const renderChart = async (view, callback?) => {
   }
 }
 let myChart = null
-let g2Timer: number
+let g2Timer: ReturnType<typeof setTimeout>
 const renderG2Plot = async (chart, chartView: G2PlotChartView<any, any>) => {
   g2Timer && clearTimeout(g2Timer)
   g2Timer = setTimeout(async () => {
@@ -375,7 +389,7 @@ const dynamicAreaId = ref('')
 const country = ref('')
 const chartContainer = ref<HTMLElement>(null)
 let scope
-let mapTimer: number
+let mapTimer: ReturnType<typeof setTimeout>
 const renderL7Plot = async (chart: ChartObj, chartView: L7PlotChartView<any, any>, callback) => {
   const map = parseJson(chart.customAttr).map
   let areaId = map.id
@@ -408,7 +422,7 @@ const renderL7Plot = async (chart: ChartObj, chartView: L7PlotChartView<any, any
   }, 500)
 }
 
-let mapL7Timer: number
+let mapL7Timer: ReturnType<typeof setTimeout>
 const renderL7 = async (chart: ChartObj, chartView: L7ChartView<any, any>, callback) => {
   mapL7Timer && clearTimeout(mapL7Timer)
   mapL7Timer = setTimeout(async () => {

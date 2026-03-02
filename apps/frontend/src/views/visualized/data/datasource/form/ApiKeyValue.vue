@@ -13,6 +13,8 @@ export interface Item {
   value: string
   description: string
   type: string
+  nameType?: string
+  originName?: string
 }
 const props = defineProps({
   keyPlaceholder: propTypes.string.def(''),
@@ -185,7 +187,7 @@ const timeFunLists = [
               >
                 <el-option
                   v-for="item in timeFunLists"
-                  :key="item.originName"
+                  :key="item.value"
                   :label="item.label"
                   :value="item.value"
                 />

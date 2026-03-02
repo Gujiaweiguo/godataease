@@ -58,9 +58,11 @@ const handlerSelected = multipleSelection => {
       notCurrentArr.push(resultIndex)
     }
   })
-  notCurrentArr.sort().reduceRight((_, next) => {
-    state.multipleSelectionCache.splice(next, 1)
-  }, 0)
+  notCurrentArr
+    .sort((a, b) => b - a)
+    .forEach(next => {
+      state.multipleSelectionCache.splice(next, 1)
+    })
 }
 
 onBeforeMount(() => {
@@ -81,8 +83,22 @@ const state = reactive({
   tableAttrs: {}
 })
 
-const imgType = computed(() => {
-  return props.emptyImg ? props.emptyImg : props.isSearch ? 'tree' : 'noneWhite'
+type EmptyImgType = 'input' | 'select' | 'table' | 'none' | 'noneWhite' | 'tree' | 'error'
+const EMPTY_IMG_TYPES: EmptyImgType[] = [
+  'input',
+  'select',
+  'table',
+  'none',
+  'noneWhite',
+  'tree',
+  'error'
+]
+
+const imgType = computed<EmptyImgType>(() => {
+  if (props.emptyImg && EMPTY_IMG_TYPES.includes(props.emptyImg as EmptyImgType)) {
+    return props.emptyImg as EmptyImgType
+  }
+  return props.isSearch ? 'tree' : 'noneWhite'
 })
 const table = ref(null)
 

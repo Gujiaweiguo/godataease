@@ -86,7 +86,7 @@ const initIframe = async (name: string) => {
       }
 
       // Initialize token lifecycle
-      await tokenLifecycle.initialize(embeddedStore.getToken, window.location.origin, {
+      await tokenLifecycle.initialize(embeddedStore.getToken, {
         refreshEnabled: true,
         tokenType: 'iframe',
         resourceId: embeddedStore.resourceId

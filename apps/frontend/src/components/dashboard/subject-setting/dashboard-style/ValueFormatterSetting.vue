@@ -15,16 +15,15 @@ const { t } = useI18n()
 
 const emit = defineEmits(['onFormatterItemChange'])
 
-const props = defineProps({
-  formatterCfg: {
-    type: Object,
-    required: true
-  },
-  themes: {
-    type: String,
-    default: 'light'
+const props = withDefaults(
+  defineProps<{
+    formatterCfg: BaseFormatter
+    themes?: EditorTheme
+  }>(),
+  {
+    themes: 'light'
   }
-})
+)
 
 const { formatterCfg } = toRefs(props)
 
@@ -33,17 +32,16 @@ const state = reactive({
   exampleResult: '20000000'
 })
 
-function changeUnitLanguage(cfg: BaseFormatter, lang) {
+function changeUnitLanguage(cfg: BaseFormatter, lang: 'ch' | 'en') {
   onChangeFormatCfgUnitLanguage(cfg, lang)
   getExampleValue()
 }
 
 const init = () => {
   if (!formatterCfg.value) {
-    formatterCfg.value = formatterCfg
-
-    initFormatCfgUnit(formatterCfg.value)
+    return
   }
+  initFormatCfgUnit(formatterCfg.value)
 }
 
 const onFormatChange = () => {

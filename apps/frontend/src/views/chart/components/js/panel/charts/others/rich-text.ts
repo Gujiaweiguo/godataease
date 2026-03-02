@@ -6,6 +6,7 @@ const { t } = useI18n()
  * 富文本图表
  */
 export class RichTextChartView extends AbstractChartView {
+  selectorSpec: EditorSelectorSpec = {}
   properties: EditorProperty[] = [
     'background-overall-component',
     'border-style',

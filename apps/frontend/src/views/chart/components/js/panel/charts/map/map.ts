@@ -314,10 +314,11 @@ export class Map extends L7PlotChartView<ChoroplethOptions, Choropleth> {
     })
     if (colorScale.length) {
       options.color['value'] = colorScale.map(item =>
-        item.color ? new ColorWrapper(item.color) : new ColorWrapper(item)
+        typeof item === 'string' ? item : item.color
       )
-      if (colorScale[0].value && !misc.mapAutoLegend) {
-        options.color['scale']['domain'] = [
+      const colorScaleFirst = colorScale[0]
+      if (typeof colorScaleFirst !== 'string' && colorScaleFirst?.value && !misc.mapAutoLegend) {
+        ;(options.color as any)['scale']['domain'] = [
           minValue ?? filterEmptyMinValue(sourceData, 'value'),
           maxValue
         ]
@@ -441,13 +442,13 @@ export class Map extends L7PlotChartView<ChoroplethOptions, Choropleth> {
         const item = items.find(item => value >= item.value[0] && value <= item.value[1])
         return item ? item.color : basicStyle.areaBaseColor
       }
-      options.color.scale.domain = [ranges[0][0], ranges[ranges.length - 1][1]]
+      ;(options.color as any).scale.domain = [ranges[0][0], ranges[ranges.length - 1][1]]
     } else {
       customLegend['customContent'] = (_: string, items: CategoryLegendListItem[]) => {
         const showItems = items?.length > 30 ? items.slice(0, 30) : items
         if (showItems?.length) {
           if (showItems.length === 1) {
-            showItems[0].value = options.color.scale.domain.slice(0, 2)
+            showItems[0].value = (options.color as any).scale.domain.slice(0, 2)
           }
           return this.createLegendCustomContent(showItems)
         }
@@ -457,7 +458,7 @@ export class Map extends L7PlotChartView<ChoroplethOptions, Choropleth> {
     // 下钻时按照数据值计算图例
     if (chart.drill) {
       getMaxAndMinValueByData(options.source.data, 'value', 0, 0, (max, min) => {
-        options.color.scale.domain = [min, max]
+        ;(options.color as any).scale.domain = [min, max]
       })
     }
     defaultsDeep(options, { legend: customLegend })
@@ -623,17 +624,5 @@ export class Map extends L7PlotChartView<ChoroplethOptions, Choropleth> {
       this.customConfigLegend,
       this.configCustomArea
     )(chart, options, context, this)
-  }
-}
-
-class ColorWrapper {
-  private color: string
-
-  constructor(color: string) {
-    this.color = color
-  }
-
-  toString(): string {
-    return this.color
   }
 }

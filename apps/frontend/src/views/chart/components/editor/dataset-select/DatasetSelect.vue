@@ -62,14 +62,16 @@ const sourceName = computed(() =>
 
 const sortTypeChange = arr => {
   const sortType = wsCache.get('TreeSort-dataset') || 'time_desc'
-  datasetTree.value = treeSort(arr, sortType)
+  datasetTree.value = treeSort(arr as any, sortType) as unknown as Tree[]
 }
 
 const initDataset = () => {
   loadingDatasetTree.value = true
-  const method = props.sourceType === 'datasource' ? getDatasourceList : getDatasetTree
-  const params = props.sourceType === 'datasource' ? null : {}
-  method(params)
+  const request =
+    props.sourceType === 'datasource'
+      ? getDatasourceList(null as any)
+      : getDatasetTree({} as any)
+  request
     .then(res => {
       sortTypeChange((res as unknown as Tree[]) || [])
     })

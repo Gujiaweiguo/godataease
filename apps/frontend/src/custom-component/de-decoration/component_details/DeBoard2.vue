@@ -3,10 +3,14 @@ import { ref, watch, onMounted, computed } from 'vue'
 import { customMergeColor } from '@/custom-component/de-decoration/component_details/config'
 import { cloneDeep } from 'lodash-es'
 
+interface CurStyle {
+  width: number
+  height: number
+}
 interface Props {
   color?: string[]
   backgroundColor?: string
-  curStyle: object
+  curStyle: CurStyle
   scale: number
 }
 

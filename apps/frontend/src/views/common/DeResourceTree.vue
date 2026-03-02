@@ -39,7 +39,7 @@ import { BusiTreeNode, BusiTreeRequest } from '@/models/tree/TreeNode'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import { storeToRefs } from 'pinia'
-import DvHandleMore from '@/components/handle-more/src/DvHandleMore.vue'
+import DvHandleMore, { type Menu as DvMenu } from '@/components/handle-more/src/DvHandleMore.vue'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { useShareStoreWithOut } from '@/store/modules/share'
 const shareStore = useShareStoreWithOut()
@@ -98,6 +98,7 @@ const resourceListTree = ref()
 const resourceGroupOpt = ref()
 const resourceCreateOpt = ref()
 const returnMounted = ref(false)
+
 const state = reactive({
   pWeightMap: {},
   curSortType: 'time_desc',
@@ -120,7 +121,7 @@ const state = reactive({
       svgName: dvDelete,
       divided: true
     }
-  ],
+  ] as DvMenu[],
   sortType: [
     {
       label: t('visualization.time_asc'), //'按时间升序'
@@ -148,8 +149,8 @@ const dvSvgType = computed(() =>
 
 const isEmbedded = computed(() => appStore.getIsDataEaseBi || appStore.getIsIframe)
 
-const resourceTypeList = computed(() => {
-  const list = [
+const resourceTypeList = computed<DvMenu[]>(() => {
+  const list: DvMenu[] = [
     {
       label: t('work_branch.new_empty'), //'空白新建',
       svgName: dvSvgType.value,
@@ -175,11 +176,11 @@ const { handleDrop, allowDrop, handleDragStart } = treeDraggbleChart(
   curCanvasType.value
 )
 
-const menuListWeight = id => {
+const menuListWeight = (id: string): DvMenu[] => {
   const pWeight = state.pWeightMap[id]
   return pWeight < 7 ? menuList : menuListWithCopy
 }
-const menuListWithCopy = [
+const menuListWithCopy: DvMenu[] = [
   {
     label: t('visualization.cancel_publish'), //取消发布
     command: 'cancelPublish',
@@ -208,7 +209,7 @@ const menuListWithCopy = [
     divided: true
   }
 ]
-const menuList = [
+const menuList: DvMenu[] = [
   {
     label: t('visualization.cancel_publish'), //取消发布
     command: 'cancelPublish',
@@ -321,7 +322,7 @@ const getTree = async (notOpen = false) => {
     busiFlag: curCanvasType.value,
     resourceTable: props.resourceTable
   } as BusiTreeRequest
-  const isDashboard = curCanvasType.value == 'dashboard'
+  const isDashboard = curCanvasType.value === 'dashboard'
   await interactiveStore.setInteractive(request)
   const interactiveData = isDashboard ? interactiveStore.getPanel : interactiveStore.getScreen
   const nodeData = interactiveData.treeNodes
@@ -377,7 +378,7 @@ const afterTreeInit = (notOpen = false) => {
     resourceListTree.value.filter(filterText.value)
     if (notOpen) return
     nextTick(() => {
-      document.querySelector('.is-current')?.firstChild?.click()
+      ;(document.querySelector('.is-current')?.firstChild as HTMLElement | null)?.click()
     })
   })
 }

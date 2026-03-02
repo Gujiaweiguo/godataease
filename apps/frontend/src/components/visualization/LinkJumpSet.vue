@@ -250,9 +250,7 @@
                                 style="display: flex; margin-bottom: 6px"
                                 v-for="(
                                   targetViewInfo, index
-                                ) in state.linkJumpInfo.targetViewInfoList.filter(
-                                  item => item.targetType === 'view'
-                                )"
+                                ) in state.linkJumpInfo.targetViewInfoList.filter(filterViewTargets)"
                                 :key="index"
                               >
                                 <div style="flex: 1">
@@ -300,9 +298,7 @@
                                     @change="viewInfoOnChange(targetViewInfo)"
                                   >
                                     <el-option
-                                      v-for="item in state.currentLinkPanelViewArray.filter(
-                                        item => item.type !== 'outerParams'
-                                      )"
+                                      v-for="item in state.currentLinkPanelViewArray.filter(filterNonOuterParams)"
                                       :key="item.id"
                                       :label="item.title"
                                       :value="item.id"
@@ -415,9 +411,7 @@
                                   style="display: flex; margin-bottom: 6px"
                                   v-for="(
                                     targetViewInfo, index
-                                  ) in state.linkJumpInfo.targetViewInfoList.filter(
-                                    item => item.targetType === 'outerParams'
-                                  )"
+                                  ) in state.linkJumpInfo.targetViewInfoList.filter(filterOuterParamTargets)"
                                   :key="index"
                                 >
                                   <div style="flex: 1">
@@ -570,11 +564,7 @@
                           />
                           <el-scrollbar style="margin-top: 12px" height="250px">
                             <span
-                              v-for="item in state.linkJumpInfoArray.filter(
-                                item =>
-                                  !state.searchField ||
-                                  item.sourceFieldName.indexOf(state.searchField) > -1
-                              )"
+                              v-for="item in state.linkJumpInfoArray.filter(filterBySearchField)"
                               :key="item.sourceFieldId"
                               class="item-dimension"
                               :title="item.sourceFieldName"
@@ -645,7 +635,7 @@ import { storeToRefs } from 'pinia'
 import { findDvType, queryTreeApi } from '@/api/visualization/dataVisualization'
 import { ElMessage, ElScrollbar } from 'element-plus-secondary'
 import { useI18n } from '@/hooks/web/useI18n'
-import { getDatasetDetails, listFieldByDatasetGroup } from '@/api/dataset'
+import { getDatasetDetails, listFieldByDatasetGroup, Dataset } from '@/api/dataset'
 import { BusiTreeRequest } from '@/models/tree/TreeNode'
 import JumpSetOuterContentEditor from '@/components/visualization/JumpSetOuterContentEditor.vue'
 import { Search } from '@element-plus/icons-vue'
@@ -659,6 +649,34 @@ import { useCache } from '@/hooks/web/useCache'
 import { useEmbedded } from '@/store/modules/embedded'
 import { guid } from '@/views/visualized/data/dataset/form/util'
 import treeSort from '@/utils/treeSortUtils'
+
+interface JumpViewInfo {
+  type: string
+  title: string
+  tableId?: number
+}
+
+interface JumpDatasetInfo {
+  name: string
+}
+
+interface TreeNodeItem {
+  id?: string | number
+  children?: TreeNodeItem[]
+  [key: string]: unknown
+}
+
+const toArrayData = <T,>(payload: unknown): T[] => {
+  if (Array.isArray(payload)) {
+    return payload as T[]
+  }
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    const data = (payload as { data?: unknown }).data
+    return Array.isArray(data) ? (data as T[]) : []
+  }
+  return []
+}
+
 const dvMainStore = dvMainStoreWithOut()
 const { dvInfo, canvasViewInfo, componentData } = storeToRefs(dvMainStore)
 const linkJumpInfoTree = ref(null)
@@ -681,8 +699,8 @@ const state = reactive({
   activeCollapse: 'view',
   loading: false,
   showSelected: false,
-  curJumpViewInfo: {},
-  curDatasetInfo: {},
+  curJumpViewInfo: { type: '', title: '' } as JumpViewInfo,
+  curDatasetInfo: { name: '' } as JumpDatasetInfo,
   tempId: null,
   initState: false,
   viewId: null,
@@ -740,7 +758,43 @@ const state = reactive({
   quota: [],
   currentOutParams: []
 })
+
+interface FilterComponentItem {
+  component?: string
+  propValue?: unknown
+}
+
+interface FilterItem {
+  id?: string
+  name?: string
+  checkedFields?: Array<string | number | null>
+}
+
+interface LinkJumpInfoItem {
+  sourceFieldId: string
+  sourceFieldName?: string
+  checked?: boolean
+  linkType?: string
+  jumpType?: string
+  windowSize?: string
+  content?: string
+  attachParams?: boolean
+  targetDvId?: string
+  targetViewInfoList: Array<{
+    targetId?: string
+    targetViewId?: string
+    targetType?: string
+    targetFieldId?: string
+    sourceFieldActiveId?: string
+  }>
+}
 const { wsCache } = useCache()
+
+const filterViewTargets = (item: { targetType?: string }) => item.targetType === 'view'
+const filterOuterParamTargets = (item: { targetType?: string }) => item.targetType === 'outerParams'
+const filterNonOuterParams = (item: { type?: string }) => item.type !== 'outerParams'
+const filterBySearchField = (item: { sourceFieldName?: string }) =>
+  !state.searchField || (item.sourceFieldName || '').includes(state.searchField)
 
 const outerContentEditor = ref(null)
 
@@ -754,7 +808,7 @@ const resetParams = () => {
   state.linkJumpInfo = null
 }
 
-const dialogInit = viewItem => {
+const dialogInit = (viewItem: { id: string; type: string }) => {
   resetParams()
   state.showSelected = false
   dialogShow.value = true
@@ -762,23 +816,31 @@ const dialogInit = viewItem => {
   init(viewItem)
 }
 
-const initCurFilterFieldArray = componentDataCheck => {
-  componentDataCheck.forEach(componentItem => {
+const initCurFilterFieldArray = (componentDataCheck: FilterComponentItem[]) => {
+  componentDataCheck.forEach((componentItem: FilterComponentItem) => {
     if (componentItem.component === 'VQuery' && componentItem.propValue instanceof Array) {
-      componentItem.propValue.forEach(filterItem => {
-        if (filterItem.checkedFields.includes(state.viewId)) {
-          state.linkJumpCurFilterFieldArray.push({
-            id: filterItem.id,
-            name: filterItem.name,
-            deType: 'filter'
-          })
+      componentItem.propValue.forEach((filterItem: unknown) => {
+        const typedFilter = filterItem as FilterItem
+        if (
+          typedFilter.id &&
+          typedFilter.name &&
+          Array.isArray(typedFilter.checkedFields) &&
+          typedFilter.checkedFields.includes(state.viewId)
+        ) {
+          state.linkJumpCurFilterFieldArray.push({ id: typedFilter.id, name: typedFilter.name, deType: 'filter' })
         }
       })
-    } else if (componentItem.component === 'Group') {
-      initCurFilterFieldArray(componentItem.propValue)
-    } else if (componentItem.component === 'DeTabs') {
-      componentItem.propValue.forEach(tabItem => {
-        initCurFilterFieldArray(tabItem.componentData)
+    } else if (componentItem.component === 'Group' && Array.isArray(componentItem.propValue)) {
+      initCurFilterFieldArray(componentItem.propValue as FilterComponentItem[])
+    } else if (componentItem.component === 'DeTabs' && Array.isArray(componentItem.propValue)) {
+      componentItem.propValue.forEach((tabItem: unknown) => {
+        const tabComponentData =
+          tabItem && typeof tabItem === 'object' && 'componentData' in tabItem
+            ? (tabItem as { componentData?: unknown }).componentData
+            : undefined
+        if (Array.isArray(tabComponentData)) {
+          initCurFilterFieldArray(tabComponentData as FilterComponentItem[])
+        }
       })
     }
   })
@@ -786,7 +848,7 @@ const initCurFilterFieldArray = componentDataCheck => {
 
 const isIndicator = computed(() => 'indicator' === state.viewType)
 
-const init = viewItem => {
+const init = (viewItem: { id: string; type: string }) => {
   state.initState = false
   state.viewId = viewItem.id
   state.viewType = viewItem.type
@@ -819,11 +881,12 @@ const init = viewItem => {
   }
   const request = { busiFlag: 'dashboard-dataV' } as BusiTreeRequest
   // 获取可关联的仪表板
-  queryTreeApi(request).then(rsp => {
-    if (rsp && rsp[0]?.id === '0') {
-      state.panelList = rsp[0].children
+  queryTreeApi(request).then((rsp: unknown) => {
+    const treeList = toArrayData<TreeNodeItem>(rsp)
+    if (treeList[0]?.id === '0') {
+      state.panelList = treeList[0].children || []
     } else {
-      state.panelList = rsp
+      state.panelList = treeList
     }
     state.panelList = filterEmptyFolderTree(state.panelList)
     const curSortType = wsCache.get(`TreeSort-${dvInfo.value.type}`) || 'time_asc'
@@ -836,26 +899,28 @@ const init = viewItem => {
 
   if (chartDetails.tableId) {
     // 获取当前数据集信息
-    getDatasetDetails(chartDetails.tableId).then(res => {
-      state.curDatasetInfo = res || {}
+    getDatasetDetails(chartDetails.tableId).then((res: Dataset | null | undefined) => {
+      state.curDatasetInfo = res || { name: '' }
     })
     // 获取当前图表的字段信息
-    listFieldByDatasetGroup(chartDetails.tableId).then(rsp => {
+    listFieldByDatasetGroup(chartDetails.tableId).then(
+      (rsp: { data: Array<{ id: string; name?: string; deType?: number }> }) => {
       state.linkJumpCurViewFieldArray = []
       const sourceCurViewFieldArray = rsp.data
-      sourceCurViewFieldArray.forEach(fieldItem => {
+      sourceCurViewFieldArray.forEach((fieldItem: { id: string; name?: string; deType?: number }) => {
         if (checkAllAxisStr.indexOf(fieldItem.id) > -1) {
           state.linkJumpCurViewFieldArray.push(fieldItem)
         }
       })
-    })
+      }
+    )
 
     // 获取当前图表的关联信息
-    queryWithViewId(dvInfo.value.id, state.viewId).then(rsp => {
-      state.linkJump = rsp.data
+    queryWithViewId(dvInfo.value.id, state.viewId).then((rsp: { data?: { linkJumpInfoArray?: unknown[] } }) => {
+      state.linkJump = rsp.data || { linkJumpInfoArray: [] }
       state.linkJumpInfoArray = []
       state.linkJumpInfoXArray = []
-      state.linkJump.linkJumpInfoArray.forEach(linkJumpInfo => {
+      state.linkJump.linkJumpInfoArray.forEach((linkJumpInfo: LinkJumpInfoItem) => {
         if (checkJumpStr.indexOf(linkJumpInfo.sourceFieldId) > -1) {
           state.mapJumpInfoArray[linkJumpInfo.sourceFieldId] = linkJumpInfo
           state.linkJumpInfoArray.push(linkJumpInfo)
@@ -877,7 +942,7 @@ const init = viewItem => {
 const save = () => {
   // 字段检查
   let subCheckCountAll = 0
-  state.linkJump.linkJumpInfoArray.forEach(linkJumpInfo => {
+  state.linkJump.linkJumpInfoArray.forEach((linkJumpInfo: LinkJumpInfoItem) => {
     if (linkJumpInfo.checked) {
       let subCheckCount = 0
       if (linkJumpInfo.linkType === 'inner') {
@@ -886,7 +951,11 @@ const save = () => {
           subCheckCountAll++
         }
         linkJumpInfo.targetViewInfoList &&
-          linkJumpInfo.targetViewInfoList.forEach(function (link) {
+          linkJumpInfo.targetViewInfoList.forEach(function (link: {
+            sourceFieldActiveId?: string
+            targetFieldId?: string
+            targetViewId?: string
+          }) {
             if (!(link.sourceFieldActiveId && link.targetFieldId && link.targetViewId)) {
               subCheckCount++
               subCheckCountAll++
@@ -913,7 +982,7 @@ const save = () => {
       snapshotStore.recordSnapshotCache('updateJumpSet')
       ElMessage.success(t('common.save_success'))
       // 刷新跳转信息
-      queryVisualizationJumpInfo(dvInfo.value.id).then(rsp => {
+      queryVisualizationJumpInfo(dvInfo.value.id).then((rsp: { data?: unknown }) => {
         dvMainStore.setNowPanelJumpInfo(rsp.data)
         cancel()
       })
@@ -923,7 +992,7 @@ const save = () => {
       state.loading = false
     })
 }
-const nodeClick = data => {
+const nodeClick = (data: { sourceFieldId?: string } | undefined) => {
   if (!data) {
     return
   }
@@ -949,53 +1018,83 @@ const nodeClick = data => {
   codeMirrorContentSet(state.linkJumpInfo.content)
 }
 
-const codeMirrorContentSet = content => {
+const codeMirrorContentSet = (content: string) => {
   nextTick(() => {
     outerContentEditor.value?.editorInit(content)
   })
 }
 
 // 获取当前图表字段 关联仪表板的图表信息列表
-const getPanelViewList = dvId => {
-  viewTableDetailList(dvId).then(rsp => {
+const getPanelViewList = (dvId: string | number) => {
+  viewTableDetailList(dvId).then(
+    (rsp: {
+      data: {
+        visualizationViewTables: Array<Record<string, unknown>>
+        outParamsJumpInfo?: Array<Record<string, unknown>>
+        bashComponentData: string
+      }
+    }) => {
     state.viewIdFieldArrayMap = {}
     state.currentLinkPanelViewArray = rsp.data.visualizationViewTables
     if (state.currentLinkPanelViewArray) {
-      state.currentLinkPanelViewArray.forEach(view => {
-        state.viewIdFieldArrayMap[view.id] = view.tableFields
+      state.currentLinkPanelViewArray.forEach((view: Record<string, unknown>) => {
+        const viewId = view.id as string
+        state.viewIdFieldArrayMap[viewId] = (view.tableFields as unknown[]) || []
       })
     }
     // 外部参数 currentLinkPanelViewArray 也加入
     // 在图表侧进行隐藏 保存的时候直接保存currentLinkPanelViewArray 方便处理
     state.currentOutParams = rsp.data.outParamsJumpInfo || []
     if (state.currentOutParams && state.currentOutParams.length > 0) {
-      state.currentOutParams.forEach(outerParamsItem => {
+      state.currentOutParams.forEach((outerParamsItem: Record<string, unknown>) => {
         state.currentLinkPanelViewArray.push(outerParamsItem)
-        state.viewIdFieldArrayMap[outerParamsItem.id] = [
+        state.viewIdFieldArrayMap[outerParamsItem.id as string] = [
           { id: '1000001', name: t('visualization.out_params_no_select') }
         ]
       })
     }
     // 增加过滤组件匹配
-    JSON.parse(rsp.data.bashComponentData).forEach(componentItem => {
-      if (componentItem.component === 'VQuery' && componentItem.propValue instanceof Array) {
-        componentItem.propValue.forEach(filterItem => {
-          state.currentLinkPanelViewArray.push({
-            id: filterItem.id,
-            type: 'filter',
-            name: filterItem.name,
-            title: filterItem.name
+    let bashComponentData: unknown = []
+    try {
+      bashComponentData = JSON.parse(rsp.data.bashComponentData)
+    } catch {
+      bashComponentData = []
+    }
+    if (Array.isArray(bashComponentData)) {
+      bashComponentData.forEach((componentItem: unknown) => {
+        if (
+          componentItem &&
+          typeof componentItem === 'object' &&
+          'component' in componentItem &&
+          (componentItem as { component?: unknown }).component === 'VQuery' &&
+          'propValue' in componentItem &&
+          Array.isArray((componentItem as { propValue?: unknown }).propValue)
+        ) {
+          const filterList = (componentItem as { propValue: unknown[] }).propValue
+          filterList.forEach((filterItem: unknown) => {
+            if (filterItem && typeof filterItem === 'object') {
+              const typedFilter = filterItem as { id?: string; name?: string }
+              if (typedFilter.id && typedFilter.name) {
+                state.currentLinkPanelViewArray.push({
+                  id: typedFilter.id,
+                  type: 'filter',
+                  name: typedFilter.name,
+                  title: typedFilter.name
+                })
+                state.viewIdFieldArrayMap[typedFilter.id] = [
+                  { id: '1000001', name: t('visualization.filter_no_select') }
+                ]
+              }
+            }
           })
-          state.viewIdFieldArrayMap[filterItem.id] = [
-            { id: '1000001', name: t('visualization.filter_no_select') }
-          ]
-        })
-      }
-    })
-  })
+        }
+      })
+    }
+    }
+  )
 }
 
-const dvNodeClick = data => {
+const dvNodeClick = (data: { leaf?: boolean; weight?: number; id?: string | number }) => {
   if (data.leaf) {
     state.curDataVWeight = data.weight
     state.linkJumpInfo.targetViewInfoList = []
@@ -1014,10 +1113,10 @@ const addLinkJumpField = (type = 'view') => {
   })
 }
 
-const deleteLinkJumpFieldById = targetId => {
+const deleteLinkJumpFieldById = (targetId?: string) => {
   if (targetId) {
     let indexResult
-    state.linkJumpInfo.targetViewInfoList.forEach((item, index) => {
+    state.linkJumpInfo.targetViewInfoList.forEach((item: { targetId?: string }, index: number) => {
       if (targetId === item.targetId) {
         indexResult = index
       }
@@ -1028,7 +1127,7 @@ const deleteLinkJumpFieldById = targetId => {
   }
 }
 
-const fieldIdDisabledCheck = targetViewInfo => {
+const fieldIdDisabledCheck = (targetViewInfo: { targetViewId?: string; sourceFieldActiveId?: string }) => {
   return (
     (state.viewIdFieldArrayMap[targetViewInfo.targetViewId] &&
       state.viewIdFieldArrayMap[targetViewInfo.targetViewId].length === 1 &&
@@ -1037,7 +1136,7 @@ const fieldIdDisabledCheck = targetViewInfo => {
   )
 }
 
-const viewInfoOnChange = targetViewInfo => {
+const viewInfoOnChange = (targetViewInfo: { targetViewId?: string; targetFieldId?: string }) => {
   if (
     state.viewIdFieldArrayMap[targetViewInfo.targetViewId] &&
     state.viewIdFieldArrayMap[targetViewInfo.targetViewId].length === 1 &&
@@ -1048,7 +1147,7 @@ const viewInfoOnChange = targetViewInfo => {
     targetViewInfo.targetFieldId = null
   }
 }
-const sourceFieldCheckedChange = data => {
+const sourceFieldCheckedChange = (data: LinkJumpInfoItem) => {
   nextTick(() => {
     linkJumpInfoTree.value.setCurrentKey(data.sourceFieldId)
     nodeClick(data)
@@ -1067,22 +1166,22 @@ const outerContentShow = computed(() => {
   return state.linkJumpInfo && state.linkJumpInfo.linkType === 'outer' && dialogShow.value
 })
 
-const filterNodeMethod = (value, data) => {
+const filterNodeMethod = (value: boolean, data: { checked?: boolean }) => {
   return !value || data.checked
 }
 
 const isEmbedded = computed(() => appStore.getIsDataEaseBi || appStore.getIsIframe)
 const openType = '_blank'
 
-const resourceEdit = async resourceId => {
+const resourceEdit = async (resourceId: string) => {
   if (state.curDataVWeight && state.curDataVWeight < 7) {
     ElMessage.error(t('visualization.no_edit_auth'))
     return
   }
   let busiFlagResult
-  await findDvType(resourceId).then(res => {
-    busiFlagResult = res.data
-  })
+    await findDvType(resourceId).then((res: { data?: string }) => {
+      busiFlagResult = res.data
+    })
   const baseUrl = busiFlagResult === 'dataV' ? '#/dvCanvas?dvId=' : '#/dashboard?resourceId='
   if (isEmbedded.value) {
     embeddedStore.clearState()
@@ -1102,7 +1201,7 @@ const resourceEdit = async resourceId => {
 }
 
 const openHandler = ref(null)
-const initOpenHandler = newWindow => {
+const initOpenHandler = (newWindow: Window | null) => {
   if (openHandler?.value) {
     const pm = {
       methodName: 'initOpenHandler',
@@ -1114,14 +1213,14 @@ const initOpenHandler = newWindow => {
 
 watch(
   () => state.showSelected,
-  newValue => {
+  (newValue: boolean) => {
     linkJumpInfoTree.value?.filter(newValue)
   }
 )
 
 watch(
   () => outerContentShow.value,
-  newValue => {
+  (newValue: boolean) => {
     if (newValue) {
       codeMirrorContentSet(state.linkJumpInfo.content)
     }

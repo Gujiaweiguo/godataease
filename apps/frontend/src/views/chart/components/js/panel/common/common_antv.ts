@@ -12,6 +12,7 @@ import { TooltipOptions } from '@antv/l7plot/dist/lib/types/tooltip'
 import { FeatureCollection } from '@antv/l7plot/dist/esm/plots/choropleth/types'
 import { Datum } from '@antv/g2plot/esm/types/common'
 import { Tooltip } from '@antv/g2plot/esm'
+import type { Plot, PickOptions } from '@antv/g2plot/esm/core/plot'
 import { add } from 'mathjs'
 import isEmpty from 'lodash-es/isEmpty'
 import _ from 'lodash'
@@ -31,8 +32,6 @@ import { Scene } from '@antv/l7-scene'
 import { type IZoomControlOption } from '@antv/l7-component'
 import { PositionType } from '@antv/l7-core'
 import { centroid } from '@turf/centroid'
-import type { Plot } from '@antv/g2plot'
-import type { PickOptions } from '@antv/g2plot/lib/core/plot'
 import { defaults, find } from 'lodash-es'
 import { useI18n } from '@/hooks/web/useI18n'
 import { isMobile } from '@/utils/utils'
@@ -1215,7 +1214,13 @@ const RESET_BTN =
 const ZOOM_OUT_BTN =
   '<svg t="1717486240292" fill="${fill}" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13641" width="14px" height="14px"><path d="M935 423.3H89C40.2 423.3 0.3 463.2 0.3 512c0 48.8 39.9 88.7 88.7 88.7h846c48.8 0 88.7-39.9 88.7-88.7 0-48.8-39.9-88.7-88.7-88.7z" p-id="13642"></path></svg>'
 export class CustomZoom extends Zoom {
-  resetButtonGroup(container) {
+  constructor(option: Partial<IZoomControlOption> = {}) {
+    super(option)
+    const self = this as unknown as Record<string, unknown>
+    self['resetButtonGroup'] = (container: HTMLElement) => this.deResetButtonGroup(container)
+  }
+
+  private deResetButtonGroup(container) {
     DOM.clearChildren(container)
     this['zoomInButton'] = this['createButton'](
       this.controlOption.zoomInText,
@@ -1298,7 +1303,7 @@ export class CustomZoom extends Zoom {
       zoomOutTitle: 'Zoom out',
       resetText,
       showZoom: false
-    } as IZoomControlOption
+    } as unknown as ReturnType<Zoom['getDefault']>
   }
 }
 export function configL7Zoom(
@@ -1804,7 +1809,71 @@ function configCarouselTooltip(plot, chart) {
  * @param {boolean} enlargeElement - 放大弹窗
  * @returns {{x: number, y: number}} - 计算后的 x 和 y 坐标
  */
-function calculateTooltipPosition(chart, isCarousel, tooltipCtl, chartElement, event) {
+interface TooltipEventLike {
+  type?: string
+  clientX?: number
+  clientY?: number
+}
+
+interface TooltipControllerLike {
+  point: {
+    x: number
+    y: number
+  }
+  title?: string
+  tooltip?: {
+    cfg?: {
+      container?: HTMLElement
+    }
+  }
+  hideTooltip: () => void
+}
+
+interface PlotTooltipLike {
+  container?: HTMLElement
+  showMarkers?: boolean
+  follow?: boolean
+}
+
+interface PlotChartLike {
+  ele: HTMLElement
+  interactions?: {
+    tooltip?: {
+      context?: {
+        event?: TooltipEventLike
+      }
+    }
+  }
+  getController: (name: string) => unknown
+  getOptions: () => {
+    tooltip?: PlotTooltipLike | false
+  }
+  getTheme: () => {
+    components?: {
+      tooltip?: {
+        x?: number
+        y?: number
+      }
+    }
+  }
+}
+
+interface PlotWithTooltipLike {
+  options: {
+    tooltip?: PlotTooltipLike | false
+  }
+  chart: PlotChartLike
+  on: (event: string, handler: () => void) => void
+  once: (event: string, handler: () => void) => void
+}
+
+function calculateTooltipPosition(
+  chart,
+  isCarousel,
+  tooltipCtl: TooltipControllerLike,
+  chartElement: HTMLElement,
+  event?: TooltipEventLike
+) {
   // 辅助函数: 根据不同图表类型计算 Tooltip 的y位置
   const getTooltipY = () => {
     const top = Number(chartElement.getBoundingClientRect().top)
@@ -1822,7 +1891,10 @@ function calculateTooltipPosition(chart, isCarousel, tooltipCtl, chartElement, e
       y: getTooltipY()
     }
   } else {
-    return { x: event.clientX, y: event.clientY }
+    return {
+      x: event?.clientX ?? 0,
+      y: event?.clientY ?? 0
+    }
   }
 }
 const getChartElements = chart => {
@@ -1837,11 +1909,13 @@ export function configPlotTooltipEvent<O extends PickOptions, P extends Plot<O>>
   chart: Chart,
   plot: P
 ) {
-  const { tooltip } = parseJson(chart.customAttr)
+  const customAttr = parseJson(chart.customAttr) as DeepPartial<ChartAttr>
+  const tooltip = customAttr.tooltip
   if (!tooltip.show) {
     ChartCarouselTooltip.destroyByContainer(chart.container)
     return
   }
+  const tooltipPlot = plot as unknown as PlotWithTooltipLike
   // 图表容器，用于计算 tooltip 的位置
   // 获取图表元素，优先顺序：放大 > 预览 > 公共连接页面 > 默认
   let chartElement = getChartElements(chart)
@@ -1850,41 +1924,58 @@ export function configPlotTooltipEvent<O extends PickOptions, P extends Plot<O>>
   // 轮播时tooltip的zIndex
   const carousel_zIndex = enlargeElement ? '9999' : '1002'
   configCarouselTooltip(plot, chart)
+  const tooltipOptions = tooltipPlot.options.tooltip
+  if (!tooltipOptions || !tooltipOptions.container) {
+    return
+  }
   // 鼠标可移入, 移入之后保持显示, 移出之后隐藏
-  plot.options.tooltip.container.addEventListener('mouseenter', e => {
-    e.target.style.visibility = 'visible'
-    e.target.style.display = 'block'
+  tooltipOptions.container.addEventListener('mouseenter', e => {
+    const target = e.currentTarget
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+    target.style.visibility = 'visible'
+    target.style.display = 'block'
   })
-  plot.options.tooltip.container.addEventListener('mouseleave', e => {
-    e.target.style.visibility = 'hidden'
-    e.target.style.display = 'none'
+  tooltipOptions.container.addEventListener('mouseleave', e => {
+    const target = e.currentTarget
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+    target.style.visibility = 'hidden'
+    target.style.display = 'none'
   })
   // 手动处理 tooltip 的显示和隐藏事件，需配合源码理解
   // https://github.com/antvis/G2/blob/master/src/chart/controller/tooltip.ts#showTooltip
-  plot.on('tooltip:show', () => {
-    const tooltipCtl = plot.chart.getController('tooltip')
+  tooltipPlot.on('tooltip:show', () => {
+    const tooltipCtl = tooltipPlot.chart.getController('tooltip') as TooltipControllerLike | undefined
     if (!tooltipCtl) {
       return
     }
     const tooltipInstance = ChartCarouselTooltip.getInstanceByContainer(chart.container)
-    if (tooltipInstance && tooltipInstance.hasParentWithSwitchHidden(plot.chart.ele)) {
+    if (tooltipInstance && tooltipInstance.hasParentWithSwitchHidden(tooltipPlot.chart.ele)) {
       return
     }
     // 处理 tooltip 与下拉菜单的显示冲突问题
     const viewTrackBarElement = document.getElementById('view-track-bar-' + chart.id)
-    const event = plot.chart.interactions.tooltip?.context?.event
+    const event = tooltipPlot.chart.interactions?.tooltip?.context?.event
     // 是否时轮播模式
     const isCarousel =
-      chart.customAttr?.tooltip?.carousel &&
+      customAttr.tooltip?.carousel &&
       (!event || // 事件触发时，使用event的client坐标
         ['plot:leave', 'plot:mouseleave'].includes(event?.type) || //鼠标离开时，使用tooltipCtl.point
         ['pie', 'pie-rose', 'pie-donut'].includes(chart.type)) // 饼图时，使用tooltipCtl.point
-    plot.options.tooltip.showMarkers = isCarousel ? true : false
+    tooltipOptions.showMarkers = !!isCarousel
     const wrapperDom = document.getElementById(G2_TOOLTIP_WRAPPER)
-    wrapperDom.style.zIndex = isCarousel && wrapperDom ? carousel_zIndex : '9999'
+    if (wrapperDom) {
+      wrapperDom.style.zIndex = isCarousel ? carousel_zIndex : '9999'
+    }
     if (tooltipCtl.tooltip) {
       // 处理视图放大后再关闭 tooltip 的 dom 被清除
-      const container = tooltipCtl.tooltip.cfg.container
+      const container = tooltipCtl.tooltip.cfg?.container
+      if (!container) {
+        return
+      }
       // 当下拉菜单不显示时，移除tooltip的hidden-tooltip样式
       if (viewTrackBarElement?.getAttribute('aria-expanded') === 'false') {
         container.classList.toggle('hidden-tooltip', false)
@@ -1897,25 +1988,37 @@ export function configPlotTooltipEvent<O extends PickOptions, P extends Plot<O>>
           full.item(0).appendChild(container)
         } else {
           const wrapperDom = document.getElementById(G2_TOOLTIP_WRAPPER)
-          wrapperDom.appendChild(container)
+          wrapperDom?.appendChild(container)
         }
       }
     }
-    plot.chart.getOptions().tooltip.follow = false
+    const chartOptions = tooltipPlot.chart.getOptions()
+    if (chartOptions.tooltip) {
+      chartOptions.tooltip.follow = false
+    }
     tooltipCtl.title = Math.random().toString()
     // 当显示提示为事件触发时，使用event的client坐标，否则使用tooltipCtl.point 数据点的位置，在图表中，需要加上图表在绘制区的位置
     chartElement = getChartElements(chart)
-    const { x, y } = calculateTooltipPosition(chart, isCarousel, tooltipCtl, chartElement, event)
-    plot.chart.getTheme().components.tooltip.x = x
-    plot.chart.getTheme().components.tooltip.y = y
+    if (!chartElement) {
+      return
+    }
+    const { x, y } = calculateTooltipPosition(chart, !!isCarousel, tooltipCtl, chartElement, event)
+    const tooltipTheme = tooltipPlot.chart.getTheme().components?.tooltip
+    if (tooltipTheme) {
+      tooltipTheme.x = x
+      tooltipTheme.y = y
+    }
   })
   // https://github.com/antvis/G2/blob/master/src/chart/controller/tooltip.ts#hideTooltip
-  plot.on('plot:leave', () => {
-    const tooltipCtl = plot.chart.getController('tooltip')
+  tooltipPlot.on('plot:leave', () => {
+    const tooltipCtl = tooltipPlot.chart.getController('tooltip') as TooltipControllerLike | undefined
     if (!tooltipCtl) {
       return
     }
-    plot.chart.getOptions().tooltip.follow = true
+    const chartOptions = tooltipPlot.chart.getOptions()
+    if (chartOptions.tooltip) {
+      chartOptions.tooltip.follow = true
+    }
     const container = tooltipCtl.tooltip?.cfg?.container
     if (container) {
       container.style.display = 'none'
@@ -1923,28 +2026,30 @@ export function configPlotTooltipEvent<O extends PickOptions, P extends Plot<O>>
     tooltipCtl.hideTooltip()
   })
   // 移动端处理，关闭其他图表的提示
-  plot.on('plot:touchstart', () => {
+  tooltipPlot.on('plot:touchstart', () => {
     const wrapperDom = document.getElementById(G2_TOOLTIP_WRAPPER)
     if (wrapperDom) {
-      const tooltipCtl = plot.chart.getController('tooltip')
+      const tooltipCtl = tooltipPlot.chart.getController('tooltip') as TooltipControllerLike | undefined
       if (!tooltipCtl) {
         return
       }
-      const container = tooltipCtl.tooltip?.cfg.container
+      const container = tooltipCtl.tooltip?.cfg?.container
       for (const ele of wrapperDom.children) {
-        if (!container || container.id !== ele.id) {
+        if (ele instanceof HTMLElement && (!container || container.id !== ele.id)) {
           ele.style.display = 'none'
         }
       }
     }
   })
-  plot.on('tooltip:hidden', () => {
-    const tooltipCtl = plot.chart.getController('tooltip')
+  tooltipPlot.on('tooltip:hidden', () => {
+    const tooltipCtl = tooltipPlot.chart.getController('tooltip') as TooltipControllerLike | undefined
     if (!tooltipCtl) {
       return
     }
-    const container = tooltipCtl.tooltip?.cfg.container
-    container && (container.style.display = 'none')
+    const container = tooltipCtl.tooltip?.cfg?.container
+    if (container) {
+      container.style.display = 'none'
+    }
   })
 }
 
@@ -1967,30 +2072,31 @@ export function getConditions(chart: Chart) {
       continue
     }
     for (const t of field.conditions) {
+      type ConditionPoint = [string, string | number]
       const annotation = {
         type: 'regionFilter',
-        start: ['start', 'median'],
-        end: ['end', 'min'],
+        start: ['start', 'median'] as ConditionPoint,
+        end: ['end', 'min'] as ConditionPoint,
         color: t.color
       }
       // 加中线
       const annotationLine = {
         type: 'line',
-        start: ['start', t.value],
-        end: ['end', t.value],
+        start: ['start', t.value] as ConditionPoint,
+        end: ['end', t.value] as ConditionPoint,
         style: {
           stroke: t.color,
           lineDash: [2, 2]
         }
       }
       if (t.term === 'between') {
-        annotation.start = ['start', parseFloat(t.min)]
-        annotation.end = ['end', parseFloat(t.max)]
-        annotationLine.start = ['start', parseFloat(t.min)]
-        annotationLine.end = ['end', parseFloat(t.min)]
+        annotation.start = ['start', Number(t.min)]
+        annotation.end = ['end', Number(t.max)]
+        annotationLine.start = ['start', Number(t.min)]
+        annotationLine.end = ['end', Number(t.min)]
         annotations.push(JSON.parse(JSON.stringify(annotationLine)))
-        annotationLine.start = ['start', parseFloat(t.max)]
-        annotationLine.end = ['end', parseFloat(t.max)]
+        annotationLine.start = ['start', Number(t.max)]
+        annotationLine.end = ['end', Number(t.max)]
         annotations.push(annotationLine)
       } else if (['lt', 'le'].includes(t.term)) {
         annotation.start = ['start', t.value]
@@ -2015,7 +2121,8 @@ const AXIS_LABEL_TOOLTIP_STYLE = {
   padding: '8px 12px',
   opacity: '0.95',
   position: 'absolute',
-  visibility: 'visible'
+  visibility: 'visible',
+  maxWidth: '200px'
 }
 const AXIS_LABEL_TOOLTIP_TPL =
   '<div class="g2-axis-label-tooltip">' + '<div class="g2-tooltip-title">{title}</div>' + '</div>'
@@ -2237,7 +2344,7 @@ export const addConditionsStyleColorToData = (chart: Chart, options) => {
  * @param quotaList 指标列表
  * @param values 值
  */
-const getColorByConditions = (quotaList: [], values: number | number[], chart) => {
+const getColorByConditions = (quotaList: string[], values: number | number[], chart) => {
   const { threshold } = parseJson(chart.senior)
   const { basicStyle } = parseJson(chart.customAttr)
   const currentValue = Array.isArray(values) ? values[1] - values[0] : values

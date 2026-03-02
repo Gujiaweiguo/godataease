@@ -5,7 +5,7 @@
       :height="`${svgWH[1]}px`"
       :style="`transform:scale(${svgScale[0]},${svgScale[1]});`"
     >
-      <template v-for="(point, i) in points" :key="i">
+      <template v-for="(point, _i) in points" :key="_i">
         <rect
           v-if="Math.random() > 0.6"
           :fill="mergedColor[0]"
@@ -84,9 +84,13 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { cloneDeep } from 'lodash-es'
 import { customMergeColor } from '@/custom-component/de-decoration/component_details/config'
 
+interface CurStyle {
+  width: number
+  height: number
+}
 interface Props {
   color?: string[]
-  curStyle: object
+  curStyle: CurStyle
   scale: number
 }
 

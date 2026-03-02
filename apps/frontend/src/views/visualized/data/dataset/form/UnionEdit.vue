@@ -3,6 +3,7 @@ import { ref, reactive, inject, type Ref } from 'vue'
 import UnionFieldList from './UnionFieldList.vue'
 import UnionItemEdit from './UnionItemEdit.vue'
 import type { Field, NodeType, UnionType, Node } from './util'
+import type { Field as ChartField } from '@/api/chart'
 import { getTableField } from '@/api/dataset'
 import { cloneDeep } from 'lodash-es'
 
@@ -136,8 +137,8 @@ defineExpose({
       </div>
     </div>
     <union-item-edit
-      :parent-field-list="parentField"
-      :node-field-list="nodeField"
+      :parent-field-list="parentField as unknown as ChartField[]"
+      :node-field-list="nodeField as unknown as ChartField[]"
       :node="node"
       @change-union-type="val => (node.unionType = val)"
       v-if="node.tableName"

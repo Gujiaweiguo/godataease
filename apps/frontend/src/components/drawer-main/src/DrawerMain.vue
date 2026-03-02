@@ -1,32 +1,96 @@
 <script lang="ts" setup>
 import { ref, reactive, computed } from 'vue'
 import { ElDrawer, ElButton } from 'element-plus-secondary'
-import { propTypes } from '@/utils/propTypes'
 import DrawerFilter from '@/components/drawer-filter/src/DrawerFilter.vue'
 import DrawerEnumFilter from '@/components/drawer-filter/src/DrawerEnumFilter.vue'
 import DrawerTimeFilter from '@/components/drawer-filter/src/DrawerTimeFilter.vue'
 import DrawerTreeFilter from '@/components/drawer-filter/src/DrawerTreeFilter.vue'
 import { useI18n } from '@/hooks/web/useI18n'
 const { t } = useI18n()
-const props = defineProps({
-  filterOptions: propTypes.arrayOf(
-    propTypes.shape({
-      type: propTypes.string,
-      field: propTypes.string,
-      option: propTypes.array,
-      title: propTypes.string,
-      property: propTypes.shape({})
-    })
-  ),
-  title: propTypes.string
-})
-const myRefs = ref([])
+
+type TreeOption = {
+  value: string
+  label: string
+  children: TreeOption[]
+  disabled: boolean
+}
+
+type SelectOption = {
+  id: string
+  name: string
+}
+
+type TreeConfig = {
+  checkStrictly: boolean
+  showCheckbox: boolean
+  checkOnClickNode: boolean
+  placeholder: string
+}
+
+type SelectConfig = {
+  placeholder: string
+}
+
+type Config = {
+  placeholder: string
+  showType: string
+  rangeSeparator: string
+  startPlaceholder: string
+  endPlaceholder: string
+  format: string
+  valueFormat: string
+  size: string
+  placement: string
+}
+
+type TreeFilterOption = {
+  type: 'tree-select'
+  field: string
+  option: TreeOption[]
+  title: string
+  property?: TreeConfig
+  operator?: string
+}
+
+type SelectFilterOption = {
+  type: 'select'
+  field: string
+  option: SelectOption[]
+  title: string
+  property?: SelectConfig
+  operator?: string
+}
+
+type EnumFilterOption = {
+  type: 'enum'
+  field: string
+  option: SelectOption[]
+  title: string
+  operator?: string
+}
+
+type TimeFilterOption = {
+  type: 'time'
+  field: string
+  title: string
+  property?: Config
+  operator?: string
+}
+
+type FilterOption = TreeFilterOption | SelectFilterOption | EnumFilterOption | TimeFilterOption
+
+const props = defineProps<{
+  filterOptions: FilterOption[]
+  title?: string
+}>()
+
+const myRefs = ref<Array<unknown>>([])
 const componentList = computed(() => {
-  return props.filterOptions
+  return props.filterOptions || []
 })
 
 const state = reactive({
-  conditions: []
+  conditions: [] as Array<{ field: string; value: unknown[]; operator?: string }>
 })
 const userDrawer = ref(false)
 
@@ -38,7 +102,8 @@ const cleanrInnerValue = (index?: number) => {
   if (!field) {
     return
   }
-  myRefs.value[index]?.clear()
+  const targetRef = myRefs.value[index] as { clear?: () => void } | undefined
+  targetRef?.clear?.()
   for (let i = 0; i < state.conditions.length; i++) {
     if (state.conditions[i].field === field) {
       state.conditions[i].value = []
@@ -48,7 +113,8 @@ const cleanrInnerValue = (index?: number) => {
 const clearInnerTag = (index?: number) => {
   if (isNaN(index)) {
     for (let i = 0; i < componentList.value.length; i++) {
-      myRefs.value[i]?.clear()
+      const targetRef = myRefs.value[i] as { clear?: () => void } | undefined
+      targetRef?.clear?.()
     }
     return
   }
@@ -56,7 +122,8 @@ const clearInnerTag = (index?: number) => {
   const field = condition?.field
   for (let i = 0; i < componentList.value.length; i++) {
     if (componentList.value[i].field === field) {
-      myRefs.value[i]?.clear()
+      const targetRef = myRefs.value[i] as { clear?: () => void } | undefined
+      targetRef?.clear?.()
     }
   }
 }

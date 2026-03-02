@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
 const width = computed(() => props.curStyle.width)
 const height = computed(() => props.curStyle.height)
 const dur = computed(() => props.duration)
+const length = computed(() => (width.value + height.value - 5) * 2)
 
 const defaultColor = ref(['#2862b7', '#2862b7'])
 const mergedColor = ref<string[]>([])

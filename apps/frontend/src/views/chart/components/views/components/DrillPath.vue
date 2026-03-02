@@ -37,6 +37,8 @@ const drillJump = index => {
 }
 
 const drillPathVar = computed(() => [{ '--drill-color': textColor.value }])
+
+const drillFilterValue = (filter: any) => filter?.value?.[0] || ''
 </script>
 
 <template>
@@ -56,8 +58,8 @@ const drillPathVar = computed(() => [{ '--drill-color': textColor.value }])
         class="drill-item"
         @click="drillJump(index + 1)"
       >
-        <span class="item-name" :style="{ color: textColor }" :title="filter.value[0]">{{
-          filter.value[0]
+        <span class="item-name" :style="{ color: textColor }" :title="drillFilterValue(filter)">{{
+          drillFilterValue(filter)
         }}</span>
       </el-breadcrumb-item>
     </el-breadcrumb>

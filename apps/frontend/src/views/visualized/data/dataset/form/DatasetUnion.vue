@@ -205,6 +205,10 @@ const delNodeFake = (id, arr) => {
 
 const changeSqlId = ref([])
 const changedNodeId = ref([])
+
+const getCurrentNodeNoteName = (node: Node | null | undefined): string => {
+  return (node && (node as unknown as { noteName?: string }).noteName) || '-'
+}
 const saveSqlNode = (val: SqlNode, cb) => {
   const { tableName, id, sql, datasourceId, sqlVariableDetails = null, changeFlag = false } = val
   if (changeFlag) {
@@ -1234,8 +1238,8 @@ const emits = defineEmits([
           >
         </div>
         <div class="info" style="margin-top: 4px">
-          <span :title="currentNode.noteName" style="max-width: 500px" class="name ellipsis"
-            >{{ t('data_set.table_remarks') }}:{{ currentNode.noteName || '-' }}</span
+          <span :title="getCurrentNodeNoteName(currentNode)" style="max-width: 500px" class="name ellipsis"
+            >{{ t('data_set.table_remarks') }}:{{ getCurrentNodeNoteName(currentNode) }}</span
           >
         </div>
       </div>

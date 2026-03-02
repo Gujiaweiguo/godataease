@@ -41,6 +41,18 @@ import { getItemsOfView } from '@antv/g2/lib/interaction/action/active-region'
 
 const { t } = useI18n()
 const DEFAULT_DATA: any[] = []
+
+type LegendDisplayItem = {
+  name: string
+  value: string
+  marker: {
+    symbol: string
+    style: {
+      r: number
+      fill: string
+    }
+  }
+}
 /**
  * 柱状图
  */
@@ -226,6 +238,11 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
       pre[next.id] = next
       return pre
     }, {})
+    const labelPosition =
+      typeof tmpOptions.label === 'object' &&
+      (tmpOptions.label.position === 'top' || tmpOptions.label.position === 'bottom')
+        ? tmpOptions.label.position
+        : 'top'
     // 默认是灰色
     tmpOptions.label.style.fill = DEFAULT_LABEL.color
     const label = {
@@ -264,14 +281,9 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
       },
       position: data => {
         if (data.value < 0) {
-          if (tmpOptions.label?.position === 'top') {
-            return 'bottom'
-          }
-          if (tmpOptions.label?.position === 'bottom') {
-            return 'top'
-          }
+          return labelPosition === 'top' ? 'bottom' : 'top'
         }
-        return tmpOptions.label?.position
+        return labelPosition
       }
     }
     return {
@@ -311,7 +323,10 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
       columnWidthRatio = 1
     }
     if (columnWidthRatio) {
-      options.columnWidthRatio = columnWidthRatio
+      options = {
+        ...options,
+        columnWidthRatio
+      }
     }
 
     return options
@@ -499,19 +514,22 @@ export class StackBar extends Bar {
     const extStack = chart.extStack[0]
     if ((!sort || sort === 'none') && extStack?.customSort?.length > 0) {
       // 图例自定义排序
-      const sort = extStack.customSort ?? []
-      if (sort?.length) {
+      const customSortValues: string[] = Array.isArray(extStack.customSort)
+        ? extStack.customSort
+        : []
+      if (customSortValues.length) {
         // 用值域限定排序，有可能出现新数据但是未出现在图表上，所以这边要遍历一下子维度，加到后面，让新数据显示出来
         const data = options.data
-        const cats =
-          data?.reduce((p, n) => {
+        const cats: string[] = []
+        if (Array.isArray(data)) {
+          data.forEach(n => {
             const cat = n['category']
-            if (cat && !p.includes(cat)) {
-              p.push(cat)
+            if (typeof cat === 'string' && !cats.includes(cat)) {
+              cats.push(cat)
             }
-            return p
-          }, []) || []
-        const values = sort.reduce((p, n) => {
+          })
+        }
+        const values: string[] = customSortValues.reduce((p: string[], n: string) => {
           if (cats.includes(n)) {
             const index = cats.indexOf(n)
             if (index !== -1) {
@@ -521,12 +539,19 @@ export class StackBar extends Bar {
           }
           return p
         }, [])
-        cats.length > 0 && values.push(...cats)
-        options.meta = {
-          ...options.meta,
-          category: {
-            type: 'cat',
-            values
+        if (cats.length > 0) {
+          cats.forEach(cat => {
+            values.push(cat)
+          })
+        }
+        options = {
+          ...options,
+          meta: {
+            ...options.meta,
+            category: {
+              type: 'cat',
+              values
+            }
           }
         }
       }
@@ -575,10 +600,16 @@ export class StackBar extends Bar {
       size = DEFAULT_LEGEND_STYLE.size
     }
 
-    optionTmp.legend.marker.style = style => {
-      return {
-        r: size,
-        fill: style.fill
+    if (optionTmp.legend.marker && typeof optionTmp.legend.marker !== 'function') {
+      const marker = optionTmp.legend.marker
+      optionTmp.legend.marker = {
+        ...marker,
+        style: style => {
+          return {
+            r: size,
+            fill: style.fill
+          }
+        }
       }
     }
     const { sort, customSort, icon } = customStyle.legend
@@ -591,25 +622,29 @@ export class StackBar extends Bar {
           return p
         }, {}) || {}
       const dupCheck = new Set()
-      const colors = optionTmp.color ?? optionTmp.theme.styleSheet.paletteQualitative10
-      const items = optionTmp.data?.reduce((arr, item) => {
-        if (!dupCheck.has(item.category)) {
-          const fill = seriesMap[item.category]?.color ?? colors[dupCheck.size % colors.length]
-          dupCheck.add(item.category)
-          arr.push({
-            name: item.category,
-            value: item.category,
-            marker: {
-              symbol: icon,
-              style: {
-                r: size,
-                fill: isAlphaColor(fill) ? fill : convertToAlphaColor(fill, basicStyle.alpha)
+      const theme = optionTmp.theme as { styleSheet?: { paletteQualitative10?: string[] } }
+      const palette = theme.styleSheet?.paletteQualitative10 ?? []
+      const colors = optionTmp.color ?? palette
+      const items: LegendDisplayItem[] = []
+      if (Array.isArray(optionTmp.data)) {
+        optionTmp.data.forEach(item => {
+          if (!dupCheck.has(item.category)) {
+            const fill = seriesMap[item.category]?.color ?? colors[dupCheck.size % colors.length]
+            dupCheck.add(item.category)
+            items.push({
+              name: item.category,
+              value: item.category,
+              marker: {
+                symbol: icon,
+                style: {
+                  r: size,
+                  fill: isAlphaColor(fill) ? fill : convertToAlphaColor(fill, basicStyle.alpha)
+                }
               }
-            }
-          })
-        }
-        return arr
-      }, [])
+            })
+          }
+        })
+      }
       if (sort !== 'custom') {
         items.sort((a, b) => {
           return sort !== 'desc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
@@ -625,7 +660,7 @@ export class StackBar extends Bar {
         })
         items.unshift(...tmp)
       }
-      optionTmp.legend.items = items
+      optionTmp.legend.items = items as unknown as typeof optionTmp.legend.items
       if (extStack?.customSort?.length > 0) {
         delete optionTmp.meta?.category.values
       }
@@ -718,8 +753,15 @@ export class GroupBar extends StackBar {
       return plot
     }
     plot.chart.once('beforepaint', () => {
-      const geo = plot.chart.geometries[0]
-      const originMapping = geo.beforeMapping.bind(geo)
+      const geo = plot.chart.geometries[0] as unknown as {
+        getXScale: () => { values: string[] }
+        beforeMapping?: (originData: Array<Array<{ _origin: { field: string }; field: string; value: number }>>) => unknown
+      }
+      const originMapping =
+        typeof geo.beforeMapping === 'function' ? geo.beforeMapping.bind(geo) : undefined
+      if (!originMapping) {
+        return
+      }
       geo.beforeMapping = originData => {
         const values = geo.getXScale().values
         const valueMap = values.reduce((p, n) => {

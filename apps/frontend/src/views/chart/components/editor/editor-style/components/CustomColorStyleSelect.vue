@@ -23,8 +23,8 @@ const props = withDefaults(
       customColor: any
       colorIndex: number
     }
-    propertyInner: Array<string>
-    chart: ChartObj
+    propertyInner?: Array<string>
+    chart?: ChartObj
     sub?: boolean
   }>(),
   {
@@ -234,7 +234,7 @@ const changeColorOption = (option?) => {
   }
 }
 const resetCustomColor = () => {
-  const { type } = props.chart
+  const type = props.chart?.type || ''
   const { basicStyleForm } = state.value
 
   if (type.includes('map')) {
@@ -323,6 +323,7 @@ const colorItemBorderColor = (index, state) => {
         <gradient-color-selector
           v-model="state"
           :themes="themes"
+          :property-inner="props.propertyInner || []"
           @select-color-case="selectColorCase"
         />
       </el-form-item>

@@ -383,7 +383,13 @@ const add = (pid?: string) => {
 loadTreeData(true)
 
 // geoArea
-const customTreeData = ref([
+type CustomTreeNode = {
+  id: string
+  name: string
+  children?: CustomGeoArea[] | null
+}
+
+const customTreeData = ref<CustomTreeNode[]>([
   {
     id: '000',
     name: t('system.custom_area')

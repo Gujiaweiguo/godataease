@@ -38,7 +38,7 @@ const formatDate = () => {
 
   const date = new Date()
 
-  state.nowDate = date.format(timeFormat)
+  state.nowDate = (date as any).format(timeFormat)
 
   if (showWeek) {
     state.nowWeek = weekArr[date.getDay()]

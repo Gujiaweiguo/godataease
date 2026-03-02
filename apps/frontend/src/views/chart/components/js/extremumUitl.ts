@@ -347,10 +347,10 @@ export const createExtremumPoint = (chart, ev) => {
             // 最值dom高度超过50%时，最值dom向下
             if (top < 0 && (Math.abs(top) / point.y) * 100 >= 50) {
               pointElement.style.transform = `translateX(-50%) translateY(${translateYValue}px)`
-              childNode.style.marginTop = '-16px'
-              childNode.style.transform = 'rotate(180deg)'
+              ;(childNode as HTMLElement).style.marginTop = '-16px'
+              ;(childNode as HTMLElement).style.transform = 'rotate(180deg)'
             } else {
-              childNode.style.display = 'block'
+              ;(childNode as HTMLElement).style.display = 'block'
             }
           }
         })

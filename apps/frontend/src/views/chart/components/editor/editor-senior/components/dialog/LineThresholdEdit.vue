@@ -126,7 +126,7 @@ const init = () => {
 }
 const initOptions = (item, fieldObj) => {
   if (fieldObj) {
-    item.options = JSON.parse(JSON.stringify(valueOptions.value))
+    ;(item as any).options = JSON.parse(JSON.stringify(valueOptions.value))
     item.conditions &&
       item.conditions.forEach(ele => {
         ele.term = ''
@@ -181,7 +181,7 @@ const initFields = () => {
   // 字段不存在时
   let change = false
   state.thresholdArr.forEach(item => {
-    item.options = JSON.parse(JSON.stringify(valueOptions.value))
+    ;(item as any).options = JSON.parse(JSON.stringify(valueOptions.value))
     const fieldItemObj = state.fields.filter(ele => ele.id === item.fieldId)
     if (fieldItemObj.length === 0) {
       change = true
@@ -249,6 +249,10 @@ const getFieldOptions = fieldItem => {
   } else {
     return fieldOptions
   }
+}
+
+const getThresholdOptions = fieldItem => {
+  return ((fieldItem as any)?.options || []) as Array<{ label: string; options: any[] }>
 }
 
 init()
@@ -325,7 +329,7 @@ init()
               <el-form-item class="form-item">
                 <el-select v-model="item.term" @change="changeThreshold">
                   <el-option-group
-                    v-for="(group, idx) in fieldItem.options"
+                    v-for="(group, idx) in getThresholdOptions(fieldItem)"
                     :key="idx"
                     :label="group.label"
                   >
