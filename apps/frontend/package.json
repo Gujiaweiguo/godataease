@@ -18,6 +18,8 @@
     "test:core": "vitest run tests/unit tests/integration src/tests/unit",
     "test:affected:embedding": "vitest run tests/unit/events tests/integration/parent-child-communication.test.ts src/tests/unit/services/TokenManager.test.ts src/tests/unit/utils/embedding-utils.test.ts",
     "test:affected:datasource": "vitest run tests/unit/datasource tests/unit/example.test.ts",
+    "quality:report": "node scripts/quality-report.cjs",
+    "quality:report:summary": "node scripts/quality-report.cjs --summary",
     "test:watch": "vitest",
     "test:coverage": "vitest run tests/unit/example.test.ts --coverage",
     "test:coverage:core": "vitest run tests/unit tests/integration src/tests/unit --coverage",
