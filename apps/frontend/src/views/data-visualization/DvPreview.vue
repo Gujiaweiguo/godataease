@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, type CSSProperties } from 'vue'
 import DePreview from '@/components/data-visualization/canvas/DePreview.vue'
 import { storeToRefs } from 'pinia'
 
@@ -70,7 +70,7 @@ const contentInnerClass = computed(() => {
   }
 })
 
-const outerStyle = computed(() => {
+const outerStyle = computed<CSSProperties>(() => {
   return {
     flexDirection: props.canvasStylePreview.screenAdaptor === 'heightFirst' ? 'row' : 'column'
   }

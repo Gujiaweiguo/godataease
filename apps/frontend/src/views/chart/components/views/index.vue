@@ -713,7 +713,7 @@ const checkFieldIsAllowEmpty = (allField?) => {
       // 如果有限制长度，且字段长度不足，标记为空并跳出
       if (
         value['limit'] &&
-        (!view.value?.[key] || view.value?.[key]?.length < parseInt(value['limit']))
+        (!view.value?.[key] || view.value?.[key]?.length < (value['limit'] as number))
       ) {
         showEmpty.value = true
         break
@@ -1008,17 +1008,17 @@ const modifyAlpha = isBorder => {
   return `rgba(${r}, ${g}, ${b}, ${!backgroundColorSelect || isBorder ? 0.01 : a})`
 }
 
-const titleIconStyle = computed(() => {
+const titleIconStyle = computed<CSSProperties>(() => {
   const bgColor = modifyAlpha(false)
   const borderColor = modifyAlpha(true)
   // 不显示标题时，图标的样式
-  const style = {
+  const style: CSSProperties = {
     position: 'absolute',
     border: `1px solid ${borderColor}`,
-    'background-color': bgColor,
-    'border-radius': '2px',
+    backgroundColor: bgColor,
+    borderRadius: '2px',
     padding: '0 2px 0 2px',
-    'z-index': 1,
+    zIndex: 1,
     top: '2px',
     left: '2px',
     ...(trackMenu.value.length ? {} : { display: 'none' })
@@ -1104,7 +1104,7 @@ const clearG2Tooltip = () => {
   const g2TooltipWrapper = document.getElementById('g2-tooltip-wrapper')
   if (g2TooltipWrapper) {
     for (const ele of g2TooltipWrapper.children) {
-      ele.style.display = 'none'
+      (ele as HTMLElement).style.display = 'none'
     }
   }
 }

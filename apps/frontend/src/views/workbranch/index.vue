@@ -252,11 +252,12 @@ const apply = () => {
     encodeURIComponent(Base64.encode(JSON.stringify(templateTemplate)))
   let newWindow = null
   let embeddedBaseUrl = ''
+  const pid = embeddedStore.pid || router.currentRoute.value.query.pid
   if (isDataEaseBi.value) {
     embeddedBaseUrl = embeddedStore.baseUrl
   }
-  if (state.pid) {
-    newWindow = window.open(embeddedBaseUrl + baseUrl + `&pid=${state.pid}`, openType)
+  if (pid) {
+    newWindow = window.open(embeddedBaseUrl + baseUrl + `&pid=${String(pid)}`, openType)
   } else {
     newWindow = window.open(embeddedBaseUrl + baseUrl, openType)
   }

@@ -71,7 +71,7 @@ const props = defineProps({
     required: true
   },
   fieldsData: {
-    type: Array,
+    type: Array as PropType<Array<{ id?: string }>>,
     required: true
   },
   themes: {

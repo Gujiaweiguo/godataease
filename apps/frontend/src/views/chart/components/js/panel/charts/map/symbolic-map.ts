@@ -99,7 +99,7 @@ export class SymbolicMap extends L7ChartView<Scene, L7Config> {
     if (rect?.height <= 0) {
       return new L7Wrapper(drawOption.chartObj?.getScene(), [])
     }
-    const xAxis = deepCopy(chart.xAxis)
+    const xAxis = deepCopy(chart.xAxis) as any[]
     let basicStyle
     let miscStyle
     if (chart.customAttr) {
@@ -115,12 +115,13 @@ export class SymbolicMap extends L7ChartView<Scene, L7Config> {
     if (
       chart.chartExtRequest?.linkageFilters?.length &&
       xAxis?.length === 2 &&
-      chart.data?.tableRow.length
+      chart.data?.tableRow?.length
     ) {
+      const tableRow = chart.data?.tableRow as any[]
       // 经度
-      const lng = chart.data?.tableRow?.[0][chart.xAxis[0].dataeaseName]
+      const lng = tableRow?.[0]?.[xAxis[0]?.dataeaseName]
       // 纬度
-      const lat = chart.data?.tableRow?.[0][chart.xAxis[1].dataeaseName]
+      const lat = tableRow?.[0]?.[xAxis[1]?.dataeaseName]
       center = [lng, lat]
     }
     const chartObj = drawOption.chartObj as unknown as L7Wrapper<L7Config, Scene>
@@ -478,7 +479,7 @@ export class SymbolicMap extends L7ChartView<Scene, L7Config> {
           const tooltipElement = containerElement.getElementsByClassName('l7-popup')
           for (let i = 0; i < tooltipElement?.length; i++) {
             const element = tooltipElement[i] as HTMLElement
-            element.firstElementChild.style.display = 'none'
+            ;(element.firstElementChild as HTMLElement).style.display = 'none'
             element.style.transform = 'translate(15px, 12px)'
             const isNearRightEdge =
               containerElement.clientWidth - mouseX <= element.clientWidth + 10
@@ -631,5 +632,9 @@ export class SymbolicMap extends L7ChartView<Scene, L7Config> {
       mapStyle: 'normal'
     }
     return chart
+  }
+
+  protected setupOptions(_chart: Chart, options: L7Config): L7Config {
+    return options
   }
 }

@@ -4,7 +4,7 @@ import {
   L7PlotDrawOptions
 } from '@/views/chart/components/js/panel/types/impl/l7plot'
 import { Choropleth, ChoroplethOptions } from '@antv/l7plot/dist/esm/plots/choropleth'
-import { Dot, DotOptions, IPlotLayer } from '@antv/l7plot'
+import { Dot, DotOptions } from '@antv/l7plot'
 import {
   MAP_AXIS_TYPE,
   MAP_EDITOR_PROPERTY,
@@ -66,7 +66,9 @@ export class BubbleMap extends L7PlotChartView<ChoroplethOptions, Choropleth> {
     let data = chart.data?.data
     if (areaId.startsWith('custom_')) {
       customSubArea = (await getCustomGeoArea(areaId)).data || []
-      customSubArea.forEach(a => (a.scopeArr = a.scope?.split(',') || []))
+      customSubArea.forEach(a => {
+        a.scopeArr = a.scope?.split(',') || []
+      })
       geoJson = cloneDeep(await getGeoJsonFile('156'))
       const areaNameMap = geoJson.features.reduce((p, n) => {
         p['156' + n.properties.adcode] = n.properties.name
@@ -155,14 +157,16 @@ export class BubbleMap extends L7PlotChartView<ChoroplethOptions, Choropleth> {
     options = { ...options, tooltip: { ...tooltip, showComponent: false } }
     const view = new Choropleth(container, options)
     const dotLayer = this.getDotLayer(chart, geoJson, drawOption, customSubArea)
-    if (!areaId.startsWith('custom_')) {
-      dotLayer.options = { ...dotLayer.options, tooltip }
-    }
     this.configZoomButton(chart, view)
     mapRendering(container)
     view.once('loaded', () => {
       // 修改地图鼠标样式为默认
-      view.scene.map._canvasContainer.lastElementChild.style.cursor = 'default'
+      const mapCanvas = document
+        .getElementById(container)
+        ?.querySelector('canvas') as HTMLCanvasElement | null
+      if (mapCanvas) {
+        mapCanvas.style.cursor = 'default'
+      }
       const { layers } = context
       if (layers) {
         layers.forEach(l => {
@@ -176,15 +180,15 @@ export class BubbleMap extends L7PlotChartView<ChoroplethOptions, Choropleth> {
       view.scene.map['keyboard'].disable()
       dotLayer.on('dotLayer:click', (ev: MapMouseEvent) => {
         const data = ev.feature.properties
-        let adcode, scope
+        let adcode: string | number | undefined
+        let scope: string[] | undefined
         if (areaId.startsWith('custom_')) {
           adcode = '156'
           const area = customSubArea.find(a => a.name === data.name)
           scope = area?.scopeArr
         } else {
-          adcode = view.currentDistrictData.features.find(
-            i => i.properties.name === ev.feature.properties.name
-          )?.properties.adcode
+          adcode = geoJson.features.find(i => i.properties.name === ev.feature.properties.name)?.properties
+            .adcode
         }
         action({
           x: ev.x,
@@ -208,7 +212,7 @@ export class BubbleMap extends L7PlotChartView<ChoroplethOptions, Choropleth> {
     geoJson: FeatureCollection,
     drawOption: L7PlotDrawOptions<Choropleth>,
     customSubArea: CustomGeoSubArea[]
-  ): IPlotLayer {
+  ): Dot {
     const { areaId } = drawOption
     const { basicStyle, tooltip } = parseJson(chart.customAttr)
     const { bubbleCfg } = parseJson(chart.senior)
@@ -385,7 +389,9 @@ export class BubbleMap extends L7PlotChartView<ChoroplethOptions, Choropleth> {
     handleGeoJson(geoJson, curAreaNameMapping)
     options.color = basicStyle.areaBaseColor
     if (!chart.data?.data?.length || !geoJson?.features?.length) {
-      options.label && (options.label.field = 'name')
+      if (options.label && typeof options.label === 'object') {
+        options.label.field = 'name'
+      }
       return options
     }
     const data = chart.data.data

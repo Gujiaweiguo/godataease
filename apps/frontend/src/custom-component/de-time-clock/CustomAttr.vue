@@ -1,4 +1,11 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { inject } from 'vue'
+import { useI18n } from '@/hooks/web/useI18n'
+
+const { t } = useI18n()
+const themes = inject('themes')
+const dashboardActive = inject('dashboardActive')
+</script>
 
 <template>
   <el-collapse-item

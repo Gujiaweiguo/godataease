@@ -192,11 +192,20 @@ const state = reactive({
 })
 
 const showWatermarkSetting = computed(() => {
-  return (
-    dvInfo.value.watermarkInfo &&
-    dvInfo.value.watermarkInfo?.settingContent?.enable &&
-    dvInfo.value.watermarkInfo?.settingContent?.enablePanelCustom
-  )
+  const watermarkInfo = dvInfo.value.watermarkInfo
+  if (!watermarkInfo || typeof watermarkInfo !== 'object' || !('settingContent' in watermarkInfo)) {
+    return false
+  }
+  const settingContent = (
+    watermarkInfo as {
+      settingContent?: {
+        enable?: boolean
+        enablePanelCustom?: boolean
+      }
+    }
+  ).settingContent
+
+  return Boolean(settingContent?.enable && settingContent?.enablePanelCustom)
 })
 
 const goFile = () => {

@@ -270,7 +270,7 @@ const initMarketTemplate = () => {
       state.hasResult = true
       state.categories = rsp.data.categories
       initTemplateShow()
-      const activeCategoriesShow = getActiveCategories(state.currentMarketTemplateShowList)
+      const activeCategoriesShow = getActiveCategories(state.marketTemplatePreviewShowList)
       state.categories = rsp.data.categories.filter(category =>
         activeCategoriesShow.has(category.label)
       )

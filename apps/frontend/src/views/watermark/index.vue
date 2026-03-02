@@ -115,10 +115,16 @@ import { useI18n } from '@/hooks/web/useI18n'
 import ParamsTips from '@/views/watermark/ParamsTips.vue'
 const { t } = useI18n()
 
+interface UserLoginInfo {
+  account: string
+  name: string
+  ip: string
+}
+
 const state = reactive({
   userLoginInfo: {
-    username: '',
-    nickName: '',
+    account: '',
+    name: '',
     ip: ''
   },
   cmOption: {
@@ -145,7 +151,7 @@ const state = reactive({
     '#999999',
     '#000000',
     '#FFFFFF'
-  ],
+  ] as string[],
   watermarkForm: {
     enable: false,
     enablePanelCustom: false,
@@ -186,20 +192,20 @@ const save = () => {
   })
 }
 
-const findData = callback => {
+const findData = (callback: (rsp: { data: { settingContent: string } }) => void) => {
   watermarkFind().then(rsp => {
     callback(rsp)
   })
 }
 
-const findUserData = callback => {
+const findUserData = (callback: (rsp: { data: UserLoginInfo }) => void) => {
   personInfoApi().then(rsp => {
     callback(rsp)
   })
 }
 
 const initData = () => {
-  findData(res => {
+  findData((res: { data: { settingContent: string } }) => {
     state.watermarkForm = JSON.parse(res.data.settingContent)
     state.watermarkFormSource = { ...state.watermarkForm }
     initWatermark()
@@ -207,13 +213,13 @@ const initData = () => {
 }
 
 const initWatermark = () => {
-  let watermark_txt
+  let watermark_txt = ''
   let watermark_width = 120
   if (state.watermarkForm.type === 'custom') {
     watermark_txt = state.watermarkForm.content
     watermark_txt = watermark_txt.replaceAll('${ip}', state.userLoginInfo.ip)
-    watermark_txt = watermark_txt.replaceAll('${username}', state.userLoginInfo.name)
-    watermark_txt = watermark_txt.replaceAll('${nickName}', state.userLoginInfo.account)
+    watermark_txt = watermark_txt.replaceAll('${username}', state.userLoginInfo.account)
+    watermark_txt = watermark_txt.replaceAll('${nickName}', state.userLoginInfo.name)
     watermark_txt = watermark_txt.replaceAll('${time}', getNow())
     watermark_width = watermark_txt.length * state.watermarkForm.watermark_fontsize * 0.75
     watermark_width = watermark_width > 350 ? 350 : watermark_width
@@ -248,7 +254,7 @@ const initWatermark = () => {
 }
 
 onMounted(() => {
-  findUserData(res => {
+  findUserData((res: { data: UserLoginInfo }) => {
     state.userLoginInfo = res.data
     initData()
   })

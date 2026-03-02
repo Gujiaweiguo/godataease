@@ -389,8 +389,9 @@ const calcData = (view, callback) => {
           isError.value = true
           errMsg.value = res.msg
         } else {
-          chartData.value = res?.data as Partial<Chart['data']>
-          emit('onDrillFilters', res?.drillFilters)
+          emit('onDrillFilters', (res as any)?.drillFilters)
+
+          dvMainStore.setViewDataDetails(view.id, res)
 
           dvMainStore.setViewDataDetails(view.id, res)
           renderChart(res)

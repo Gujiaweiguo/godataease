@@ -11,7 +11,7 @@
       <div v-if="popComponentData && popComponentData.length > 0" class="pop-content">
         <!--使用ComponentWrapper 保留扩展能力-->
         <ComponentWrapper
-          v-for="(item, index) in popComponentData"
+          v-for="(item, index) in popComponentDataTyped"
           :id="'component-pop-' + item.id"
           :view-info="canvasViewInfo[item.id]"
           :key="index"
@@ -22,6 +22,8 @@
           :show-position="showPosition"
           :style="customPopStyle"
           :scale="innerScale"
+          :canvas-style-data="canvasStyleData"
+          :canvas-view-info="canvasViewInfo"
         />
       </div>
       <div
@@ -97,6 +99,12 @@ const props = defineProps({
 
 const { canvasStyleData, popComponentData, canvasViewInfo, scale, canvasState } = toRefs(props)
 const { curComponent } = storeToRefs(dvMainStore)
+
+interface PopComponentItem {
+  id: string
+  propValue?: any[]
+}
+const popComponentDataTyped = computed(() => popComponentData.value as PopComponentItem[])
 const baseStyle = computed(() => {
   return {
     fontSize: 30 * props.scale + 'px',
@@ -162,7 +170,8 @@ const customPopStyle = computed(() => {
 const popCanvasStyle = computed(() => {
   if (canvasState.value.curPointArea === 'hidden') {
     let queryCount = 0
-    popComponentData.value.forEach(popItem => {
+    popComponentDataTyped.value.forEach(popItem => {
+      queryCount = 0 + (popItem.propValue?.length || 0)
       queryCount = 0 + popItem.propValue.length
     })
     return {

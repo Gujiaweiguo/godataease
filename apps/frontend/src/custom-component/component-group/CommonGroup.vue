@@ -85,7 +85,7 @@ const groupActiveChange = category => {
             class="item-top"
             draggable="true"
             :data-id="groupInfo.category + '&' + chartInfo.value"
-            :title="chartInfo.title || ''"
+            :title="'title' in chartInfo ? chartInfo.title : ''"
           >
             <Icon
               v-if="['outer_svg', 'graphical'].includes(chartInfo.type)"
@@ -100,7 +100,7 @@ const groupActiveChange = category => {
             ></DeDecoration>
             <component v-else style="color: #a6a6a6" :is="chartInfo.icon"></component>
           </div>
-          <div v-if="chartInfo.title" class="item-bottom">
+          <div v-if="'title' in chartInfo" class="item-bottom">
             <span>{{ chartInfo.title }}</span>
           </div>
         </el-col>

@@ -218,17 +218,21 @@ const init = () => {
 const initOptions = item => {
   if (item.field) {
     if ([0, 5, 7].includes(item.field.deType)) {
-      item.options = JSON.parse(JSON.stringify(textOptions))
+      ;(item as any).options = JSON.parse(JSON.stringify(textOptions))
     } else if (item.field.deType === 1) {
-      item.options = JSON.parse(JSON.stringify(dateOptions))
+      ;(item as any).options = JSON.parse(JSON.stringify(dateOptions))
     } else {
-      item.options = JSON.parse(JSON.stringify(valueOptions))
+      ;(item as any).options = JSON.parse(JSON.stringify(valueOptions))
     }
     item.conditions &&
       item.conditions.forEach(ele => {
         ele.term = ''
       })
   }
+}
+
+const getThresholdOptions = fieldItem => {
+  return ((fieldItem as any)?.options || []) as Array<{ label: string; options: any[] }>
 }
 const initFields = () => {
   let fields = []
@@ -355,7 +359,7 @@ init()
               <el-form-item class="form-item">
                 <el-select v-model="item.term" @change="changeThreshold">
                   <el-option-group
-                    v-for="(group, idx) in fieldItem.options"
+                    v-for="(group, idx) in getThresholdOptions(fieldItem)"
                     :key="idx"
                     :label="group.label"
                   >

@@ -114,7 +114,7 @@ const init = reactive({
     }),
 
   // 文件上传
-  file_picker_callback: (callback, value, meta) => {
+  file_picker_callback: (callback, _value, meta) => {
     // Provide file and text for the link dialog
     if (meta.filetype == 'file') {
       callback('mypage.html', { text: 'My text' })

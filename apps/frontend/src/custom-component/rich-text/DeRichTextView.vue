@@ -579,8 +579,7 @@ const calcData = (view: Chart, callback) => {
           errMsg.value = res.msg
         } else {
           state.data = res?.data
-          state.viewDataInfo = res
-          state.totalItems = res?.totalItems
+          state.totalItems = (res as any)?.totalItems
           const curViewInfo = canvasViewInfo.value[element.value.id]
           // 此处是编辑时使用，多仪表板嵌入 canvasViewInfo 会被覆盖可能出现无法读取情况
           if (res.data && curViewInfo) {

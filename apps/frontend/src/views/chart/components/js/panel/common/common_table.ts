@@ -1059,10 +1059,11 @@ export function configHeaderInteraction(chart: Chart, option: S2Options) {
             .filter((node): node is Element => node.nodeType === 1)
             .find(node => node.classList.contains('antv-s2-tooltip-container'))
           if (child) {
-            const left = child.offsetLeft + child.clientWidth
+            const el = child as HTMLElement
+            const left = el.offsetLeft + el.clientWidth
             if (left > parent.offsetWidth) {
-              const newLeft = parent.offsetWidth - child.clientWidth - 10
-              child.style.left = `${newLeft}px`
+              const newLeft = parent.offsetWidth - el.clientWidth - 10
+              el.style.left = `${newLeft}px`
             }
           }
         }
@@ -1787,7 +1788,8 @@ export async function exportRowQuotaTreePivot(instance: PivotSheet, chart: Chart
       return
     }
     const cell = worksheet.getCell(index + 1, 1)
-    cell.value = metaMap[column]?.name ?? column
+    const columnKey = String(column)
+    cell.value = metaMap[columnKey]?.name ?? columnKey
     cell.alignment = { vertical: 'middle', horizontal: 'center' }
     cell.border = {
       right: { style: 'thick', color: { argb: '00000000' } }

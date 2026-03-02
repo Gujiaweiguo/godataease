@@ -34,7 +34,7 @@
         <el-form-item :effect="themes" :label="t('visualization.video_links')">
           <el-input
             :effect="themes"
-            v-model="state.streamMediaInfoTemp[state.streamMediaInfoTemp.videoType].url"
+            v-model="(state.streamMediaInfoTemp[state.streamMediaInfoTemp.videoType] as any).url"
             @blur="onChange"
           />
           <span class="tips-class"> Tips:{{ t('visualization.live_tips') }} </span>

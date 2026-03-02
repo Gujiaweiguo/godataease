@@ -77,17 +77,36 @@ declare interface Chart {
   extColor: Axis[]
 
   fontFamily?: string
+  chartExtRequest?: {
+    drill?: any[]
+    filter?: any[]
+    linkageFilters?: any[]
+    outerParamsFilters?: any[]
+    webParamsFilters?: any[]
+    resultCount?: number
+    resultMode?: string
+    user?: string
+  }
 }
+
 declare type CustomAttr = DeepPartial<ChartAttr> | JSONString<DeepPartial<ChartAttr>>
 declare type CustomStyle = DeepPartial<ChartStyle> | JSONString<DeepPartial<ChartStyle>>
-declare type CustomSenior = DeepPartial<ChartSenior> | JSONString<DeepPartial<ChartSenior>>
-declare type CustomPlugin = DeepPartial<ChartPlugin> | JSONString<DeepPartial<ChartPlugin>>
 
 declare type ChartObj = Omit<Chart, 'customAttr' | 'customStyle' | 'senior' | 'plugin'> & {
   customAttr: ChartAttr
   customStyle: ChartStyle
   senior: ChartSenior
   plugin?: ChartPlugin
+  chartExtRequest?: {
+    drill?: any[]
+    filter?: any[]
+    linkageFilters?: any[]
+    outerParamsFilters?: any[]
+    webParamsFilters?: any[]
+    resultCount?: number
+    resultMode?: string
+    user?: string
+  }
 }
 
 /**
@@ -219,6 +238,10 @@ declare interface Axis extends ChartViewField {
    * 轴类型
    */
   axisType?: string
+  /**
+   * 序列ID
+   */
+  seriesId?: string
   /**
    * 数据源ID
    */

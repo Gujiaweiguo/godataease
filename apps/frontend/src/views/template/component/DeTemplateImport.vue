@@ -73,10 +73,15 @@
 
 <script lang="ts" setup>
 import { save, nameCheck, findOne, categoryTemplateNameCheck } from '@/api/template'
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, PropType } from 'vue'
 import { imgUrlTrans } from '@/utils/imgUtils'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { useI18n } from '@/hooks/web/useI18n'
+interface CategoryItem {
+  id: string
+  name: string
+}
+
 const emits = defineEmits(['closeEditTemplateDialog', 'refresh', 'addCategoryInfo'])
 const { t } = useI18n()
 const filesRef = ref(null)
@@ -87,7 +92,7 @@ const props = defineProps({
     required: true
   },
   templateCategories: {
-    type: Array,
+    type: Array as PropType<CategoryItem[]>,
     required: true
   },
   optType: {

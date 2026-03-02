@@ -111,7 +111,6 @@ export abstract class S2ChartView<P extends SpreadSheet> extends AntVAbstractCha
         y: event.clientY
       },
       content,
-      meta,
       event
     })
   }
@@ -167,7 +166,7 @@ export abstract class S2ChartView<P extends SpreadSheet> extends AntVAbstractCha
         let fieldId
         if (cellMeta) {
           const field = find(meta, item => item.field === cellMeta.valueField)
-          fieldId = field?.id
+          fieldId = field?.field
         }
         touchAction(callback, fieldId)
       })

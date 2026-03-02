@@ -23,7 +23,12 @@ export interface Field {
   value: Array<{}>
   checked: boolean
   primaryKey: boolean
+  deExtractType?: number
   children?: Array<{}>
+}
+
+interface PluginFormRef {
+  invokeMethod: (payload: { methodName: string; args: unknown[] }) => void
 }
 
 export interface ApiItem {
@@ -76,7 +81,11 @@ let apiItem = reactive<ApiItem>({
   status: '',
   name: '',
   type: 'table',
+  appToken: '',
+  tableId: '',
+  viewId: '',
   url: '',
+  copy: false,
   method: 'GET',
   request: {
     changeId: '',
@@ -92,6 +101,11 @@ let apiItem = reactive<ApiItem>({
       verification: '',
       username: '',
       password: ''
+    },
+    page: {
+      pageType: 'empty',
+      requestData: [],
+      responseData: []
     }
   },
   fields: [],
@@ -113,9 +127,9 @@ const columns = shallowRef([])
 const valueList = shallowRef([])
 const tableData = shallowRef([])
 const apiItemBasicInfo = ref<FormInstance>()
-const xpackApiItemBasicInfo = ref<FormInstance>()
+const xpackApiItemBasicInfo = ref<PluginFormRef>()
 const isSupportSetKey = ref(false)
-const isNumber = (rule, value, callback) => {
+const isNumber = (_rule, value, callback) => {
   if (!value) {
     callback(new Error(t('datasource.please_input_query_timeout')))
     return
@@ -218,7 +232,7 @@ const initApiItem = (
   valueList.value = []
   if (paramsList) {
     for (let i = 0; i < paramsList.length; i++) {
-      valueList.value = valueList.value.concat(paramsList[i].fields)
+      valueList.value = valueList.value.concat(paramsList[i].fields || [])
     }
   }
   Object.assign(apiItem, val)
@@ -256,7 +270,7 @@ const showApiData = () => {
         })
       loading.value = false
     } else {
-      return false
+      return
     }
   })
 }
@@ -288,9 +302,10 @@ const saveItem = () => {
   if (apiItem.type === 'params') {
     for (let i = 0; i < apiItem.fields.length; i++) {
       for (let j = 0; j < paramsList.length; j++) {
-        for (let k = 0; k < paramsList[j].fields.length; k++) {
+        const paramFields = paramsList[j].fields || []
+        for (let k = 0; k < paramFields.length; k++) {
           if (
-            apiItem.fields[i].name === paramsList[j].fields[k].name &&
+            apiItem.fields[i].name === paramFields[k].name &&
             apiItem.serialNumber !== paramsList[j].serialNumber
           ) {
             ElMessage.error(t('data_source.name_already_exists') + apiItem.fields[i].name)

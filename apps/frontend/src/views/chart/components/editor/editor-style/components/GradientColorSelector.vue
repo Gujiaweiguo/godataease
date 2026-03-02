@@ -56,7 +56,7 @@ const scrollToSelected = () => {
   if (!parents) return
   const items = parents.getElementsByClassName('color-div-base selected')
   if (items && items.length) {
-    const top = items[0].offsetTop || 0
+    const top = (items[0] as HTMLElement).offsetTop || 0
     parents.scrollTo(0, top)
   }
 }

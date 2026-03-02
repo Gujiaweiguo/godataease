@@ -133,31 +133,45 @@ let chartData = shallowRef<Partial<Chart['data']>>({
 const containerId = 'container-' + showPosition.value + '-' + view.value.id + '-' + suffixId.value
 const viewTrack = ref(null)
 
-const calcData = (viewInfo: Chart, callback, resetPageInfo = true) => {
-  if (viewInfo.customAttr.basicStyle.tablePageStyle === 'general') {
+const calcData = (
+  viewInfo: Chart & { chartExtRequest?: Record<string, unknown> },
+  callback,
+  resetPageInfo = true
+) => {
+  const customAttr = parseJson(viewInfo.customAttr) as DeepPartial<ChartAttr>
+  if (!viewInfo.chartExtRequest) {
+    viewInfo.chartExtRequest = {}
+  }
+  const extRequest = viewInfo.chartExtRequest
+  if (customAttr.basicStyle?.tablePageStyle === 'general') {
     if (state.currentPageSize !== 0) {
-      viewInfo.chartExtRequest.pageSize = state.currentPageSize
+      extRequest.pageSize = state.currentPageSize
       state.pageInfo.pageSize = state.currentPageSize
     } else {
-      viewInfo.chartExtRequest.pageSize = state.pageInfo.pageSize
+      extRequest.pageSize = state.pageInfo.pageSize
     }
   } else {
-    delete viewInfo.chartExtRequest?.pageSize
+    delete extRequest.pageSize
   }
   if (viewInfo.tableId || viewInfo['dataFrom'] === 'template') {
     isError.value = false
     const v = JSON.parse(JSON.stringify(viewInfo))
     getData(v)
-      .then(res => {
-        if (res.code && res.code !== 0) {
+      .then((res: IResponse<any>) => {
+        const chartRes = res as IResponse<any> & {
+          data?: Partial<Chart['data']>
+          totalItems?: number
+          drillFilters?: unknown
+        }
+        if (chartRes.code && chartRes.code !== 0) {
           isError.value = true
-          errMsg.value = res.msg
+          errMsg.value = chartRes.msg
         } else {
-          chartData.value = res?.data as Partial<Chart['data']>
-          state.totalItems = res?.totalItems
-          dvMainStore.setViewDataDetails(viewInfo.id, res)
-          emit('onDrillFilters', res?.drillFilters)
-          renderChart(res as unknown as Chart, resetPageInfo)
+          chartData.value = chartRes.data as Partial<Chart['data']>
+          state.totalItems = chartRes.totalItems ?? 0
+          dvMainStore.setViewDataDetails(viewInfo.id, chartRes)
+          emit('onDrillFilters', chartRes.drillFilters)
+          renderChart(chartRes as unknown as Chart, resetPageInfo)
         }
         callback?.()
       })
@@ -223,12 +237,20 @@ const renderChart = (viewInfo: Chart, resetPageInfo: boolean) => {
   recursionTransObj(customStyleTrans, actualChart.customStyle, scale.value, terminal.value)
 
   setupPage(actualChart, resetPageInfo)
-  nextTick(() => debounceRender(resetPageInfo))
+  nextTick().then(() => debounceRender())
+}
+
+const getFacetController = () => {
+  return myChart?.facet as unknown as {
+    timer?: { stop: () => void }
+    cancelScrollFrame?: () => void
+  }
 }
 
 const debounceRender = debounce(() => {
-  myChart?.facet?.timer?.stop()
-  myChart?.facet?.cancelScrollFrame()
+  const facetController = getFacetController()
+  facetController?.timer?.stop()
+  facetController?.cancelScrollFrame?.()
   myChart?.destroy()
   myChart?.getCanvasElement()?.remove()
   const chartView = chartViewManager.getChartView(
@@ -273,14 +295,14 @@ const setupPage = (chart: ChartObj, resetPageInfo?: boolean) => {
 }
 
 const mouseMove = () => {
-  myChart?.facet?.timer?.stop()
+  getFacetController()?.timer?.stop()
 }
 
 const mouseLeave = () => {
   initScroll()
 }
 
-let scrollTimer
+let scrollTimer: ReturnType<typeof setTimeout> | undefined
 const initScroll = () => {
   scrollTimer && clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => {
@@ -295,7 +317,7 @@ const initScroll = () => {
       !state.showPage
     ) {
       // 防止多次渲染
-      myChart.facet.timer?.stop()
+      getFacetController()?.timer?.stop()
       // 已滚动的距离
       let scrolledOffset = myChart.store.get('scrollY') || 0
       // 平滑滚动，兼容原有的滚动速率设置
@@ -591,9 +613,10 @@ const trackMenuCalc = itemId => {
 
 const resizeAction = resizeColumn => {
   // 从头开始滚动
-  if (myChart?.facet.timer) {
-    myChart?.facet.timer.stop()
-    nextTick(initScroll)
+  const facetController = getFacetController()
+  if (facetController?.timer) {
+    facetController.timer.stop()
+    nextTick().then(() => initScroll())
   }
   if (showPosition.value !== 'canvas') {
     return
@@ -620,16 +643,16 @@ defineExpose({
   trackMenu
 })
 
-let timer
+let timer: ReturnType<typeof setTimeout> | undefined
 const resize = (width, height) => {
   if (timer) {
     clearTimeout(timer)
   }
   timer = setTimeout(() => {
     if (!myChart?.facet) {
-      debounceRender(false)
+      debounceRender()
     } else {
-      myChart?.facet?.timer?.stop()
+      getFacetController()?.timer?.stop()
       myChart?.changeSheetSize(width, height)
       myChart?.render()
     }
@@ -661,7 +684,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   try {
-    myChart?.facet.timer?.stop()
+    getFacetController()?.timer?.stop()
     myChart?.destroy()
     myChart = null
     resizeObserver?.disconnect()

@@ -65,10 +65,14 @@
 
 <script lang="tsx" setup>
 import { ref, watch, onMounted, computed } from 'vue'
+interface CurStyle {
+  width: number
+  height: number
+}
 interface Props {
   color?: string[]
   backgroundColor?: string
-  curStyle: object
+  curStyle: CurStyle
   scale: number
 }
 const props = withDefaults(defineProps<Props>(), {

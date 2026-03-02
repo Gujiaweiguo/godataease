@@ -1,5 +1,7 @@
 import { DualAxes, Plot } from '@antv/g2plot'
 
+type PlotAny = Plot<any>
+
 /**
  * 使用 Map 来存储实例，键为 chart.container 对象
  */
@@ -69,7 +71,7 @@ type CarouselConfig = {
  * 图表轮播提示管理类
  * */
 class ChartCarouselTooltip {
-  private plot: Plot | DualAxes
+  private plot: PlotAny | DualAxes
   private config: Required<CarouselConfig>
   private currentIndex = 0
   private values: string[] = []
@@ -83,7 +85,7 @@ class ChartCarouselTooltip {
   // 图表是否在可视范围内
   private chartIsVisible: boolean
 
-  private constructor(plot: Plot | DualAxes, private chart: Chart, config: CarouselConfig) {
+  private constructor(plot: PlotAny | DualAxes, private chart: Chart, config: CarouselConfig) {
     this.plot = plot
     this.config = { ...DEFAULT_CAROUSEL_CONFIG, ...config }
     this.init()
@@ -92,7 +94,7 @@ class ChartCarouselTooltip {
   /**
    * 创建或更新实例
    * */
-  static manage(plot: Plot | DualAxes, chart: Chart, config: CarouselConfig) {
+  static manage(plot: PlotAny | DualAxes, chart: Chart, config: CarouselConfig) {
     if (!isSupport(chart.type)) return null
     const container = chart.container
     let instance = CAROUSEL_MANAGER_INSTANCES.get(container)
@@ -267,8 +269,8 @@ class ChartCarouselTooltip {
    *  判断是否满足启动条件' */
   private shouldStart() {
     return (
-      this.chart.customAttr?.tooltip?.show &&
-      this.chart.customAttr?.tooltip?.carousel?.enable &&
+      (this.chart.customAttr as any)?.tooltip?.show &&
+      (this.chart.customAttr as any)?.tooltip?.carousel?.enable &&
       this.values.length > 0 &&
       this.chartIsVisible &&
       !this.hasParentWithSwitchHidden(this.plot.chart.ele)
@@ -310,19 +312,19 @@ class ChartCarouselTooltip {
     if (this.plot instanceof DualAxes) {
       return this.getDualAxesTooltipPosition(view, value)
     }
-    const types = view
+    const types = (view as any)
       .scale()
       .getGeometries()
-      .map(item => item.type)
+      .map((item: any) => item.type)
     let point = { x: 0, y: 0 }
     if (!types.length) return point
     types.forEach(type => {
       if (type === 'interval' || type === 'point') {
-        point = view
+        point = (view as any)
           .scale()
           .getGeometries()
-          .find(item => item.type === type)
-          .elements.find(item => item.data.field === value && (item.model.x || item.model.y))?.model
+          .find((item: any) => item.type === type)
+          ?.elements?.find((item: any) => item.data?.field === value && (item.model?.x || item.model?.y))?.model
       }
     })
     // 处理柱状图和折线图,柱状图固定y轴位置
@@ -393,7 +395,7 @@ class ChartCarouselTooltip {
     if (CHART_CATEGORY.LINE.includes(this.chart.type)) return
     this.unHighlightPoint(value)
     this.plot.setState(
-      this.getHighlightType(),
+      this.getHighlightType() as any,
       (data: any) => data[this.config.xField] === value,
       true
     )
@@ -405,7 +407,7 @@ class ChartCarouselTooltip {
   private unHighlightPoint(value?: string) {
     if (CHART_CATEGORY.LINE.includes(this.chart.type)) return
     this.plot.setState(
-      this.getHighlightType(),
+      this.getHighlightType() as any,
       (data: any) => data[this.config.xField] !== value,
       false
     )
@@ -430,9 +432,9 @@ class ChartCarouselTooltip {
   private getTooltipContainer() {
     const tooltipCtl = this.plot.chart.getController('tooltip')
     if (!tooltipCtl) {
-      return
+      return null
     }
-    return tooltipCtl.tooltip?.cfg?.container
+    return (tooltipCtl as any).tooltip
   }
 
   /**
@@ -614,7 +616,7 @@ class ChartCarouselTooltip {
   /**
    * 更新配置
    * */
-  private update(plot: Plot | DualAxes, chart: Chart, config: CarouselConfig) {
+  private update(plot: PlotAny | DualAxes, chart: Chart, config: CarouselConfig) {
     this.stop()
     this.plot = plot
     this.chart = chart

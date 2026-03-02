@@ -74,7 +74,7 @@ const loadCanvasDataAsync = async (dvId: string, dvType: string, ignoreParams = 
   let jumpParam: { sourceDvId?: string; sourceViewId?: string } | null = null
   // 获取外部跳转参数
   if (jumpInfoParam) {
-    jumpParam = JSON.parse(Base64.decode(decodeURIComponent(jumpInfoParam)))
+    jumpParam = JSON.parse(Base64.decode(decodeURIComponent(jumpInfoParam as string)))
     const jumpRequestParam = {
       sourceDvId: jumpParam.sourceDvId,
       sourceViewId: jumpParam.sourceViewId,
@@ -111,7 +111,7 @@ const loadCanvasDataAsync = async (dvId: string, dvType: string, ignoreParams = 
   if (attachParamsEncode || hasTicketArgs) {
     try {
       if (!!attachParamsEncode) {
-        attachParam = JSON.parse(Base64.decode(decodeURIComponent(attachParamsEncode)))
+        attachParam = JSON.parse(Base64.decode(decodeURIComponent(attachParamsEncode as string)))
       }
       if (hasTicketArgs) {
         attachParam = Object.assign({}, attachParam, argsObject)
@@ -223,7 +223,7 @@ const initIframe = async () => {
       }
 
       // Initialize token lifecycle
-      await tokenLifecycle.initialize(embeddedStore.getToken, window.location.origin, {
+      await tokenLifecycle.initialize(embeddedStore.getToken, {
         refreshEnabled: true,
         tokenType: 'iframe',
         resourceId: embeddedStore.dvId
@@ -275,7 +275,7 @@ onMounted(async () => {
     dvMainStore.setCanvasAttachInfo({ taskId, showWatermark })
   }
   if (dvId) {
-    await loadCanvasDataAsync(dvId, dvType, ignoreParams)
+    await loadCanvasDataAsync(String(dvId), dvType as string, ignoreParams)
     return
   }
   dvMainStore.setEmbeddedCallBack(callBackFlag || 'no')

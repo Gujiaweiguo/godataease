@@ -212,8 +212,8 @@ function groupAreaAdaptor(leftOffset = 0, topOffset = 0) {
   //如果当前画布是Group内部画布 则对应组件定位在resize时要还原到groupStyle中
   if (isGroupCanvas(canvasId) || isTabCanvas(canvasId)) {
     groupStyleRevert(curComponent.value, {
-      width: parentNode.offsetWidth,
-      height: parentNode.offsetHeight
+      width: (parentNode as HTMLElement).offsetWidth,
+      height: (parentNode as HTMLElement).offsetHeight
     })
   } else if (curComponent.value.component === 'GroupArea' && areaData.value.components.length > 0) {
     areaData.value.components.forEach(component => {

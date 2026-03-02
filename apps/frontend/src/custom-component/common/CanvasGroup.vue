@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { toRefs } from 'vue'
+import { toRefs, PropType } from 'vue'
 import CanvasCore from '@/components/data-visualization/canvas/CanvasCore.vue'
 import GroupPreview from '@/custom-component/group/GroupPreview.vue'
+
+type CanvasGroupComponentAny = any[]
 
 const props = defineProps({
   canvasStyleData: {
@@ -9,7 +11,7 @@ const props = defineProps({
     required: true
   },
   componentData: {
-    type: Array,
+    type: Array as PropType<CanvasGroupComponentAny>,
     required: true
   },
   canvasViewInfo: {

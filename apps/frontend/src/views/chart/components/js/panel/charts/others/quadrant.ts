@@ -462,10 +462,16 @@ export class Quadrant extends G2PlotChartView<ScatterOptions, G2Scatter> {
     } else {
       size = DEFAULT_LEGEND_STYLE.size
     }
-    optionTmp.legend.marker.style = style => {
-      return {
-        r: size,
-        fill: style.fill
+    const marker = optionTmp.legend.marker
+    if (typeof marker !== 'function') {
+      optionTmp.legend.marker = {
+        ...marker,
+        style: style => {
+          return {
+            r: size,
+            fill: (style as any).fill
+          }
+        }
       }
     }
     return optionTmp

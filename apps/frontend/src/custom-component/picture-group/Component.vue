@@ -43,7 +43,8 @@ const state = reactive({
   showUrl: null,
   firstRender: true,
   previewFirstRender: true,
-  curImgList: []
+  curImgList: [],
+  totalItems: 0
 })
 const initReady = ref(true)
 const props = defineProps({
@@ -246,11 +247,11 @@ const calcData = (viewCalc: Chart, callback) => {
           isError.value = true
           errMsg.value = res.msg
         } else {
-          res.type = 'picture-group'
-          res.render = 'custom'
+          ;(res as any).type = 'picture-group'
+          ;(res as any).render = 'custom'
           state.data = res?.data
           state.viewDataInfo = res
-          state.totalItems = res?.totalItems
+          state.totalItems = (res as any)?.totalItems
           const curViewInfo = canvasViewInfo.value[element.value.id]
           curViewInfo['curFields'] = res.data.fields
           dvMainStore.setViewDataDetails(element.value.id, res)

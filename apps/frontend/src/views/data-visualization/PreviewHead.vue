@@ -49,6 +49,7 @@ const preview = () => {
 const isDataEaseBi = computed(() => appStore.getIsDataEaseBi)
 const isIframe = computed(() => appStore.getIsIframe)
 const shareDisable = computed(() => shareStore.getShareDisable || isDesktop())
+const dvWeight = computed(() => Number((dvInfo.value as Record<string, unknown>).weight || 0))
 const exportPermissions = computed(() =>
   exportPermission(dvInfo.value['weight'], dvInfo.value['ext'])
 )
@@ -178,10 +179,10 @@ const initOpenHandler = newWindow => {
         v-if="!shareDisable"
         :disabled="dvInfo.status === 0"
         :resource-id="dvInfo.id"
-        :weight="dvInfo.weight"
+        :weight="dvWeight"
         :resource-type="dvInfo.type"
       />
-      <el-button class="custom-button" v-if="dvInfo.weight > 6" type="primary" @click="dvEdit()">
+      <el-button class="custom-button" v-if="dvWeight > 6" type="primary" @click="dvEdit()">
         <template #icon>
           <icon name="icon_edit_outlined"><icon_edit_outlined class="svg-icon" /></icon>
         </template>

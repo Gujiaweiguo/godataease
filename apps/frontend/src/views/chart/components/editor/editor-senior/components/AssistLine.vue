@@ -18,11 +18,11 @@ const props = defineProps({
     required: true
   },
   quotaData: {
-    type: Array,
+    type: Array as () => Array<{ summary?: string; id?: string }>,
     required: true
   },
   quotaExtData: {
-    type: Array,
+    type: Array as () => Array<{ summary?: string; id?: string }>,
     required: true
   },
   themes: {

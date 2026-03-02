@@ -378,7 +378,7 @@ watch(
           <collapse-switch-item
             v-if="showProperties('border-style') && commonBorderPop && !batchOptStatus"
             v-model="commonBorderPop.borderActive"
-            @modelChange="val => onActiveChange(val)"
+            @modelChange="() => onActiveChange()"
             :themes="themes"
             :title="t('visualization.board')"
             name="borderSetting"

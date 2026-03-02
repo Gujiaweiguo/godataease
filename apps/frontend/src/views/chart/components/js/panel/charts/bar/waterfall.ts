@@ -83,11 +83,11 @@ export class Waterfall extends G2PlotChartView<WaterfallOptions, G2Waterfall> {
   axisConfig = {
     xAxis: {
       name: `${t('chart.drag_block_type_axis')} / ${t('chart.dimension')}`,
-      type: 'd'
+      type: 'd' as const
     },
     yAxis: {
       name: `${t('chart.drag_block_value_axis')} / ${t('chart.quota')}`,
-      type: 'q',
+      type: 'q' as const,
       limit: 1
     }
   }
@@ -123,7 +123,7 @@ export class Waterfall extends G2PlotChartView<WaterfallOptions, G2Waterfall> {
     const { colors, gradient, alpha } = customAttr.basicStyle
     const [risingColorRgba, fallingColorRgba, totalColorRgba] = colors
 
-    let columnWidthRatio
+    let columnWidthRatio: number | undefined
     const _v = customAttr.basicStyle.columnWidthRatio ?? DEFAULT_BASIC_STYLE.columnWidthRatio
     if (_v >= 1 && _v <= 100) {
       columnWidthRatio = _v / 100.0
@@ -133,7 +133,10 @@ export class Waterfall extends G2PlotChartView<WaterfallOptions, G2Waterfall> {
       columnWidthRatio = 1
     }
     if (columnWidthRatio) {
-      options.columnWidthRatio = columnWidthRatio
+      options = {
+        ...options,
+        columnWidthRatio
+      }
     }
 
     return {

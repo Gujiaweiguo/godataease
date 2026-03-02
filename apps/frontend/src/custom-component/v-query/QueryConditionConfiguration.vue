@@ -24,7 +24,6 @@ import {
 } from 'vue'
 import { storeToRefs } from 'pinia'
 import { enumValueObj } from '@/api/dataset'
-import CustomSortFilter from './CustomSortFilter.vue'
 import { addQueryCriteriaConfig } from './options'
 import { getCustomTime } from './time-format'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
@@ -40,7 +39,8 @@ import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapsho
 import { useI18n } from '@/hooks/web/useI18n'
 import { fieldType } from '@/utils/attr'
 import { ElMessage, ElSelect, ElMessageBox } from 'element-plus-secondary'
-import type { DatasetDetail } from '@/api/dataset'
+import type { DatasetDetail, ParamsDetail } from '@/api/dataset'
+import type { Field } from '@/api/chart'
 import { getDsDetailsWithPerm, getSqlParams, listFieldsWithPermissions } from '@/api/dataset'
 import EmptyBackground from '@/components/empty-background/src/EmptyBackground.vue'
 import TreeFieldDialog from '@/custom-component/v-query/TreeFieldDialog.vue'
@@ -67,6 +67,20 @@ interface DatasetField {
   title: string
   id: string
   tableId: string
+}
+
+interface DatasetFieldItem extends DatasetDetail {
+  checkedFields?: string[]
+  checkedFieldsMap?: Record<string, unknown>
+}
+
+interface FieldWithParams extends Field {
+  variableName?: string
+  params?: unknown[]
+}
+
+interface ParamsDetailWithParams extends ParamsDetail {
+  params?: unknown[]
 }
 
 const props = defineProps({
@@ -188,7 +202,7 @@ const manual = ref()
 const activeCondition = ref('')
 const isIndeterminate = ref(false)
 const datasetTree = shallowRef([])
-const fields = ref<DatasetDetail[]>()
+const fields = ref<DatasetFieldItem[]>()
 
 const { queryElement } = toRefs(props)
 const getDetype = (id, arr) => {
@@ -595,10 +609,10 @@ const numTypeChange = () => {
 
 const setParametersNumType = componentId => {
   curComponent.value.parametersArr[componentId] = duplicateRemoval(
-    unref(fields)
+    (unref(fields)
       .filter(ele => ele.componentId === componentId)
       .map(ele => Object.values(ele?.fields || {}).flat())
-      .flat()
+      .flat() as FieldWithParams[])
       .filter(
         ele =>
           [
@@ -613,10 +627,10 @@ const setParametersNumType = componentId => {
 
 const setParametersTimeType = componentId => {
   curComponent.value.parametersArr[componentId] = duplicateRemoval(
-    unref(fields)
+    (unref(fields)
       .filter(ele => ele.componentId === componentId)
       .map(ele => Object.values(ele?.fields || {}).flat())
-      .flat()
+      .flat() as FieldWithParams[])
       .filter(
         ele =>
           [
@@ -677,8 +691,7 @@ const duplicateRemoval = arr => {
 const setParameters = field => {
   const fieldArr = Object.values(curComponent.value.checkedFieldsMap).filter(ele => !!ele)
   curComponent.value.parameters = duplicateRemoval(
-    Object.values(field?.fields || {})
-      .flat()
+    (Object.values(field?.fields || {}).flat() as FieldWithParams[])
       .filter(ele => fieldArr.includes(ele.id) && !!ele.variableName)
       .concat(curComponent.value.parameters.filter(ele => fieldArr.includes(ele.id)))
   )
@@ -1714,16 +1727,17 @@ const init = (queryId: string) => {
   if (!params.length) return
   Promise.all([getDsDetailsWithPerm(params), getSqlParams(params)])
     .then(([dq, p]) => {
+      const paramsList = p as ParamsDetailWithParams[]
       dq.filter(ele => !!ele).forEach(ele => {
         ele.activelist = 'dimensionList'
-        ele.fields.parameterList = p.filter(
+        ele.fields.parameterList = paramsList.filter(
           itx => itx.datasetGroupId === ele.id && !itx.params?.length
-        )
+        ) as unknown as Field[]
         ele.hasParameter = !!ele.fields.parameterList.length
         ele.fields.dimensionList = (ele.fields.dimensionList || []).filter(
-          itx => !itx.params?.length
+          itx => !(itx as FieldWithParams).params?.length
         )
-        ele.fields.quotaList = (ele.fields.quotaList || []).filter(itx => !itx.params?.length)
+        ele.fields.quotaList = (ele.fields.quotaList || []).filter(itx => !(itx as FieldWithParams).params?.length)
         datasetMap[ele.id] = ele
       })
       fields.value = datasetFieldList.value

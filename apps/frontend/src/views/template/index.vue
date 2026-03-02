@@ -283,7 +283,10 @@ const state = reactive({
       }
     ]
   },
-  templateEditForm: {},
+  templateEditForm: {
+    name: '',
+    nodeType: 'folder'
+  } as Record<string, unknown>,
   editTemplate: false,
   dialogTitle: '',
   dialogTitleLabel: '',
@@ -462,7 +465,7 @@ const templateDeleteInfo = id => {
 }
 
 const showTemplateEditDialog = (type, templateInfo) => {
-  state.templateEditForm = null
+  state.templateEditForm = { name: '', nodeType: 'folder' }
   state.formType = type
   if (type === 'edit') {
     state.templateEditForm = JSON.parse(JSON.stringify(templateInfo))
@@ -470,7 +473,7 @@ const showTemplateEditDialog = (type, templateInfo) => {
       state.templateEditForm['nodeType'] === 'folder'
         ? t('template_manage.rename')
         : t('template_manage.edit_template')
-    state.originName = state.templateEditForm['label']
+    state.originName = String(state.templateEditForm['label'] || '')
   } else {
     state.dialogTitle = t('visualization.add_category')
     state.templateEditForm = {

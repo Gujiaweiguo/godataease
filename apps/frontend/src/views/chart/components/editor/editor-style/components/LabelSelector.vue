@@ -260,8 +260,8 @@ const changeLabelAttr = (prop: string, render = true) => {
   emit('onLabelChange', { data: state.labelForm, render }, prop)
 }
 
-function changeLabelUnitLanguage(cfg: BaseFormatter, lang, prop: string, render = true) {
-  onChangeFormatCfgUnitLanguage(cfg, lang)
+function changeLabelUnitLanguage(cfg: DeepPartial<BaseFormatter>, lang, prop: string, render = true) {
+  onChangeFormatCfgUnitLanguage(cfg as BaseFormatter, lang)
   changeLabelAttr(prop, render)
 }
 

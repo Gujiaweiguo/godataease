@@ -490,7 +490,7 @@ const dsChange = debounce((val: string) => {
 
 const handleDsChange = () => {
   setFlag()
-  dsChange()
+  dsChange(sqlNode.value.datasourceId)
 }
 
 const copyInfo = async (value: string) => {

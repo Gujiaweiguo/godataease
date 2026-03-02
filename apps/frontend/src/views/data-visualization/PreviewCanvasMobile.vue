@@ -59,7 +59,7 @@ const downloadH2 = type => {
 
 const loadCanvasDataAsync = async (dvId, dvType) => {
   const jumpInfoParam = embeddedStore.jumpInfoParam || router.currentRoute.value.query.jumpInfoParam
-  let jumpParam
+  let jumpParam: { sourceDvId?: string; sourceViewId?: string } | null = null
   // 获取外部跳转参数
   if (jumpInfoParam) {
     jumpParam = JSON.parse(Base64.decode(decodeURIComponent(jumpInfoParam as string)))
@@ -78,16 +78,16 @@ const loadCanvasDataAsync = async (dvId, dvType) => {
       console.error(e)
     }
   }
-  let argsObject = null
+  let argsObject: Record<string, unknown> | null = null
   try {
     argsObject = JSON.parse(props.ticketArgs)
   } catch (error) {
     console.error(error)
   }
-  const hasTicketArgs = argsObject && Object.keys(argsObject)
+  const hasTicketArgs = !!(argsObject && Object.keys(argsObject).length)
 
   // 添加外部参数
-  let attachParam
+  let attachParam: Record<string, unknown> | null = null
   try {
     await getOuterParamsInfo(dvId).then(rsp => {
       dvMainStore.setNowPanelOuterParamsInfoV2(rsp.data, dvId)
@@ -117,10 +117,11 @@ const loadCanvasDataAsync = async (dvId, dvType) => {
   }
 
   const req = dvType === 'dashboard' ? initCanvasDataMobile : initCanvasData
-  req(
-    dvId,
-    { busiFlag: dvType },
-    async function ({
+  try {
+    req(
+      dvId,
+      { busiFlag: dvType },
+      async function ({
       canvasDataResult,
       canvasStyleResult,
       dvInfo,
@@ -156,16 +157,19 @@ const loadCanvasDataAsync = async (dvId, dvType) => {
         setTitle(dvInfo.name)
       }
       initBrowserTimer()
-    }
-  ).catch(err => {
+      }
+    )
+  } catch (err) {
     console.log(err)
-  })
+  }
 }
 
-let p = null
-const XpackLoaded = () => p(true)
+let p: ((value: boolean) => void) | null = null
+const XpackLoaded = () => p?.(true)
 onMounted(async () => {
-  await new Promise(r => (p = r))
+  await new Promise<void>(resolve => {
+    p = () => resolve()
+  })
   dvMainStore.setMobileInPc(true)
   dvMainStore.setInMobile(true)
   const dvId = embeddedStore.dvId || router.currentRoute.value.query.dvId

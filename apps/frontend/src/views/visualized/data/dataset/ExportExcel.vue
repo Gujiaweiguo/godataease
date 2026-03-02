@@ -6,7 +6,6 @@ import icon_refresh_outlined from '@/assets/svg/icon_refresh_outlined.svg'
 import { ref, h, onUnmounted, computed, reactive } from 'vue'
 import { EmptyBackground } from '@/components/empty-background'
 import { ElButton, ElMessage, ElMessageBox, ElTabPane, ElTabs } from 'element-plus-secondary'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import {
   exportTasks,
   exportRetry,
@@ -22,6 +21,12 @@ import Icon from '@/components/icon-custom/src/Icon.vue'
 import { useCache } from '@/hooks/web/useCache'
 import { useLinkStoreWithOut } from '@/store/modules/link'
 import { useAppStoreWithOut } from '@/store/modules/app'
+
+type ExportStatus = 'SUCCESS' | 'FAILED' | 'IN_PROGRESS' | 'PENDING'
+type ExportTaskMessage = {
+  exportStatus?: ExportStatus
+  exportFromName?: string
+}
 
 const { t } = useI18n()
 const state = reactive({
@@ -61,7 +66,7 @@ const tabList = ref([
     name: 'ALL'
   }
 ])
-let timer
+let timer: ReturnType<typeof setInterval> | undefined
 const handleClose = () => {
   drawer.value = false
   clearInterval(timer)
@@ -73,9 +78,9 @@ const desktop = wsCache.get('app.desktop')
 onUnmounted(() => {
   clearInterval(timer)
 })
-const handleClick = tab => {
+const handleClick = (tab?: { paneName?: string | number }) => {
   if (tab) {
-    activeName.value = tab.paneName
+    activeName.value = String(tab.paneName)
   }
   if (activeName.value === 'ALL') {
     description.value = t('data_export.no_file')
@@ -156,19 +161,22 @@ const linkStore = useLinkStoreWithOut()
 const appStore = useAppStoreWithOut()
 const isDataEaseBi = computed(() => appStore.getIsDataEaseBi)
 
-const taskExportTopicCall = task => {
+const taskExportTopicCall = (task: unknown) => {
+  const parsedTask: ExportTaskMessage =
+    typeof task === 'string' ? (JSON.parse(task) as ExportTaskMessage) : ((task ?? {}) as ExportTaskMessage)
+
   if (!linkStore.getLinkToken && !isDataEaseBi.value && !appStore.getIsIframe) {
-    if (JSON.parse(task).exportStatus === 'SUCCESS') {
+    if (parsedTask.exportStatus === 'SUCCESS') {
       openMessageLoading(
-        JSON.parse(task).exportFromName + ` ${t('data_set.successful_go_to')}`,
+        `${parsedTask.exportFromName ?? ''} ${t('data_set.successful_go_to')}`,
         'success',
         callbackExportSuc
       )
       return
     }
-    if (JSON.parse(task).exportStatus === 'FAILED') {
+    if (parsedTask.exportStatus === 'FAILED') {
       openMessageLoading(
-        JSON.parse(task).exportFromName + ` ${t('data_set.failed_go_to')}`,
+        `${parsedTask.exportFromName ?? ''} ${t('data_set.failed_go_to')}`,
         'error',
         callbackExportError
       )
@@ -176,9 +184,14 @@ const taskExportTopicCall = task => {
   }
 }
 
-const openMessageLoading = (text, type = 'success', cb) => {
+const openMessageLoading = (
+  text: string,
+  type: 'success' | 'warning' | 'info' | 'error' | 'loading' = 'success',
+  cb: () => void
+) => {
   // success error loading
   const customClass = `de-message-${type || 'success'} de-message-export`
+  const messageType = type === 'loading' ? 'info' : type
   ElMessage({
     message: h('p', null, [
       h(
@@ -202,8 +215,7 @@ const openMessageLoading = (text, type = 'success', cb) => {
         t('data_export.export_center')
       )
     ]),
-    icon: type === 'loading' ? h(RefreshLeft) : '',
-    type,
+    type: messageType,
     showClose: true,
     customClass
   })
@@ -226,7 +238,7 @@ const downLoadAll = () => {
     })
     return
   }
-  multipleSelection.value.map(ele => {
+  multipleSelection.value.forEach(ele => {
     generateDownloadUri(ele.id).then(() => {
       window.open(PATH_URL + '/exportCenter/download/' + ele.id)
     })
@@ -350,7 +362,7 @@ defineExpose({
     append-to-body
     :before-close="handleClose"
   >
-    <el-tabs v-model="activeName" @tab-click="handleClick">
+    <el-tabs v-model="activeName" @tab-click="pane => handleClick(pane)">
       <el-tab-pane v-for="tab in tabList" :key="tab.name" :label="tab.label" :name="tab.name" />
     </el-tabs>
     <el-button

@@ -25,17 +25,17 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
   axisConfig = {
     xAxis: {
       name: `${t('chart.form_type')} / ${t('chart.dimension')}`,
-      type: 'd',
+      type: 'd' as const,
       limit: 1
     },
     yAxis: {
       name: `${t('chart.progress_target')} / ${t('chart.quota')}`,
-      type: 'q',
+      type: 'q' as const,
       limit: 1
     },
     yAxisExt: {
       name: `${t('chart.progress_current')} / ${t('chart.quota')}`,
-      type: 'q',
+      type: 'q' as const,
       limit: 1
     }
   }
@@ -190,7 +190,7 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
       ...configRoundAngle(chart, 'barStyle')
     }
 
-    let barWidthRatio
+    let barWidthRatio: number | undefined
     const _v = basicStyle.columnWidthRatio ?? DEFAULT_BASIC_STYLE.columnWidthRatio
     if (_v >= 1 && _v <= 100) {
       barWidthRatio = _v / 100.0
@@ -200,7 +200,10 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
       barWidthRatio = 1
     }
     if (barWidthRatio) {
-      options.barWidthRatio = barWidthRatio
+      options = {
+        ...options,
+        barWidthRatio
+      }
     }
 
     return options
@@ -247,7 +250,7 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
               }
             }
           })
-          return result.length == 0 ? originalItems : result
+          return result.length === 0 ? originalItems : result
         },
         container: getTooltipContainer(`tooltip-${chart.id}`),
         itemTpl: TOOLTIP_TPL,
@@ -285,15 +288,19 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
   }
   protected configYAxis(chart: Chart, options: BarOptions): BarOptions {
     const baseOption = super.configYAxis(chart, options)
-    if (!baseOption.yAxis) {
+    const yAxisOption = baseOption.yAxis
+    if (!yAxisOption) {
       return baseOption
     }
-    baseOption.yAxis.position = 'bottom'
+    let nextYAxis = {
+      ...yAxisOption,
+      position: 'bottom' as const
+    }
     const yAxis = parseJson(chart.customStyle).yAxis
     if (yAxis.axisLabel.show) {
       const rotate = yAxis.axisLabel.rotate
-      let textAlign = 'end'
-      let textBaseline = 'middle'
+      let textAlign: 'end' | 'center' = 'end'
+      let textBaseline: 'middle' | 'top' | 'bottom' = 'middle'
       if (Math.abs(rotate) > 75) {
         textAlign = 'center'
       }
@@ -303,8 +310,25 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
       if (rotate < -75) {
         textBaseline = 'bottom'
       }
-      baseOption.yAxis.label.style.textBaseline = textBaseline
-      baseOption.yAxis.label.style.textAlign = textAlign
+      const yAxisLabel = nextYAxis.label
+      if (
+        yAxisLabel &&
+        typeof yAxisLabel === 'object' &&
+        yAxisLabel.style &&
+        typeof yAxisLabel.style !== 'function'
+      ) {
+        nextYAxis = {
+          ...nextYAxis,
+          label: {
+            ...yAxisLabel,
+            style: {
+              ...yAxisLabel.style,
+              textBaseline,
+              textAlign
+            }
+          }
+        }
+      }
     }
 
     /*if (baseOption.yAxis.position === 'left') {
@@ -313,7 +337,10 @@ export class ProgressBar extends G2PlotChartView<BarOptions, G2Progress> {
     if (baseOption.yAxis.position === 'right') {
       baseOption.yAxis.position = 'top'
     }*/
-    return baseOption
+    return {
+      ...baseOption,
+      yAxis: nextYAxis
+    }
   }
   setupDefaultOptions(chart: ChartObj): ChartObj {
     chart.customStyle.yAxis = {

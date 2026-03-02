@@ -1,3 +1,5 @@
+declare type EditorTheme = 'dark' | 'light'
+
 declare type EditorProperty =
   | 'background-overall-component'
   | 'border-style'

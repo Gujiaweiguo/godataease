@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { findNewComponentFromList } from '@/custom-component/component-list' // 左侧列表数据
-import { computed, nextTick, onMounted, reactive, ref, toRefs, onBeforeUnmount, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, toRefs, onBeforeUnmount, watch, PropType } from 'vue'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
 import { storeToRefs } from 'pinia'
@@ -19,7 +19,7 @@ const props = defineProps({
     required: true
   },
   componentData: {
-    type: Array,
+    type: Array as PropType<any[]>,
     required: true
   },
   canvasViewInfo: {

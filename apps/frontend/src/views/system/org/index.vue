@@ -134,7 +134,7 @@ const getParentName = (parentId: number | null) => {
 
 const loadOrgList = async () => {
   try {
-    const res = await orgListApi({ current: 1, size: 100 })
+    const res = await orgListApi()
     if (res.code === '000000') {
       orgList.value = res.data?.list || []
     }
@@ -202,7 +202,7 @@ const handleViewAudit = (row: any) => {
   })
 }
 
-const handleSubmit = async () => {
+const handleSubmit = async (_event?: MouseEvent) => {
   try {
     let res
     if (form.value.orgId) {

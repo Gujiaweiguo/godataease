@@ -19,11 +19,11 @@ const props = defineProps({
     required: true
   },
   dimensionData: {
-    type: Array,
+    type: Array as () => Array<{ deType?: number; id?: string }>,
     required: false
   },
   quotaData: {
-    type: Array,
+    type: Array as () => Array<{ deType?: number; id?: string }>,
     required: false
   }
 })

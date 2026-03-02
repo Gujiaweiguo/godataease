@@ -133,6 +133,7 @@ export const nameMap = {
 }
 
 export interface Configuration {
+  url?: string
   dataBase: string
   jdbcUrl: string
   urlType: string
@@ -167,6 +168,12 @@ export interface ApiConfiguration {
   status: string
   useJsonPath: boolean
   serialNumber: number
+  fields?: Array<{
+    name: string
+    primaryKey?: boolean
+    length?: number
+    deExtractType?: number
+  }>
 }
 
 export interface SyncSetting {
@@ -200,4 +207,5 @@ export interface Node {
   paramsConfiguration?: ApiConfiguration[]
   weight?: number
   lastSyncTime?: number | string
+  extraFlag?: number
 }

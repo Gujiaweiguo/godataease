@@ -168,7 +168,7 @@ const doUseCache = flag => {
   }
 }
 
-const initLocalCanvasData = callBack => {
+const initLocalCanvasData = (callBack?: () => void) => {
   const { resourceId, opt, sourcePid } = state
   const busiFlag = opt === 'copy' ? 'dashboard-copy' : 'dashboard'
   initCanvasData(
@@ -286,10 +286,10 @@ onMounted(async () => {
       if (createType === 'template') {
         wsCache.delete('de-template-data')
         if (deTemplateData) {
-          dvMainStore.setComponentData(deTemplateData.componentData)
-          dvMainStore.setCanvasStyle(deTemplateData.canvasStyleData)
-          dvMainStore.setCanvasViewInfo(deTemplateData.canvasViewInfo)
-          dvMainStore.setAppDataInfo(deTemplateData.appData)
+          dvMainStore.setComponentData(deTemplateData.componentData as unknown[])
+          dvMainStore.setCanvasStyle(deTemplateData.canvasStyleData as Record<string, unknown>)
+          dvMainStore.setCanvasViewInfo(deTemplateData.canvasViewInfo as Record<string, unknown>)
+          dvMainStore.setAppDataInfo(deTemplateData.appData as Record<string, unknown>)
         }
         setTimeout(() => {
           snapshotStore.recordSnapshotCache('template')

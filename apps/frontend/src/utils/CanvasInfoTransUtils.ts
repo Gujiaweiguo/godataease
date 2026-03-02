@@ -1,8 +1,8 @@
 import { deepCopy } from '@/utils/utils'
 
-export default function defaultConditionTrans(canvasInfo) {
+export default function defaultConditionTrans(canvasInfo: any) {
   const { reportFilterInfo, componentData } = canvasInfo
-  const componentDataArray = JSON.parse(componentData)
+  const componentDataArray: any[] = JSON.parse(componentData)
   const allFilter = []
   const componentMap = {}
   // 获取所有查询条件
