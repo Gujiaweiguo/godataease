@@ -8,8 +8,16 @@ End-to-end tests for DataEase frontend using [Playwright](https://playwright.dev
 e2e/
 ├── auth/              # Authentication tests
 │   └── login.spec.ts  # Login flow tests
+├── chart/             # Chart editor tests
+│   └── chart.spec.ts  # Chart editor smoke tests
 ├── datasource/        # Datasource management tests
 │   └── datasource.spec.ts
+├── embedding/         # Embedding parameter tests
+│   └── embedding.spec.ts
+├── interactive/       # Interactive tree tests
+│   └── interactive.spec.ts
+├── map/               # Map chart tests
+│   └── map.spec.ts
 └── smoke.spec.ts      # Basic smoke tests
 ```
 
@@ -52,8 +60,25 @@ E2E_BASE_URL=http://localhost:8080 npm run e2e
 
 ### CI
 
-E2E tests run automatically in GitHub Actions on push/PR to main/dev branches.
+E2E tests can be run in CI with backend service:
 
+1. **Manual trigger**: Go to Actions → Frontend CI → Run workflow → Enable "Run E2E tests"
+
+2. **Automatic (when backend available)**: The `e2e` job will run when backend service is configured in CI.
+
+Note: Tests marked with `test.fixme` require backend service and will be skipped without it.
+
+## Test Categories
+
+| Category | Description | Backend Required |
+|----------|-------------|------------------|
+| Smoke | Basic page load tests | No |
+| Auth | Login/logout tests | Partial |
+| Chart | Chart editor functionality | Yes |
+| Map | Map chart types (flow, heat, symbolic) | Yes |
+| Embedding | Embedded mode parameters | Yes |
+| Interactive | Resource tree navigation | Yes |
+| Datasource | Datasource management | Yes |
 ## Test Credentials
 
 Tests use environment variables for credentials:
