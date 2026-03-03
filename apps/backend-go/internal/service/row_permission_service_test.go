@@ -276,6 +276,9 @@ func TestBuildItemCondition(t *testing.T) {
 	if cond == "" {
 		t.Error("Expected non-empty condition for enum filter")
 	}
+	if len(args) != 2 {
+		t.Errorf("Expected 2 args for enum filter, got %d", len(args))
+	}
 
 	// Test with logic filter
 	cond, args = svc.buildItemCondition(&permission.DatasetRowPermissionsTreeItem{
@@ -285,6 +288,9 @@ func TestBuildItemCondition(t *testing.T) {
 	})
 	if cond == "" {
 		t.Error("Expected non-empty condition for logic filter")
+	}
+	if len(args) != 1 {
+		t.Errorf("Expected 1 arg for logic filter, got %d", len(args))
 	}
 }
 
