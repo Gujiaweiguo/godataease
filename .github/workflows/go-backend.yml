@@ -102,7 +102,7 @@ jobs:
     - name: Run drift check
       if: steps.changes.outputs.backend == 'true'
       run: make drift-check
-    - name: Run integration tests
+    - name: Run repository integration tests
       if: steps.changes.outputs.backend == 'true'
       env:
         TEST_DB_HOST: 127.0.0.1
@@ -110,7 +110,7 @@ jobs:
         TEST_DB_USER: root
         TEST_DB_PASSWORD: Admin168
         TEST_DB_NAME: dataease_test
-      run: make test-integration
+      run: go test -tags=integration -v -count=1 ./internal/repository/...
 
     - name: Run linter
       if: steps.changes.outputs.backend == 'true'
@@ -125,7 +125,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ steps.changes.outputs.backend }}" = "true" ]; then
           echo "- Unit tests: completed" >> $GITHUB_STEP_SUMMARY
-          echo "- Integration tests: completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository integration tests: completed" >> $GITHUB_STEP_SUMMARY
           echo "- Drift check: completed" >> $GITHUB_STEP_SUMMARY
           echo "- Service coverage gate: completed (>=${SERVICE_COVERAGE_THRESHOLD}%)" >> $GITHUB_STEP_SUMMARY
           echo "Full backend CI executed." >> $GITHUB_STEP_SUMMARY
