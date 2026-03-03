@@ -341,3 +341,84 @@ func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth_InvalidRoleID(t *testing.
 	err := svc.DeleteRoleMenuAuth(0)
 	assert.Equal(t, ErrInvalidRoleID, err)
 }
+
+func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_RoleNotFound(t *testing.T) {
+	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
+
+	roleRepo := repository.NewRoleRepository(testDB)
+	menuRepo := repository.NewMenuRepository(testDB)
+	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+
+	// Create menus
+	menu1 := &menu.CoreMenu{Name: "NoRole Menu", Pid: 0, MenuSort: 1}
+	menuRepo.Create(menu1)
+
+	// Try to save without creating role
+	req := &SaveRoleMenuRequest{
+		RoleID:  99999,
+		MenuIDs: []int64{menu1.ID},
+	}
+	err := svc.SaveRoleMenuAuth(req)
+	assert.Equal(t, ErrRoleNotFound, err)
+}
+
+func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_InvalidRoleID(t *testing.T) {
+	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
+
+	roleRepo := repository.NewRoleRepository(testDB)
+	menuRepo := repository.NewMenuRepository(testDB)
+	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+
+	req := &SaveRoleMenuRequest{
+		RoleID:  0,
+		MenuIDs: []int64{1},
+	}
+	err := svc.SaveRoleMenuAuth(req)
+	assert.Equal(t, ErrInvalidRoleID, err)
+
+	req.RoleID = -1
+	err = svc.SaveRoleMenuAuth(req)
+	assert.Equal(t, ErrInvalidRoleID, err)
+}
+
+func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth_Success(t *testing.T) {
+	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
+
+	roleRepo := repository.NewRoleRepository(testDB)
+	menuRepo := repository.NewMenuRepository(testDB)
+	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+
+	// Create role and menus
+	testRole := &role.SysRole{
+		RoleName: "DeleteSuccess Role",
+		RoleCode: "delete_success_role",
+		Status:   1,
+		CreateBy: strPtr("tester"),
+	}
+	err := roleRepo.Create(testRole)
+	assert.NoError(t, err)
+
+	menu1 := &menu.CoreMenu{Name: "DeleteSuccess Menu", Pid: 0, MenuSort: 1}
+	menuRepo.Create(menu1)
+
+	// Save role menu auth
+	err = roleMenuRepo.SaveRoleMenus(testRole.RoleID, []int64{menu1.ID})
+	assert.NoError(t, err)
+
+	// Verify it exists
+	auth, err := svc.GetRoleMenuAuth(testRole.RoleID)
+	assert.NoError(t, err)
+	assert.Len(t, auth.MenuIDs, 1)
+
+	// Delete role menu auth
+	err = svc.DeleteRoleMenuAuth(testRole.RoleID)
+	assert.NoError(t, err)
+
+	// Verify it's deleted
+	auth, err = svc.GetRoleMenuAuth(testRole.RoleID)
+	assert.NoError(t, err)
+	assert.Len(t, auth.MenuIDs, 0)
+}

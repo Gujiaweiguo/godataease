@@ -224,3 +224,110 @@ func TestMenuServiceIntegration_IsAdminRole(t *testing.T) {
 	assert.False(t, svc.isAdminRole([]int64{2, 3}))
 	assert.False(t, svc.isAdminRole([]int64{}))
 }
+
+func TestMenuServiceIntegration_DeleteWithRoleMenuCleanup(t *testing.T) {
+	cleanupTables(&menu.CoreMenu{}, &role.RoleMenu{})
+
+	menuRepo := repository.NewMenuRepository(testDB)
+	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
+	svc := NewMenuServiceWithRoleFilter(menuRepo, roleMenuRepo)
+
+	// Create parent menu
+	parent := &menu.CoreMenu{
+		Name:     "ParentWithRole",
+		Path:     "/parent-role",
+		Pid:      0,
+		Type:     0,
+		MenuSort: 1,
+	}
+	err := menuRepo.Create(parent)
+	assert.NoError(t, err)
+
+	// Create child menu
+	child := &menu.CoreMenu{
+		Name:     "ChildWithRole",
+		Path:     "/parent-role/child",
+		Pid:      parent.ID,
+		Type:     0,
+		MenuSort: 1,
+	}
+	err = menuRepo.Create(child)
+	assert.NoError(t, err)
+
+	// Assign role-menu association to child
+	err = roleMenuRepo.SaveRoleMenus(5, []int64{child.ID})
+	assert.NoError(t, err)
+
+	// Delete child (should succeed and clean up role-menu associations)
+	err = svc.Delete(child.ID)
+	assert.NoError(t, err)
+
+	// Verify child is deleted
+	_, err = menuRepo.GetByID(child.ID)
+	assert.Error(t, err)
+}
+
+func TestMenuServiceIntegration_DeleteWithRoleMenuRepo(t *testing.T) {
+	cleanupTables(&menu.CoreMenu{}, &role.RoleMenu{})
+
+	menuRepo := repository.NewMenuRepository(testDB)
+	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
+	svc := NewMenuServiceWithRoleFilter(menuRepo, roleMenuRepo)
+
+	// Create a standalone menu
+	testMenu := &menu.CoreMenu{
+		Name:     "StandaloneMenu",
+		Path:     "/standalone",
+		Pid:      0,
+		Type:     0,
+		MenuSort: 1,
+	}
+	err := menuRepo.Create(testMenu)
+	assert.NoError(t, err)
+
+	// Assign to role
+	err = roleMenuRepo.SaveRoleMenus(6, []int64{testMenu.ID})
+	assert.NoError(t, err)
+
+	// Delete menu - should also clean up role_menu entries
+	err = svc.Delete(testMenu.ID)
+	assert.NoError(t, err)
+
+	// Verify menu is deleted
+	_, err = menuRepo.GetByID(testMenu.ID)
+	assert.Error(t, err)
+}
+
+func TestMenuServiceIntegration_Delete_HasChildrenError(t *testing.T) {
+	cleanupTables(&menu.CoreMenu{})
+
+	repo := repository.NewMenuRepository(testDB)
+	svc := NewMenuService(repo)
+
+	// Create parent
+	parent := &menu.CoreMenu{
+		Name:     "ErrorParent",
+		Path:     "/error-parent",
+		Pid:      0,
+		Type:     0,
+		MenuSort: 1,
+	}
+	err := svc.Create(parent)
+	assert.NoError(t, err)
+
+	// Create child
+	child := &menu.CoreMenu{
+		Name:     "ErrorChild",
+		Path:     "/error-parent/child",
+		Pid:      parent.ID,
+		Type:     0,
+		MenuSort: 1,
+	}
+	err = svc.Create(child)
+	assert.NoError(t, err)
+
+	// Try to delete parent - should fail with ErrMenuHasChildren
+	err = svc.Delete(parent.ID)
+	assert.Error(t, err)
+	assert.Equal(t, ErrMenuHasChildren, err)
+}

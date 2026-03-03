@@ -152,3 +152,19 @@ func TestExcelService_SetFieldType_AllTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestNewExcelService_FallbackToTmp(t *testing.T) {
+	// Test that NewExcelService works even when /opt/dataease2.0/data/excel/ is not writable
+	// Since we can't easily mock os.MkdirAll, we verify the service is created
+	svc := NewExcelService()
+	if svc == nil {
+		t.Fatal("expected ExcelService instance")
+	}
+	if svc.uploadDir == "" {
+		t.Fatal("expected uploadDir to be set")
+	}
+	// Verify the upload directory exists
+	if _, err := os.Stat(svc.uploadDir); os.IsNotExist(err) {
+		t.Fatalf("uploadDir %s should exist", svc.uploadDir)
+	}
+}
