@@ -295,3 +295,30 @@ func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
 		t.Fatalf("expected default login 0, got %d", login)
 	}
 }
+
+
+
+func TestSystemParam_RepoErrors(t *testing.T) {
+	mockRepo := &MockSystemParamRepository{
+		saveBasicErr:     errors.New("save basic error"),
+		saveOnlineMapErr: errors.New("save online map error"),
+		saveSQLBotErr:    errors.New("save sqlbot error"),
+	}
+	svc := NewSystemParamService(mockRepo, nil)
+
+	err := svc.SaveBasic([]system.SettingItem{})
+	if err == nil {
+		t.Error("Expected error for SaveBasic")
+	}
+
+	err = svc.SaveOnlineMap(&system.OnlineMapEditor{})
+	if err == nil {
+		t.Error("Expected error for SaveOnlineMap")
+	}
+
+	err = svc.SaveSQLBot(&system.SQLBotConfig{})
+	if err == nil {
+		t.Error("Expected error for SaveSQLBot")
+	}
+}
+

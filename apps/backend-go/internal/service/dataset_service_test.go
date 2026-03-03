@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 	"dataease/backend/internal/domain/dataset"
 	calcitev1 "dataease/backend/proto/calcite/v1"
 
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -254,4 +256,52 @@ func TestInferPreviewDeTypeAndDateTimeText(t *testing.T) {
 	if isDateTimeText("not-a-date") {
 		t.Fatal("invalid datetime text should be false")
 	}
+}
+
+func TestPreviewSQL_EdgeCases(t *testing.T) {
+	svc := NewDatasetService(nil)
+
+	// Test nil request
+	result, err := svc.PreviewSQL(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result["sql"])
+
+	// Test empty SQL
+	result, err = svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: ""})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result["sql"])
+
+	// Test whitespace only SQL
+	result, err = svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "   "})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result["sql"])
+}
+
+
+func TestPreviewSQL_ValidateError(t *testing.T) {
+	svc := NewDatasetService(nil)
+
+	// Test invalid SQL (INSERT)
+	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "INSERT INTO x VALUES (1)"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "select")
+
+	// Test multi-statement SQL
+	_, err = svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "SELECT 1; SELECT 2"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "single")
+}
+
+func TestPreviewSQL_Base64DecodedEmpty(t *testing.T) {
+	svc := NewDatasetService(nil)
+
+	// Test base64 encoded empty string
+	encodedEmpty := base64.StdEncoding.EncodeToString([]byte("   "))
+	result, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: encodedEmpty})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result["sql"])
 }
