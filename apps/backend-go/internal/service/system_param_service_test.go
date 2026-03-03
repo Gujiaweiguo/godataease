@@ -15,6 +15,7 @@ type MockSystemParamRepository struct {
 	saveBasicErr     error
 	saveOnlineMapErr error
 	saveSQLBotErr    error
+	getOnlineMapErr  error
 }
 
 func NewMockSystemParamRepository() *MockSystemParamRepository {
@@ -38,6 +39,9 @@ func (m *MockSystemParamRepository) SaveBasicSettings(items []system.SettingItem
 }
 
 func (m *MockSystemParamRepository) GetOnlineMap() (*system.OnlineMapEditor, error) {
+	if m.getOnlineMapErr != nil {
+		return nil, m.getOnlineMapErr
+	}
 	if m.onlineMap == nil {
 		return &system.OnlineMapEditor{MapType: "gaode", Key: "test-key"}, nil
 	}
@@ -220,6 +224,25 @@ func TestSystemParam_QueryOnlineMapByType(t *testing.T) {
 	}
 }
 
+func TestSystemParam_QueryOnlineMap(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	result, err := svc.QueryOnlineMap()
+	if err != nil {
+		t.Fatalf("QueryOnlineMap failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	mockRepo.getOnlineMapErr = errors.New("query online map error")
+	_, err = svc.QueryOnlineMap()
+	if err == nil {
+		t.Error("Expected error when repository GetOnlineMap fails")
+	}
+}
+
 func TestSystemParam_ShareBase(t *testing.T) {
 	svc := setupSystemParamService()
 
@@ -296,26 +319,117 @@ func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
 	}
 }
 
-func TestSystemParam_RepoErrors(t *testing.T) {
-	mockRepo := &MockSystemParamRepository{
-		saveBasicErr:     errors.New("save basic error"),
-		saveOnlineMapErr: errors.New("save online map error"),
-		saveSQLBotErr:    errors.New("save sqlbot error"),
-	}
+func TestSystemParam_SaveOnlineMap_WithAudit(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
 	svc := NewSystemParamService(mockRepo, nil)
 
-	err := svc.SaveBasic([]system.SettingItem{})
-	if err == nil {
-		t.Error("Expected error for SaveBasic")
+	editor := &system.OnlineMapEditor{
+		MapType:      "gaode",
+		Key:          "test-key",
+		SecurityCode: "test-code",
 	}
 
-	err = svc.SaveOnlineMap(&system.OnlineMapEditor{})
-	if err == nil {
-		t.Error("Expected error for SaveOnlineMap")
+	err := svc.SaveOnlineMap(editor)
+	if err != nil {
+		t.Fatalf("SaveOnlineMap with audit failed: %v", err)
+	}
+}
+
+func TestSystemParam_SaveSQLBot_WithAudit(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	cfg := &system.SQLBotConfig{
+		Domain:  "test.domain",
+		ID:      "test-id",
+		Enabled: true,
+		Valid:   true,
 	}
 
-	err = svc.SaveSQLBot(&system.SQLBotConfig{})
+	err := svc.SaveSQLBot(cfg)
+	if err != nil {
+		t.Fatalf("SaveSQLBot with audit failed: %v", err)
+	}
+}
+
+func TestSystemParam_SaveBasic_RepoError(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.saveBasicErr = errors.New("save basic error")
+	svc := NewSystemParamService(mockRepo, nil)
+
+	err := svc.SaveBasic([]system.SettingItem{{Pkey: "test", Pval: "value"}})
 	if err == nil {
-		t.Error("Expected error for SaveSQLBot")
+		t.Error("Expected error from SaveBasic")
+	}
+}
+
+func TestSystemParam_SaveOnlineMap_RepoError(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.saveOnlineMapErr = errors.New("save online map error")
+	svc := NewSystemParamService(mockRepo, nil)
+
+	editor := &system.OnlineMapEditor{MapType: "gaode"}
+	err := svc.SaveOnlineMap(editor)
+	if err == nil {
+		t.Error("Expected error from SaveOnlineMap")
+	}
+}
+
+func TestSystemParam_SaveSQLBot_RepoError(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.saveSQLBotErr = errors.New("save sql bot error")
+	svc := NewSystemParamService(mockRepo, nil)
+
+	cfg := &system.SQLBotConfig{Domain: "test.domain"}
+	err := svc.SaveSQLBot(cfg)
+	if err == nil {
+		t.Error("Expected error from SaveSQLBot")
+	}
+}
+
+func TestSystemParam_RepoNotReady_AllMethods(t *testing.T) {
+	// Service with nil repo
+	svc := &SystemParamService{repo: nil, auditService: nil}
+
+	// Test ShareBase
+	_, err := svc.ShareBase()
+	if err == nil {
+		t.Error("Expected error when repo is nil for ShareBase")
+	}
+
+	// Test RequestTimeOut
+	_, err = svc.RequestTimeOut()
+	if err == nil {
+		t.Error("Expected error when repo is nil for RequestTimeOut")
+	}
+
+	// Test DefaultSettings
+	_, err = svc.DefaultSettings()
+	if err == nil {
+		t.Error("Expected error when repo is nil for DefaultSettings")
+	}
+
+	// Test UI
+	_, err = svc.UI()
+	if err == nil {
+		t.Error("Expected error when repo is nil for UI")
+	}
+
+	// Test DefaultLogin
+	_, err = svc.DefaultLogin()
+	if err == nil {
+		t.Error("Expected error when repo is nil for DefaultLogin")
+	}
+
+	// Test I18nOptions
+	_, err = svc.I18nOptions()
+	if err == nil {
+		t.Error("Expected error when repo is nil for I18nOptions")
+	}
+
+	// Test QuerySQLBot
+	_, err = svc.QuerySQLBot()
+	if err == nil {
+		t.Error("Expected error when repo is nil for QuerySQLBot")
 	}
 }

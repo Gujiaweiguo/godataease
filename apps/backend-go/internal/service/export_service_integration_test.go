@@ -110,3 +110,40 @@ func TestExportServiceIntegration_ExportLimit(t *testing.T) {
 	assert.NotNil(t, limit)
 	assert.Equal(t, "10000", limit.Limit)
 }
+
+func TestExportServiceIntegration_Pager_EdgeCases(t *testing.T) {
+	repo := repository.NewExportRepository(testDB)
+	svc := NewExportService(repo)
+
+	// Test with zero page - should default to 1
+	req := &export.PagerRequest{
+		GoPage:   0,
+		PageSize: 10,
+	}
+	resp := svc.Pager(req)
+	assert.Equal(t, 1, resp.PageNum)
+
+	// Test with negative page - should default to 1
+	req = &export.PagerRequest{
+		GoPage:   -1,
+		PageSize: 10,
+	}
+	resp = svc.Pager(req)
+	assert.Equal(t, 1, resp.PageNum)
+
+	// Test with zero pageSize - should default to 10
+	req = &export.PagerRequest{
+		GoPage:   1,
+		PageSize: 0,
+	}
+	resp = svc.Pager(req)
+	assert.Equal(t, 10, resp.PageSize)
+
+	// Test with negative pageSize - should default to 10
+	req = &export.PagerRequest{
+		GoPage:   1,
+		PageSize: -5,
+	}
+	resp = svc.Pager(req)
+	assert.Equal(t, 10, resp.PageSize)
+}

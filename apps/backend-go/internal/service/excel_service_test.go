@@ -121,3 +121,34 @@ func TestExcelService_UploadFileAndLoadRemoteFile(t *testing.T) {
 		t.Fatal("expected remote sheets")
 	}
 }
+
+func TestExcelService_SetFieldType_AllTypes(t *testing.T) {
+	svc := NewExcelService()
+
+	tests := []struct {
+		name        string
+		fieldType   string
+		expectedDe  int
+		expectedExt int
+	}{
+		{"text type", FieldTypeText, 0, 0},
+		{"datetime type", FieldTypeDateTime, 1, 1},
+		{"long type", FieldTypeLong, 2, 2},
+		{"double type", FieldTypeDouble, 3, 3},
+		{"unknown type", "unknown", 0, 0},
+		{"empty type", "", 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			field := &datasource.ExcelTableField{FieldType: tt.fieldType}
+			svc.setFieldType(field)
+			if field.DeType != tt.expectedDe {
+				t.Errorf("expected DeType %d, got %d", tt.expectedDe, field.DeType)
+			}
+			if field.DeExtractType != tt.expectedExt {
+				t.Errorf("expected DeExtractType %d, got %d", tt.expectedExt, field.DeExtractType)
+			}
+		})
+	}
+}

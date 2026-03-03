@@ -59,7 +59,7 @@ func (m *MockMsgCenterRepository) GetReadStatusMap(msgIDs []string, userID int64
 		key := msgID + "-" + string(rune(userID))
 		result[msgID] = m.readStatus[key]
 	}
-return result, nil
+	return result, nil
 }
 
 // Test using direct service instantiation with mock

@@ -384,3 +384,89 @@ func TestAuditServiceIntegration_ExportAuditLogs_Empty(t *testing.T) {
 	_, err := svc.ExportAuditLogs([]int64{}, "csv")
 	assert.Error(t, err)
 }
+
+func TestAuditServiceIntegration_ExportAuditLogs_DefaultFormat(t *testing.T) {
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
+	svc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+
+	// Create audit log
+	userID := int64(1)
+	svc.CreateAuditLog(&audit.AuditLogCreateRequest{
+		UserID:       &userID,
+		Username:     strPtr("testuser"),
+		ActionType:   audit.ActionTypeUserAction,
+		ActionName:   "Action",
+		ResourceType: strPtr("USER"),
+		Operation:    audit.OperationCreate,
+	})
+
+	// Get log IDs
+	result, _ := svc.QueryAuditLogs(&audit.AuditLogQuery{Page: 1, PageSize: 100})
+	logs := result.List.([]*audit.AuditLog)
+	ids := make([]int64, len(logs))
+	for i, log := range logs {
+		ids[i] = log.ID
+	}
+
+	// Export with unknown format (should default to CSV)
+	filePath, err := svc.ExportAuditLogs(ids, "unknown")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, filePath)
+}
+
+func TestAuditServiceIntegration_RecordLoginFailure_WithAllFields(t *testing.T) {
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
+	svc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+
+	// Test with all fields populated
+	req := &audit.LoginFailureRequest{
+		Username:      "fulluser",
+		IPAddress:     strPtr("192.168.1.1"),
+		FailureReason: strPtr("Account locked"),
+		UserAgent:     strPtr("Mozilla/5.0"),
+	}
+
+	failure, err := svc.RecordLoginFailure(req)
+	assert.NoError(t, err)
+	assert.NotNil(t, failure)
+	assert.Equal(t, "fulluser", failure.Username)
+	assert.Equal(t, "192.168.1.1", *failure.IPAddress)
+	assert.Equal(t, "Account locked", *failure.FailureReason)
+	assert.Equal(t, "Mozilla/5.0", *failure.UserAgent)
+}
+
+func TestAuditServiceIntegration_RecordLoginFailure_TableMissing(t *testing.T) {
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
+	svc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+
+	err := testDB.Migrator().DropTable(&audit.LoginFailure{})
+	assert.NoError(t, err)
+	defer func() {
+		_ = testDB.AutoMigrate(&audit.LoginFailure{})
+	}()
+
+	_, err = svc.RecordLoginFailure(&audit.LoginFailureRequest{Username: "missing_table_user"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to record login failure")
+}
+
+func TestAuditServiceIntegration_ExportToJSON_WriteFailure(t *testing.T) {
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
+	svc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+
+	err := svc.exportToJSON([]*audit.AuditLog{{ID: 1, ActionName: "x"}}, "/proc/1/forbidden_audit_logs.json")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write file")
+}

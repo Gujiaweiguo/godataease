@@ -349,10 +349,10 @@ func TestShareServiceIntegration_Ticket_GenerateNew(t *testing.T) {
 
 	// Create ticket with GenerateNew=true
 	ticketReq := &share.TicketCreateRequest{
-		UUID:       created.UUID,
+		UUID:        created.UUID,
 		GenerateNew: true,
-		Exp:        0,
-		Args:       "",
+		Exp:         0,
+		Args:        "",
 	}
 	ticket, err := svc.CreateTicket(ticketReq)
 	assert.NoError(t, err)

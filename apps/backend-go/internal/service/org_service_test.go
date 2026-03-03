@@ -460,4 +460,3 @@ func TestOrgUpdateOrgStatus_UpdateFailed(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
-

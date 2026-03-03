@@ -1,12 +1,37 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/repository"
 )
+
+type failingDeletePermRepo struct {
+	repository.PermRepositoryInterface
+}
+
+type failingCheckPermRepo struct {
+	repository.PermRepositoryInterface
+}
+
+type failingCreatePermRepo struct {
+	repository.PermRepositoryInterface
+}
+
+func (r *failingDeletePermRepo) Delete(permID int64) error {
+	return errors.New("delete failed")
+}
+
+func (r *failingCheckPermRepo) CheckKeyExists(permKey string, excludePermID int64) (int64, error) {
+	return 0, errors.New("check failed")
+}
+
+func (r *failingCreatePermRepo) Create(p *permission.SysPerm) error {
+	return errors.New("create failed")
+}
 
 func setupPermService() *PermService {
 	mockRepo := repository.NewMockPermRepository()
@@ -95,5 +120,75 @@ func TestDeletePerm(t *testing.T) {
 	_, err = svc.GetPermByID(permID)
 	if err == nil {
 		t.Error("Expected error after delete, got nil")
+	}
+}
+func TestCheckPermKeyExists(t *testing.T) {
+	svc := setupPermService()
+
+	// Create a permission first
+	req := &permission.PermCreateRequest{
+		PermName: "Test Exists",
+		PermKey:  "test:exists",
+	}
+	_, err := svc.CreatePerm(req)
+	if err != nil {
+		t.Fatalf("CreatePerm failed: %v", err)
+	}
+
+	// Check if key exists
+	exists, err := svc.CheckPermKeyExists("test:exists")
+	if err != nil {
+		t.Fatalf("CheckPermKeyExists failed: %v", err)
+	}
+	if !exists {
+		t.Error("Expected perm key to exist")
+	}
+
+	// Check non-existent key
+	exists, err = svc.CheckPermKeyExists("non:existent:key")
+	if err != nil {
+		t.Fatalf("CheckPermKeyExists for non-existent failed: %v", err)
+	}
+	if exists {
+		t.Error("Expected perm key to not exist")
+	}
+}
+
+func TestDeletePerm_Error(t *testing.T) {
+	svc := NewPermService(&failingDeletePermRepo{PermRepositoryInterface: repository.NewMockPermRepository()})
+
+	err := svc.DeletePerm(1)
+	if err == nil {
+		t.Fatal("Expected error from DeletePerm")
+	}
+	if err.Error() == "" {
+		t.Fatal("Expected non-empty error message")
+	}
+}
+
+func TestCheckPermKeyExists_Error(t *testing.T) {
+	svc := NewPermService(&failingCheckPermRepo{PermRepositoryInterface: repository.NewMockPermRepository()})
+
+	_, err := svc.CheckPermKeyExists("x:y")
+	if err == nil {
+		t.Fatal("Expected error from CheckPermKeyExists")
+	}
+}
+
+func TestCreatePerm_CheckKeyError(t *testing.T) {
+	svc := NewPermService(&failingCheckPermRepo{PermRepositoryInterface: repository.NewMockPermRepository()})
+
+	_, err := svc.CreatePerm(&permission.PermCreateRequest{PermName: "x", PermKey: "x:y"})
+	if err == nil {
+		t.Fatal("Expected error from CreatePerm when check key fails")
+	}
+}
+
+func TestCreatePerm_CreateError(t *testing.T) {
+	svc := NewPermService(&failingCreatePermRepo{PermRepositoryInterface: repository.NewMockPermRepository()})
+
+	_, err := svc.CreatePerm(&permission.PermCreateRequest{PermName: "x", PermKey: "x:y"})
+	if err == nil {
+		t.Fatal("Expected error from CreatePerm when repository create fails")
 	}
 }

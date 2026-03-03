@@ -244,3 +244,63 @@ func TestRetainBeforeMAndAfterN_ZeroValues(t *testing.T) {
 		t.Errorf("Expected '******', got '%s'", result)
 	}
 }
+
+func TestApplyCustomRule_DefaultCase(t *testing.T) {
+	svc := &ColumnPermissionService{}
+
+	rule := &permission.DesensitizationRule{
+		CustomBuiltInRule: "unknown_custom_rule",
+	}
+
+	result := svc.applyCustomRule("test", rule)
+	if result != "******" {
+		t.Errorf("Expected '******' for unknown custom rule, got '%s'", result)
+	}
+}
+
+func TestApplyCustomRule_NilRule(t *testing.T) {
+	svc := &ColumnPermissionService{}
+
+	result := svc.applyCustomRule("test", nil)
+	if result != "******" {
+		t.Errorf("Expected '******' for nil rule, got '%s'", result)
+	}
+}
+
+func TestRetainBeforeMAndAfterN_NegativeValues(t *testing.T) {
+	svc := &ColumnPermissionService{}
+
+	// Negative M and N should be treated as 0
+	result := svc.retainBeforeMAndAfterN("test", -1, -1)
+	if result != "******" {
+		t.Errorf("Expected '******' for negative values, got '%s'", result)
+	}
+
+	// Negative M, positive N - m becomes 0, so retain 0 before, 2 after
+	result = svc.retainBeforeMAndAfterN("test", -1, 2)
+	if result != "***st" {
+		t.Errorf("Expected '***st' for negative M, got '%s'", result)
+	}
+
+	// Positive M, negative N - n becomes 0, so retain 2 before, 0 after
+	result = svc.retainBeforeMAndAfterN("test", 2, -1)
+	if result != "te***" {
+		t.Errorf("Expected 'te***' for negative N, got '%s'", result)
+	}
+}
+
+func TestRetainMToN_EdgeCases(t *testing.T) {
+	svc := &ColumnPermissionService{}
+
+	// M >= N case
+	result := svc.retainMToN("test", 3, 2)
+	if result != "*** ***" {
+		t.Errorf("Expected '*** ***' for M >= N, got '%s'", result)
+	}
+
+	// M and N out of bounds - returns as much as possible
+	result = svc.retainMToN("ab", 0, 5)
+	if result != "ab***" {
+		t.Errorf("Expected 'ab***' for out of bounds, got '%s'", result)
+	}
+}

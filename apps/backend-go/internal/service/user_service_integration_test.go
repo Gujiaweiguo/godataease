@@ -252,7 +252,7 @@ func TestUserServiceIntegration_SearchUsers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, result.Total, int64(10))
 	assert.Equal(t, 1, result.Current) // Current is int
-	assert.Equal(t, 10, result.Size)    // Size is int
+	assert.Equal(t, 10, result.Size)   // Size is int
 }
 
 func TestUserServiceIntegration_SearchUsers_DefaultPagination(t *testing.T) {
@@ -268,7 +268,7 @@ func TestUserServiceIntegration_SearchUsers_DefaultPagination(t *testing.T) {
 	result, err := svc.SearchUsers(req)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, result.Current) // Current is int
-	assert.Equal(t, 10, result.Size)    // Size is int
+	assert.Equal(t, 10, result.Size)   // Size is int
 }
 
 func TestUserServiceIntegration_ResetPassword(t *testing.T) {

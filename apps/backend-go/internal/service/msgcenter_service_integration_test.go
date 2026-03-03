@@ -3,6 +3,7 @@
 package service
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
 
 func TestMsgCenterService_Count(t *testing.T) {
@@ -123,4 +125,47 @@ func TestMsgCenterService_ReadBatch(t *testing.T) {
 		assert.True(t, result.Success)
 		assert.Equal(t, 0, result.Updated)
 	})
+}
+
+func TestMsgCenterService_Read_IsReadError(t *testing.T) {
+	err := testDB.Migrator().DropTable("core_msg_setting")
+	assert.NoError(t, err)
+	defer func() {
+		_ = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_msg_setting (
+	id BIGINT AUTO_INCREMENT PRIMARY KEY,
+	msg_id VARCHAR(100),
+	user_id BIGINT,
+	status VARCHAR(20),
+	read_at DATETIME,
+	UNIQUE INDEX idx_msg_user (msg_id, user_id),
+	INDEX idx_user_id (user_id)
+)`).Error
+	}()
+
+	repo := repository.NewMsgCenterRepository(testDB)
+	svc := NewMsgCenterService(repo)
+
+	resp := svc.Read(&msgcenter.ReadRequest{ID: "err-msg"}, time.Now().UnixNano())
+	assert.False(t, resp.Success)
+	assert.False(t, resp.AlreadyRead)
+}
+
+func TestMsgCenterService_Read_MarkAsReadError(t *testing.T) {
+	repoDB := testDB.Session(&gorm.Session{NewDB: true})
+	callbackName := "test:force_msgcenter_create_error"
+
+	err := repoDB.Callback().Create().Before("gorm:create").Register(callbackName, func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced create error"))
+	})
+	assert.NoError(t, err)
+	defer func() {
+		_ = repoDB.Callback().Create().Remove(callbackName)
+	}()
+
+	repo := repository.NewMsgCenterRepository(repoDB)
+	svc := NewMsgCenterService(repo)
+
+	resp := svc.Read(&msgcenter.ReadRequest{ID: "mark-error-msg"}, time.Now().UnixNano())
+	assert.False(t, resp.Success)
+	assert.False(t, resp.AlreadyRead)
 }
