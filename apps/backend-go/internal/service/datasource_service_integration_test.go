@@ -3,18 +3,25 @@
 package service
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 	"time"
 
+	datasetdomain "dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/repository"
+	seatunnelv1 "dataease/backend/proto/seatunnel/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestDatasourceService_Save(t *testing.T) {
@@ -678,6 +685,122 @@ func TestDatasourceService_ListSyncRecord(t *testing.T) {
 	})
 }
 
+func TestDatasourceService_ListSyncRecord_Success(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	dsID := int64(20260303)
+	now := time.Now().UnixMilli()
+	err := repo.CreateSyncTaskLog(&datasource.SyncRecord{
+		DsID:        dsID,
+		TaskID:      1001,
+		StartTime:   now,
+		CreateTime:  now,
+		TaskStatus:  "running",
+		TableName:   "orders",
+		Name:        "orders",
+		TriggerType: "table",
+	})
+	require.NoError(t, err)
+
+	page, err := svc.ListSyncRecord(dsID, 0, 0)
+	require.NoError(t, err)
+	require.NotNil(t, page)
+	assert.Equal(t, dsID, page.DatasourceID)
+	assert.Equal(t, 1, page.Current)
+	assert.Equal(t, 10, page.Size)
+	assert.GreaterOrEqual(t, page.Total, int64(1))
+	assert.NotEmpty(t, page.Records)
+}
+
+type mockSeatunnelSyncServiceServer struct {
+	seatunnelv1.UnimplementedSyncServiceServer
+	fail bool
+}
+
+func (m *mockSeatunnelSyncServiceServer) SubmitTask(context.Context, *seatunnelv1.SubmitTaskRequest) (*seatunnelv1.SubmitTaskResponse, error) {
+	if m.fail {
+		return nil, status.Error(codes.Internal, "submit failed")
+	}
+	return &seatunnelv1.SubmitTaskResponse{TaskId: "99001"}, nil
+}
+
+func startSeatunnelServerForIntegration(t *testing.T, fail bool) (string, func()) {
+	t.Helper()
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	grpcServer := grpc.NewServer()
+	seatunnelv1.RegisterSyncServiceServer(grpcServer, &mockSeatunnelSyncServiceServer{fail: fail})
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+
+	cleanup := func() {
+		grpcServer.Stop()
+		_ = lis.Close()
+	}
+
+	return lis.Addr().String(), cleanup
+}
+
+func TestDatasourceService_SyncAPITable_WithRepoLog(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	addr, cleanup := startSeatunnelServerForIntegration(t, false)
+	defer cleanup()
+	svc.SetSeatunnelConfig(addr, 3*time.Second, 0)
+
+	dsID := int64(99001)
+	result, err := svc.SyncAPITable(map[string]string{
+		"datasourceId": strconv.FormatInt(dsID, 10),
+		"source":       "api",
+		"target":       "mysql",
+		"tableName":    "orders",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "99001", result["taskId"])
+
+	page, err := svc.ListSyncRecord(dsID, 1, 10)
+	require.NoError(t, err)
+	require.NotNil(t, page)
+	assert.NotEmpty(t, page.Records)
+	assert.Equal(t, "running", page.Records[0].TaskStatus)
+}
+
+func TestDatasourceService_SyncAPITable_SubmitFailCreatesFailedLog(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	addr, cleanup := startSeatunnelServerForIntegration(t, true)
+	defer cleanup()
+	svc.SetSeatunnelConfig(addr, 3*time.Second, 0)
+
+	dsID := int64(99002)
+	_, err := svc.SyncAPITable(map[string]string{
+		"datasourceId": strconv.FormatInt(dsID, 10),
+		"source":       "api",
+		"target":       "mysql",
+		"tableName":    "orders",
+	})
+	assert.Error(t, err)
+
+	page, listErr := svc.ListSyncRecord(dsID, 1, 10)
+	require.NoError(t, listErr)
+	require.NotNil(t, page)
+	assert.NotEmpty(t, page.Records)
+	assert.Equal(t, "failed", page.Records[0].TaskStatus)
+}
+
 func TestDatasourceService_CheckAPIDatasource(t *testing.T) {
 	cleanupTables(&datasource.CoreDatasource{})
 
@@ -764,6 +887,62 @@ func TestDatasourceService_GetTableStatus(t *testing.T) {
 	})
 }
 
+func TestDatasourceService_TableMetadataAndPreview_Success(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_ds_preview_meta").Error
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	err := testDB.Exec("CREATE TABLE it_ds_preview_meta (id BIGINT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(64), amount INT)").Error
+	require.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_ds_preview_meta (name, amount) VALUES ('Alice', 100), ('Bob', 90)").Error
+	require.NoError(t, err)
+
+	dsID := int64(88001)
+	tableType := "table"
+	tableName := "it_ds_preview_meta"
+	rowName := "preview_meta"
+	err = testDB.Create(&datasetdomain.CoreDatasetTable{
+		Name:           &rowName,
+		DatasourceID:   &dsID,
+		DatasetGroupID: 0,
+		PhysicalTable:  &tableName,
+		Type:           &tableType,
+	}).Error
+	require.NoError(t, err)
+
+	tables, err := svc.GetTables(&datasource.TableRequest{DatasourceID: dsID})
+	require.NoError(t, err)
+	require.Len(t, tables, 1)
+	assert.Equal(t, tableName, tables[0].TableName)
+
+	statusList, err := svc.GetTableStatus(&datasource.TableRequest{DatasourceID: dsID})
+	require.NoError(t, err)
+	require.Len(t, statusList, 1)
+	assert.Equal(t, datasource.StatusSuccess, statusList[0].Status)
+	assert.Equal(t, int64(0), statusList[0].LastUpdate)
+
+	fields, err := svc.GetTableField(&datasource.TableRequest{TableName: tableName})
+	require.NoError(t, err)
+	assert.NotEmpty(t, fields)
+
+	preview, err := svc.PreviewData(&datasource.TableRequest{TableName: tableName, Limit: 1})
+	require.NoError(t, err)
+	require.NotNil(t, preview)
+	assert.NotEmpty(t, preview.Fields)
+	assert.Len(t, preview.Data, 1)
+	assert.Equal(t, int64(2), preview.Total)
+
+	schemas, err := svc.GetSchema()
+	require.NoError(t, err)
+	assert.NotEmpty(t, schemas)
+
+	err = testDB.Exec("DROP TABLE IF EXISTS it_ds_preview_meta").Error
+	require.NoError(t, err)
+}
+
 func TestDatasourceService_GetTableField(t *testing.T) {
 	cleanupTables(&datasource.CoreDatasource{})
 
@@ -798,8 +977,6 @@ func TestDatasourceService_PreviewData(t *testing.T) {
 		assert.Equal(t, int64(0), result.Total)
 	})
 }
-
-
 
 func TestParseTaskID(t *testing.T) {
 	tests := []struct {
@@ -1206,5 +1383,3 @@ func TestDatasourceService_CompatDatasourceID_Nearest(t *testing.T) {
 		assert.Equal(t, int64(-1), fixedID)
 	})
 }
-
-

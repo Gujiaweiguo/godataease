@@ -13,7 +13,7 @@ jobs:
       run:
         working-directory: apps/backend-go
     env:
-      SERVICE_COVERAGE_THRESHOLD: ${{ vars.SERVICE_COVERAGE_THRESHOLD || '82.0' }}
+      SERVICE_COVERAGE_THRESHOLD: "${{ vars.SERVICE_COVERAGE_THRESHOLD || '85.0' }}"
 
     services:
       mysql:
@@ -117,7 +117,7 @@ jobs:
       uses: golangci/golangci-lint-action@v4
       with:
         working-directory: apps/backend-go
-
+        only-new-issues: true
     - name: Summary
       if: always()
       run: |

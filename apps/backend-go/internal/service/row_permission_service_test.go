@@ -228,3 +228,133 @@ func TestEscapeSQL(t *testing.T) {
 		})
 	}
 }
+
+func TestIsAdmin(t *testing.T) {
+	// Test with nil admin checker
+	svc := &RowPermissionService{adminChecker: nil}
+	if svc.IsAdmin(1) {
+		t.Error("Expected false when adminChecker is nil")
+	}
+
+	// Test with admin checker and admin user
+	mockChecker := &mockAdminChecker{adminUserIDs: map[int64]bool{1: true}}
+	svc = &RowPermissionService{adminChecker: mockChecker}
+	if !svc.IsAdmin(1) {
+		t.Error("Expected true for admin user")
+	}
+
+	// Test with admin checker and non-admin user
+	if svc.IsAdmin(2) {
+		t.Error("Expected false for non-admin user")
+	}
+}
+
+func TestGetUserRoleIDs(t *testing.T) {
+	// Test with nil repo
+	svc := &RowPermissionService{userRoleRepo: nil}
+	ids, err := svc.GetUserRoleIDs(1)
+	if ids != nil || err != nil {
+		t.Errorf("Expected nil, nil, got %v, %v", ids, err)
+	}
+}
+
+func TestBuildItemCondition(t *testing.T) {
+	svc := &RowPermissionService{}
+
+	// Test with FieldID = 0
+	cond, args := svc.buildItemCondition(&permission.DatasetRowPermissionsTreeItem{FieldID: 0})
+	if cond != "" || args != nil {
+		t.Errorf("Expected empty condition for FieldID=0, got %s, %v", cond, args)
+	}
+
+	// Test with enum filter
+	cond, args = svc.buildItemCondition(&permission.DatasetRowPermissionsTreeItem{
+		FieldID:    1,
+		FilterType: "enum",
+		EnumValue:  []string{"a", "b"},
+	})
+	if cond == "" {
+		t.Error("Expected non-empty condition for enum filter")
+	}
+	if len(args) != 2 {
+		t.Errorf("Expected 2 args for enum filter, got %d", len(args))
+	}
+
+	// Test with logic filter
+	cond, args = svc.buildItemCondition(&permission.DatasetRowPermissionsTreeItem{
+		FieldID: 1,
+		Term:    permission.OperatorEq,
+		Value:   "test",
+	})
+	if cond == "" {
+		t.Error("Expected non-empty condition for logic filter")
+	}
+	if len(args) != 1 {
+		t.Errorf("Expected 1 arg for logic filter, got %d", len(args))
+	}
+}
+
+func TestBuildLogicCondition_AllOperators(t *testing.T) {
+	svc := &RowPermissionService{}
+
+	tests := []struct {
+		name     string
+		term     string
+		value    string
+		wantCond string
+		wantArgs int
+	}{
+		{"not_eq", "not_eq", "test", "`field` != ?", 1},
+		{"not eq", "not eq", "test", "`field` != ?", 1},
+		{"not_like", permission.OperatorNotLike, "test", "`field` NOT LIKE ?", 1},
+		{"not_null", permission.OperatorNotNull, "", "`field` IS NOT NULL", 0},
+		{"empty", permission.OperatorEmpty, "", "`field` = ''", 0},
+		{"not_empty", permission.OperatorNotEmpty, "", "`field` != ''", 0},
+		{"lt", permission.OperatorLt, "100", "`field` < ?", 1},
+		{"ge", permission.OperatorGe, "100", "`field` >= ?", 1},
+		{"le", permission.OperatorLe, "100", "`field` <= ?", 1},
+		{"in", permission.OperatorIn, "test", "", 0},
+		{"not_in", permission.OperatorNotIn, "test", "", 0},
+		{"default", "unknown", "test", "`field` = ?", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cond, args := svc.buildLogicCondition("`field`", tt.term, tt.value)
+			if cond != tt.wantCond {
+				t.Errorf("condition = %v, want %v", cond, tt.wantCond)
+			}
+			if len(args) != tt.wantArgs {
+				t.Errorf("args count = %v, want %v", len(args), tt.wantArgs)
+			}
+		})
+	}
+}
+
+func TestParseTreeObj_EmptyAndNil(t *testing.T) {
+	svc := &RowPermissionService{}
+
+	// Test nil object
+	cond, args := svc.parseTreeObj(nil)
+	if cond != "" || args != nil {
+		t.Errorf("Expected empty for nil, got %s, %v", cond, args)
+	}
+
+	// Test empty items
+	cond, args = svc.parseTreeObj(&permission.DatasetRowPermissionsTreeObj{Items: []permission.DatasetRowPermissionsTreeItem{}})
+	if cond != "" || args != nil {
+		t.Errorf("Expected empty for empty items, got %s, %v", cond, args)
+	}
+
+	// Test default logic (empty string)
+	cond, _ = svc.parseTreeObj(&permission.DatasetRowPermissionsTreeObj{
+		Logic: "",
+		Items: []permission.DatasetRowPermissionsTreeItem{
+			{FieldID: 1, Term: permission.OperatorEq, Value: "a"},
+		},
+	})
+	// Default should be OR
+	if cond != "(`1` = ?)" {
+		t.Errorf("Expected OR logic as default, got %s", cond)
+	}
+}
