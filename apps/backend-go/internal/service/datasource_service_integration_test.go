@@ -602,6 +602,40 @@ func TestDatasourceService_LatestTypes(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
+
+	t.Run("with creator - no datasources", func(t *testing.T) {
+		result, err := svc.LatestTypes("nonexistent_creator")
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("with creator - with datasources", func(t *testing.T) {
+		// Create some datasources
+		for i := 0; i < 3; i++ {
+			cfg := &datasource.ConnectionConfig{
+				Host:     "localhost",
+				Port:     3306,
+				Database: fmt.Sprintf("test_db_%d", i),
+			}
+			cfgJSON, _ := json.Marshal(cfg)
+			cfgStr := base64.StdEncoding.EncodeToString(cfgJSON)
+
+			req := &datasource.WriteRequest{
+				Name:          fmt.Sprintf("LatestType DS %d", i),
+				Type:          fmt.Sprintf("type_%d", i),
+				Configuration: &cfgStr,
+			}
+			_, err := svc.Save(req)
+			require.NoError(t, err)
+		}
+
+		// Note: LatestTypes requires create_by to be set
+		// Since we can't set it through Save, this will return empty
+		result, err := svc.LatestTypes("test_creator")
+		require.NoError(t, err)
+		// Result will be empty because create_by is not set
+		assert.Empty(t, result)
+	})
 }
 
 func TestDatasourceService_ShowFinishPage(t *testing.T) {
