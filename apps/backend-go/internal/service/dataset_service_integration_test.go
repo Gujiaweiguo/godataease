@@ -164,6 +164,52 @@ func TestDatasetServiceIntegration_Save_EmptyName(t *testing.T) {
 	assert.Contains(t, err.Error(), "name is required")
 }
 
+func TestDatasetServiceIntegration_Save_UpdateNotFound(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	_, err := svc.Save(&dataset.WriteRequest{ID: 999999, Name: "x", NodeType: "dataset"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestDatasetServiceIntegration_Save_UpdateKeepExistingValues(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	parent, err := svc.Save(&dataset.WriteRequest{Name: "ParentKeep", NodeType: "folder"})
+	assert.NoError(t, err)
+	original, err := svc.Save(&dataset.WriteRequest{Name: "ChildKeep", NodeType: "dataset", PID: &parent.ID})
+	assert.NoError(t, err)
+
+	newType := "custom"
+	updated, err := svc.Save(&dataset.WriteRequest{ID: original.ID, Type: &newType})
+	assert.NoError(t, err)
+	assert.Equal(t, "ChildKeep", updated.Name)
+	if assert.NotNil(t, updated.PID) {
+		assert.Equal(t, parent.ID, *updated.PID)
+	}
+	if assert.NotNil(t, updated.Type) {
+		assert.Equal(t, "custom", *updated.Type)
+	}
+}
+
+func TestDatasetServiceIntegration_Create_DestinationNotFound(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	pid := int64(999999)
+	_, err := svc.Create(&dataset.WriteRequest{Name: "Child", NodeType: "dataset", PID: &pid})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "destination folder not found")
+}
+
 func TestDatasetServiceIntegration_Rename(t *testing.T) {
 	cleanupTables(&dataset.CoreDatasetGroup{})
 
@@ -198,6 +244,21 @@ func TestDatasetServiceIntegration_Rename_EmptyName(t *testing.T) {
 	_, err := svc.Rename(created.ID, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "name is required")
+}
+
+func TestDatasetServiceIntegration_Rename_InvalidAndNotFound(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	_, err := svc.Rename(0, "x")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
+
+	_, err = svc.Rename(999999, "x")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestDatasetServiceIntegration_Move(t *testing.T) {
@@ -259,6 +320,15 @@ func TestDatasetServiceIntegration_Delete(t *testing.T) {
 	// Verify deleted
 	_, err = svc.GetGroupByID(created.ID)
 	assert.Error(t, err)
+}
+
+func TestDatasetServiceIntegration_Delete_InvalidID(t *testing.T) {
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	err := svc.Delete(0)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
 }
 
 func TestDatasetServiceIntegration_Delete_Recursive(t *testing.T) {
@@ -614,4 +684,3 @@ func TestDatasetServiceIntegration_Move_NonExistentID(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
-

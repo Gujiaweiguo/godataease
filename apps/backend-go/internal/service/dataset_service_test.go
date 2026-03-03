@@ -280,7 +280,6 @@ func TestPreviewSQL_EdgeCases(t *testing.T) {
 	assert.Empty(t, result["sql"])
 }
 
-
 func TestPreviewSQL_ValidateError(t *testing.T) {
 	svc := NewDatasetService(nil)
 
@@ -304,4 +303,61 @@ func TestPreviewSQL_Base64DecodedEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Empty(t, result["sql"])
+}
+
+func TestSetCalciteConfig_DefaultPreserve(t *testing.T) {
+	svc := NewDatasetService(nil)
+	defaultTimeout := svc.calciteTimeout
+	defaultRetries := svc.calciteRetries
+
+	svc.SetCalciteConfig(" 127.0.0.1:7001 ", 0, -1)
+
+	assert.Equal(t, "127.0.0.1:7001", svc.calciteAddress)
+	assert.Equal(t, defaultTimeout, svc.calciteTimeout)
+	assert.Equal(t, defaultRetries, svc.calciteRetries)
+
+	svc.SetCalciteConfig("127.0.0.1:7002", 3*time.Second, 2)
+	assert.Equal(t, 3*time.Second, svc.calciteTimeout)
+	assert.Equal(t, 2, svc.calciteRetries)
+}
+
+func TestDatasetService_EarlyValidation(t *testing.T) {
+	svc := NewDatasetService(nil)
+
+	_, err := svc.Save(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "request is required")
+
+	_, err = svc.Create(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "request is required")
+
+	_, err = svc.Rename(0, "name")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
+
+	_, err = svc.Move(0, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
+
+	_, err = svc.Move(10, 10)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be itself")
+
+	err = svc.Delete(0)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
+}
+
+func TestDatasetService_NormalizedHelpers(t *testing.T) {
+	assert.Equal(t, int64(0), normalizedDatasetPID(nil))
+	neg := int64(-3)
+	assert.Equal(t, int64(0), normalizedDatasetPID(&neg))
+	pos := int64(7)
+	assert.Equal(t, int64(7), normalizedDatasetPID(&pos))
+
+	assert.Equal(t, "", normalizedDatasetNodeType(""))
+	assert.Equal(t, dataset.NodeTypeFolder, normalizedDatasetNodeType(dataset.NodeTypeFolder))
+	assert.Equal(t, dataset.NodeTypeDataset, normalizedDatasetNodeType(dataset.NodeTypeDataset))
+	assert.Equal(t, dataset.NodeTypeDataset, normalizedDatasetNodeType("unknown"))
 }
