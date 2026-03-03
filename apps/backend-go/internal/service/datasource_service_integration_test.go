@@ -1551,3 +1551,38 @@ func TestDatasourceService_Move_ErrorPaths(t *testing.T) {
 		assert.Equal(t, int64(0), *result.PID)
 	})
 }
+
+// TestDatasourceService_Delete_DeepRecursive tests deep recursive deletion
+func TestDatasourceService_Delete_DeepRecursive(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	// Create deeply nested structure: root -> level1 -> level2 -> leaf
+	root, err := svc.CreateFolder("Root", 0)
+	require.NoError(t, err)
+
+	level1, err := svc.CreateFolder("Level1", root.ID)
+	require.NoError(t, err)
+
+	level2, err := svc.CreateFolder("Level2", level1.ID)
+	require.NoError(t, err)
+
+	leaf, err := svc.CreateFolder("Leaf", level2.ID)
+	require.NoError(t, err)
+
+	// Delete root - should cascade delete all children
+	err = svc.Delete(root.ID)
+	require.NoError(t, err)
+
+	// Verify all are deleted
+	_, err = svc.GetByID(root.ID)
+	assert.Error(t, err)
+	_, err = svc.GetByID(level1.ID)
+	assert.Error(t, err)
+	_, err = svc.GetByID(level2.ID)
+	assert.Error(t, err)
+	_, err = svc.GetByID(leaf.ID)
+	assert.Error(t, err)
+}

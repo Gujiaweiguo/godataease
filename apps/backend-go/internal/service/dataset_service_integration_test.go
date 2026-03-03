@@ -1077,3 +1077,114 @@ func TestDatasetServiceIntegration_GetSQLParams_EdgeCases(t *testing.T) {
 		assert.Len(t, result, 1)
 	})
 }
+
+func TestDatasetServiceIntegration_Delete_DeepRecursive(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Create nested folder structure: root -> level1 -> level2 -> leaf
+	root, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Root Folder",
+		NodeType: "folder",
+	})
+	require.NoError(t, err)
+
+	level1, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Level 1 Folder",
+		NodeType: "folder",
+		PID:      &root.ID,
+	})
+	require.NoError(t, err)
+
+	level2, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Level 2 Folder",
+		NodeType: "folder",
+		PID:      &level1.ID,
+	})
+	require.NoError(t, err)
+
+	leaf, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Leaf Dataset",
+		NodeType: "dataset",
+		PID:      &level2.ID,
+	})
+	require.NoError(t, err)
+
+	// Delete root - should cascade delete all children
+	err = svc.Delete(root.ID)
+	assert.NoError(t, err)
+
+	// Verify all are deleted
+	_, err = svc.GetGroupByID(root.ID)
+	assert.Error(t, err)
+	_, err = svc.GetGroupByID(level1.ID)
+	assert.Error(t, err)
+	_, err = svc.GetGroupByID(level2.ID)
+	assert.Error(t, err)
+	_, err = svc.GetGroupByID(leaf.ID)
+	assert.Error(t, err)
+}
+
+func TestDatasetServiceIntegration_GetFieldEnumObj_WithResultModeAndFilter(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_result_mode").Error
+	err := testDB.Exec("CREATE TABLE it_enum_result_mode (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64), city VARCHAR(64))").Error
+	require.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_enum_result_mode (region, city) VALUES ('East', 'Shanghai'), ('West', 'Chengdu'), ('North', 'Beijing')").Error
+	require.NoError(t, err)
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	group, err := svc.Save(&dataset.WriteRequest{Name: "EnumResultMode", NodeType: "dataset"})
+	require.NoError(t, err)
+
+	table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_enum_result_mode")}
+	require.NoError(t, testDB.Create(table).Error)
+
+	deType := 0
+	regionField := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("region"), Name: dsSvcStrPtr("region"), DeType: &deType}
+	cityField := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("city"), Name: dsSvcStrPtr("city"), DeType: &deType}
+	require.NoError(t, testDB.Create(regionField).Error)
+	require.NoError(t, testDB.Create(cityField).Error)
+
+	t.Run("result mode 1 uses higher limit", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID:    regionField.ID,
+			ResultMode: 1,
+			Sort:       "ASC",
+		})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, result)
+	})
+
+	t.Run("with filter condition", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID: regionField.ID,
+			Filter: []dataset.EnumFilter{
+				{FieldID: fmt.Sprintf("%d", regionField.ID), Operator: "in", Value: []interface{}{"East"}},
+			},
+			Sort: "ASC",
+		})
+		assert.NoError(t, err)
+		assert.Len(t, result, 1)
+	})
+
+	t.Run("display ID different from query ID", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID:   regionField.ID,
+			DisplayID: cityField.ID,
+			Sort:      "ASC",
+		})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, result)
+	})
+
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_result_mode")
+}
