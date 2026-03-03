@@ -270,6 +270,29 @@ func TestRoleMenuServiceIntegration_IsMenuAuthorized(t *testing.T) {
 	assert.False(t, authorized)
 }
 
+func TestRoleMenuServiceIntegration_IsMenuAuthorized_EmptyRoleIDs(t *testing.T) {
+	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
+
+	roleRepo := repository.NewRoleRepository(testDB)
+	menuRepo := repository.NewMenuRepository(testDB)
+	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+
+	// Create menu
+	testMenu := &menu.CoreMenu{Name: "Test Menu", Pid: 0, MenuSort: 1}
+	menuRepo.Create(testMenu)
+
+	// Check with empty roleIDs - should return false
+	authorized, err := svc.IsMenuAuthorized([]int64{}, testMenu.ID)
+	assert.NoError(t, err)
+	assert.False(t, authorized)
+
+	// Check with nil roleIDs - should return false
+	authorized, err = svc.IsMenuAuthorized(nil, testMenu.ID)
+	assert.NoError(t, err)
+	assert.False(t, authorized)
+}
+
 func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth(t *testing.T) {
 	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
 
