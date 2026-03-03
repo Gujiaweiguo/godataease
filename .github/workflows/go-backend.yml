@@ -12,6 +12,8 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend-go
+    env:
+      SERVICE_COVERAGE_THRESHOLD: ${{ vars.SERVICE_COVERAGE_THRESHOLD || '82.0' }}
 
     services:
       mysql:
@@ -86,7 +88,6 @@ jobs:
         TEST_DB_USER: root
         TEST_DB_PASSWORD: Admin168
         TEST_DB_NAME: dataease_test
-        COVERAGE_THRESHOLD: 82.0
       run: |
         go test -tags=integration -coverprofile=coverage.out ./internal/service/...
         coverage=$(go tool cover -func=coverage.out | awk '/^total:/{gsub("%", "", $3); print $3}')
@@ -94,9 +95,9 @@ jobs:
           echo "Failed to parse service coverage from coverage.out"
           exit 1
         fi
-        echo "Service integration coverage: ${coverage}% (threshold: ${COVERAGE_THRESHOLD}%)"
-        echo "- Service integration coverage: ${coverage}% (threshold: ${COVERAGE_THRESHOLD}%)" >> "$GITHUB_STEP_SUMMARY"
-        awk -v c="$coverage" -v t="$COVERAGE_THRESHOLD" 'BEGIN { if ((c + 0) < (t + 0)) { printf("Coverage %s%% is below threshold %s%%\n", c, t); exit 1 } }'
+        echo "Service integration coverage: ${coverage}% (threshold: ${SERVICE_COVERAGE_THRESHOLD}%)"
+        echo "- Service integration coverage: ${coverage}% (threshold: ${SERVICE_COVERAGE_THRESHOLD}%)" >> "$GITHUB_STEP_SUMMARY"
+        awk -v c="$coverage" -v t="$SERVICE_COVERAGE_THRESHOLD" 'BEGIN { if ((c + 0) < (t + 0)) { printf("Coverage %s%% is below threshold %s%%\n", c, t); exit 1 } }'
 
     - name: Run drift check
       if: steps.changes.outputs.backend == 'true'
@@ -126,7 +127,7 @@ jobs:
           echo "- Unit tests: completed" >> $GITHUB_STEP_SUMMARY
           echo "- Integration tests: completed" >> $GITHUB_STEP_SUMMARY
           echo "- Drift check: completed" >> $GITHUB_STEP_SUMMARY
-          echo "- Service coverage gate: completed (>=82.0%)" >> $GITHUB_STEP_SUMMARY
+          echo "- Service coverage gate: completed (>=${SERVICE_COVERAGE_THRESHOLD}%)" >> $GITHUB_STEP_SUMMARY
           echo "Full backend CI executed." >> $GITHUB_STEP_SUMMARY
         else
           echo "No backend-go changes detected, backend CI skipped intentionally." >> $GITHUB_STEP_SUMMARY
