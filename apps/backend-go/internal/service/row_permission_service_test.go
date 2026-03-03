@@ -358,3 +358,15 @@ func TestParseTreeObj_EmptyAndNil(t *testing.T) {
 		t.Errorf("Expected OR logic as default, got %s", cond)
 	}
 }
+
+func TestBuildSelectColumns_Admin(t *testing.T) {
+	svc := &RowPermissionService{
+		adminChecker: &mockAdminChecker{adminUserIDs: map[int64]bool{1: true}},
+	}
+
+	// Test admin user returns *
+	cols, err := svc.BuildSelectColumns(1, 1)
+	if err != nil || cols != "*" {
+		t.Errorf("Expected * for admin, got %s, %v", cols, err)
+	}
+}

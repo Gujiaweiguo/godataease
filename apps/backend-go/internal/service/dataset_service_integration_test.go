@@ -14,6 +14,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDatasetServiceIntegration_Tree(t *testing.T) {
@@ -801,4 +802,278 @@ func TestDatasetServiceIntegration_GetSQLParams_NilList(t *testing.T) {
 	result, err := svc.GetSQLParams(nil)
 	assert.NoError(t, err)
 	assert.Empty(t, result)
+}
+
+func TestDatasetServiceIntegration_GetFieldEnum_EdgeCases(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	t.Run("nil request returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnum(nil)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("empty field IDs returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{}})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("invalid field ID is skipped", func(t *testing.T) {
+		result, err := svc.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{0, -1, 999999}})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("duplicate field IDs are deduplicated", func(t *testing.T) {
+		_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_dup").Error
+		err := testDB.Exec("CREATE TABLE it_enum_dup (id BIGINT PRIMARY KEY AUTO_INCREMENT, val VARCHAR(64))").Error
+		require.NoError(t, err)
+		err = testDB.Exec("INSERT INTO it_enum_dup (val) VALUES ('A'), ('B')").Error
+		require.NoError(t, err)
+
+		group, err := svc.Save(&dataset.WriteRequest{Name: "EnumDup", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_enum_dup")}
+		require.NoError(t, testDB.Create(table).Error)
+
+		deType := 0
+		field := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("val"), Name: dsSvcStrPtr("val"), DeType: &deType}
+		require.NoError(t, testDB.Create(field).Error)
+
+		// Request with duplicate IDs
+		result, err := svc.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{field.ID, field.ID, field.ID}})
+		assert.NoError(t, err)
+		assert.Len(t, result, 2) // Only A and B, not 6 entries
+
+		testDB.Exec("DROP TABLE IF EXISTS it_enum_dup")
+	})
+
+	t.Run("result mode 1 uses higher limit", func(t *testing.T) {
+		_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_mode").Error
+		err := testDB.Exec("CREATE TABLE it_enum_mode (id BIGINT PRIMARY KEY AUTO_INCREMENT, val VARCHAR(64))").Error
+		require.NoError(t, err)
+
+		group, err := svc.Save(&dataset.WriteRequest{Name: "EnumMode", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_enum_mode")}
+		require.NoError(t, testDB.Create(table).Error)
+
+		deType := 0
+		field := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("val"), Name: dsSvcStrPtr("val"), DeType: &deType}
+		require.NoError(t, testDB.Create(field).Error)
+
+		result, err := svc.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{field.ID}, ResultMode: 1})
+		assert.NoError(t, err)
+		assert.Empty(t, result) // Empty because table has no data
+
+		testDB.Exec("DROP TABLE IF EXISTS it_enum_mode")
+	})
+}
+
+func TestDatasetServiceIntegration_GetFieldEnumObj_EdgeCases(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	t.Run("nil request returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(nil)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("invalid query ID returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 0})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("non-existent field ID returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 999999})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("display ID defaults to query ID when zero", func(t *testing.T) {
+		_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_display").Error
+		err := testDB.Exec("CREATE TABLE it_enum_display (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64))").Error
+		require.NoError(t, err)
+		err = testDB.Exec("INSERT INTO it_enum_display (region) VALUES ('East'), ('West')").Error
+		require.NoError(t, err)
+
+		group, err := svc.Save(&dataset.WriteRequest{Name: "EnumDisplay", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_enum_display")}
+		require.NoError(t, testDB.Create(table).Error)
+
+		deType := 0
+		field := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("region"), Name: dsSvcStrPtr("region"), DeType: &deType}
+		require.NoError(t, testDB.Create(field).Error)
+
+		// DisplayID=0 should default to QueryID
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID:   field.ID,
+			DisplayID: 0, // Will default to QueryID
+			Sort:      "ASC",
+		})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, result)
+
+		testDB.Exec("DROP TABLE IF EXISTS it_enum_display")
+	})
+
+	t.Run("sort ID resets when table mismatch", func(t *testing.T) {
+		_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_sort1").Error
+		_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_sort2").Error
+		err := testDB.Exec("CREATE TABLE it_enum_sort1 (id BIGINT PRIMARY KEY AUTO_INCREMENT, val1 VARCHAR(64))").Error
+		require.NoError(t, err)
+		err = testDB.Exec("CREATE TABLE it_enum_sort2 (id BIGINT PRIMARY KEY AUTO_INCREMENT, val2 VARCHAR(64))").Error
+		require.NoError(t, err)
+		err = testDB.Exec("INSERT INTO it_enum_sort1 (val1) VALUES ('A')").Error
+		require.NoError(t, err)
+		err = testDB.Exec("INSERT INTO it_enum_sort2 (val2) VALUES ('B')").Error
+		require.NoError(t, err)
+
+		group1, err := svc.Save(&dataset.WriteRequest{Name: "EnumSort1", NodeType: "dataset"})
+		require.NoError(t, err)
+		group2, err := svc.Save(&dataset.WriteRequest{Name: "EnumSort2", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		table1 := &dataset.CoreDatasetTable{DatasetGroupID: group1.ID, PhysicalTable: dsSvcStrPtr("it_enum_sort1")}
+		table2 := &dataset.CoreDatasetTable{DatasetGroupID: group2.ID, PhysicalTable: dsSvcStrPtr("it_enum_sort2")}
+		require.NoError(t, testDB.Create(table1).Error)
+		require.NoError(t, testDB.Create(table2).Error)
+
+		deType := 0
+		field1 := &dataset.CoreDatasetTableField{DatasetGroupID: group1.ID, DatasetTableID: &table1.ID, OriginName: dsSvcStrPtr("val1"), Name: dsSvcStrPtr("val1"), DeType: &deType}
+		field2 := &dataset.CoreDatasetTableField{DatasetGroupID: group2.ID, DatasetTableID: &table2.ID, OriginName: dsSvcStrPtr("val2"), Name: dsSvcStrPtr("val2"), DeType: &deType}
+		require.NoError(t, testDB.Create(field1).Error)
+		require.NoError(t, testDB.Create(field2).Error)
+
+		// SortID from different table should be reset
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID:   field1.ID,
+			DisplayID: field1.ID,
+			SortID:    field2.ID, // Different table - should be reset
+			Sort:      "ASC",
+		})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, result)
+
+		testDB.Exec("DROP TABLE IF EXISTS it_enum_sort1")
+		testDB.Exec("DROP TABLE IF EXISTS it_enum_sort2")
+	})
+}
+
+func TestDatasetServiceIntegration_GetSQLParams_EdgeCases(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	t.Run("invalid datasetGroupID is skipped", func(t *testing.T) {
+		result, err := svc.GetSQLParams([]int64{0, -1, 999999})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("dataset with no tables returns empty", func(t *testing.T) {
+		group, err := svc.Save(&dataset.WriteRequest{Name: "NoTablesDS", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		result, err := svc.GetSQLParams([]int64{group.ID})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("table with empty SQLVariables is skipped", func(t *testing.T) {
+		group, err := svc.Save(&dataset.WriteRequest{Name: "EmptyVarsDS", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		err = testDB.Create(&dataset.CoreDatasetTable{
+			DatasetGroupID: group.ID,
+			PhysicalTable:  dsSvcStrPtr("empty_vars_table"),
+			SQLVariables:   dsSvcStrPtr(""),
+		}).Error
+		require.NoError(t, err)
+
+		result, err := svc.GetSQLParams([]int64{group.ID})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("table with invalid JSON SQLVariables is skipped", func(t *testing.T) {
+		group, err := svc.Save(&dataset.WriteRequest{Name: "InvalidJSONDS", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		err = testDB.Create(&dataset.CoreDatasetTable{
+			DatasetGroupID: group.ID,
+			PhysicalTable:  dsSvcStrPtr("invalid_json_table"),
+			SQLVariables:   dsSvcStrPtr("not valid json"),
+		}).Error
+		require.NoError(t, err)
+
+		result, err := svc.GetSQLParams([]int64{group.ID})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("table with empty variableName is skipped", func(t *testing.T) {
+		group, err := svc.Save(&dataset.WriteRequest{Name: "EmptyNameDS", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		sqlVars, _ := json.Marshal([]map[string]interface{}{
+			{"variableName": "", "type": []string{"TEXT"}, "params": []interface{}{""}},
+			{"variableName": "   ", "type": []string{"TEXT"}, "params": []interface{}{""}},
+			{"variableName": "valid_name", "type": []string{"TEXT"}, "params": []interface{}{"value"}},
+		})
+
+		err = testDB.Create(&dataset.CoreDatasetTable{
+			DatasetGroupID: group.ID,
+			PhysicalTable:  dsSvcStrPtr("empty_name_table"),
+			SQLVariables:   dsSvcStrPtr(string(sqlVars)),
+		}).Error
+		require.NoError(t, err)
+
+		result, err := svc.GetSQLParams([]int64{group.ID})
+		assert.NoError(t, err)
+		assert.Len(t, result, 1) // Only the valid_name should be returned
+		assert.Equal(t, "valid_name", result[0].VariableName)
+	})
+
+	t.Run("mixed valid and invalid IDs", func(t *testing.T) {
+		group, err := svc.Save(&dataset.WriteRequest{Name: "MixedDS", NodeType: "dataset"})
+		require.NoError(t, err)
+
+		sqlVars, _ := json.Marshal([]map[string]interface{}{
+			{"variableName": "p_test", "type": []string{"TEXT"}, "params": []interface{}{"value"}},
+		})
+
+		err = testDB.Create(&dataset.CoreDatasetTable{
+			DatasetGroupID: group.ID,
+			PhysicalTable:  dsSvcStrPtr("mixed_table"),
+			SQLVariables:   dsSvcStrPtr(string(sqlVars)),
+		}).Error
+		require.NoError(t, err)
+
+		// Include valid and invalid IDs
+		result, err := svc.GetSQLParams([]int64{0, -1, group.ID, 999999})
+		assert.NoError(t, err)
+		assert.Len(t, result, 1)
+	})
 }

@@ -1433,3 +1433,121 @@ func TestDatasourceService_CompatDatasourceID_Nearest(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+// TestDatasourceService_CheckRepeat_EdgeCases tests additional CheckRepeat branches
+func TestDatasourceService_CheckRepeat_EdgeCases(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	t.Run("empty type falls back to nodeType", func(t *testing.T) {
+		cfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "test_fallback"}
+		cfgJSON, _ := json.Marshal(cfg)
+		cfgStr := base64.StdEncoding.EncodeToString(cfgJSON)
+
+		req := &datasource.WriteRequest{
+			Name:          "NodeType Fallback",
+			NodeType:      "mysql",
+			Configuration: &cfgStr,
+		}
+
+		isRepeat, err := svc.CheckRepeat(req)
+		require.NoError(t, err)
+		assert.False(t, isRepeat)
+	})
+
+	t.Run("empty configuration returns false", func(t *testing.T) {
+		req := &datasource.WriteRequest{
+			Name: "No Config",
+			Type: "mysql",
+		}
+
+		isRepeat, err := svc.CheckRepeat(req)
+		require.NoError(t, err)
+		assert.False(t, isRepeat)
+	})
+
+	t.Run("whitespace configuration returns false", func(t *testing.T) {
+		ws := "   "
+		req := &datasource.WriteRequest{
+			Name:          "Whitespace Config",
+			Type:          "mysql",
+			Configuration: &ws,
+		}
+
+		isRepeat, err := svc.CheckRepeat(req)
+		require.NoError(t, err)
+		assert.False(t, isRepeat)
+	})
+
+	t.Run("invalid JSON configuration returns false", func(t *testing.T) {
+		invalid := "not-base64"
+		req := &datasource.WriteRequest{
+			Name:          "Invalid Config",
+			Type:          "mysql",
+			Configuration: &invalid,
+		}
+
+		isRepeat, err := svc.CheckRepeat(req)
+		require.NoError(t, err)
+		assert.False(t, isRepeat)
+	})
+
+	t.Run("check with exclude ID", func(t *testing.T) {
+		cfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "test_exclude"}
+		cfgJSON, _ := json.Marshal(cfg)
+		cfgStr := base64.StdEncoding.EncodeToString(cfgJSON)
+
+		// Create first datasource
+		created, err := svc.Save(&datasource.WriteRequest{
+			Name:          "Exclude Test",
+			Type:          "mysql",
+			Configuration: &cfgStr,
+		})
+		require.NoError(t, err)
+
+		// Check repeat with same config but exclude the created ID
+		req := &datasource.WriteRequest{
+			ID:            created.ID,
+			Name:          "Updated Name",
+			Type:          "mysql",
+			Configuration: &cfgStr,
+		}
+
+		isRepeat, err := svc.CheckRepeat(req)
+		require.NoError(t, err)
+		assert.False(t, isRepeat) // Should not be a repeat because we exclude the same ID
+	})
+}
+
+// TestDatasourceService_Move_ErrorPaths tests additional Move error paths
+func TestDatasourceService_Move_ErrorPaths(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	t.Run("move non-existent datasource", func(t *testing.T) {
+		folder, err := svc.CreateFolder("Target Folder", 0)
+		require.NoError(t, err)
+
+		result, err := svc.Move(999999, folder.ID)
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("move to root (pid=0)", func(t *testing.T) {
+		folder, err := svc.CreateFolder("Parent for Root Move", 0)
+		require.NoError(t, err)
+
+		child, err := svc.CreateFolder("Child for Root Move", folder.ID)
+		require.NoError(t, err)
+
+		// Move child to root
+		result, err := svc.Move(child.ID, 0)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), *result.PID)
+	})
+}

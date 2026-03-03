@@ -502,3 +502,108 @@ func TestChart_fieldNameShort(t *testing.T) {
 		t.Errorf("fieldNameShort() length = %d, want 18", len(result))
 	}
 }
+
+func TestChart_convertToChartField(t *testing.T) {
+	tests := []struct {
+		name      string
+		field     *dataset.CoreDatasetTableField
+		wantGroup string
+		wantSumm  string
+	}{
+		{
+			name: "text field with default group",
+			field: &dataset.CoreDatasetTableField{
+				ID:        1,
+				DeType:    intPtrForChart(0),
+				GroupType: strPtr(""),
+			},
+			wantGroup: "d",
+			wantSumm:  "count",
+		},
+		{
+			name: "numeric field with default group",
+			field: &dataset.CoreDatasetTableField{
+				ID:        2,
+				DeType:    intPtrForChart(2),
+				GroupType: strPtr(""),
+			},
+			wantGroup: "q",
+			wantSumm:  "sum",
+		},
+		{
+			name: "double field with default group",
+			field: &dataset.CoreDatasetTableField{
+				ID:        3,
+				DeType:    intPtrForChart(3),
+				GroupType: strPtr(""),
+			},
+			wantGroup: "q",
+			wantSumm:  "sum",
+		},
+		{
+			name: "datetime field with count summary",
+			field: &dataset.CoreDatasetTableField{
+				ID:        4,
+				DeType:    intPtrForChart(1),
+				GroupType: strPtr(""),
+			},
+			wantGroup: "d",
+			wantSumm:  "count",
+		},
+		{
+			name: "field with ID -1 uses count summary",
+			field: &dataset.CoreDatasetTableField{
+				ID:        -1,
+				DeType:    intPtrForChart(2),
+				GroupType: strPtr(""),
+			},
+			wantGroup: "q",
+			wantSumm:  "count",
+		},
+		{
+			name: "field with explicit group type",
+			field: &dataset.CoreDatasetTableField{
+				ID:        5,
+				DeType:    intPtrForChart(0),
+				GroupType: strPtr("q"),
+			},
+			wantGroup: "q",
+			wantSumm:  "count", // deType=0 uses count summary
+		},
+		{
+			name: "field with deType 7 uses count summary",
+			field: &dataset.CoreDatasetTableField{
+				ID:        6,
+				DeType:    intPtrForChart(7),
+				GroupType: strPtr(""),
+			},
+			wantGroup: "d",
+			wantSumm:  "count",
+		},
+		{
+			name: "field with nil DeType uses 0",
+			field: &dataset.CoreDatasetTableField{
+				ID:            7,
+				DeType:        nil,
+				DeExtractType: intPtrForChart(2),
+				GroupType:     strPtr(""),
+			},
+			wantGroup: "d",     // nil DeType defaults to 0
+			wantSumm:  "count", // deType=0 uses count summary
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertToChartField(tt.field)
+			if result.GroupType != tt.wantGroup {
+				t.Errorf("GroupType = %v, want %v", result.GroupType, tt.wantGroup)
+			}
+			if result.Summary != tt.wantSumm {
+				t.Errorf("Summary = %v, want %v", result.Summary, tt.wantSumm)
+			}
+		})
+	}
+}
+
+func intPtrForChart(i int) *int { return &i }
