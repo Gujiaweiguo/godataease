@@ -97,3 +97,34 @@ func TestDeletePerm(t *testing.T) {
 		t.Error("Expected error after delete, got nil")
 	}
 }
+func TestCheckPermKeyExists(t *testing.T) {
+	svc := setupPermService()
+
+	// Create a permission first
+	req := &permission.PermCreateRequest{
+		PermName: "Test Exists",
+		PermKey:  "test:exists",
+	}
+	_, err := svc.CreatePerm(req)
+	if err != nil {
+		t.Fatalf("CreatePerm failed: %v", err)
+	}
+
+	// Check if key exists
+	exists, err := svc.CheckPermKeyExists("test:exists")
+	if err != nil {
+		t.Fatalf("CheckPermKeyExists failed: %v", err)
+	}
+	if !exists {
+		t.Error("Expected perm key to exist")
+	}
+
+	// Check non-existent key
+	exists, err = svc.CheckPermKeyExists("non:existent:key")
+	if err != nil {
+		t.Fatalf("CheckPermKeyExists for non-existent failed: %v", err)
+	}
+	if exists {
+		t.Error("Expected perm key to not exist")
+	}
+}
