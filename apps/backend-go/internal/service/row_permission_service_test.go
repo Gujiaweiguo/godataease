@@ -189,7 +189,6 @@ func TestParseTreeObj(t *testing.T) {
 	}
 }
 
-
 func TestEscapeSQL(t *testing.T) {
 	svc := &RowPermissionService{}
 
@@ -270,9 +269,9 @@ func TestBuildItemCondition(t *testing.T) {
 
 	// Test with enum filter
 	cond, args = svc.buildItemCondition(&permission.DatasetRowPermissionsTreeItem{
-		FieldID:   1,
+		FieldID:    1,
 		FilterType: "enum",
-		EnumValue: []string{"a", "b"},
+		EnumValue:  []string{"a", "b"},
 	})
 	if cond == "" {
 		t.Error("Expected non-empty condition for enum filter")

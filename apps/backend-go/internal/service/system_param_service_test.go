@@ -296,8 +296,6 @@ func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
 	}
 }
 
-
-
 func TestSystemParam_RepoErrors(t *testing.T) {
 	mockRepo := &MockSystemParamRepository{
 		saveBasicErr:     errors.New("save basic error"),
@@ -321,4 +319,3 @@ func TestSystemParam_RepoErrors(t *testing.T) {
 		t.Error("Expected error for SaveSQLBot")
 	}
 }
-
