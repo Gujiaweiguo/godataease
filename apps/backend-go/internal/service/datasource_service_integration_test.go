@@ -1586,3 +1586,45 @@ func TestDatasourceService_Delete_DeepRecursive(t *testing.T) {
 	_, err = svc.GetByID(leaf.ID)
 	assert.Error(t, err)
 }
+
+func TestDatasourceService_Move_ToChild(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	// Create parent folder
+	parent, err := svc.CreateFolder("Parent", 0)
+	require.NoError(t, err)
+
+	// Create child folder
+	child, err := svc.CreateFolder("Child", parent.ID)
+	require.NoError(t, err)
+
+	// Try to move parent to child - should fail
+	_, err = svc.Move(parent.ID, child.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be child")
+}
+
+func TestDatasourceService_Move_DeepNested(t *testing.T) {
+	cleanupTables(&datasource.CoreDatasource{})
+
+	repo := repository.NewDatasourceRepository(testDB)
+	svc := NewDatasourceService(repo)
+
+	// Create nested structure
+	root, err := svc.CreateFolder("Root", 0)
+	require.NoError(t, err)
+
+	level1, err := svc.CreateFolder("Level1", root.ID)
+	require.NoError(t, err)
+
+	level2, err := svc.CreateFolder("Level2", level1.ID)
+	require.NoError(t, err)
+
+	// Try to move root to level2 - should fail
+	_, err = svc.Move(root.ID, level2.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be child")
+}

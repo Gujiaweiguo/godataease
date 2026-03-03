@@ -361,3 +361,35 @@ func TestDatasetService_NormalizedHelpers(t *testing.T) {
 	assert.Equal(t, dataset.NodeTypeDataset, normalizedDatasetNodeType(dataset.NodeTypeDataset))
 	assert.Equal(t, dataset.NodeTypeDataset, normalizedDatasetNodeType("unknown"))
 }
+
+func TestPreviewSQL_CalciteClientCaching(t *testing.T) {
+	mock := &mockCalciteValidateServer{}
+	addr, cleanup := startMockCalciteServer(t, mock)
+	defer cleanup()
+
+	svc := NewDatasetService(nil)
+	svc.SetCalciteConfig(addr, 2*time.Second, 0)
+
+	// First call - should create client
+	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "SELECT 1"})
+	assert.Error(t, err) // validation fails in mock
+
+	// Second call - should use cached client
+	initialCalls := atomic.LoadInt32(&mock.validateCalls)
+	_, err = svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: "SELECT 2"})
+	assert.Error(t, err)
+	secondCalls := atomic.LoadInt32(&mock.validateCalls)
+
+	// Both calls should have hit the server
+	assert.Greater(t, secondCalls, initialCalls)
+}
+
+func TestPreviewSQL_CalciteEmptyAddress(t *testing.T) {
+	svc := NewDatasetService(nil)
+	// Don't set calcite config - should skip calcite validation
+
+	// Test with empty SQL - should return empty result without calling calcite or repo
+	result, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: ""})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+}

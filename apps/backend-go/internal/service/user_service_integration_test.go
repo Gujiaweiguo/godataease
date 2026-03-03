@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -329,4 +330,62 @@ func TestUserServiceIntegration_UpdateUserStatus_UserNotFound(t *testing.T) {
 	err := svc.UpdateUserStatus(99999, user.StatusDisabled)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "user not found")
+}
+
+func TestUserServiceIntegration_DeleteUser_WithRolesAndPerms(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	userPermRepo := repository.NewUserPermRepository(testDB)
+	svc := NewUserService(userRepo, userRoleRepo, userPermRepo)
+
+	// Create user
+	id, err := svc.CreateUser(&user.UserCreateRequest{
+		Username: "delete_with_relations",
+		Password: "password123",
+	})
+	require.NoError(t, err)
+
+	// Add role and perm relations (simulate)
+	roleRelation := &user.SysUserRole{UserID: id, RoleID: 1}
+	require.NoError(t, testDB.Create(roleRelation).Error)
+
+	permRelation := &user.SysUserPerm{UserID: id, PermID: 1}
+	require.NoError(t, testDB.Create(permRelation).Error)
+
+	// Delete user - should also delete relations
+	err = svc.DeleteUser(id)
+	assert.NoError(t, err)
+
+	// Verify user deleted
+	_, err = userRepo.GetByID(id)
+	assert.Error(t, err)
+
+	// Verify relations are cleaned up (soft delete or actual delete)
+	var roleCount int64
+	testDB.Model(&user.SysUserRole{}).Where("user_id = ?", id).Count(&roleCount)
+	assert.Equal(t, int64(0), roleCount)
+}
+
+func TestUserServiceIntegration_CreateUser_CheckUsernameCount(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	svc := NewUserService(userRepo, repository.NewUserRoleRepository(testDB), repository.NewUserPermRepository(testDB))
+
+	// Create first user
+	_, err := svc.CreateUser(&user.UserCreateRequest{
+		Username: "countuser",
+		Password: "password123",
+	})
+	require.NoError(t, err)
+
+	// Try to create with same username
+	_, err = svc.CreateUser(&user.UserCreateRequest{
+		Username: "countuser",
+		Password: "password456",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "username already exists")
 }
