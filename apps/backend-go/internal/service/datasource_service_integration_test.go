@@ -1416,4 +1416,20 @@ func TestDatasourceService_CompatDatasourceID_Nearest(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, int64(-1), fixedID)
 	})
+
+	t.Run("compat resolves legacy multiple-of-100 id to nearest existing", func(t *testing.T) {
+		legacyID := ((created.ID / 100) + 1) * 100
+		if legacyID == created.ID {
+			legacyID += 100
+		}
+
+		fixedID, err := svc.compatDatasourceID(legacyID)
+		require.NoError(t, err)
+		assert.Equal(t, created.ID, fixedID)
+	})
+
+	t.Run("compat returns not found when multiple-of-100 has no nearest", func(t *testing.T) {
+		_, err := svc.compatDatasourceID(1000000)
+		assert.Error(t, err)
+	})
 }

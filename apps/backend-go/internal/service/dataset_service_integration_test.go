@@ -727,6 +727,26 @@ func TestDatasetServiceIntegration_PreviewSQL_NilRequest(t *testing.T) {
 	assert.Empty(t, result["data"].(dataset.SQLPreviewData).Data)
 }
 
+func TestDatasetServiceIntegration_IsDescendant_FalsePath(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	root, err := svc.Save(&dataset.WriteRequest{Name: "RootOnly", NodeType: "folder"})
+	assert.NoError(t, err)
+
+	_, err = svc.Save(&dataset.WriteRequest{Name: "ChildOnly", NodeType: "folder", PID: &root.ID})
+	assert.NoError(t, err)
+
+	independent, err := svc.Save(&dataset.WriteRequest{Name: "Independent", NodeType: "folder"})
+	assert.NoError(t, err)
+
+	isDesc, err := svc.isDescendant(root.ID, independent.ID)
+	assert.NoError(t, err)
+	assert.False(t, isDesc)
+}
+
 func TestDatasetServiceIntegration_PreviewSQL_EmptySQL(t *testing.T) {
 	repo := repository.NewDatasetRepository(testDB)
 	svc := NewDatasetService(repo)

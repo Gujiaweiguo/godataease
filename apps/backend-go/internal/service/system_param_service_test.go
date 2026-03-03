@@ -15,6 +15,7 @@ type MockSystemParamRepository struct {
 	saveBasicErr     error
 	saveOnlineMapErr error
 	saveSQLBotErr    error
+	getOnlineMapErr  error
 }
 
 func NewMockSystemParamRepository() *MockSystemParamRepository {
@@ -38,6 +39,9 @@ func (m *MockSystemParamRepository) SaveBasicSettings(items []system.SettingItem
 }
 
 func (m *MockSystemParamRepository) GetOnlineMap() (*system.OnlineMapEditor, error) {
+	if m.getOnlineMapErr != nil {
+		return nil, m.getOnlineMapErr
+	}
 	if m.onlineMap == nil {
 		return &system.OnlineMapEditor{MapType: "gaode", Key: "test-key"}, nil
 	}
@@ -217,6 +221,25 @@ func TestSystemParam_QueryOnlineMapByType(t *testing.T) {
 	}
 	if result == nil {
 		t.Error("Expected non-nil result")
+	}
+}
+
+func TestSystemParam_QueryOnlineMap(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	result, err := svc.QueryOnlineMap()
+	if err != nil {
+		t.Fatalf("QueryOnlineMap failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	mockRepo.getOnlineMapErr = errors.New("query online map error")
+	_, err = svc.QueryOnlineMap()
+	if err == nil {
+		t.Error("Expected error when repository GetOnlineMap fails")
 	}
 }
 

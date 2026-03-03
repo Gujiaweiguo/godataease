@@ -175,6 +175,17 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Failed to create core_ticket table: %v\n", err)
 	}
 
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_sys_setting (
+	id BIGINT AUTO_INCREMENT PRIMARY KEY,
+	pkey VARCHAR(255) NOT NULL,
+	pval LONGTEXT,
+	type VARCHAR(50),
+	sort INT DEFAULT 0,
+	UNIQUE INDEX idx_pkey (pkey)
+)`).Error; err != nil {
+		log.Fatalf("Failed to create core_sys_setting table: %v\n", err)
+	}
+
 	code := m.Run()
 
 	sqlDB, _ = testDB.DB()
