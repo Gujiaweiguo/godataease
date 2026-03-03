@@ -252,11 +252,11 @@ func TestVisualizationServiceIntegration_Update_AllFields(t *testing.T) {
 		ID:              id,
 		Name:            strPtr("Updated Name"),
 		PID:             &newPID,
-		Type:           &newType,
+		Type:            &newType,
 		CanvasStyleData: strPtr("{\"style\":\"updated\"}"),
 		ComponentData:   strPtr("{\"components\":[1,2,3]}"),
 		MobileLayout:    &mobileLayout,
-		Status:         &newStatus,
+		Status:          &newStatus,
 	}
 	err = svc.Update(updateReq, "updater")
 	require.NoError(t, err)

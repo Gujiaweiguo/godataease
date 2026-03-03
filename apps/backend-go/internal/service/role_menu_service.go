@@ -5,8 +5,7 @@ import (
 	"dataease/backend/internal/repository"
 	"errors"
 	"go.uber.org/zap"
-	)
-
+)
 
 var (
 	ErrRoleNotFound   = errors.New("role not found")

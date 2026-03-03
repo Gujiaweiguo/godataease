@@ -203,7 +203,6 @@ func TestRowPermissionServiceIntegration_IsAdminAndGetRoleIDs(t *testing.T) {
 	assert.Nil(t, roles)
 }
 
-
 // TestBuildLogicCondition tests the buildLogicCondition method with various operators
 func TestRowPermissionServiceIntegration_BuildLogicCondition_AllOperators(t *testing.T) {
 	rowRepo := repository.NewRowPermissionRepository(testDB)
@@ -211,9 +210,9 @@ func TestRowPermissionServiceIntegration_BuildLogicCondition_AllOperators(t *tes
 	svc := NewRowPermissionService(rowRepo, colRepo, nil, nil)
 
 	tests := []struct {
-		name      string
-		term      string
-		value     string
+		name       string
+		term       string
+		value      string
 		wantClause string
 		wantArgs   int
 	}{

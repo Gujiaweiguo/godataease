@@ -126,10 +126,10 @@ func TestExcelService_SetFieldType_AllTypes(t *testing.T) {
 	svc := NewExcelService()
 
 	tests := []struct {
-		name         string
-		fieldType    string
-		expectedDe   int
-		expectedExt  int
+		name        string
+		fieldType   string
+		expectedDe  int
+		expectedExt int
 	}{
 		{"text type", FieldTypeText, 0, 0},
 		{"datetime type", FieldTypeDateTime, 1, 1},
