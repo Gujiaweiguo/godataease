@@ -1188,3 +1188,227 @@ func TestDatasetServiceIntegration_GetFieldEnumObj_WithResultModeAndFilter(t *te
 
 	_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_result_mode")
 }
+
+func TestDatasetServiceIntegration_GetFieldEnumObj_MoreEdgeCases(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	t.Run("nil request returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(nil)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("invalid QueryID returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 0})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+
+		result, err = svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: -1})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("non-existent QueryID returns empty", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 999999})
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+}
+
+func TestDatasetServiceIntegration_GetFieldEnumObj_WithSortID(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_sort").Error
+	err := testDB.Exec("CREATE TABLE it_enum_sort (id BIGINT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(64), value INT)").Error
+	require.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_enum_sort (name, value) VALUES ('A', 3), ('B', 1), ('C', 2)").Error
+	require.NoError(t, err)
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	group, err := svc.Save(&dataset.WriteRequest{Name: "EnumSort", NodeType: "dataset"})
+	require.NoError(t, err)
+
+	table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_enum_sort")}
+	require.NoError(t, testDB.Create(table).Error)
+
+	deType := 0
+	nameField := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("name"), Name: dsSvcStrPtr("name"), DeType: &deType}
+	valueField := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("value"), Name: dsSvcStrPtr("value"), DeType: &deType}
+	require.NoError(t, testDB.Create(nameField).Error)
+	require.NoError(t, testDB.Create(valueField).Error)
+
+	t.Run("sort by same field", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID: nameField.ID,
+			SortID:  nameField.ID,
+			Sort:    "ASC",
+		})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, result)
+	})
+
+	t.Run("with search text", func(t *testing.T) {
+		result, err := svc.GetFieldEnumObj(&dataset.EnumValueRequest{
+			QueryID:    nameField.ID,
+			SearchText: "A",
+			Sort:       "ASC",
+		})
+		assert.NoError(t, err)
+		assert.Len(t, result, 1)
+	})
+
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_enum_sort")
+}
+func TestDatasetServiceIntegration_Delete_EmptyFolder(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Create empty folder
+	folder, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Empty Folder",
+		NodeType: "folder",
+	})
+	require.NoError(t, err)
+
+	// Delete empty folder
+	err = svc.Delete(folder.ID)
+	assert.NoError(t, err)
+
+	// Verify deleted
+	_, err = svc.GetGroupByID(folder.ID)
+	assert.Error(t, err)
+}
+
+func TestDatasetServiceIntegration_Delete_SingleDataset(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Create single dataset
+	ds, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Single Dataset",
+		NodeType: "dataset",
+	})
+	require.NoError(t, err)
+
+	// Delete dataset
+	err = svc.Delete(ds.ID)
+	assert.NoError(t, err)
+
+	// Verify deleted
+	_, err = svc.GetGroupByID(ds.ID)
+	assert.Error(t, err)
+}
+
+func TestDatasetServiceIntegration_Move_ToChild(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Create parent folder
+	parent, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Parent Folder",
+		NodeType: "folder",
+	})
+	require.NoError(t, err)
+
+	// Create child folder
+	child, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Child Folder",
+		NodeType: "folder",
+		PID:      &parent.ID,
+	})
+	require.NoError(t, err)
+
+	// Try to move parent to child - should fail
+	_, err = svc.Move(parent.ID, child.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be child")
+}
+
+func TestDatasetServiceIntegration_Move_DeepNested(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Create nested structure: root -> level1 -> level2 -> leaf
+	root, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Root",
+		NodeType: "folder",
+	})
+	require.NoError(t, err)
+
+	level1, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Level1",
+		NodeType: "folder",
+		PID:      &root.ID,
+	})
+	require.NoError(t, err)
+
+	level2, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Level2",
+		NodeType: "folder",
+		PID:      &level1.ID,
+	})
+	require.NoError(t, err)
+
+	// Try to move root to level2 - should fail (level2 is a descendant of root)
+	_, err = svc.Move(root.ID, level2.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be child")
+}
+
+func TestDatasetServiceIntegration_Move_Success(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Create folder1
+	folder1, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Folder1",
+		NodeType: "folder",
+	})
+	require.NoError(t, err)
+
+	// Create folder2
+	folder2, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Folder2",
+		NodeType: "folder",
+	})
+	require.NoError(t, err)
+
+	// Create dataset under folder1
+	ds, err := svc.Save(&dataset.WriteRequest{
+		Name:     "Dataset",
+		NodeType: "dataset",
+		PID:      &folder1.ID,
+	})
+	require.NoError(t, err)
+
+	// Move dataset from folder1 to folder2
+	moved, err := svc.Move(ds.ID, folder2.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, folder2.ID, *moved.PID)
+
+	// Verify the move
+	found, err := svc.GetGroupByID(ds.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, folder2.ID, *found.PID)
+}
