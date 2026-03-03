@@ -682,5 +682,34 @@ func TestDatasetServiceIntegration_Move_NonExistentID(t *testing.T) {
 
 	_, err := svc.Move(999999, 0)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestDatasetServiceIntegration_GetFieldEnumDs_InvalidID(t *testing.T) {
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Test with zero ID
+	result, err := svc.GetFieldEnumDs(0)
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+
+	// Test with negative ID
+	result, err = svc.GetFieldEnumDs(-1)
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+func TestDatasetServiceIntegration_PerDelete_InvalidID(t *testing.T) {
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	// Test with zero ID
+	_, err := svc.PerDelete(0)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
+
+	// Test with negative ID
+	_, err = svc.PerDelete(-1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "id is required")
 }

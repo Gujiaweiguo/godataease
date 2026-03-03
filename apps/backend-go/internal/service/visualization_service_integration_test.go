@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVisualizationServiceIntegration_Save(t *testing.T) {
@@ -223,4 +224,123 @@ func TestVisualizationServiceIntegration_DeleteLogic_NotFound(t *testing.T) {
 	// Delete non-existent should not error (just updates 0 rows)
 	err := svc.DeleteLogic(99999, "deleter")
 	assert.NoError(t, err)
+}
+
+func TestVisualizationServiceIntegration_Update_AllFields(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	// Create first
+	nodeType := "panel"
+	createReq := &visualization.SaveRequest{
+		Name:            "Original Name",
+		NodeType:        &nodeType,
+		CanvasStyleData: strPtr("{\"style\":\"original\"}"),
+		ComponentData:   strPtr("{\"components\":[]}"),
+	}
+	id, err := svc.Save(createReq, "creator")
+	require.NoError(t, err)
+
+	// Update all fields
+	newPID := int64(0)
+	newType := "dashboard"
+	newStatus := 0
+	mobileLayout := true
+	updateReq := &visualization.UpdateRequest{
+		ID:              id,
+		Name:            strPtr("Updated Name"),
+		PID:             &newPID,
+		Type:           &newType,
+		CanvasStyleData: strPtr("{\"style\":\"updated\"}"),
+		ComponentData:   strPtr("{\"components\":[1,2,3]}"),
+		MobileLayout:    &mobileLayout,
+		Status:         &newStatus,
+	}
+	err = svc.Update(updateReq, "updater")
+	require.NoError(t, err)
+
+	// Verify updated
+	detail, err := repo.GetByID(id)
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Name", detail.Name)
+	require.NotNil(t, detail.Type)
+	assert.Equal(t, newType, *detail.Type)
+	require.NotNil(t, detail.Status)
+	assert.Equal(t, newStatus, *detail.Status)
+}
+
+func TestVisualizationServiceIntegration_List_WithPaging(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	// Create multiple items
+	nodeType := "panel"
+	for i := 0; i < 15; i++ {
+		_, err := svc.Save(&visualization.SaveRequest{
+			Name:     "Dashboard " + string(rune('A'+i)),
+			NodeType: &nodeType,
+		}, "tester")
+		require.NoError(t, err)
+	}
+
+	// Test pagination - page 1
+	current := 1
+	size := 10
+	resp, err := svc.List(&visualization.ListRequest{Current: current, Size: size})
+	require.NoError(t, err)
+	assert.Equal(t, int64(15), resp.Total)
+	assert.Equal(t, 10, len(resp.List))
+	assert.Equal(t, 1, resp.Current)
+	assert.Equal(t, 10, resp.Size)
+
+	// Test pagination - page 2
+	current = 2
+	resp, err = svc.List(&visualization.ListRequest{Current: current, Size: size})
+	require.NoError(t, err)
+	assert.Equal(t, 5, len(resp.List))
+}
+
+func TestVisualizationServiceIntegration_List_EdgeCases(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	// Create some items
+	nodeType := "panel"
+	for i := 0; i < 5; i++ {
+		_, err := svc.Save(&visualization.SaveRequest{
+			Name:     "Dashboard " + string(rune('A'+i)),
+			NodeType: &nodeType,
+		}, "tester")
+		require.NoError(t, err)
+	}
+
+	t.Run("list with zero current", func(t *testing.T) {
+		resp, err := svc.List(&visualization.ListRequest{Current: 0, Size: 10})
+		require.NoError(t, err)
+		assert.Equal(t, 1, resp.Current) // Should default to 1
+	})
+
+	t.Run("list with negative current", func(t *testing.T) {
+		resp, err := svc.List(&visualization.ListRequest{Current: -1, Size: 10})
+		require.NoError(t, err)
+		assert.Equal(t, 1, resp.Current) // Should default to 1
+	})
+
+	t.Run("list with zero size", func(t *testing.T) {
+		resp, err := svc.List(&visualization.ListRequest{Current: 1, Size: 0})
+		require.NoError(t, err)
+		assert.Equal(t, 10, resp.Size) // Should default to 10
+	})
+
+	t.Run("list with negative size", func(t *testing.T) {
+		resp, err := svc.List(&visualization.ListRequest{Current: 1, Size: -5})
+		require.NoError(t, err)
+		assert.Equal(t, 10, resp.Size) // Should default to 10
+	})
 }

@@ -454,3 +454,130 @@ func TestLicense_BuildLicenseResult_ContainsExpired(t *testing.T) {
 		t.Errorf("Expected status 'expired' when contains 'expired', got '%s'", result.Status)
 	}
 }
+
+func TestLicense_firstInt64(t *testing.T) {
+	tests := []struct {
+		name     string
+		m        map[string]interface{}
+		keys     []string
+		expected int64
+	}{
+		{
+			name:     "empty map",
+			m:        map[string]interface{}{},
+			keys:     []string{"key1"},
+			expected: 0,
+		},
+		{
+			name:     "float64 value",
+			m:        map[string]interface{}{"count": float64(100)},
+			keys:     []string{"count"},
+			expected: 100,
+		},
+		{
+			name:     "float64 zero",
+			m:        map[string]interface{}{"count": float64(0)},
+			keys:     []string{"count"},
+			expected: 0,
+		},
+		{
+			name:     "int64 value",
+			m:        map[string]interface{}{"count": int64(200)},
+			keys:     []string{"count"},
+			expected: 200,
+		},
+		{
+			name:     "int64 zero",
+			m:        map[string]interface{}{"count": int64(0)},
+			keys:     []string{"count"},
+			expected: 0,
+		},
+		{
+			name:     "string value",
+			m:        map[string]interface{}{"count": "300"},
+			keys:     []string{"count"},
+			expected: 300,
+		},
+		{
+			name:     "string value with spaces",
+			m:        map[string]interface{}{"count": " 400 "},
+			keys:     []string{"count"},
+			expected: 400,
+		},
+		{
+			name:     "string invalid",
+			m:        map[string]interface{}{"count": "invalid"},
+			keys:     []string{"count"},
+			expected: 0,
+		},
+		{
+			name:     "string zero",
+			m:        map[string]interface{}{"count": "0"},
+			keys:     []string{"count"},
+			expected: 0,
+		},
+		{
+			name:     "multiple keys - first exists",
+			m:        map[string]interface{}{"key1": float64(10), "key2": float64(20)},
+			keys:     []string{"key1", "key2"},
+			expected: 10,
+		},
+		{
+			name:     "multiple keys - second exists",
+			m:        map[string]interface{}{"key2": float64(20)},
+			keys:     []string{"key1", "key2"},
+			expected: 20,
+		},
+		{
+			name:     "multiple keys - none exist",
+			m:        map[string]interface{}{"key3": float64(30)},
+			keys:     []string{"key1", "key2"},
+			expected: 0,
+		},
+		{
+			name:     "unsupported type",
+			m:        map[string]interface{}{"count": []int{1, 2, 3}},
+			keys:     []string{"count"},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := firstInt64(tt.m, tt.keys...)
+			if result != tt.expected {
+				t.Errorf("firstInt64() = %d, expected %d", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLicense_Version(t *testing.T) {
+	mockRepo := NewMockLicenseRepository()
+	svc := NewLicenseService(mockRepo)
+
+	// Test default version (no env vars set)
+	version := svc.Version()
+	if version == "" {
+		t.Error("Expected non-empty version")
+	}
+
+	// Test with BUILD_VERSION env var
+	t.Setenv("BUILD_VERSION", "v2.0.0-test")
+	version = svc.Version()
+	if version != "v2.0.0-test" {
+		t.Errorf("Expected version 'v2.0.0-test', got '%s'", version)
+	}
+}
+
+func TestLicense_Version_DEBuildVersion(t *testing.T) {
+	mockRepo := NewMockLicenseRepository()
+	svc := NewLicenseService(mockRepo)
+
+	// Test with DE_BUILD_VERSION env var (when BUILD_VERSION is not set)
+	t.Setenv("DE_BUILD_VERSION", "v2.0.0-de-test")
+	version := svc.Version()
+	if version != "v2.0.0-de-test" {
+		t.Errorf("Expected version 'v2.0.0-de-test', got '%s'", version)
+	}
+}

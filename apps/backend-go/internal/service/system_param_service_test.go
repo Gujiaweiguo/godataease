@@ -296,26 +296,70 @@ func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
 	}
 }
 
-func TestSystemParam_RepoErrors(t *testing.T) {
-	mockRepo := &MockSystemParamRepository{
-		saveBasicErr:     errors.New("save basic error"),
-		saveOnlineMapErr: errors.New("save online map error"),
-		saveSQLBotErr:    errors.New("save sqlbot error"),
-	}
+func TestSystemParam_SaveOnlineMap_WithAudit(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
 	svc := NewSystemParamService(mockRepo, nil)
 
-	err := svc.SaveBasic([]system.SettingItem{})
-	if err == nil {
-		t.Error("Expected error for SaveBasic")
+	editor := &system.OnlineMapEditor{
+		MapType:      "gaode",
+		Key:          "test-key",
+		SecurityCode: "test-code",
 	}
 
-	err = svc.SaveOnlineMap(&system.OnlineMapEditor{})
-	if err == nil {
-		t.Error("Expected error for SaveOnlineMap")
+	err := svc.SaveOnlineMap(editor)
+	if err != nil {
+		t.Fatalf("SaveOnlineMap with audit failed: %v", err)
+	}
+}
+
+func TestSystemParam_SaveSQLBot_WithAudit(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	cfg := &system.SQLBotConfig{
+		Domain:  "test.domain",
+		ID:      "test-id",
+		Enabled: true,
+		Valid:   true,
 	}
 
-	err = svc.SaveSQLBot(&system.SQLBotConfig{})
+	err := svc.SaveSQLBot(cfg)
+	if err != nil {
+		t.Fatalf("SaveSQLBot with audit failed: %v", err)
+	}
+}
+
+func TestSystemParam_SaveBasic_RepoError(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.saveBasicErr = errors.New("save basic error")
+	svc := NewSystemParamService(mockRepo, nil)
+
+	err := svc.SaveBasic([]system.SettingItem{{Pkey: "test", Pval: "value"}})
 	if err == nil {
-		t.Error("Expected error for SaveSQLBot")
+		t.Error("Expected error from SaveBasic")
+	}
+}
+
+func TestSystemParam_SaveOnlineMap_RepoError(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.saveOnlineMapErr = errors.New("save online map error")
+	svc := NewSystemParamService(mockRepo, nil)
+
+	editor := &system.OnlineMapEditor{MapType: "gaode"}
+	err := svc.SaveOnlineMap(editor)
+	if err == nil {
+		t.Error("Expected error from SaveOnlineMap")
+	}
+}
+
+func TestSystemParam_SaveSQLBot_RepoError(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.saveSQLBotErr = errors.New("save sql bot error")
+	svc := NewSystemParamService(mockRepo, nil)
+
+	cfg := &system.SQLBotConfig{Domain: "test.domain"}
+	err := svc.SaveSQLBot(cfg)
+	if err == nil {
+		t.Error("Expected error from SaveSQLBot")
 	}
 }
