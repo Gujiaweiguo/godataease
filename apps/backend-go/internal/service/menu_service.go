@@ -33,10 +33,12 @@ func (s *MenuService) Query() ([]*menu.MenuVO, error) {
 }
 
 func (s *MenuService) QueryByRoleIDs(roleIDs []int64) ([]*menu.MenuVO, error) {
+	// Admin role always gets all menus
+	if s.isAdminRole(roleIDs) {
+		return s.Query()
+	}
+
 	if s.roleMenuRepo == nil || len(roleIDs) == 0 {
-		if s.isAdminRole(roleIDs) {
-			return s.Query()
-		}
 		return []*menu.MenuVO{}, nil
 	}
 

@@ -267,3 +267,31 @@ func TestSystemParam_I18nOptions(t *testing.T) {
 		t.Error("Expected non-empty i18n options")
 	}
 }
+
+func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
+	svc := setupSystemParamService()
+
+	sqlbot, err := svc.QuerySQLBot()
+	if err != nil {
+		t.Fatalf("QuerySQLBot failed: %v", err)
+	}
+	if sqlbot == nil {
+		t.Fatal("expected non-nil sqlbot config")
+	}
+
+	ui, err := svc.UI()
+	if err != nil {
+		t.Fatalf("UI failed: %v", err)
+	}
+	if len(ui) != 0 {
+		t.Fatalf("expected empty ui list, got %d", len(ui))
+	}
+
+	login, err := svc.DefaultLogin()
+	if err != nil {
+		t.Fatalf("DefaultLogin failed: %v", err)
+	}
+	if login != 0 {
+		t.Fatalf("expected default login 0, got %d", login)
+	}
+}

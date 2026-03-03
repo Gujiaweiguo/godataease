@@ -1,11 +1,19 @@
 package service
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"mime/multipart"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/datasource"
+	"github.com/xuri/excelize/v2"
 )
 
 func TestDecodeConfig_Base64(t *testing.T) {
@@ -78,5 +86,112 @@ func TestCheckAPIDatasource(t *testing.T) {
 	}
 	if result["showApiStructure"] != true {
 		t.Fatalf("expected showApiStructure=true, got %#v", result["showApiStructure"])
+	}
+}
+
+func TestPingTCP(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+	defer ln.Close()
+
+	addr := ln.Addr().(*net.TCPAddr)
+	if err = pingTCP(addr.IP.String(), addr.Port, time.Second); err != nil {
+		t.Fatalf("pingTCP should connect: %v", err)
+	}
+}
+
+func TestDatasourceService_UploadAndLoadRemoteFile(t *testing.T) {
+	svc := NewDatasourceService(nil)
+
+	csvContent := "name,amount\nAlice,100\n"
+	tmp, err := os.CreateTemp("", "ds-upload-*.csv")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	defer os.Remove(tmp.Name())
+	_, _ = tmp.WriteString(csvContent)
+	_, _ = tmp.Seek(0, 0)
+	defer tmp.Close()
+
+	header := &multipart.FileHeader{Filename: "ds.csv", Size: int64(len(csvContent))}
+	data, err := svc.UploadFile(tmp, header, 1, 0)
+	if err != nil {
+		t.Fatalf("UploadFile failed: %v", err)
+	}
+	if data == nil || len(data.Sheets) == 0 {
+		t.Fatal("expected uploaded data with sheets")
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(csvContent))
+	}))
+	defer server.Close()
+
+	remote, err := svc.LoadRemoteFile(server.URL+"/remote.csv", "", "", 1)
+	if err != nil {
+		t.Fatalf("LoadRemoteFile failed: %v", err)
+	}
+	if remote == nil || len(remote.Sheets) == 0 {
+		t.Fatal("expected remote data with sheets")
+	}
+}
+
+func TestDatasourceService_ListSyncRecord_InvalidAndNoRepo(t *testing.T) {
+	svc := NewDatasourceService(nil)
+
+	_, err := svc.ListSyncRecord(0, 1, 10)
+	if err == nil {
+		t.Fatal("expected invalid datasource id error")
+	}
+
+	_, err = svc.ListSyncRecord(1, 1, 10)
+	if err == nil {
+		t.Fatal("expected repository unavailable error")
+	}
+}
+
+func TestDatasourceService_SyncAPIWrappers_ErrorPaths(t *testing.T) {
+	svc := NewDatasourceService(nil)
+
+	_, err := svc.SyncAPITable(map[string]string{})
+	if err == nil {
+		t.Fatal("expected error for empty request")
+	}
+
+	_, err = svc.SyncAPITable(map[string]string{"datasourceId": "1"})
+	if err == nil {
+		t.Fatal("expected seatunnel client error")
+	}
+
+	_, err = svc.SyncAPIDs(map[string]string{"datasourceId": "1"})
+	if err == nil {
+		t.Fatal("expected seatunnel client error")
+	}
+}
+
+func TestExcelService_ParseExcelFile_XLSX(t *testing.T) {
+	svc := NewExcelService()
+
+	f := excelize.NewFile()
+	defer f.Close()
+	_ = f.SetCellValue("Sheet1", "A1", "name")
+	_ = f.SetCellValue("Sheet1", "B1", "amount")
+	_ = f.SetCellValue("Sheet1", "A2", "Alice")
+	_ = f.SetCellValue("Sheet1", "B2", 100)
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		t.Fatalf("write xlsx buffer failed: %v", err)
+	}
+
+	sheets, err := svc.parseExcelFile("demo.xlsx", bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("parseExcelFile xlsx failed: %v", err)
+	}
+	if len(sheets) == 0 {
+		t.Fatal("expected parsed sheets from xlsx")
 	}
 }

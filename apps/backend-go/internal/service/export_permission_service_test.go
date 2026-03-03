@@ -272,3 +272,23 @@ func TestExportPermissionService_AdminBypass(t *testing.T) {
 		t.Errorf("Expected reason 'admin', got '%s'", result.Reason)
 	}
 }
+
+func TestExportPermissionService_CheckScreenAndDatasourceExport(t *testing.T) {
+	mockRepo := newMockExportResourcePermRepo()
+	mockRepo.userPermOk[1] = map[int64]bool{1: true}
+	mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+	mockChecker := &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}}
+	resourceSvc := NewResourcePermissionService(mockRepo, mockChecker)
+	exportSvc := NewExportPermissionService(resourceSvc, nil)
+	ctx := context.Background()
+
+	screen := exportSvc.CheckScreenExport(ctx, 1, 101)
+	if !screen.HasPermission {
+		t.Error("expected screen export permission")
+	}
+
+	datasource := exportSvc.CheckDatasourceExport(ctx, 1, 201)
+	if !datasource.HasPermission {
+		t.Error("expected datasource export permission")
+	}
+}
