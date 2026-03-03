@@ -79,12 +79,71 @@ Notes:
 - L2 集成/契约层（接口与数据）：Backend 仓储/HTTP 集成测试、契约差异检查（contract diff / drift-check）。
 - L3 端到端冒烟层（关键流程）：登录、权限、数据源创建/编辑/校验等关键用户路径。
 
+- 若修改 API 兼容相关逻辑，增加执行 `make drift-check`（必要时结合 contract diff workflow）。
+
 ### AI 最低验证要求（提交前）
 - 修改 Frontend 代码至少执行：`npm run lint`、`npm run ts:check`。
 - 若修改 Frontend 业务逻辑（store/composable/utils/api 处理），应补充或执行对应 Vitest 用例（`npm run test -- --run`）。
 - 修改 Backend 代码至少执行：`make test`。
 - 若修改 Repository/SQL/迁移/持久化逻辑，增加执行 `make test-integration`（环境不满足时需在结论中明确说明未执行原因与风险）。
 - 若修改 API 兼容相关逻辑，增加执行 `make drift-check`（必要时结合 contract diff workflow）。
+
+### Backend 数据库测试规则（强制）
+
+**必须使用 MySQL 8 (Docker Compose) 进行数据库相关测试，禁止使用 SQLite 内存数据库。**
+
+#### MySQL 8 连接信息
+```
+主机: mysql8 或 172.19.0.2
+端口: 3306
+用户: root
+密码: Admin168
+测试数据库: dataease_test
+```
+
+#### 运行集成测试命令
+```bash
+# 方式一：使用 Makefile
+cd apps/backend-go
+TEST_DB_HOST=172.19.0.2 TEST_DB_PASSWORD=Admin168 TEST_DB_NAME=dataease_test make test-integration
+
+# 方式二：直接运行 go test
+TEST_DB_HOST=172.19.0.2 TEST_DB_PASSWORD=Admin168 TEST_DB_NAME=dataease_test go test -tags=integration -v -count=1 ./internal/service/...
+```
+
+#### 集成测试编写规范
+1. **Build Tag**: 所有集成测试文件必须添加 `//go:build integration` 标签
+2. **测试套件**: 使用 `integration_suite_test.go` 中定义的 `testDB` 全局变量
+3. **数据清理**: 每个测试用例开始前调用 `cleanupTables()` 清理相关表
+4. **命名约定**: 集成测试文件命名为 `*_integration_test.go`
+
+#### 示例集成测试结构
+```go
+//go:build integration
+
+package service
+
+import (
+    "testing"
+    "dataease/backend/internal/domain/user"
+    "dataease/backend/internal/repository"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestUserServiceIntegration_CreateUser(t *testing.T) {
+    cleanupTables(&user.SysUser{})
+    
+    userRepo := repository.NewUserRepository(testDB)
+    svc := NewUserService(userRepo, ...)
+    
+    // 测试逻辑...
+}
+```
+
+#### 为什么禁止 SQLite
+1. **行为差异**: MySQL 与 SQLite 在 SQL 语法、类型系统、默认值处理上存在差异
+2. **生产一致性**: 生产环境使用 MySQL，测试应与生产环境保持一致
+3. **GORM 兼容性**: 部分 GORM 特性在 SQLite 上表现不同（如 `default` 标签、外键约束）
 
 ### 按改动路径触发测试矩阵（Frontend）
 - 变更 `events/embedding`、`hooks/event`、`embedded store/token utils`：执行 `npm run test:affected:embedding`。
