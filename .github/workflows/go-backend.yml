@@ -13,7 +13,7 @@ jobs:
       run:
         working-directory: apps/backend-go
     env:
-      SERVICE_COVERAGE_THRESHOLD: ${{ vars.SERVICE_COVERAGE_THRESHOLD || '82.0' }}
+      SERVICE_COVERAGE_THRESHOLD: "${{ vars.SERVICE_COVERAGE_THRESHOLD || '85.0' }}"
 
     services:
       mysql:
