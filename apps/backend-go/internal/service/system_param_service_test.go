@@ -363,3 +363,50 @@ func TestSystemParam_SaveSQLBot_RepoError(t *testing.T) {
 		t.Error("Expected error from SaveSQLBot")
 	}
 }
+
+func TestSystemParam_RepoNotReady_AllMethods(t *testing.T) {
+	// Service with nil repo
+	svc := &SystemParamService{repo: nil, auditService: nil}
+
+	// Test ShareBase
+	_, err := svc.ShareBase()
+	if err == nil {
+		t.Error("Expected error when repo is nil for ShareBase")
+	}
+
+	// Test RequestTimeOut
+	_, err = svc.RequestTimeOut()
+	if err == nil {
+		t.Error("Expected error when repo is nil for RequestTimeOut")
+	}
+
+	// Test DefaultSettings
+	_, err = svc.DefaultSettings()
+	if err == nil {
+		t.Error("Expected error when repo is nil for DefaultSettings")
+	}
+
+	// Test UI
+	_, err = svc.UI()
+	if err == nil {
+		t.Error("Expected error when repo is nil for UI")
+	}
+
+	// Test DefaultLogin
+	_, err = svc.DefaultLogin()
+	if err == nil {
+		t.Error("Expected error when repo is nil for DefaultLogin")
+	}
+
+	// Test I18nOptions
+	_, err = svc.I18nOptions()
+	if err == nil {
+		t.Error("Expected error when repo is nil for I18nOptions")
+	}
+
+	// Test QuerySQLBot
+	_, err = svc.QuerySQLBot()
+	if err == nil {
+		t.Error("Expected error when repo is nil for QuerySQLBot")
+	}
+}
