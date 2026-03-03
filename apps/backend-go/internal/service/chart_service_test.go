@@ -351,3 +351,154 @@ func TestChartCopyAndDeleteField(t *testing.T) {
 		t.Fatalf("expected copied field deleted, got %d", len(repo.chartFieldsByChart[99]))
 	}
 }
+
+// Test helper functions
+func TestChart_marshalJSONField(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     map[string]interface{}
+		key      string
+		wantStr  string
+		wantBool bool
+	}{
+		{"key exists", map[string]interface{}{"field": "value"}, "field", "\"value\"", true},
+		{"key not exists", map[string]interface{}{"field": "value"}, "other", "", false},
+		{"nil body", nil, "field", "", false},
+	}
+
+	// Test object value separately
+	objBody := map[string]interface{}{"field": map[string]interface{}{"a": 1}}
+	gotStr, gotBool := marshalJSONField(objBody, "field")
+	if !gotBool {
+		t.Error("marshalJSONField object value should return true")
+	}
+	if gotStr != `{"a":1}` {
+		t.Errorf("marshalJSONField object value = %v, want {\"a\":1}", gotStr)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStr, gotBool := marshalJSONField(tt.body, tt.key)
+			if gotBool != tt.wantBool {
+				t.Errorf("marshalJSONField() bool = %v, want %v", gotBool, tt.wantBool)
+			}
+			if gotBool && gotStr != tt.wantStr {
+				t.Errorf("marshalJSONField() str = %v, want %v", gotStr, tt.wantStr)
+			}
+		})
+	}
+}
+
+func TestChart_stringFromAny(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		wantStr  string
+		wantBool bool
+	}{
+		{"valid string", "hello", "hello", true},
+		{"string with spaces", "  hello  ", "hello", true},
+		{"empty string", "", "", false},
+		{"whitespace only", "   ", "", false},
+		{"not a string", 123, "", false},
+		{"nil", nil, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStr, gotBool := stringFromAny(tt.input)
+			if gotBool != tt.wantBool {
+				t.Errorf("stringFromAny() bool = %v, want %v", gotBool, tt.wantBool)
+			}
+			if gotStr != tt.wantStr {
+				t.Errorf("stringFromAny() str = %v, want %v", gotStr, tt.wantStr)
+			}
+		})
+	}
+}
+
+func TestChart_int64FromAny(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		wantVal  int64
+		wantBool bool
+	}{
+		{"int64", int64(100), 100, true},
+		{"int", int(50), 50, true},
+		{"float64", float64(123.45), 123, true},
+		{"json.Number", json.Number("999"), 999, true},
+		{"string number", "456", 456, true},
+		{"string with spaces", " 789 ", 789, true},
+		{"invalid string", "abc", 0, false},
+		{"nil", nil, 0, false},
+		{"other type", []int{}, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotVal, gotBool := int64FromAny(tt.input)
+			if gotBool != tt.wantBool {
+				t.Errorf("int64FromAny() bool = %v, want %v", gotBool, tt.wantBool)
+			}
+			if gotVal != tt.wantVal {
+				t.Errorf("int64FromAny() val = %v, want %v", gotVal, tt.wantVal)
+			}
+		})
+	}
+}
+
+func TestChart_intFromAny(t *testing.T) {
+	val, ok := intFromAny(int64(100))
+	if !ok || val != 100 {
+		t.Errorf("intFromAny() = %d, %v, want 100, true", val, ok)
+	}
+
+	_, ok = intFromAny("invalid")
+	if ok {
+		t.Error("intFromAny() should return false for invalid input")
+	}
+}
+
+func TestChart_stringValue(t *testing.T) {
+	s := "  hello  "
+	if got := stringValue(&s); got != "hello" {
+		t.Errorf("stringValue() = %v, want hello", got)
+	}
+
+	if got := stringValue(nil); got != "" {
+		t.Errorf("stringValue(nil) = %v, want empty", got)
+	}
+}
+
+func TestChart_intPointerValue(t *testing.T) {
+	i := 42
+	if got := intPointerValue(&i); got != 42 {
+		t.Errorf("intPointerValue() = %v, want 42", got)
+	}
+
+	if got := intPointerValue(nil); got != 0 {
+		t.Errorf("intPointerValue(nil) = %v, want 0", got)
+	}
+}
+
+func TestChart_boolPointerValue(t *testing.T) {
+	b := true
+	if got := boolPointerValue(&b); got != true {
+		t.Errorf("boolPointerValue() = %v, want true", got)
+	}
+
+	if got := boolPointerValue(nil); got != false {
+		t.Errorf("boolPointerValue(nil) = %v, want false", got)
+	}
+}
+
+func TestChart_fieldNameShort(t *testing.T) {
+	result := fieldNameShort("test")
+	if !strings.HasPrefix(result, "f_") {
+		t.Errorf("fieldNameShort() = %v, want f_ prefix", result)
+	}
+	if len(result) != 18 { // f_ + 16 hex chars (truncated from md5)
+		t.Errorf("fieldNameShort() length = %d, want 18", len(result))
+	}
+}

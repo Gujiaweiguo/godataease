@@ -168,3 +168,90 @@ func TestPreviewSQL_BlockExecutionWhenCalciteUnavailable(t *testing.T) {
 		t.Fatal("expected calcite validate to be called")
 	}
 }
+
+func TestNewDatasetServiceWithPermission(t *testing.T) {
+	svc := NewDatasetServiceWithPermission(nil, &RowPermissionService{})
+	if svc == nil {
+		t.Fatal("expected service instance")
+	}
+	if svc.rowPermissionService == nil {
+		t.Fatal("expected row permission service configured")
+	}
+}
+
+func TestEnumAliasAndFieldIDFromAlias(t *testing.T) {
+	alias := enumAlias(123)
+	if alias != "f_123" {
+		t.Fatalf("unexpected alias: %s", alias)
+	}
+	if got := enumFieldIDFromAlias(alias); got != 123 {
+		t.Fatalf("expected 123, got %d", got)
+	}
+	if got := enumFieldIDFromAlias("bad_alias"); got != 0 {
+		t.Fatalf("expected 0 for invalid alias, got %d", got)
+	}
+}
+
+func TestBuildPreviewFieldsAndNormalizeRow(t *testing.T) {
+	now := time.Date(2026, 3, 3, 8, 0, 0, 0, time.UTC)
+	rows := []map[string]interface{}{
+		{"b": []byte("abc"), "a": now, "c": "123"},
+	}
+	fields := buildPreviewFields(rows)
+	if len(fields) != 3 {
+		t.Fatalf("expected 3 fields, got %d", len(fields))
+	}
+	if fields[0].OriginName != "a" || fields[0].DeType != 1 {
+		t.Fatalf("unexpected first field: %+v", fields[0])
+	}
+	if fields[1].OriginName != "b" || fields[1].DeType != 0 {
+		t.Fatalf("unexpected second field: %+v", fields[1])
+	}
+	if fields[2].OriginName != "c" || fields[2].DeType != 2 {
+		t.Fatalf("unexpected third field: %+v", fields[2])
+	}
+
+	normalized := normalizePreviewRow(rows[0])
+	if normalized["b"] != "abc" {
+		t.Fatalf("expected []byte converted to string, got %#v", normalized["b"])
+	}
+	if normalized["a"] != "2026-03-03 08:00:00" {
+		t.Fatalf("unexpected time format: %#v", normalized["a"])
+	}
+
+	empty := buildPreviewFields([]map[string]interface{}{})
+	if len(empty) != 0 {
+		t.Fatalf("expected empty fields for empty rows, got %d", len(empty))
+	}
+}
+
+func TestInferPreviewDeTypeAndDateTimeText(t *testing.T) {
+	if inferPreviewDeType(true) != 4 {
+		t.Fatal("bool should infer to 4")
+	}
+	if inferPreviewDeType(int64(1)) != 2 {
+		t.Fatal("int should infer to 2")
+	}
+	if inferPreviewDeType(1.23) != 3 {
+		t.Fatal("float should infer to 3")
+	}
+	if inferPreviewDeType("2026-03-03") != 1 {
+		t.Fatal("date text should infer to 1")
+	}
+	if inferPreviewDeType("45.67") != 3 {
+		t.Fatal("float text should infer to 3")
+	}
+	if inferPreviewDeType("x") != 0 {
+		t.Fatal("plain text should infer to 0")
+	}
+
+	if !isDateTimeText("2026-03-03T08:00:00Z") {
+		t.Fatal("rfc3339 text should be datetime")
+	}
+	if !isDateTimeText("2026/03/03") {
+		t.Fatal("slash date text should be datetime")
+	}
+	if isDateTimeText("not-a-date") {
+		t.Fatal("invalid datetime text should be false")
+	}
+}

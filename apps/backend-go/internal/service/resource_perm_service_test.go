@@ -211,3 +211,39 @@ func TestCheckManagePermission(t *testing.T) {
 		t.Error("CheckManagePermission should return true")
 	}
 }
+
+func TestResourcePermissionService_DelegateMethods(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	mockRepo.userPerms[11] = []int64{1, 2}
+	mockRepo.rolePerms[12] = []int64{3, 4}
+	svc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+
+	userPerms, err := svc.GetUserPermissionIDs(11)
+	if err != nil {
+		t.Fatalf("GetUserPermissionIDs failed: %v", err)
+	}
+	if len(userPerms) != 2 {
+		t.Fatalf("expected 2 user perms, got %d", len(userPerms))
+	}
+
+	rolePerms, err := svc.GetRolePermissionIDs(12)
+	if err != nil {
+		t.Fatalf("GetRolePermissionIDs failed: %v", err)
+	}
+	if len(rolePerms) != 2 {
+		t.Fatalf("expected 2 role perms, got %d", len(rolePerms))
+	}
+
+	if err = svc.GrantPermissionToUser(1, 2, "tester"); err != nil {
+		t.Fatalf("GrantPermissionToUser failed: %v", err)
+	}
+	if err = svc.RevokePermissionFromUser(1, 2); err != nil {
+		t.Fatalf("RevokePermissionFromUser failed: %v", err)
+	}
+	if err = svc.GrantPermissionToRole(3, 4); err != nil {
+		t.Fatalf("GrantPermissionToRole failed: %v", err)
+	}
+	if err = svc.RevokePermissionFromRole(3, 4); err != nil {
+		t.Fatalf("RevokePermissionFromRole failed: %v", err)
+	}
+}
