@@ -14,7 +14,7 @@ on:
       run_e2e:
         description: 'Run E2E tests (requires backend service)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:
@@ -95,9 +95,53 @@ jobs:
         id: testcore
         if: steps.affected.outputs.target != 'none'
         run: npm run ${{ steps.affected.outputs.target }}
+
+      - name: Datasource benchmark
+        id: bench
+        if: steps.changes.outputs.datasource == 'true' || steps.changes.outputs.shared == 'true'
+        run: |
+          mkdir -p benchmark-results
+          set -o pipefail
+          BENCH_OUTPUT_JSON=benchmark-results/datasource-tree-current.json npm run bench:datasource-tree | tee benchmark-results/datasource-tree-benchmark.txt
+
+      - name: Datasource benchmark compare
+        id: bench_compare
+        if: steps.changes.outputs.datasource == 'true' || steps.changes.outputs.shared == 'true'
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            node scripts/benchmark-compare.cjs \
+              --baseline tests/perf/baseline/datasource-tree-baseline.json \
+              --current benchmark-results/datasource-tree-current.json \
+              --output benchmark-results/datasource-tree-compare.md \
+              --json-output benchmark-results/datasource-tree-compare.json \
+              --threshold=10 \
+              --ignore-below-ms=0.5 \
+              --fail-on-regression=true
+          else
+            node scripts/benchmark-compare.cjs \
+              --baseline tests/perf/baseline/datasource-tree-baseline.json \
+              --current benchmark-results/datasource-tree-current.json \
+              --output benchmark-results/datasource-tree-compare.md \
+              --json-output benchmark-results/datasource-tree-compare.json \
+              --threshold=10 \
+              --ignore-below-ms=0.5
+          fi
+
+      - name: Upload datasource benchmark artifact
+        if: always() && (steps.changes.outputs.datasource == 'true' || steps.changes.outputs.shared == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: datasource-tree-benchmark-${{ github.run_id }}
+          path: |
+            apps/frontend/benchmark-results/datasource-tree-benchmark.txt
+            apps/frontend/benchmark-results/datasource-tree-current.json
+            apps/frontend/benchmark-results/datasource-tree-compare.md
+            apps/frontend/benchmark-results/datasource-tree-compare.json
+          retention-days: 14
+
       - name: Summary
         if: always()
-        run: npm run quality:report:summary -- --ts=${{ steps.tscheck.outcome }} --lint=${{ steps.lint.outcome }} --build=${{ steps.build.outcome }} --test-core=${{ steps.test.outcome }} --affected-target=${{ steps.affected.outputs.target }} --affected=${{ steps.testcore.outcome }}
+        run: npm run quality:report:summary -- --ts=${{ steps.tscheck.outcome }} --lint=${{ steps.lint.outcome }} --build=${{ steps.build.outcome }} --test-core=${{ steps.test.outcome }} --affected-target=${{ steps.affected.outputs.target }} --affected=${{ steps.testcore.outcome }} --bench=${{ steps.bench.outcome }} --bench-compare=${{ steps.bench_compare.outcome }}
 
   # E2E tests job - requires backend service
   # Run manually via workflow_dispatch with run_e2e=true
@@ -109,18 +153,6 @@ jobs:
     defaults:
       run:
         working-directory: apps/frontend
-
-    services:
-      # Note: Backend service would be configured here when available
-      # For now, this job is only triggered manually
-      # Example backend service configuration:
-      # backend:
-      #   image: dataease/backend:latest
-      #   ports:
-      #     - 8088:8088
-      #   env:
-      #     DATABASE_URL: ...
-      #     REDIS_URL: ...
 
     steps:
       - uses: actions/checkout@v4
