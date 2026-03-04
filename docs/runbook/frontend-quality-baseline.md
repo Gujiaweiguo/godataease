@@ -2,6 +2,10 @@
 
 本文档用于统一记录前端每周质量基线，便于趋势跟踪与回归预警。
 
+相关文档：
+
+- 系统冒烟清单与用例映射：`docs/runbook/frontend-e2e-system-smoke-matrix.md`
+
 ## 目标
 
 - 用固定字段记录每周前端质量信号。
@@ -11,6 +15,13 @@
 
 - `apps/frontend/scripts/quality-report.cjs` 生成的 CI Summary。
 - 工作流：`.github/workflows/frontend.yml`（`quality` job 的 Summary 步骤）。
+- 系统冒烟：`.github/workflows/frontend.yml`（`system_smoke` job 的 Summary 与 Playwright artifact）。
+
+## System Smoke 执行入口
+
+- 手动：GitHub Actions -> `Frontend CI` -> `Run workflow`，设置 `run_system_smoke=true`
+- 定时：`Frontend CI` 内置 nightly 调度自动执行 `system_smoke`（非阻断）
+- 本地：`apps/frontend` 下执行 `npm run e2e:system-smoke`
 
 ## 固定字段
 

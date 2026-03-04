@@ -9,6 +9,8 @@ on:
     branches: [main, dev]
     paths:
       - 'apps/frontend/**'
+  schedule:
+    - cron: '30 19 * * *'
   workflow_dispatch:
     inputs:
       run_e2e:
@@ -16,9 +18,15 @@ on:
         required: false
         default: false
         type: boolean
+      run_system_smoke:
+        description: 'Run non-blocking system smoke tests'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   quality:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -185,3 +193,135 @@ jobs:
           name: playwright-report
           path: apps/frontend/playwright-report/
           retention-days: 7
+
+  system_smoke:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: apps/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Check smoke test prerequisites
+        id: smoke_prereq
+        env:
+          E2E_BASE_URL_SECRET: ${{ secrets.E2E_BASE_URL }}
+          E2E_PASSWORD_SECRET: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          if [ -z "$E2E_BASE_URL_SECRET" ] || [ -z "$E2E_PASSWORD_SECRET" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "## System Smoke" >> "$GITHUB_STEP_SUMMARY"
+            echo "Skipped: missing E2E_BASE_URL or E2E_PASSWORD secret." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run system smoke tests
+        if: steps.smoke_prereq.outputs.run == 'true'
+        id: smoke
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME || 'admin' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          mkdir -p test-results/system-smoke
+          PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/system-smoke/results.json npm run e2e:system-smoke -- --reporter=list,json
+
+      - name: Collect system smoke stats
+        if: always() && steps.smoke_prereq.outputs.run == 'true'
+        id: smoke_stats
+        run: |
+          node <<'EOF'
+          const fs = require('fs')
+          const reportPath = 'test-results/system-smoke/results.json'
+          const outFile = process.env.GITHUB_OUTPUT
+          if (!fs.existsSync(reportPath)) {
+            fs.appendFileSync(outFile, 'has_stats=false\n')
+            process.exit(0)
+          }
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+          const stats = report.stats || {}
+          const passed = Number(stats.expected ?? 0)
+          const failed = Number(stats.unexpected ?? 0)
+          const skipped = Number(stats.skipped ?? 0)
+          const flaky = Number(stats.flaky ?? 0)
+          const total = passed + failed + skipped + flaky
+          fs.appendFileSync(outFile, 'has_stats=true\n')
+          fs.appendFileSync(outFile, `total=${total}\n`)
+          fs.appendFileSync(outFile, `passed=${passed}\n`)
+          fs.appendFileSync(outFile, `failed=${failed}\n`)
+          fs.appendFileSync(outFile, `skipped=${skipped}\n`)
+          fs.appendFileSync(outFile, `flaky=${flaky}\n`)
+          EOF
+
+      - name: Upload system smoke report
+        if: always() && steps.smoke_prereq.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-system-smoke-report
+          path: |
+            apps/frontend/playwright-report/
+            apps/frontend/test-results/system-smoke/results.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: System smoke summary
+        if: always()
+        run: |
+          echo "## Frontend System Smoke" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | Result | Total | Passed | Failed | Skipped | Flaky |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.smoke_prereq.outputs.run }}" != "true" ]; then
+            echo "| ${{ github.event_name }} | skipped (missing secrets) | - | - | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.smoke_stats.outputs.has_stats }}" != "true" ]; then
+            echo "| ${{ github.event_name }} | ${{ steps.smoke.outcome }} | - | - | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| ${{ github.event_name }} | ${{ steps.smoke.outcome }} | ${{ steps.smoke_stats.outputs.total }} | ${{ steps.smoke_stats.outputs.passed }} | ${{ steps.smoke_stats.outputs.failed }} | ${{ steps.smoke_stats.outputs.skipped }} | ${{ steps.smoke_stats.outputs.flaky }} |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Notify Slack on system smoke failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.FRONTEND_SYSTEM_SMOKE_SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "FRONTEND_SYSTEM_SMOKE_SLACK_WEBHOOK_URL is not configured, skip Slack notify"
+            exit 0
+          fi
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="[frontend-system-smoke] FAILED on ${{ github.ref_name }}. Run: ${RUN_URL}"
+          curl -sS -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"${MESSAGE}\"}" || true
+
+      - name: Notify WeCom on system smoke failure
+        if: failure()
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.FRONTEND_SYSTEM_SMOKE_WECOM_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WECOM_WEBHOOK_URL" ]; then
+            echo "FRONTEND_SYSTEM_SMOKE_WECOM_WEBHOOK_URL is not configured, skip WeCom notify"
+            exit 0
+          fi
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="[frontend-system-smoke] FAILED on ${{ github.ref_name }}. Run: ${RUN_URL}"
+          curl -sS -X POST "$WECOM_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"msgtype\":\"text\",\"text\":{\"content\":\"${MESSAGE}\"}}" || true
