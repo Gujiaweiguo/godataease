@@ -94,3 +94,25 @@ jobs:
           else
             echo "No compare report generated." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Notify Slack on failure
+        if: failure() && secrets.FRONTEND_BENCHMARK_SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.FRONTEND_BENCHMARK_SLACK_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="[frontend-benchmark-nightly] FAILED on ${{ github.ref_name }}. Run: ${RUN_URL}"
+          curl -sS -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"${MESSAGE}\"}" || true
+
+      - name: Notify WeCom on failure
+        if: failure() && secrets.FRONTEND_BENCHMARK_WECOM_WEBHOOK_URL != ''
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.FRONTEND_BENCHMARK_WECOM_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="[frontend-benchmark-nightly] FAILED on ${{ github.ref_name }}. Run: ${RUN_URL}"
+          curl -sS -X POST "$WECOM_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"msgtype\":\"text\",\"text\":{\"content\":\"${MESSAGE}\"}}" || true
