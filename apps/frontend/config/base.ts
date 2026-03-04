@@ -2,6 +2,7 @@ import pkg from '../package.json'
 import viteCompression from 'vite-plugin-compression'
 
 export default {
+  base: '/',
   plugins: [
     viteCompression({
       // gzip静态资源压缩配置
