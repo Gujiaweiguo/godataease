@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-03-04T19:23:27.000Z",
+  "sampling": {
+    "warmup": 3,
+    "samples": 13
+  },
+  "results": [
+    {
+      "scale": "1000 nodes",
+      "samples": 13,
+      "trimmedSamples": 11,
+      "searchLegacyMedianMs": 2.69,
+      "searchOptimizedMedianMs": 2.28,
+      "searchSpeedup": 1.18,
+      "expandLegacyMedianMs": 1.82,
+      "expandOptimizedMedianMs": 0.08,
+      "expandSpeedup": 22.75,
+      "pruneLegacyMedianMs": 0.71,
+      "pruneOptimizedMedianMs": 0.12,
+      "pruneSpeedup": 5.92
+    },
+    {
+      "scale": "5000 nodes",
+      "samples": 13,
+      "trimmedSamples": 11,
+      "searchLegacyMedianMs": 13.06,
+      "searchOptimizedMedianMs": 13.43,
+      "searchSpeedup": 0.97,
+      "expandLegacyMedianMs": 44.92,
+      "expandOptimizedMedianMs": 0.31,
+      "expandSpeedup": 144.9,
+      "pruneLegacyMedianMs": 28.63,
+      "pruneOptimizedMedianMs": 1.1,
+      "pruneSpeedup": 26.03
+    }
+  ]
+}

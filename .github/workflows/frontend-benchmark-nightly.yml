@@ -1,0 +1,96 @@
+name: Frontend Datasource Benchmark Nightly
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: 'Compare threshold percentage (default: 10)'
+        required: false
+        default: '10'
+        type: string
+      ignore-below-ms:
+        description: 'Ignore tiny metric values below this ms (default: 0.5)'
+        required: false
+        default: '0.5'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-benchmark-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  datasource-benchmark-nightly:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prepare benchmark metadata
+        id: meta
+        run: |
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          THRESHOLD="${{ github.event.inputs.threshold || '10' }}"
+          IGNORE_BELOW_MS="${{ github.event.inputs['ignore-below-ms'] || '0.5' }}"
+          echo "stamp=${STAMP}" >> "$GITHUB_OUTPUT"
+          echo "threshold=${THRESHOLD}" >> "$GITHUB_OUTPUT"
+          echo "ignore_below_ms=${IGNORE_BELOW_MS}" >> "$GITHUB_OUTPUT"
+
+      - name: Run datasource benchmark
+        run: |
+          OUT_DIR="benchmark-results/nightly/${{ steps.meta.outputs.stamp }}"
+          mkdir -p "${OUT_DIR}"
+          set -o pipefail
+          BENCH_OUTPUT_JSON="${OUT_DIR}/datasource-tree-current.json" npm run bench:datasource-tree | tee "${OUT_DIR}/datasource-tree-benchmark.txt"
+
+      - name: Compare against baseline
+        run: |
+          OUT_DIR="benchmark-results/nightly/${{ steps.meta.outputs.stamp }}"
+          node scripts/benchmark-compare.cjs \
+            --baseline tests/perf/baseline/datasource-tree-baseline.json \
+            --current "${OUT_DIR}/datasource-tree-current.json" \
+            --output "${OUT_DIR}/datasource-tree-compare.md" \
+            --json-output "${OUT_DIR}/datasource-tree-compare.json" \
+            --threshold="${{ steps.meta.outputs.threshold }}" \
+            --ignore-below-ms="${{ steps.meta.outputs.ignore_below_ms }}"
+
+      - name: Upload nightly benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-datasource-benchmark-nightly-${{ steps.meta.outputs.stamp }}
+          path: apps/frontend/benchmark-results/nightly/${{ steps.meta.outputs.stamp }}/
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          OUT_DIR="benchmark-results/nightly/${{ steps.meta.outputs.stamp }}"
+          echo "## Frontend Datasource Benchmark Nightly" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Stamp (UTC): `${{ steps.meta.outputs.stamp }}`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Threshold: `${{ steps.meta.outputs.threshold }}%`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ignore below: `${{ steps.meta.outputs.ignore_below_ms }}ms`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "${OUT_DIR}/datasource-tree-compare.md" ]; then
+            cat "${OUT_DIR}/datasource-tree-compare.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No compare report generated." >> "$GITHUB_STEP_SUMMARY"
+          fi

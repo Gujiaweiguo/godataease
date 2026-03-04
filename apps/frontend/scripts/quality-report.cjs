@@ -52,7 +52,15 @@ const buildRunUrl = () => {
   return `${server}/${repo}/actions/runs/${runId}`
 }
 
-const buildMarkdown = ({ rows, buildStatus, affectedTarget, affectedStatus, baselineMeta }) => {
+const buildMarkdown = ({
+  rows,
+  buildStatus,
+  affectedTarget,
+  affectedStatus,
+  benchStatus,
+  benchCompareStatus,
+  baselineMeta
+}) => {
   const lines = [
     '## Frontend Quality Report',
     '',
@@ -66,6 +74,8 @@ const buildMarkdown = ({ rows, buildStatus, affectedTarget, affectedStatus, base
 
   lines.push('')
   lines.push(`- Build: ${statusLabel(buildStatus || 'unknown')}`)
+  lines.push(`- Datasource benchmark: ${statusLabel(benchStatus || 'unknown')}`)
+  lines.push(`- Datasource benchmark compare: ${statusLabel(benchCompareStatus || 'unknown')}`)
   lines.push(`- Affected target: ${affectedTarget || 'none'}`)
   lines.push(`- Affected tests: ${statusLabel(affectedStatus || (affectedTarget === 'none' ? 'skipped' : 'unknown'))}`)
   lines.push('')
@@ -80,6 +90,8 @@ const buildMarkdown = ({ rows, buildStatus, affectedTarget, affectedStatus, base
   lines.push(`| ESLint | ${statusLabel(baselineMeta.lintStatus)} |`)
   lines.push(`| Tests (core) | ${statusLabel(baselineMeta.testCoreStatus)} |`)
   lines.push(`| Build | ${statusLabel(baselineMeta.buildStatus)} |`)
+  lines.push(`| Datasource benchmark | ${statusLabel(baselineMeta.benchStatus)} |`)
+  lines.push(`| Datasource benchmark compare | ${statusLabel(baselineMeta.benchCompareStatus)} |`)
   lines.push(`| Affected target | ${baselineMeta.affectedTarget || 'none'} |`)
   lines.push(`| Affected tests | ${statusLabel(baselineMeta.affectedStatus)} |`)
   lines.push(`| Workflow run | ${baselineMeta.runUrl} |`)
@@ -103,6 +115,10 @@ if (summaryMode) {
   const tsStatus = normalizeStatus(getArg('ts', process.env.DE_TS || 'unknown'))
   const lintStatus = normalizeStatus(getArg('lint', process.env.DE_LINT || 'unknown'))
   const testCoreStatus = normalizeStatus(getArg('test-core', process.env.DE_TEST_CORE || 'unknown'))
+  const benchStatus = normalizeStatus(getArg('bench', process.env.DE_BENCH || 'unknown'))
+  const benchCompareStatus = normalizeStatus(
+    getArg('bench-compare', process.env.DE_BENCH_COMPARE || 'unknown')
+  )
 
   const rows = [
     {
@@ -119,12 +135,24 @@ if (summaryMode) {
       name: 'Tests (core)',
       status: testCoreStatus,
       duration: getArg('test-core-ms', '-')
+    },
+    {
+      name: 'Datasource benchmark',
+      status: benchStatus,
+      duration: getArg('bench-ms', '-')
+    },
+    {
+      name: 'Datasource benchmark compare',
+      status: benchCompareStatus,
+      duration: getArg('bench-compare-ms', '-')
     }
   ]
 
   const markdown = buildMarkdown({
     rows,
     buildStatus,
+    benchStatus,
+    benchCompareStatus,
     affectedTarget,
     affectedStatus,
     baselineMeta: {
@@ -141,6 +169,8 @@ if (summaryMode) {
       lintStatus,
       testCoreStatus,
       buildStatus,
+      benchStatus,
+      benchCompareStatus,
       affectedTarget,
       affectedStatus,
       runUrl: getArg('run-url', process.env.DE_BASELINE_RUN_URL || '') || buildRunUrl()
@@ -182,6 +212,8 @@ checks.forEach(check => {
 const markdown = buildMarkdown({
   rows,
   buildStatus: 'n/a',
+  benchStatus: 'n/a',
+  benchCompareStatus: 'n/a',
   affectedTarget: 'n/a',
   affectedStatus: 'n/a',
   baselineMeta: {
@@ -192,6 +224,8 @@ const markdown = buildMarkdown({
     lintStatus: rows[1]?.status || 'unknown',
     testCoreStatus: rows[2]?.status || 'unknown',
     buildStatus: 'n/a',
+    benchStatus: 'n/a',
+    benchCompareStatus: 'n/a',
     affectedTarget: 'n/a',
     affectedStatus: 'n/a',
     runUrl: 'n/a'

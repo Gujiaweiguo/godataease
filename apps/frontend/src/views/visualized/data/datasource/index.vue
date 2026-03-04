@@ -24,7 +24,7 @@ import icon_succeed_filled from '@/assets/svg/icon_succeed_filled.svg'
 import icon_close_filled from '@/assets/svg/icon_close_filled.svg'
 import icon_replace_outlined from '@/assets/svg/icon_replace_outlined.svg'
 import iconMaybe_outlined from '@/assets/svg/icon-maybe_outlined.svg'
-import { computed, h, unref, reactive, ref, shallowRef, nextTick, watch, onMounted } from 'vue'
+import { computed, h, unref, reactive, ref, shallowRef, nextTick, watch, onMounted, triggerRef } from 'vue'
 import { dsTypes } from '@/views/visualized/data/datasource/form/option'
 import type { TabPaneName, ElMessageBoxOptions } from 'element-plus-secondary'
 import {
@@ -82,6 +82,17 @@ import BaseInfoContent from './BaseInfoContent.vue'
 import type { BusiTreeNode, BusiTreeRequest } from '@/models/tree/TreeNode'
 import { useMoveLine } from '@/hooks/web/useMoveLine'
 import { cloneDeep } from 'lodash-es'
+import {
+  createExpandedKeyPersistScheduler,
+  createFilterKeywordCache,
+  createTreeFilterHandler,
+  filterNodeByKeyword,
+  getExpandedKeysArray,
+  mutateExpandedKeySet,
+  persistExpandedKeysToCache,
+  pruneExpandedKeySet,
+  restoreExpandedKeysFromCache
+} from './treeState'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import treeSort from '@/utils/treeSortUtils'
 import { useCache } from '@/hooks/web/useCache'
@@ -218,12 +229,14 @@ const originResourceTree = shallowRef([])
 
 const handleSortTypeChange = sortType => {
   state.datasourceTree = treeSort(originResourceTree.value, sortType)
+  pruneExpandedKeys(state.datasourceTree)
   state.curSortType = sortType
   wsCache.set('TreeSort-datasource', state.curSortType)
 }
 
 const sortTypeChange = sortType => {
   state.datasourceTree = treeSort(originResourceTree.value, sortType)
+  pruneExpandedKeys(state.datasourceTree)
   state.curSortType = sortType
 }
 const handleSizeChange = pageSize => {
@@ -371,6 +384,14 @@ const showErrorInfo = info => {
 }
 
 const pluginDs = ref([])
+const dsPluginIconMap = computed<Record<string, string | null>>(() => {
+  const map: Record<string, string | null> = {}
+  ;(pluginDs.value as Array<{ type: string; icon?: string | null }>).forEach(ele => {
+    map[ele.type] = ele.icon ?? null
+  })
+  return map
+})
+
 const loadDsPlugin = data => {
   pluginDs.value = data
   pluginDs.value.forEach(ele => {
@@ -378,19 +399,11 @@ const loadDsPlugin = data => {
   })
 }
 const getDsIcon = data => {
-  if (pluginDs?.value.length === 0) return null
   if (!data.leaf) return null
-
-  const arr = pluginDs.value.filter(ele => {
-    return ele.type === data.type
-  })
-  return arr && arr.length > 0 ? arr[0].icon : null
+  return dsPluginIconMap.value[data.type] ?? null
 }
 const getDsIconType = type => {
-  const arr = pluginDs.value.filter(ele => {
-    return ele.type === type
-  })
-  return arr && arr.length > 0 ? arr[0].icon : null
+  return dsPluginIconMap.value[type] ?? null
 }
 
 const getDsIconName = data => {
@@ -650,11 +663,34 @@ const createDatasource = (data?: Tree) => {
 }
 const showRecord = ref(false)
 const dsListTree = ref()
-const expandedKey = ref([])
+const expandedKeySet = ref<Set<string | number>>(new Set())
+const expandedKey = computed(() => getExpandedKeysArray(expandedKeySet.value))
 const dsListTreeShow = ref(true)
-watch(dsName, (val: string) => {
-  dsListTree.value.filter(val)
+
+function pruneExpandedKeys(treeNodes: BusiTreeNode[]) {
+  const { nextExpandedKeySet, changed } = pruneExpandedKeySet(expandedKeySet.value, treeNodes)
+  if (!changed) return
+  expandedKeySet.value = nextExpandedKeySet
+  persistExpandedKeys()
+}
+
+const restoreExpandedKeys = () => {
+  expandedKeySet.value = restoreExpandedKeysFromCache(wsCache)
+}
+
+const persistExpandedKeys = () => {
+  persistExpandedKeysToCache(wsCache, expandedKeySet.value)
+}
+const schedulePersistExpandedKeys = createExpandedKeyPersistScheduler(() => {
+  persistExpandedKeys()
 })
+
+watch(
+  dsName,
+  createTreeFilterHandler((val: string) => {
+    dsListTree.value?.filter(val)
+  })
+)
 const updateTreeExpand = () => {
   dsListTreeShow.value = false
   nextTick(() => {
@@ -695,19 +731,26 @@ const updateApiDs = () => {
 
 const nodeExpand = data => {
   if (data.id) {
-    expandedKey.value.push(data.id)
+    const changed = mutateExpandedKeySet(expandedKeySet.value, data.id, true)
+    if (!changed) return
+    triggerRef(expandedKeySet)
+    schedulePersistExpandedKeys()
   }
 }
 
 const nodeCollapse = data => {
   if (data.id) {
-    expandedKey.value.splice(expandedKey.value.indexOf(data.id), 1)
+    const changed = mutateExpandedKeySet(expandedKeySet.value, data.id, false)
+    if (!changed) return
+    triggerRef(expandedKeySet)
+    schedulePersistExpandedKeys()
   }
 }
 
+const filterKeywordCache = createFilterKeywordCache()
+
 const filterNode = (value: string, data: BusiTreeNode) => {
-  if (!value) return true
-  return data.name?.toLowerCase().includes(value.toLowerCase())
+  return filterNodeByKeyword(value, data, filterKeywordCache)
 }
 
 const editDatasource = (editType?: number) => {
@@ -1059,6 +1102,7 @@ onMounted(() => {
   nodeInfo.id = (dsId as string) || (route.query.id as string) || ''
   wsCache.delete('ds-info-id')
   loadInit()
+  restoreExpandedKeys()
   listDs()
   setSupportSetKey()
   const { opt } = router?.currentRoute?.value?.query || {}
