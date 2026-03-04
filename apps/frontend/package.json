@@ -26,6 +26,7 @@
     "test:coverage": "vitest run tests/unit/example.test.ts --coverage",
     "test:coverage:core": "vitest run tests/unit tests/integration src/tests/unit --coverage",
     "e2e": "playwright test",
+    "e2e:system-smoke": "playwright test --grep @system-smoke",
     "e2e:ui": "playwright test --ui",
     "e2e:debug": "playwright test --debug",
     "e2e:report": "playwright show-report"
