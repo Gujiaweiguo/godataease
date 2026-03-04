@@ -10,6 +10,17 @@ const hasLoginForm = async page => {
   return passwordCount > 0 && loginButtonCount > 0
 }
 
+const loginWithValidCredentials = async page => {
+  const username = process.env.E2E_USERNAME || 'admin'
+  const password = process.env.E2E_PASSWORD || 'DataEase123456'
+
+  await page.locator('input[type="text"]').first().fill(username)
+  await page.locator('input[type="password"]').first().fill(password)
+
+  const loginButton = page.locator('button:has-text("Login")').or(page.locator('button:has-text("登录")'))
+  await loginButton.click()
+}
+
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
@@ -46,25 +57,32 @@ test.describe('Authentication', () => {
     expect(hasError || stillOnLogin).toBeTruthy()
   })
 
-  // Note: This test requires backend service to be running
-  test.fixme('should login successfully with valid credentials', async ({ page }) => {
-    const username = process.env.E2E_USERNAME || 'admin'
-    const password = process.env.E2E_PASSWORD || 'DataEase123456'
+  test('SYS-SMK-004 @system-smoke should login successfully with valid credentials', async ({ page, context }) => {
+    await context.clearCookies()
+    await page.goto('/')
 
-    await page.locator('input[type="text"]').first().fill(username)
-    await page.locator('input[type="password"]').first().fill(password)
+    await expect(page.locator('input[type="text"]').first()).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('input[type="password"]').first()).toBeVisible({ timeout: 10000 })
 
-    // Support both Chinese and English UI
-    const loginButton = page.locator('button:has-text("Login")').or(page.locator('button:has-text("登录")'))
-    await loginButton.click()
+    await loginWithValidCredentials(page)
 
-    // Wait for navigation away from login page
-    await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {
-      // If timeout, check if we're still on login due to invalid credentials
-    })
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => Object.keys(localStorage).includes('user.token'))
+      }, { timeout: 20000 })
+      .toBe(true)
 
-    // Verify we're not on login page anymore (successful login)
-    const currentUrl = page.url()
-    expect(currentUrl).not.toContain('login')
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => window.location.hash)
+      }, { timeout: 20000 })
+      .toContain('/workbranch/index')
+
+    const hasAppShell =
+      (await page.locator('#app').count()) > 0 ||
+      (await page.locator('.de-layout').count()) > 0 ||
+      (await page.locator('body').count()) > 0
+
+    expect(hasAppShell).toBeTruthy()
   })
 })
