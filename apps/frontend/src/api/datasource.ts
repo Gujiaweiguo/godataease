@@ -1,5 +1,6 @@
 import request from '@/config/axios'
 import { nameTrim } from '@/utils/utils'
+import { withDatasourceError } from './decorators/datasourceErrorDecorator'
 
 export interface DatasetOrFolder {
   name: string
@@ -75,9 +76,7 @@ export const previewData = (data = {}) => {
     return res?.data
   })
 }
-export const validate = (data = {}) => {
-  return request.post({ url: '/datasource/validate', data })
-}
+export const validate = (data = {}) => request.post({ url: '/datasource/validate', data })
 
 export const isShowFinishPage = async () => {
   return request.get({ url: '/datasource/showFinishPage' })
@@ -139,9 +138,7 @@ export const checkRepeat = async (data = {}): Promise<Dataset> => {
 }
 
 export const checkApiItem = async (data = {}): Promise<IResponse> => {
-  return request.post({ url: '/datasource/checkApiDatasource', data }).then(res => {
-    return res
-  })
+  return withDatasourceError(() => request.post({ url: '/datasource/checkApiDatasource', data }))
 }
 
 export const getDatasetTree = async (data = {}): Promise<IResponse> => {

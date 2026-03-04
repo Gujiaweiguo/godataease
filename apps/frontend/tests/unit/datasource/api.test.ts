@@ -25,8 +25,12 @@ import {
   getHidePwById,
   getSimpleDs,
   uploadFile,
-  save
+  save,
+  validate,
+  syncApiTable,
+  checkApiItem
 } from '@/api/datasource'
+import { withDatasourceError } from '@/api/decorators/datasourceErrorDecorator'
 
 describe('Datasource API wrappers', () => {
   beforeEach(() => {
@@ -90,4 +94,35 @@ describe('Datasource API wrappers', () => {
       data: { name: '  demo  ' }
     })
   })
+
+  it('uses withDatasourceError decorator for validate method', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { valid: true } })
+    const result = await validate({ id: '123' })
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasource/validate',
+      data: { id: '123' }
+    })
+    expect(result).toEqual({ data: { valid: true } })
+  })
+
+  it('uses withDatasourceError decorator for syncApiTable method', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { tables: [] } })
+    const result = await syncApiTable({ datasourceId: '123' })
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasource/syncApiTable',
+      data: { datasourceId: '123' }
+    })
+    expect(result).toEqual({ data: { tables: [] } })
+  })
+
+  it('uses withDatasourceError decorator for checkApiItem method', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { valid: true } })
+    const result = await checkApiItem({ url: 'http://example.com' })
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasource/checkApiDatasource',
+      data: { url: 'http://example.com' }
+    })
+    expect(result).toEqual({ data: { valid: true } })
+  })
+
 })
