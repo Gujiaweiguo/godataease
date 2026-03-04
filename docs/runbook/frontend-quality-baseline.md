@@ -21,6 +21,8 @@
 - ESLint
 - Tests (core)
 - Build
+- Datasource benchmark
+- Datasource benchmark compare
 - Affected target
 - Affected tests
 - Workflow run
@@ -29,9 +31,9 @@
 
 每周追加一行：
 
-| Week | Date (UTC) | Branch | Commit | TS | ESLint | Tests(core) | Build | Affected target | Affected tests | Workflow run | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-W10 | 2026-03-02 | main | 7170ddc | pass | pass | pass | pass | test:core | pass | https://github.com/Gujiaweiguo/godataease/actions/runs/<run-id> | 基线初始化 |
+| Week | Date (UTC) | Branch | Commit | TS | ESLint | Tests(core) | Build | DS Bench | DS Bench Compare | Affected target | Affected tests | Workflow run | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-W10 | 2026-03-02 | main | 7170ddc | pass | pass | pass | pass | n/a | n/a | test:core | pass | https://github.com/Gujiaweiguo/godataease/actions/runs/<run-id> | 基线初始化 |
 
 ## 执行步骤
 
