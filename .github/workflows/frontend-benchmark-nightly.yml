@@ -96,10 +96,14 @@ jobs:
           fi
 
       - name: Notify Slack on failure
-        if: failure() && secrets.FRONTEND_BENCHMARK_SLACK_WEBHOOK_URL != ''
+        if: failure()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.FRONTEND_BENCHMARK_SLACK_WEBHOOK_URL }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "FRONTEND_BENCHMARK_SLACK_WEBHOOK_URL is not configured, skip Slack notify"
+            exit 0
+          fi
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MESSAGE="[frontend-benchmark-nightly] FAILED on ${{ github.ref_name }}. Run: ${RUN_URL}"
           curl -sS -X POST "$SLACK_WEBHOOK_URL" \
@@ -107,10 +111,14 @@ jobs:
             -d "{\"text\":\"${MESSAGE}\"}" || true
 
       - name: Notify WeCom on failure
-        if: failure() && secrets.FRONTEND_BENCHMARK_WECOM_WEBHOOK_URL != ''
+        if: failure()
         env:
           WECOM_WEBHOOK_URL: ${{ secrets.FRONTEND_BENCHMARK_WECOM_WEBHOOK_URL }}
         run: |
+          if [ -z "$WECOM_WEBHOOK_URL" ]; then
+            echo "FRONTEND_BENCHMARK_WECOM_WEBHOOK_URL is not configured, skip WeCom notify"
+            exit 0
+          fi
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MESSAGE="[frontend-benchmark-nightly] FAILED on ${{ github.ref_name }}. Run: ${RUN_URL}"
           curl -sS -X POST "$WECOM_WEBHOOK_URL" \
