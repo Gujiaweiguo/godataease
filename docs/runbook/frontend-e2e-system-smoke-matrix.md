@@ -105,3 +105,7 @@
 ---
 
 已支持按标签执行最小系统冒烟集：`npm run e2e:system-smoke`。
+
+## 10. E2E Test Account Configuration
+
+For detailed test account setup and required permissions, and required permissions, and troubleshooting steps, see [Frontend E2E Test Account Configuration](./frontend-e2e-test-account.md).
