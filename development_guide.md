@@ -8,6 +8,8 @@ DataEase 是开源的 BI（商业智能）工具，支持通过拖拽方式制�
 **许可证**: GPL v3
 **官网**: https://dataease.cn
 
+**提交前自检清单**: [docs/runbook/dev-validation-checklist.md](./docs/runbook/dev-validation-checklist.md)
+
 ---
 
 ## 🛠 技术栈

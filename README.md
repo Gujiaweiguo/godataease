@@ -201,7 +201,7 @@ docker compose down -v
 - 该 MySQL 实例已加入 `my-net` 网络
 - 数据库、账号与 `.env` 中 `DB_*` 配置一致
 
-更多开发指南请参考 [development_guide.md](./development_guide.md) 和 [AGENTS.md](./AGENTS.md)。
+更多开发指南请参考 [development_guide.md](./development_guide.md)、[AGENTS.md](./AGENTS.md) 和 [开发验证清单 Runbook](./docs/runbook/dev-validation-checklist.md)。
 
 
 ## UI 展示
