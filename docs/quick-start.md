@@ -258,4 +258,5 @@ npm run ts:check             # TypeScript 类型检查
 - [API 文档](./api/)
 - [OpenSpec 规范](../openspec/AGENTS.md)
 - [开发指南](../development_guide.md)
+- [开发验证清单 Runbook](./runbook/dev-validation-checklist.md)
 - [贡献指南](../CONTRIBUTING.md)
