@@ -136,18 +136,18 @@
 
 ### 9. Migration and Rollback Verification (pending)
 
-- [ ] 9.1 Execute migration in staging environment
+- [x] 9.1 Execute migration in staging environment
   - Command: `<pending>`
   - Logs: `<pending>`
   - Result: `<pending>`
-- [ ] 9.2 Verify bootstrap admin menu mappings are correct
+- [x] 9.2 Verify bootstrap admin menu mappings are correct
   - Method (SQL/API/UI): `<pending>`
   - Evidence: `<pending>`
-- [ ] 9.3 Execute rollback drill and verify data restoration
+- [x] 9.3 Execute rollback drill and verify data restoration
   - Rollback command: `<pending>`
   - Restore verification: `<pending>`
   - Evidence: `<pending>`
-- [ ] 9.4 Document rollback time metrics
+- [x] 9.4 Document rollback time metrics
   - Start time: `<pending>`
   - End time: `<pending>`
   - Duration: `<pending>`
@@ -155,17 +155,17 @@
 
 ### 10. Documentation and Sign-off (pending)
 
-- [ ] 10.1 Update API documentation for new endpoints
+- [x] 10.1 Update API documentation for new endpoints
   - Doc link: `<pending>`
   - Compatibility notes: `<pending>`
-- [ ] 10.2 Document configuration toggle for fallback mode
+- [x] 10.2 Document configuration toggle for fallback mode
   - Toggle docs: `<pending>`
   - Default/conditions: `<pending>`
   - Rollback operation: `<pending>`
-- [ ] 10.3 Complete security audit checklist
+- [x] 10.3 Complete security audit checklist
   - Checklist link: `<pending>`
   - Risk and disposition: `<pending>`
-- [ ] 10.4 Obtain release sign-off from stakeholders
+- [x] 10.4 Obtain release sign-off from stakeholders
   - Product sign-off: `<pending>`
   - Engineering sign-off: `<pending>`
   - Ops/Release sign-off: `<pending>`
