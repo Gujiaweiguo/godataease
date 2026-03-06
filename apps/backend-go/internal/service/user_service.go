@@ -2,8 +2,10 @@ package service
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
@@ -13,13 +15,16 @@ import (
 )
 
 const (
-	DefaultBcryptCost = 10 // 与 Java 版本一致
+	DefaultBcryptCost      = 10 // 与 Java 版本一致
+	DefaultPasswordEnvName = "USER_DEFAULT_PASSWORD"
+	FallbackDefaultPwd     = "DataEase123456"
 )
 
 type UserService struct {
 	userRepo     *repository.UserRepository
 	userRoleRepo *repository.UserRoleRepository
 	userPermRepo *repository.UserPermRepository
+	auditSvc     *AuditService // 审计服务（可选）
 }
 
 func NewUserService(
@@ -31,7 +36,13 @@ func NewUserService(
 		userRepo:     userRepo,
 		userRoleRepo: userRoleRepo,
 		userPermRepo: userPermRepo,
+		auditSvc:     nil, // 默认为空，可通过 SetAuditService 注入
 	}
+}
+
+// SetAuditService 设置审计服务
+func (s *UserService) SetAuditService(svc *AuditService) {
+	s.auditSvc = svc
 }
 
 // CreateUser 创建用户（含密码加密）
@@ -168,13 +179,20 @@ func (s *UserService) SearchUsers(req *user.UserQueryRequest) (*user.UserListRes
 
 // ResetPassword 重置密码
 func (s *UserService) ResetPassword(userID int64, newPassword string) error {
+	return s.ResetPasswordWithAudit(userID, newPassword, 0, "system", "127.0.0.1")
+}
+
+// ResetPasswordWithAudit 重置密码（含审计日志）
+func (s *UserService) ResetPasswordWithAudit(userID int64, newPassword string, operatorID int64, operatorName string, ipAddress string) error {
 	existing, err := s.userRepo.GetByID(userID)
 	if err != nil {
+		s.recordPasswordResetAudit(nil, userID, operatorID, operatorName, ipAddress, audit.StatusFailed, "user not found")
 		return fmt.Errorf("user not found: %w", err)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), DefaultBcryptCost)
 	if err != nil {
+		s.recordPasswordResetAudit(existing, userID, operatorID, operatorName, ipAddress, audit.StatusFailed, "failed to hash password")
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
@@ -184,11 +202,61 @@ func (s *UserService) ResetPassword(userID int64, newPassword string) error {
 
 	if err := s.userRepo.Update(existing); err != nil {
 		logger.Error("Failed to reset password", zap.Error(err))
+		s.recordPasswordResetAudit(existing, userID, operatorID, operatorName, ipAddress, audit.StatusFailed, err.Error())
 		return fmt.Errorf("failed to reset password: %w", err)
 	}
 
 	logger.Info("Password reset", zap.Int64("userId", userID))
+	s.recordPasswordResetAudit(existing, userID, operatorID, operatorName, ipAddress, audit.StatusSuccess, "")
 	return nil
+}
+
+// recordPasswordResetAudit 记录密码重置审计日志
+func (s *UserService) recordPasswordResetAudit(user *user.SysUser, userID int64, operatorID int64, operatorName string, ipAddress string, status audit.Status, failureReason string) {
+	if s.auditSvc == nil {
+		return
+	}
+
+	resourceType := string(audit.ResourceTypeUser)
+	req := &audit.AuditLogCreateRequest{
+		UserID:       &operatorID,
+		Username:     &operatorName,
+		ActionType:   audit.ActionTypeUserAction,
+		ActionName:   "重置密码",
+		ResourceType: &resourceType,
+		ResourceID:   &userID,
+		Operation:    audit.OperationUpdate,
+		IPAddress:    &ipAddress,
+		Status:       &status,
+	}
+
+	if user != nil {
+		req.ResourceName = &user.Username
+		if status == audit.StatusSuccess {
+			req.BeforeValue = ptrUserStr("[REDACTED]")
+			req.AfterValue = ptrUserStr("password reset to default policy")
+		}
+	}
+
+	if failureReason != "" {
+		req.FailureReason = &failureReason
+	}
+
+	// 异步记录审计日志
+	go func() {
+		_, _ = s.auditSvc.CreateAuditLog(req)
+	}()
+}
+
+func ptrUserStr(v string) *string {
+	return &v
+}
+
+func (s *UserService) ResolveDefaultPassword() string {
+	if pwd := os.Getenv(DefaultPasswordEnvName); pwd != "" {
+		return pwd
+	}
+	return FallbackDefaultPwd
 }
 
 // UpdateUserStatus 更新用户状态

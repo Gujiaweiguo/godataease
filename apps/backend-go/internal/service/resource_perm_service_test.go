@@ -103,6 +103,23 @@ func (m *mockResourcePermRepo) RevokePermFromRole(roleID, permID int64) error {
 	return nil
 }
 
+// ========== 双视角接口实现 ==========
+func (m *mockResourcePermRepo) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return []*permission.UserResourcePermVO{}, nil
+}
+
+func (m *mockResourcePermRepo) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return []*permission.ResourceUserPermVO{}, nil
+}
+
+func (m *mockResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
+	return nil
+}
+
+func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
 func TestCheckPermission_AdminBypass(t *testing.T) {
 	mockRepo := newMockResourcePermRepo()
 	mockChecker := &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{1: true}}

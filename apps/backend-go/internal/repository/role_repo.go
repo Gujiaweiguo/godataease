@@ -52,3 +52,57 @@ func (r *RoleRepository) CountByRoleCode(roleCode string) (int64, error) {
 		Count(&count).Error
 	return count, err
 }
+
+// CountUserRoles 统计用户的角色数量
+func (r *RoleRepository) CountUserRoles(userID int64) (int64, error) {
+	var count int64
+	err := r.db.Table("sys_user_role").
+		Where("user_id = ?", userID).
+		Count(&count).Error
+	return count, err
+}
+
+// GetUserRoleIDs 获取用户的角色ID列表
+func (r *RoleRepository) GetUserRoleIDs(userID int64) ([]int64, error) {
+	var roleIDs []int64
+	err := r.db.Table("sys_user_role").
+		Where("user_id = ?", userID).
+		Pluck("role_id", &roleIDs).Error
+	return roleIDs, err
+}
+
+// BindUserRole 绑定用户到角色
+func (r *RoleRepository) BindUserRole(userID, roleID, orgID int64) error {
+	userRole := map[string]interface{}{
+		"user_id": userID,
+		"role_id": roleID,
+		"org_id":  orgID,
+	}
+	return r.db.Table("sys_user_role").Create(userRole).Error
+}
+
+// UnbindUserRole 解绑用户与角色
+func (r *RoleRepository) UnbindUserRole(userID, roleID int64) error {
+	return r.db.Table("sys_user_role").
+		Where("user_id = ? AND role_id = ?", userID, roleID).
+		Delete(nil).Error
+}
+
+// GetRolesByIDs 根据角色ID列表查询角色
+func (r *RoleRepository) GetRolesByIDs(roleIDs []int64) ([]*role.SysRole, error) {
+	var roles []*role.SysRole
+	err := r.db.Where("role_id IN ? AND status = ?", roleIDs, role.StatusEnabled).
+		Find(&roles).Error
+	return roles, err
+}
+
+// QueryByOrgID 查询组织下的角色
+func (r *RoleRepository) QueryByOrgID(orgID int64, keyword string) ([]*role.SysRole, error) {
+	var roles []*role.SysRole
+	db := r.db.Model(&role.SysRole{}).Where("status = ?", role.StatusEnabled)
+	if keyword != "" {
+		db = db.Where("role_name LIKE ?", "%"+keyword+"%")
+	}
+	err := db.Order("create_time DESC").Find(&roles).Error
+	return roles, err
+}

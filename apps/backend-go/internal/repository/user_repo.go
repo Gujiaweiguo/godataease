@@ -132,6 +132,22 @@ func (r *UserRepository) ListUsersByIds(ids []int64) ([]*user.SysUser, error) {
 	return users, err
 }
 
+// SearchExternalUser 搜索组织外用户（不在指定组织的用户）
+func (r *UserRepository) SearchExternalUser(keyword string, excludeOrgID int64) ([]*user.SysUser, error) {
+	var users []*user.SysUser
+	db := r.db.Model(&user.SysUser{}).
+		Where("del_flag = ?", user.DelFlagNormal).
+		Where("user_id NOT IN (SELECT user_id FROM sys_user_role WHERE org_id = ?)", excludeOrgID)
+	
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		db = db.Where("username LIKE ? OR nick_name LIKE ? OR email LIKE ?", kw, kw, kw)
+	}
+	
+	err := db.Limit(20).Find(&users).Error
+	return users, err
+}
+
 // UserRoleRepository 关联表操作（用户-角色）
 type UserRoleRepository struct {
 	db *gorm.DB
@@ -181,4 +197,14 @@ func (r *UserRoleRepository) GetRoleIDsByUserID(userID int64) ([]int64, error) {
 	var roleIDs []int64
 	err := r.db.Model(&user.SysUserRole{}).Where("user_id = ?", userID).Pluck("role_id", &roleIDs).Error
 	return roleIDs, err
+}
+
+// CountByOrgID 统计组织下的用户数量
+func (r *UserRepository) CountByOrgID(orgID int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&user.SysUser{}).
+		Joins("JOIN sys_user_role ur ON ur.user_id = sys_user.user_id").
+		Where("ur.org_id = ? AND sys_user.del_flag = ?", orgID, user.DelFlagNormal).
+		Count(&count).Error
+	return count, err
 }

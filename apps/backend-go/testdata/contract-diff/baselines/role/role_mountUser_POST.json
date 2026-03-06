@@ -1,0 +1,56 @@
+{
+  "apiIdentity": {
+    "path": "/de2api/role/mountUser",
+    "method": "POST",
+    "owner": "role-team",
+    "priority": "P0",
+    "blockingLevel": "critical",
+    "description": "Add organization users to role"
+  },
+  "requestContext": {
+    "body": {
+      "rid": 1,
+      "uids": [1, 2, 3],
+      "orgId": 1,
+      "over": false
+    },
+    "headers": {
+      "Authorization": "Bearer <token>"
+    }
+  },
+  "standardResponse": {
+    "status": 200,
+    "code": "000000",
+    "msg": "success",
+    "data": null
+  },
+  "errorResponses": [
+    {
+      "condition": "role_not_found",
+      "status": 200,
+      "code": "500000",
+      "msg": "role not found"
+    },
+    {
+      "condition": "user_not_found",
+      "status": 200,
+      "code": "500000",
+      "msg": "user not found"
+    }
+  ],
+  "versionMetadata": {
+    "captured_at": "2026-03-05T00:00:00Z",
+    "baseline_version": "1.0.0",
+    "change_id": "align-rbac-with-xpack-docs"
+  },
+  "notes": {
+    "caveats": [
+      "Idempotent - duplicate associations ignored",
+      "Audit log must record operation",
+      "Users must belong to same organization"
+    ],
+    "auditEvents": [
+      "ADD_ROLE_MEMBER"
+    ]
+  }
+}

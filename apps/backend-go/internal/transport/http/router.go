@@ -150,11 +150,16 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	userRoleRepo := repository.NewUserRoleRepository(db)
 	userPermRepo := repository.NewUserPermRepository(db)
 	userService := service.NewUserService(userRepo, userRoleRepo, userPermRepo)
-	userHandler := handler.NewUserHandler(userService)
+	userImportService := service.NewUserImportService(userService)
+	userHandler := handler.NewUserHandler(userService, userImportService)
+	// Role module initialization (must be before OrgService as it depends on roleRepo)
+	roleRepo := repository.NewRoleRepository(db)
+	roleService := service.NewRoleService(roleRepo, userRepo, userRoleRepo)
+	roleHandler := handler.NewRoleHandler(roleService)
 
 	// Organization module initialization
 	orgRepo := repository.NewOrgRepository(db)
-	orgService := service.NewOrgService(orgRepo)
+	orgService := service.NewOrgService(orgRepo, auditService, userRepo, roleRepo)
 	orgHandler := handler.NewOrgHandler(orgService)
 
 	// Permission module initialization
@@ -167,15 +172,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	embeddedService := service.NewEmbeddedService(embeddedRepo)
 	embeddedHandler := handler.NewEmbeddedHandler(embeddedService)
 
-	// Role module initialization
-	roleRepo := repository.NewRoleRepository(db)
-	roleService := service.NewRoleService(roleRepo)
-	roleHandler := handler.NewRoleHandler(roleService)
-
 	// Menu module initialization
 	menuRepo := repository.NewMenuRepository(db)
 	menuService := service.NewMenuService(menuRepo)
 	menuHandler := handler.NewMenuHandler(menuService)
+
 
 	// RoleMenu module initialization
 	roleMenuRepo := repository.NewRoleMenuRepository(db)

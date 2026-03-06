@@ -162,6 +162,25 @@ func (m *mockResourcePermRepoForExport) RevokePermFromRole(roleID, permID int64)
 	return nil
 }
 
+// ========== 双视角接口 mock 实现 ==========
+// ========== 双视角接口 mock 实现 ==========
+func (m *mockResourcePermRepoForExport) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return []*permission.UserResourcePermVO{}, nil
+}
+
+func (m *mockResourcePermRepoForExport) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return []*permission.ResourceUserPermVO{}, nil
+}
+
+func (m *mockResourcePermRepoForExport) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
+	return nil
+}
+
+func (m *mockResourcePermRepoForExport) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
+
 func TestExportDownload_TaskToResourceMapping(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

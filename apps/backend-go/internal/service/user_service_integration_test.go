@@ -3,6 +3,8 @@
 package service
 
 import (
+	"mime/multipart"
+	"os"
 	"testing"
 
 	"dataease/backend/internal/domain/user"
@@ -388,4 +390,56 @@ func TestUserServiceIntegration_CreateUser_CheckUsernameCount(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "username already exists")
+}
+
+func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	svc := NewUserService(userRepo, repository.NewUserRoleRepository(testDB), repository.NewUserPermRepository(testDB))
+	importSvc := NewUserImportService(svc)
+
+	_, err := svc.CreateUser(&user.UserCreateRequest{
+		Username: "dupuser",
+		Password: "password123",
+		RealName: "Duplicate User",
+	})
+	require.NoError(t, err)
+
+	csvContent := "username,realName,email,phone\n" +
+		"dupuser,Dup User,dup@example.com,13800000001\n" +
+		"bademail,Bad User,invalid-email,13800000002\n" +
+		"newuser,New User,newuser@example.com,13800000003\n"
+
+	tmpFile, err := os.CreateTemp("", "user-import-integration-*.csv")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	_, err = tmpFile.WriteString(csvContent)
+	require.NoError(t, err)
+	_, err = tmpFile.Seek(0, 0)
+	require.NoError(t, err)
+
+	header := &multipart.FileHeader{Filename: "users.csv", Size: int64(len(csvContent))}
+	result, err := importSvc.ImportUsers(tmpFile, header, "tester")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 3, result.TotalRows)
+	assert.Equal(t, 1, result.SuccessRows)
+	assert.Equal(t, 2, result.FailedRows)
+	assert.NotEmpty(t, result.ErrorKey)
+
+	reportContent, _, err := importSvc.GetErrorReport(result.ErrorKey)
+	require.NoError(t, err)
+	assert.NotEmpty(t, reportContent)
+
+	err = importSvc.ClearErrorReport(result.ErrorKey)
+	require.NoError(t, err)
+
+	created, err := userRepo.GetByUsername("newuser")
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	err = bcrypt.CompareHashAndPassword([]byte(created.Password), []byte(svc.ResolveDefaultPassword()))
+	assert.NoError(t, err)
 }

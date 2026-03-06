@@ -1,0 +1,51 @@
+{
+  "apiIdentity": {
+    "path": "/de2api/system/permission/list",
+    "method": "POST",
+    "owner": "permission-team",
+    "priority": "P0",
+    "blockingLevel": "critical",
+    "description": "List permissions with pagination"
+  },
+  "requestContext": {
+    "body": {
+      "current": 1,
+      "size": 10
+    },
+    "headers": {
+      "Authorization": "Bearer <token>"
+    }
+  },
+  "standardResponse": {
+    "status": 200,
+    "code": "000000",
+    "msg": "success",
+    "data": {
+      "list": [
+        {
+          "permId": 1,
+          "permName": "View Dashboard",
+          "permKey": "dashboard:view",
+          "permType": "menu",
+          "permDesc": "Permission to view dashboards",
+          "status": 1,
+          "createTime": "2026-01-01T00:00:00Z"
+        }
+      ],
+      "total": 1,
+      "current": 1,
+      "size": 10
+    }
+  },
+  "versionMetadata": {
+    "captured_at": "2026-03-05T00:00:00Z",
+    "baseline_version": "1.0.0",
+    "change_id": "align-rbac-with-xpack-docs"
+  },
+  "notes": {
+    "caveats": [
+      "Returns flat list - tree building is frontend responsibility",
+      "parentId field not supported in current backend"
+    ]
+  }
+}

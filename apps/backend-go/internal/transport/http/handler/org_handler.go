@@ -60,9 +60,29 @@ func (h *OrgHandler) DeleteOrg(c *gin.Context) {
 		return
 	}
 
-	err = h.orgService.DeleteOrg(orgID)
+	// 获取操作者信息
+	operatorID := int64(0)
+	operatorName := "system"
+	if userId, exists := c.Get("userId"); exists {
+		switch v := userId.(type) {
+		case int64:
+			operatorID = v
+		case int:
+			operatorID = int64(v)
+		}
+	}
+	if username, exists := c.Get("username"); exists {
+		if u, ok := username.(string); ok {
+			operatorName = u
+		}
+	}
+
+	// 获取 IP 地址
+	ipAddress := c.ClientIP()
+
+	err = h.orgService.DeleteOrg(orgID, operatorID, operatorName, ipAddress)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, "500000", err.Error())
 		return
 	}
 

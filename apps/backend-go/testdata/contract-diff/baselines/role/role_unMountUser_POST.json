@@ -1,0 +1,58 @@
+{
+  "apiIdentity": {
+    "path": "/de2api/role/unMountUser",
+    "method": "POST",
+    "owner": "role-team",
+    "priority": "P0",
+    "blockingLevel": "critical",
+    "description": "Remove user from role with last-role safety"
+  },
+  "requestContext": {
+    "body": {
+      "rid": 1,
+      "uid": 1
+    },
+    "headers": {
+      "Authorization": "Bearer <token>"
+    }
+  },
+  "standardResponse": {
+    "status": 200,
+    "code": "000000",
+    "msg": "success",
+    "data": null
+  },
+  "errorResponses": [
+    {
+      "condition": "last_role_safety_violation",
+      "status": 200,
+      "code": "500000",
+      "msg": "cannot remove user's last role"
+    },
+    {
+      "condition": "association_not_found",
+      "status": 200,
+      "code": "500000",
+      "msg": "user-role association not found"
+    }
+  ],
+  "versionMetadata": {
+    "captured_at": "2026-03-05T00:00:00Z",
+    "baseline_version": "1.0.0",
+    "change_id": "align-rbac-with-xpack-docs"
+  },
+  "notes": {
+    "caveats": [
+      "Last role safety enforced - cannot remove user's only role",
+      "Use beforeUnmountInfo to check before removal",
+      "Audit log must record operation"
+    ],
+    "auditEvents": [
+      "REMOVE_ROLE_MEMBER"
+    ],
+    "safetyPolicies": [
+      "BLOCK: Prevent removal of last role",
+      "DELETE_USER: Auto-delete user when last role removed (if configured)"
+    ]
+  }
+}

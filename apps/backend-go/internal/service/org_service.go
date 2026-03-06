@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
@@ -12,12 +13,18 @@ import (
 )
 
 type OrgService struct {
-	orgRepo *repository.OrgRepository
+	orgRepo    *repository.OrgRepository
+	auditSvc   *AuditService
+	userRepo   *repository.UserRepository
+	roleRepo   *repository.RoleRepository
 }
 
-func NewOrgService(orgRepo *repository.OrgRepository) *OrgService {
+func NewOrgService(orgRepo *repository.OrgRepository, auditSvc *AuditService, userRepo *repository.UserRepository, roleRepo *repository.RoleRepository) *OrgService {
 	return &OrgService{
-		orgRepo: orgRepo,
+		orgRepo:  orgRepo,
+		auditSvc: auditSvc,
+		userRepo: userRepo,
+		roleRepo: roleRepo,
 	}
 }
 
@@ -93,24 +100,95 @@ func (s *OrgService) UpdateOrg(req *org.OrgUpdateRequest) error {
 	return nil
 }
 
-func (s *OrgService) DeleteOrg(orgID int64) error {
+func (s *OrgService) DeleteOrg(orgID int64, operatorID int64, operatorName string, ipAddress string) error {
+	// 1. 获取组织信息
+	orgInfo, err := s.orgRepo.GetByID(orgID)
+	if err != nil {
+		return fmt.Errorf("organization not found: %w", err)
+	}
+
+	// 2. 检查子组织
 	childrenCount, err := s.orgRepo.CountChildren(orgID)
 	if err != nil {
 		return fmt.Errorf("failed to check children: %w", err)
 	}
 	if childrenCount > 0 {
-		return fmt.Errorf("cannot delete organization with children")
+		// 记录删除失败的审计日志
+		if s.auditSvc != nil {
+			resourceType := string(audit.ResourceTypeOrganization)
+			_, _ = s.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
+				UserID:       &operatorID,
+				Username:     &operatorName,
+				ActionType:   audit.ActionTypeSystemConfig,
+				ActionName:   "删除组织",
+				ResourceType: &resourceType,
+				ResourceID:   &orgID,
+				ResourceName: &orgInfo.OrgName,
+				Operation:    audit.OperationDelete,
+				IPAddress:    &ipAddress,
+				Status:       ptrStatus(audit.StatusFailed),
+				FailureReason: ptrStr(fmt.Sprintf("组织下存在 %d 个子组织，无法删除", childrenCount)),
+			})
+		}
+		return fmt.Errorf("cannot delete organization with %d child organizations - please delete or move child organizations first", childrenCount)
 	}
 
+	// 3. 检查关联资源（可选，用于审计记录）
+	var affectedResources []string
+	if s.userRepo != nil {
+		// 检查组织下用户
+		userCount, _ := s.userRepo.CountByOrgID(orgID)
+		if userCount > 0 {
+			affectedResources = append(affectedResources, fmt.Sprintf("%d users", userCount))
+		}
+	}
+
+	// 4. 执行删除（软删除）
 	if err := s.orgRepo.Delete(orgID); err != nil {
 		logger.Error("Failed to delete organization", zap.Error(err))
 		return fmt.Errorf("failed to delete organization: %w", err)
 	}
 
-	logger.Info("Organization deleted", zap.Int64("orgId", orgID))
+	// 5. 记录成功的审计日志
+	if s.auditSvc != nil {
+		afterValue := fmt.Sprintf("组织已删除，原名称: %s", orgInfo.OrgName)
+		if len(affectedResources) > 0 {
+			afterValue += fmt.Sprintf(", 影响资源: %v", affectedResources)
+		}
+		resourceType := string(audit.ResourceTypeOrganization)
+		_, _ = s.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
+			UserID:       &operatorID,
+			Username:     &operatorName,
+			ActionType:   audit.ActionTypeSystemConfig,
+			ActionName:   "删除组织",
+			ResourceType: &resourceType,
+			ResourceID:   &orgID,
+			ResourceName: &orgInfo.OrgName,
+			Operation:    audit.OperationDelete,
+			IPAddress:    &ipAddress,
+			BeforeValue:  ptrStr(fmt.Sprintf("OrgName: %s, Level: %d", orgInfo.OrgName, orgInfo.Level)),
+			AfterValue:   ptrStr(afterValue),
+			Status:       ptrStatus(audit.StatusSuccess),
+		})
+	}
+	logger.Info("Organization deleted", zap.Int64("orgId", orgID), zap.String("orgName", orgInfo.OrgName))
 	return nil
 }
 
+// ptrInt 辅助函数
+func ptrInt(v int) *int {
+	return &v
+}
+
+// ptrStr 辅助函数
+func ptrStr(v string) *string {
+	return &v
+}
+
+// ptrStatus 辅助函数
+func ptrStatus(v audit.Status) *audit.Status {
+	return &v
+}
 func (s *OrgService) GetOrgByID(orgID int64) (*org.SysOrg, error) {
 	return s.orgRepo.GetByID(orgID)
 }

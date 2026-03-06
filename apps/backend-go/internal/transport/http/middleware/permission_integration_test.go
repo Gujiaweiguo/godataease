@@ -79,6 +79,25 @@ func (m *mockResourcePermRepo) RevokePermFromRole(roleID, permID int64) error {
 	return nil
 }
 
+// ========== 双视角接口 mock 实现 ==========
+// ========== 双视角接口 mock 实现 ==========
+func (m *mockResourcePermRepo) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return []*permission.UserResourcePermVO{}, nil
+}
+
+func (m *mockResourcePermRepo) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return []*permission.ResourceUserPermVO{}, nil
+}
+
+func (m *mockResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
+	return nil
+}
+
+func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
+
 func TestDatasetPreviewWithPerm_401_Unauthenticated(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
