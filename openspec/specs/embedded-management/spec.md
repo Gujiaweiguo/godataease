@@ -1,7 +1,7 @@
 # embedded-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-embedded-module. Update Purpose after archive.
+Define embedded application management requirements for app credentials, domain policy, and lifecycle operations.
 ## Requirements
 ### Requirement: Embedded Application Management
 The system SHALL provide embedded application management functionality for third-party integration.
@@ -118,4 +118,3 @@ The system SHALL provide the following API endpoints for embedded management.
 #### Scenario: Limit count endpoint
 - **WHEN** GET /api/embedded/limitCount is called
 - **THEN** returns the maximum number of embedded applications allowed
-

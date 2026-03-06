@@ -1,7 +1,7 @@
 # map-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-map-module. Update Purpose after archive.
+Define map asset and geographic area management behaviors, including map metadata query and maintenance workflows.
 ## Requirements
 ### Requirement: Map Area Tree Query
 The system SHALL provide map area tree query functionality for geographic visualization.
@@ -23,4 +23,3 @@ The system SHALL provide the following API endpoint for map management.
 #### Scenario: World tree endpoint
 - **WHEN** GET /api/map/worldTree is called
 - **THEN** returns root area node with nested children
-

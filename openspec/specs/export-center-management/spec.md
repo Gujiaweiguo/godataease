@@ -1,7 +1,7 @@
 # export-center-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-collaboration-export-module. Update Purpose after archive.
+Define export center task lifecycle requirements for querying, retrying, deleting, and downloading exports.
 ## Requirements
 ### Requirement: Export Task Lifecycle
 The system SHALL provide export task lifecycle management in Go backend.
@@ -23,4 +23,3 @@ The system SHALL provide controlled export file download capability.
 - **WHEN** export task is completed and caller is authorized
 - **THEN** the system returns downloadable file stream or signed URL
 - **AND** applies expiration and access control checks
-

@@ -1,7 +1,7 @@
 # calcite-sql-integration Specification
 
 ## Purpose
-TBD - created by archiving change add-calcite-sql-integration. Update Purpose after archive.
+Define Calcite-based SQL validation integration requirements for dataset preview and error handling.
 ## Requirements
 ### Requirement: Calcite SQL Parse and Validate Integration
 The Go backend SHALL implement Calcite-backed SQL parsing and validation for migration-critical SQL workflows.
@@ -36,4 +36,3 @@ Dataset SQL preview and related compatibility workflows SHALL enforce Calcite va
 - **WHEN** a dataset SQL preview request is received
 - **THEN** the backend validates SQL via Calcite before executing preview logic
 - **AND** blocks execution when validation fails
-

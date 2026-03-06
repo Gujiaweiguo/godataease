@@ -1,7 +1,7 @@
 # seatunnel-sync-integration Specification
 
 ## Purpose
-TBD - created by archiving change add-seatunnel-sync-integration. Update Purpose after archive.
+Define SeaTunnel synchronization integration requirements for task submission, status tracking, and retry control.
 ## Requirements
 ### Requirement: SeaTunnel Sync Task Orchestration
 The Go backend SHALL orchestrate datasource sync tasks through SeaTunnel for migration-critical sync workflows.
@@ -36,4 +36,3 @@ The backend SHALL provide paginated sync records for compatibility route consume
 - **WHEN** a client requests `listSyncRecord` with datasource ID and paging parameters
 - **THEN** the backend returns persisted sync records with `total/current/size/records`
 - **AND** records are ordered deterministically by creation or update time
-

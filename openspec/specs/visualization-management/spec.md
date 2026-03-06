@@ -1,7 +1,7 @@
 # visualization-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-chart-visualization-core-module. Update Purpose after archive.
+Define data visualization lifecycle requirements for listing, saving, updating, and loading visualization canvases.
 ## Requirements
 ### Requirement: Visualization Core CRUD
 The system SHALL provide visualization core CRUD capability in Go backend.

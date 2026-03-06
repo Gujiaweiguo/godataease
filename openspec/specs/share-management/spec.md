@@ -1,7 +1,7 @@
 # share-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-collaboration-export-module. Update Purpose after archive.
+Define sharing and ticket access requirements for secure external access to dashboards and resources.
 ## Requirements
 ### Requirement: Resource Sharing Core
 The system SHALL provide resource sharing core capability in Go backend.
@@ -23,4 +23,3 @@ The system SHALL support share ticket lifecycle management.
 - **WHEN** share ticket reaches expiration time or is revoked
 - **THEN** the system denies subsequent access attempts
 - **AND** records access failure in audit log
-

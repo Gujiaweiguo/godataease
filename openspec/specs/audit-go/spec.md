@@ -1,7 +1,7 @@
 # audit-go Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-audit-module. Update Purpose after archive.
+Define Go audit logging requirements for authentication events and operation traceability.
 ## Requirements
 ### Requirement: Audit Log Entity
 
@@ -62,4 +62,3 @@ TBD - created by archiving change implement-go-audit-module. Update Purpose afte
 #### Scenario: Automatic request logging
 - **WHEN** 请求经过审计中间件
 - **THEN** 系统 SHALL 自动提取并记录 user_id、ip_address、user_agent 等信息
-

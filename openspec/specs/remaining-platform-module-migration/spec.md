@@ -1,7 +1,7 @@
 # remaining-platform-module-migration Specification
 
 ## Purpose
-TBD - created by archiving change add-go-remaining-platform-modules. Update Purpose after archive.
+Define migration completion requirements for remaining platform modules moving from legacy Java to Go.
 ## Requirements
 ### Requirement: Remaining Platform Module Coverage
 The Go backend SHALL implement all approved remaining platform modules required for Java parity migration.
@@ -23,4 +23,3 @@ Migration process SHALL maintain a module-level matrix that tracks implementatio
 #### Scenario: Update module status
 - **WHEN** a module completes implementation and regression verification
 - **THEN** the migration matrix records status, verification evidence, and release decision
-

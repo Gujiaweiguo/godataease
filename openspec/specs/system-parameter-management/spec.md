@@ -1,7 +1,7 @@
 # system-parameter-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-platform-ops-module. Update Purpose after archive.
+Define system parameter management requirements for querying and updating platform-level configuration safely.
 ## Requirements
 ### Requirement: System Parameter Query
 The system SHALL provide system parameter query capability in Go backend.
@@ -18,4 +18,3 @@ The system SHALL provide controlled system parameter update capability.
 - **WHEN** authorized client updates a system parameter
 - **THEN** the system validates parameter constraints before persistence
 - **AND** records parameter update event for audit tracking
-

@@ -1,7 +1,7 @@
 # login-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-login-module. Update Purpose after archive.
+Define login and authentication requirements for credential validation, token issuance, and session safety.
 ## Requirements
 ### Requirement: Local Login
 The system SHALL provide local login functionality for user authentication.
@@ -46,4 +46,3 @@ The system SHALL provide the following API endpoints.
 #### Scenario: Logout endpoint
 - **WHEN** GET /logout is called
 - **THEN** returns success
-

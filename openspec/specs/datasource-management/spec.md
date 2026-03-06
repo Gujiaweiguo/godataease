@@ -1,7 +1,7 @@
 # datasource-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-dataset-datasource-module. Update Purpose after archive.
+Define datasource management requirements for connection lifecycle, validation, and sync-related operations.
 ## Requirements
 ### Requirement: Datasource List Query
 The system SHALL provide datasource list query capability in Go backend.
@@ -26,4 +26,3 @@ The system SHALL keep datasource behavior parity baseline between Java and Go fo
 - **WHEN** migration verification is executed for first-wave datasource APIs
 - **THEN** request/response contracts remain compatible with Java implementation
 - **AND** unsupported datasource types are explicitly documented in this change scope
-
