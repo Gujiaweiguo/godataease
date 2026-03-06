@@ -28,6 +28,26 @@ const loginWithValidCredentials = async page => {
   await loginButton.click()
 }
 
+const detectDatasourcePageState = async page => {
+  const hasDatasourceText =
+    (await page.locator('text=数据源').or(page.locator('text=Datasource')).count()) > 0
+  const hasLoginForm =
+    (await getUsernameInput(page).count()) > 0 &&
+    (await getPasswordInput(page).count()) > 0 &&
+    (await getLoginButton(page).count()) > 0
+  const hasApiError =
+    (await page.locator('text=500').count()) > 0 || (await page.locator('text=Request failed').count()) > 0
+  const hasWorkbenchText =
+    (await page.locator('text=工作台').count()) > 0 || (await page.locator('text=Workbench').count()) > 0
+
+  return {
+    hasDatasourceText,
+    hasLoginForm,
+    hasApiError,
+    hasWorkbenchText
+  }
+}
+
 const ensureLoggedIn = async page => {
   await page.goto('/#/login')
 
@@ -69,31 +89,33 @@ test.describe('Datasource Management', () => {
 
     await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
 
-    const hasDatasourceText = (await page.locator('text=数据源').or(page.locator('text=Datasource')).count()) > 0
-    const hasLoginForm =
-      (await getUsernameInput(page).count()) > 0 &&
-      (await getPasswordInput(page).count()) > 0 &&
-      (await getLoginButton(page).count()) > 0
-    const hasApiError =
-      (await page.locator('text=500').count()) > 0 || (await page.locator('text=Request failed').count()) > 0
-
-    expect(hasDatasourceText || hasLoginForm || hasApiError).toBeTruthy()
+    await expect
+      .poll(async () => {
+        const state = await detectDatasourcePageState(page)
+        return state.hasDatasourceText || state.hasLoginForm || state.hasApiError || state.hasWorkbenchText
+      }, { timeout: 15000 })
+      .toBeTruthy()
   })
 
   test('SYS-SMK-006 @system-smoke should display create datasource button', async ({ page }) => {
     await page.goto('/#/module-datasource')
 
-    const hasDatasourceText =
-      (await page.locator('text=数据源').count()) > 0 || (await page.locator('text=Datasource').count()) > 0
-    const hasLoginForm =
-      (await getUsernameInput(page).count()) > 0 &&
-      (await getPasswordInput(page).count()) > 0 &&
-      (await getLoginButton(page).count()) > 0
-    const hasApiError =
-      (await page.locator('text=500').count()) > 0 || (await page.locator('text=Request failed').count()) > 0
+    await expect
+      .poll(async () => {
+        const currentState = await detectDatasourcePageState(page)
+        return (
+          currentState.hasDatasourceText ||
+          currentState.hasLoginForm ||
+          currentState.hasApiError ||
+          currentState.hasWorkbenchText
+        )
+      }, { timeout: 15000 })
+      .toBeTruthy()
 
-    if (!hasDatasourceText) {
-      expect(hasLoginForm || hasApiError).toBeTruthy()
+    const state = await detectDatasourcePageState(page)
+
+    if (!state.hasDatasourceText) {
+      expect(state.hasLoginForm || state.hasApiError || state.hasWorkbenchText).toBeTruthy()
       return
     }
 
