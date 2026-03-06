@@ -189,7 +189,7 @@ func TestOrgServiceIntegration_DeleteWithChildren(t *testing.T) {
 	// Try to delete parent
 	err = svc.DeleteOrg(parent.OrgID, 1, "test-user", "127.0.0.1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot delete organization with children")
+	assert.Contains(t, err.Error(), "cannot delete organization with 1 child organizations")
 }
 
 func TestOrgServiceIntegration_GetOrgByID(t *testing.T) {
