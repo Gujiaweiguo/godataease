@@ -69,7 +69,7 @@ func (h *PermHandler) UpdatePerm(c *gin.Context) {
 }
 
 func (h *PermHandler) DeletePerm(c *gin.Context) {
-	permIDStr := c.Param("permId")
+	permIDStr := c.Param("id")
 	permID, err := strconv.ParseInt(permIDStr, 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid permission ID")
@@ -91,6 +91,6 @@ func RegisterPermRoutes(r *gin.RouterGroup, h *PermHandler) {
 		permGroup.POST("/list", h.ListPerms)
 		permGroup.POST("/create", h.CreatePerm)
 		permGroup.POST("/update", h.UpdatePerm)
-		permGroup.POST("/delete/:permId", h.DeletePerm)
+		permGroup.POST("/delete/:id", h.DeletePerm)
 	}
 }
