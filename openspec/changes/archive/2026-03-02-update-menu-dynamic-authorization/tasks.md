@@ -94,7 +94,8 @@
   - **Evidence**: `menu_service.go` - `isAdminRole` checks `id == 1` and bypasses role-menu filtering by calling `s.Query()` directly
 - [x] 8.4 Test non-admin user sees only authorized menus
   - **Evidence**: `menu_service.go` - `QueryByRoleIDs` filters via `roleMenuRepo.GetMenuIDsByRoleIDs` for non-admin users
-- [ ] 8.5 Document test scenarios and expected results
+- [x] 8.5 Document test scenarios and expected results
+  - **Evidence**: PR #40 merge-ready comment and manual E2E run result (`https://github.com/Gujiaweiguo/godataease/pull/40#issuecomment-4011917421`, `https://github.com/Gujiaweiguo/godataease/actions/runs/22766275220`)
 
 ## 9. Migration and Rollback Verification
 
@@ -109,3 +110,47 @@
 - [ ] 10.2 Document configuration toggle for fallback mode
 - [ ] 10.3 Complete security audit checklist
 - [ ] 10.4 Obtain release sign-off from stakeholders
+
+## 11. Acceptance Evidence (2026-03-06)
+
+- **Owner**: Gujiaweiguo
+- **Environment**: staging-like CI + local docker compose
+- **Release PR**: `#40`
+- **Merge Commit**: `fe9dd2be3d75993e3bfde99b574d1cf55f1c90cf`
+
+### 9. Migration and Rollback Verification (pending)
+
+- [ ] 9.1 Execute migration in staging environment
+  - Command: `<pending>`
+  - Logs: `<pending>`
+  - Result: `<pending>`
+- [ ] 9.2 Verify bootstrap admin menu mappings are correct
+  - Method (SQL/API/UI): `<pending>`
+  - Evidence: `<pending>`
+- [ ] 9.3 Execute rollback drill and verify data restoration
+  - Rollback command: `<pending>`
+  - Restore verification: `<pending>`
+  - Evidence: `<pending>`
+- [ ] 9.4 Document rollback time metrics
+  - Start time: `<pending>`
+  - End time: `<pending>`
+  - Duration: `<pending>`
+  - Record doc: `<pending>`
+
+### 10. Documentation and Sign-off (pending)
+
+- [ ] 10.1 Update API documentation for new endpoints
+  - Doc link: `<pending>`
+  - Compatibility notes: `<pending>`
+- [ ] 10.2 Document configuration toggle for fallback mode
+  - Toggle docs: `<pending>`
+  - Default/conditions: `<pending>`
+  - Rollback operation: `<pending>`
+- [ ] 10.3 Complete security audit checklist
+  - Checklist link: `<pending>`
+  - Risk and disposition: `<pending>`
+- [ ] 10.4 Obtain release sign-off from stakeholders
+  - Product sign-off: `<pending>`
+  - Engineering sign-off: `<pending>`
+  - Ops/Release sign-off: `<pending>`
+  - Final decision: `<pending>`
