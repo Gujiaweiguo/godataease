@@ -37,6 +37,15 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +72,12 @@ jobs:
         working-directory: apps/backend-go
         run: make build
 
+      - name: Prepare backend config
+        working-directory: apps/backend-go
+        run: |
+          mkdir -p configs
+          cp configs/config.example.yaml configs/config.yaml
+
       - name: Start backend
         working-directory: apps/backend-go
         env:
@@ -74,8 +89,21 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
         run: |
-          ./dataease-backend &
-          sleep 5
+          ./dataease-backend >/tmp/backend.log 2>&1 &
+          echo $! >/tmp/backend.pid
+
+      - name: Wait for backend
+        working-directory: apps/backend-go
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend failed to start"
+          cat /tmp/backend.log || true
+          exit 1
 
       - name: Build frontend
         run: npm run build:base
@@ -110,6 +138,14 @@ jobs:
           name: playwright-test-results
           path: apps/frontend/test-results/
           retention-days: 30
+
+      - name: Stop backend
+        if: always()
+        working-directory: apps/backend-go
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) || true
+          fi
 
       - name: Summary
         if: always()
