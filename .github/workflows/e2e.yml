@@ -78,7 +78,7 @@ jobs:
           mkdir -p configs
           cat > configs/config.yaml <<'EOF'
           server:
-            port: 8080
+            port: 8100
             mode: debug
           database:
             host: 127.0.0.1
@@ -132,7 +132,7 @@ jobs:
         working-directory: apps/backend-go
         run: |
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:8100/health >/dev/null; then
               exit 0
             fi
             sleep 2
