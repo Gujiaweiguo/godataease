@@ -35,15 +35,23 @@ func (SysRole) TableName() string {
 }
 
 type RoleCreator struct {
-	Name     string  `json:"name" binding:"required"`
-	TypeCode int     `json:"typeCode" binding:"required"`
+	RoleName string  `json:"roleName"`
+	Name     string  `json:"name"`
+	RoleKey  string  `json:"roleKey"`
+	TypeCode int     `json:"typeCode"`
+	RoleDesc *string `json:"roleDesc"`
 	Desc     *string `json:"desc"`
+	Status   *int    `json:"status"`
 }
 
 type RoleEditor struct {
-	ID   int64   `json:"id" binding:"required"`
-	Name string  `json:"name" binding:"required"`
-	Desc *string `json:"desc"`
+	ID       int64   `json:"id"`
+	RoleID   int64   `json:"roleId"`
+	RoleName string  `json:"roleName"`
+	Name     string  `json:"name"`
+	RoleDesc *string `json:"roleDesc"`
+	Desc     *string `json:"desc"`
+	Status   *int    `json:"status"`
 }
 
 type RoleVO struct {
@@ -76,4 +84,31 @@ type MountUserRequest struct {
 	Uids  []int64 `json:"uids" binding:"required"`
 	OrgId int64   `json:"orgId" binding:"required"`
 	Over  bool    `json:"over"`
+}
+
+// UnmountUserRequest 用户解绑请求
+type UnmountUserRequest struct {
+	Rid int64 `json:"rid" binding:"required"`
+	Uid int64 `json:"uid" binding:"required"`
+}
+
+// MountExternalUserRequest 绑定组织外用户请求
+type MountExternalUserRequest struct {
+	Rid int64 `json:"rid" binding:"required"`
+	Uid int64 `json:"uid" binding:"required"`
+}
+
+// RoleRequest 角色过滤器
+type RoleRequest struct {
+	Keyword *string `json:"keyword"`
+	Uid     *int64  `json:"uid"`
+}
+
+// ExternalUserVO 组织外用户VO
+type ExternalUserVO struct {
+	Uid     int64   `json:"uid"`
+	Account string  `json:"account"`
+	Name    string  `json:"name"`
+	Email   *string `json:"email"`
+	Phone   *string `json:"phone"`
 }

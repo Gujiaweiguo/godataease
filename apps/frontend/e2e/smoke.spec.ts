@@ -1,10 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-const hasLoginForm = async page => {
-  const textInput = await page.locator('input[type="text"]').count()
-  const passwordInput = await page.locator('input[type="password"]').count()
-  return textInput > 0 && passwordInput > 0
-}
+import { getUsernameInput, hasLoginForm } from './utils/auth'
 
 test.describe('Smoke Tests', () => {
   test('application should load', async ({ page }) => {
@@ -12,7 +7,7 @@ test.describe('Smoke Tests', () => {
 
     await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
     if (await hasLoginForm(page)) {
-      await expect(page.locator('input[type="text"]').first()).toBeVisible({ timeout: 10000 })
+      await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
     }
   })
 

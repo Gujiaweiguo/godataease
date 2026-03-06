@@ -1,0 +1,58 @@
+{
+  "apiIdentity": {
+    "path": "/de2api/user/resetPwd/{uid}",
+    "method": "POST",
+    "owner": "user-team",
+    "priority": "P0",
+    "blockingLevel": "critical",
+    "description": "Admin reset user password to default policy"
+  },
+  "requestContext": {
+    "pathParams": {
+      "uid": 1
+    },
+    "headers": {
+      "Authorization": "Bearer <admin-token>"
+    }
+  },
+  "standardResponse": {
+    "status": 200,
+    "code": "000000",
+    "msg": "success",
+    "data": null
+  },
+  "errorResponses": [
+    {
+      "condition": "user_not_found",
+      "status": 200,
+      "code": "500000",
+      "msg": "user not found"
+    },
+    {
+      "condition": "unauthorized",
+      "status": 200,
+      "code": "20001",
+      "msg": "unauthorized"
+    }
+  ],
+  "versionMetadata": {
+    "captured_at": "2026-03-05T00:00:00Z",
+    "baseline_version": "1.0.0",
+    "change_id": "align-rbac-with-xpack-docs"
+  },
+  "notes": {
+    "caveats": [
+      "Only admin users can reset passwords",
+      "Password reset to system default policy",
+      "Audit log must record: operator, target user, success/failure"
+    ],
+    "auditEvents": [
+      "RESET_USER_PASSWORD"
+    ],
+    "auditFields": {
+      "resourceType": "USER",
+      "actionType": "USER_ACTION",
+      "operation": "UPDATE"
+    }
+  }
+}

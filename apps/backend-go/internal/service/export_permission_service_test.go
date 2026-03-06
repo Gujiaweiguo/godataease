@@ -92,6 +92,24 @@ func (m *mockExportResourcePermRepo) RevokePermFromRole(roleID, permID int64) er
 	return nil
 }
 
+// 双视角接口 mock
+// 双视角接口 mock
+func (m *mockExportResourcePermRepo) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return []*permission.UserResourcePermVO{}, nil
+}
+
+func (m *mockExportResourcePermRepo) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return []*permission.ResourceUserPermVO{}, nil
+}
+
+func (m *mockExportResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
+	return nil
+}
+
+func (m *mockExportResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
 func TestExportPermissionService_CheckDashboardExport(t *testing.T) {
 	mockRepo := newMockExportResourcePermRepo()
 	mockRepo.userPermOk[1] = map[int64]bool{1: true}

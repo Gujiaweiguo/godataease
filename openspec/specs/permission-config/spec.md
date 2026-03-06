@@ -220,8 +220,6 @@ The system SHALL provide APIs to query and save role-menu authorization state.
 - **THEN** the system validates role and menu existence before persistence
 - **AND** the system returns success only after effective authorization state is stored
 
-
-
 ### Requirement: Role Permission Save API Availability
 The system SHALL provide role permission save APIs required by frontend role management page.
 
@@ -245,3 +243,38 @@ The system SHALL provide save APIs for menu and business permission assignments.
 - **WHEN** frontend posts permission updates to `/auth/saveMenuPer` or `/auth/saveBusiPer`
 - **THEN** backend MUST persist effective authorization state or return explicit validation/auth error
 - **AND** MUST NOT return placeholder success for unimplemented logic
+
+### Requirement: Permission Dual-Perspective Consistency
+The system SHALL provide both "configure by user" and "configure by resource" views, and both views SHALL persist to the same authorization model with equivalent effective results.
+
+#### Scenario: Grant permission in user perspective
+- **WHEN** an administrator grants a resource permission in user perspective
+- **THEN** the same grant MUST be visible in resource perspective without additional synchronization steps
+
+#### Scenario: Revoke permission in resource perspective
+- **WHEN** an administrator revokes a grant in resource perspective
+- **THEN** the same revocation MUST be visible in user perspective immediately after data refresh
+
+### Requirement: Resource Group Inheritance Effective on New Resources
+The system SHALL apply inherited permissions from resource groups to newly created resources in that group.
+
+#### Scenario: Create resource under granted group
+- **WHEN** a new dashboard/dataset is created under a group that already has grants
+- **THEN** the new resource MUST inherit effective grants for all authorized users/roles
+
+#### Scenario: Query inherited permission
+- **WHEN** a client checks resource permission for an inherited target
+- **THEN** the system MUST return permission as granted without requiring manual re-authorization
+
+### Requirement: Menu Authorization Drives Navigation Visibility
+The system SHALL bind role-menu authorization outcomes to navigation visibility decisions.
+
+#### Scenario: Grant menu to role
+- **WHEN** an administrator grants a menu node to a role
+- **THEN** users with that role MUST see the menu in navigation after authorization refresh
+
+#### Scenario: Revoke menu from role
+- **WHEN** an administrator revokes a previously granted menu node from a role
+- **THEN** users with that role MUST no longer see the menu in navigation
+- **AND** direct navigation to revoked route MUST be denied
+

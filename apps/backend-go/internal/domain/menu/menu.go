@@ -24,7 +24,12 @@ type MenuMeta struct {
 }
 
 type MenuVO struct {
-	ID        int64     `json:"-"`
+	ID        int64     `json:"id"`
+	Pid       int64     `json:"pid"`
+	Type      int       `json:"type"`
+	MenuSort  int       `json:"menuSort"`
+	Icon      string    `json:"icon"`
+	Auth      bool      `json:"auth"`
 	Path      string    `json:"path"`
 	Component string    `json:"component"`
 	Hidden    bool      `json:"hidden"`

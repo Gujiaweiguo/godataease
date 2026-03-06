@@ -1,7 +1,7 @@
 # chart-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-chart-visualization-core-module. Update Purpose after archive.
+Define chart query and data-rendering contract requirements for chart configuration and result retrieval.
 ## Requirements
 ### Requirement: Chart Core Query
 The system SHALL provide chart core query capability in Go backend.
@@ -18,4 +18,3 @@ The system SHALL provide chart data query capability for rendering.
 - **WHEN** client requests chart data with filters and time range
 - **THEN** the system executes mapped dataset query and aggregation
 - **AND** returns chart-ready structured data for frontend rendering
-

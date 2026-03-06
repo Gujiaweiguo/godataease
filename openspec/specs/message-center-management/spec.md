@@ -1,7 +1,7 @@
 # message-center-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-platform-ops-module. Update Purpose after archive.
+Define message center requirements for listing, reading, and batch state updates of notification messages.
 ## Requirements
 ### Requirement: Message Center Query
 The system SHALL provide message center query capability in Go backend.
@@ -18,4 +18,3 @@ The system SHALL provide message status update capability.
 - **WHEN** user marks a message as read
 - **THEN** the system updates message status idempotently
 - **AND** subsequent reads reflect updated status consistently
-

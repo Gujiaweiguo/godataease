@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"net/http/httptest"
 	"encoding/json"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -162,6 +162,24 @@ func (m *mockResourcePermRepoForExport) RevokePermFromRole(roleID, permID int64)
 	return nil
 }
 
+// ========== 双视角接口 mock 实现 ==========
+// ========== 双视角接口 mock 实现 ==========
+func (m *mockResourcePermRepoForExport) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return []*permission.UserResourcePermVO{}, nil
+}
+
+func (m *mockResourcePermRepoForExport) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return []*permission.ResourceUserPermVO{}, nil
+}
+
+func (m *mockResourcePermRepoForExport) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
+	return nil
+}
+
+func (m *mockResourcePermRepoForExport) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
 func TestExportDownload_TaskToResourceMapping(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -240,7 +258,6 @@ func TestExportDownload_Dataset_NoPermission(t *testing.T) {
 		t.Errorf("expected code 403001 for denied export permission, got %v", resp["code"])
 	}
 
-
 }
 
 func TestExportDownload_Dashboard_AdminBypass(t *testing.T) {
@@ -313,7 +330,6 @@ func TestExportDownload_TaskNotFound(t *testing.T) {
 		t.Errorf("expected code 404001 for task not found, got %v", resp["code"])
 	}
 
-
 }
 
 func TestExportDownload_UnauthorizedUser(t *testing.T) {
@@ -356,7 +372,6 @@ func TestExportDownload_UnauthorizedUser(t *testing.T) {
 	if resp["code"] != "403001" {
 		t.Errorf("expected code 403001 for unauthorized task access, got %v", resp["code"])
 	}
-
 
 }
 

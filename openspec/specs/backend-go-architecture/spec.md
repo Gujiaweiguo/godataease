@@ -1,7 +1,7 @@
 # backend-go-architecture Specification
 
 ## Purpose
-TBD - created by archiving change refactor-backend-to-go. Update Purpose after archive.
+Define architectural guardrails and module boundaries for the Go backend implementation and evolution.
 ## Requirements
 ### Requirement: Go Backend Framework
 
@@ -258,4 +258,3 @@ TBD - created by archiving change refactor-backend-to-go. Update Purpose after a
 #### Scenario: Canonical entry enforcement
 - **WHEN** 开发或运维执行构建/部署
 - **THEN** 系统 SHALL 通过 `infra/` 与新目录入口执行，且 `Dockerfile`/Compose/脚本不再依赖旧目录结构
-

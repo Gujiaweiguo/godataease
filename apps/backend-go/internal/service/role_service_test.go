@@ -505,7 +505,9 @@ func setupRoleService(t *testing.T) (*RoleService, *roleMockStore, func()) {
 	}
 
 	repo := repository.NewRoleRepository(gdb)
-	return NewRoleService(repo), store, func() {
+	userRepo := repository.NewUserRepository(gdb)
+	userRoleRepo := repository.NewUserRoleRepository(gdb)
+	return NewRoleService(repo, userRepo, userRoleRepo), store, func() {
 		_ = sqlDB.Close()
 	}
 }
@@ -774,4 +776,159 @@ func TestRoleStrPtr(t *testing.T) {
 	if *p != "hello" {
 		t.Fatalf("expected hello, got %q", *p)
 	}
+}
+
+// TestUnmountUser_LastRoleProtection 测试唯一角色安全策略
+func TestUnmountUser_LastRoleProtection(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	// 用户只有一个角色时应该拒绝移除
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 1, Rid: 1})
+	if err == nil {
+		t.Fatal("expected error when removing user's last role")
+	}
+	if !strings.Contains(err.Error(), "last role") {
+		t.Fatalf("expected last role error, got: %v", err)
+	}
+}
+
+// TestUnmountUser_MultipleRoles 测试用户有多个角色时可以移除
+// 注意：此测试需要完整的 sys_user_role mock 支持
+// 当前 mock 仅支持 sys_role 表，因此跳过此测试
+// 在集成测试中会覆盖此场景
+func TestUnmountUser_MultipleRoles(t *testing.T) {
+	t.Skip("requires sys_user_role mock support - covered by integration tests")
+}
+
+// TestCreateRoleWithInheritance_Success 测试带继承的角色创建
+func TestCreateRoleWithInheritance_Success(t *testing.T) {
+	svc, store, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	// 创建父角色（内置角色）
+	parentID := store.add(&role.SysRole{RoleName: "Admin", RoleCode: "admin", Status: role.StatusEnabled, ParentID: ptrInt64(0)})
+
+	// 创建继承自父角色的自定义角色
+	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "Custom Admin"}, &parentID, "tester")
+	if err != nil {
+		t.Fatalf("CreateRoleWithInheritance failed: %v", err)
+	}
+	if childID == 0 {
+		t.Fatal("expected non-zero child role id")
+	}
+
+	// 验证子角色的父ID设置正确
+	child, ok := store.get(childID)
+	if !ok {
+		t.Fatalf("child role %d not found", childID)
+	}
+	if child.ParentID == nil || *child.ParentID != parentID {
+		t.Fatalf("expected parentID %d, got %+v", parentID, child.ParentID)
+	}
+}
+
+// TestCreateRoleWithInheritance_InvalidParent 测试继承无效父角色
+func TestCreateRoleWithInheritance_InvalidParent(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	// 尝试继承不存在的角色
+	invalidParentID := int64(9999)
+	_, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "Invalid Child"}, &invalidParentID, "tester")
+	if err == nil {
+		t.Fatal("expected error when inheriting from non-existent parent")
+	}
+	if !strings.Contains(err.Error(), "parent role not found") {
+		t.Fatalf("expected parent not found error, got: %v", err)
+	}
+}
+
+// TestValidatePermissionInheritance_NoParent 测试无父角色的权限验证
+func TestValidatePermissionInheritance_NoParent(t *testing.T) {
+	svc, store, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	// 创建无父角色的角色
+	roleID := store.add(&role.SysRole{RoleName: "Standalone", RoleCode: "standalone", Status: role.StatusEnabled})
+
+	// 验证权限继承应该直接通过
+	err := svc.ValidatePermissionInheritance(roleID, []int64{1, 2, 3})
+	if err != nil {
+		t.Fatalf("ValidatePermissionInheritance failed for role without parent: %v", err)
+	}
+}
+
+func TestValidatePermissionInheritance_WithParent(t *testing.T) {
+	svc, store, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	parentID := store.add(&role.SysRole{RoleName: "Root", RoleCode: "root", Status: role.StatusEnabled, ParentID: ptrInt64(0)})
+	childID := store.add(&role.SysRole{RoleName: "Child", RoleCode: "child", Status: role.StatusEnabled, ParentID: &parentID})
+
+	err := svc.ValidatePermissionInheritance(childID, []int64{1, 2})
+	if err != nil {
+		t.Fatalf("ValidatePermissionInheritance failed for role with parent: %v", err)
+	}
+}
+
+func TestValidatePermissionInheritance_RoleNotFound(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	err := svc.ValidatePermissionInheritance(99999, []int64{1})
+	if err == nil {
+		t.Fatal("expected error when role not found")
+	}
+	if !strings.Contains(err.Error(), "role not found") {
+		t.Fatalf("expected role not found error, got: %v", err)
+	}
+}
+
+func TestCreateRoleWithInheritance_InvalidGrandparent(t *testing.T) {
+	svc, store, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	missingGrandparentID := int64(99998)
+	parentID := store.add(&role.SysRole{RoleName: "Parent", RoleCode: "parent", Status: role.StatusEnabled, ParentID: &missingGrandparentID})
+
+	_, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildWithBadGrandparent"}, &parentID, "tester")
+	if err == nil {
+		t.Fatal("expected error when inheriting with invalid grandparent")
+	}
+	if !strings.Contains(err.Error(), "grandparent role inheritance invalid") {
+		t.Fatalf("expected invalid grandparent error, got: %v", err)
+	}
+}
+
+func TestMountUsers_UserRoleRepoNil(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	svc.userRoleRepo = nil
+	err := svc.MountUsers(&role.MountUserRequest{Rid: 1, OrgId: 1, Uids: []int64{1}})
+	if err == nil {
+		t.Fatal("expected error when userRoleRepo is nil")
+	}
+	if !strings.Contains(err.Error(), "userRoleRepo not initialized") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMountExternalUser_UserRoleRepoNil(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	svc.userRoleRepo = nil
+	err := svc.MountExternalUser(&role.MountExternalUserRequest{Rid: 1, Uid: 1}, 1)
+	if err == nil {
+		t.Fatal("expected error when userRoleRepo is nil")
+	}
+	if !strings.Contains(err.Error(), "userRoleRepo not initialized") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
 }

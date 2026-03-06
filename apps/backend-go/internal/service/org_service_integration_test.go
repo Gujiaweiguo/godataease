@@ -7,21 +7,34 @@ import (
 
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/repository"
-
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOrgServiceIntegration_CreateRoot(t *testing.T) {
+// Helper function to create OrgService with all dependencies
+func newTestOrgService(t *testing.T) *OrgService {
 	cleanupTables(&org.SysOrg{})
 
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	orgRepo := repository.NewOrgRepository(testDB)
+	userRepo := repository.NewUserRepository(testDB)
+	roleRepo := repository.NewRoleRepository(testDB)
+
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
+	auditSvc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+
+	return NewOrgService(orgRepo, auditSvc, userRepo, roleRepo)
+}
+
+func TestOrgServiceIntegration_CreateRoot(t *testing.T) {
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	req := &org.OrgCreateRequest{OrgName: "Root Org"}
 	err := svc.CreateOrg(req)
 	assert.NoError(t, err)
 
-	orgs, err := repo.List()
+	orgs, err := orgRepo.List()
 	assert.NoError(t, err)
 	assert.Len(t, orgs, 1)
 
@@ -32,10 +45,8 @@ func TestOrgServiceIntegration_CreateRoot(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_CreateChild(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create parent
 	parent := &org.SysOrg{
@@ -45,7 +56,7 @@ func TestOrgServiceIntegration_CreateChild(t *testing.T) {
 		Status:   org.StatusEnabled,
 		DelFlag:  org.DelFlagNormal,
 	}
-	err := repo.Create(parent)
+	err := orgRepo.Create(parent)
 	assert.NoError(t, err)
 
 	// Create child
@@ -53,17 +64,14 @@ func TestOrgServiceIntegration_CreateChild(t *testing.T) {
 	err = svc.CreateOrg(req)
 	assert.NoError(t, err)
 
-	children, err := repo.ListByParentID(parent.OrgID)
+	children, err := orgRepo.ListByParentID(parent.OrgID)
 	assert.NoError(t, err)
 	assert.Len(t, children, 1)
 	assert.Equal(t, 2, children[0].Level)
 }
 
 func TestOrgServiceIntegration_CreateDuplicateName(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
 
 	// Create first org
 	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Duplicate"})
@@ -76,10 +84,7 @@ func TestOrgServiceIntegration_CreateDuplicateName(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_CreateParentNotFound(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
 
 	notExistParent := int64(9999)
 	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child", ParentID: &notExistParent})
@@ -88,10 +93,8 @@ func TestOrgServiceIntegration_CreateParentNotFound(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_Update(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create org
 	existing := &org.SysOrg{
@@ -101,7 +104,7 @@ func TestOrgServiceIntegration_Update(t *testing.T) {
 		Status:   org.StatusEnabled,
 		DelFlag:  org.DelFlagNormal,
 	}
-	err := repo.Create(existing)
+	err := orgRepo.Create(existing)
 	assert.NoError(t, err)
 
 	// Update
@@ -114,7 +117,7 @@ func TestOrgServiceIntegration_Update(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify
-	updated, err := repo.GetByID(existing.OrgID)
+	updated, err := orgRepo.GetByID(existing.OrgID)
 	assert.NoError(t, err)
 	assert.Equal(t, "New Name", updated.OrgName)
 	assert.NotNil(t, updated.OrgDesc)
@@ -123,10 +126,7 @@ func TestOrgServiceIntegration_Update(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_UpdateNotFound(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
 
 	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: 9999, OrgName: "New"})
 	assert.Error(t, err)
@@ -134,16 +134,14 @@ func TestOrgServiceIntegration_UpdateNotFound(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_UpdateDuplicateName(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create two orgs
 	org1 := &org.SysOrg{OrgName: "Org1", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
 	org2 := &org.SysOrg{OrgName: "Org2", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
-	repo.Create(org1)
-	repo.Create(org2)
+	orgRepo.Create(org1)
+	orgRepo.Create(org2)
 
 	// Try to rename org2 to org1
 	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: org2.OrgID, OrgName: "Org1"})
@@ -152,10 +150,8 @@ func TestOrgServiceIntegration_UpdateDuplicateName(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_Delete(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create org
 	existing := &org.SysOrg{
@@ -165,44 +161,40 @@ func TestOrgServiceIntegration_Delete(t *testing.T) {
 		Status:   org.StatusEnabled,
 		DelFlag:  org.DelFlagNormal,
 	}
-	err := repo.Create(existing)
+	err := orgRepo.Create(existing)
 	assert.NoError(t, err)
 
 	// Delete
-	err = svc.DeleteOrg(existing.OrgID)
+	err = svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
 	assert.NoError(t, err)
 
 	// Verify deleted
-	_, err = repo.GetByID(existing.OrgID)
+	_, err = orgRepo.GetByID(existing.OrgID)
 	assert.Error(t, err)
 }
 
 func TestOrgServiceIntegration_DeleteWithChildren(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create parent and child
 	parent := &org.SysOrg{OrgName: "Parent", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
-	err := repo.Create(parent)
+	err := orgRepo.Create(parent)
 	assert.NoError(t, err)
 
 	child := &org.SysOrg{OrgName: "Child", ParentID: parent.OrgID, Level: 2, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
-	err = repo.Create(child)
+	err = orgRepo.Create(child)
 	assert.NoError(t, err)
 
 	// Try to delete parent
-	err = svc.DeleteOrg(parent.OrgID)
+	err = svc.DeleteOrg(parent.OrgID, 1, "test-user", "127.0.0.1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot delete organization with children")
+	assert.Contains(t, err.Error(), "cannot delete organization with 1 child organizations")
 }
 
 func TestOrgServiceIntegration_GetOrgByID(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create org
 	existing := &org.SysOrg{
@@ -212,7 +204,7 @@ func TestOrgServiceIntegration_GetOrgByID(t *testing.T) {
 		Status:   org.StatusEnabled,
 		DelFlag:  org.DelFlagNormal,
 	}
-	err := repo.Create(existing)
+	err := orgRepo.Create(existing)
 	assert.NoError(t, err)
 
 	// Get
@@ -226,14 +218,12 @@ func TestOrgServiceIntegration_GetOrgByID(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_ListOrgs(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create multiple orgs
 	for _, name := range []string{"A", "B", "C"} {
-		err := repo.Create(&org.SysOrg{
+		err := orgRepo.Create(&org.SysOrg{
 			OrgName:  name,
 			ParentID: org.RootParentID,
 			Level:    1,
@@ -250,22 +240,20 @@ func TestOrgServiceIntegration_ListOrgs(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_GetOrgTree(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create tree structure
 	root1 := &org.SysOrg{OrgName: "Root1", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
 	root2 := &org.SysOrg{OrgName: "Root2", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
-	repo.Create(root1)
-	repo.Create(root2)
+	orgRepo.Create(root1)
+	orgRepo.Create(root2)
 
 	child1 := &org.SysOrg{OrgName: "Child1", ParentID: root1.OrgID, Level: 2, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
-	repo.Create(child1)
+	orgRepo.Create(child1)
 
 	grandchild := &org.SysOrg{OrgName: "GrandChild", ParentID: child1.OrgID, Level: 3, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
-	repo.Create(grandchild)
+	orgRepo.Create(grandchild)
 
 	// Get tree
 	tree, err := svc.GetOrgTree()
@@ -286,10 +274,8 @@ func TestOrgServiceIntegration_GetOrgTree(t *testing.T) {
 }
 
 func TestOrgServiceIntegration_UpdateStatus(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create org
 	existing := &org.SysOrg{
@@ -299,7 +285,7 @@ func TestOrgServiceIntegration_UpdateStatus(t *testing.T) {
 		Status:   org.StatusEnabled,
 		DelFlag:  org.DelFlagNormal,
 	}
-	err := repo.Create(existing)
+	err := orgRepo.Create(existing)
 	assert.NoError(t, err)
 
 	// Update status
@@ -307,20 +293,18 @@ func TestOrgServiceIntegration_UpdateStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify
-	updated, err := repo.GetByID(existing.OrgID)
+	updated, err := orgRepo.GetByID(existing.OrgID)
 	assert.NoError(t, err)
 	assert.Equal(t, org.StatusDisabled, updated.Status)
 	assert.NotNil(t, updated.UpdateTime)
 }
 
 func TestOrgServiceIntegration_CheckOrgNameExists(t *testing.T) {
-	cleanupTables(&org.SysOrg{})
-
-	repo := repository.NewOrgRepository(testDB)
-	svc := NewOrgService(repo)
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
 
 	// Create org
-	err := repo.Create(&org.SysOrg{
+	err := orgRepo.Create(&org.SysOrg{
 		OrgName:  "Existing",
 		ParentID: org.RootParentID,
 		Level:    1,

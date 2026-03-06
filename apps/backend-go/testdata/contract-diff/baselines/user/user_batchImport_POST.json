@@ -1,0 +1,63 @@
+{
+  "apiIdentity": {
+    "path": "/de2api/user/batchImport",
+    "method": "POST",
+    "owner": "user-team",
+    "priority": "P0",
+    "blockingLevel": "critical",
+    "description": "Excel user import with partial success support"
+  },
+  "requestContext": {
+    "contentType": "multipart/form-data",
+    "body": {
+      "file": "<Excel binary file>",
+      "orgId": 1
+    },
+    "headers": {
+      "Authorization": "Bearer <token>"
+    }
+  },
+  "standardResponse": {
+    "status": 200,
+    "code": "000000",
+    "msg": "success",
+    "data": {
+      "totalRows": 10,
+      "successRows": 8,
+      "failedRows": 2,
+      "errorKey": "import-error-20260305-abc123"
+    }
+  },
+  "errorResponses": [
+    {
+      "condition": "file_size_exceeds_10mb",
+      "status": 200,
+      "code": "500000",
+      "msg": "file size exceeds 10MB limit"
+    },
+    {
+      "condition": "invalid_template_format",
+      "status": 200,
+      "code": "500000",
+      "msg": "invalid template format"
+    }
+  ],
+  "versionMetadata": {
+    "captured_at": "2026-03-05T00:00:00Z",
+    "baseline_version": "1.0.0",
+    "change_id": "align-rbac-with-xpack-docs"
+  },
+  "notes": {
+    "caveats": [
+      "10MB file size limit enforced",
+      "Template validation required before processing",
+      "Partial success - failed rows do not rollback success rows",
+      "Error report downloadable via errorKey"
+    ],
+    "auditEvents": [
+      "IMPORT_USER_SUCCESS",
+      "IMPORT_USER_PARTIAL",
+      "IMPORT_USER_FAILED"
+    ]
+  }
+}

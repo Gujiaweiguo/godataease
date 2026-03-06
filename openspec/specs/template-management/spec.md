@@ -1,7 +1,7 @@
 # template-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-collaboration-export-module. Update Purpose after archive.
+Define template management requirements for listing, creating, updating, and deleting reusable templates.
 ## Requirements
 ### Requirement: Template Management Core
 The system SHALL provide template management core capability in Go backend.
@@ -18,4 +18,3 @@ The system SHALL provide template market query capability.
 - **WHEN** client requests template market list with filters
 - **THEN** the system returns matched templates with pagination
 - **AND** result includes required metadata for preview and import
-

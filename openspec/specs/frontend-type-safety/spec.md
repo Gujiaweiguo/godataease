@@ -1,7 +1,7 @@
 # frontend-type-safety Specification
 
 ## Purpose
-TBD - created by archiving change refactor-frontend-typescript-types. Update Purpose after archive.
+Define frontend type-safety requirements that ensure API contracts and key modules remain type-consistent.
 ## Requirements
 ### Requirement: TypeScript Type Safety
 
@@ -49,4 +49,3 @@ API 响应 SHALL 具有明确的类型定义。
 
 - **WHEN** API returns error
 - **THEN** error structure SHALL be typed for proper error handling
-

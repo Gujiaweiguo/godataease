@@ -72,3 +72,83 @@ type PermListResponse struct {
 	Current int         `json:"current"`
 	Size    int         `json:"size"`
 }
+
+// ========== 双视角接口 DTOs ==========
+
+// UserResourcePermVO 用户资源权限视图（按用户视角）
+type UserResourcePermVO struct {
+	ResourceID   int64  `json:"resourceId"`
+	ResourceName string `json:"resourceName"`
+	ResourceType string `json:"resourceType"`
+	PermKey      string `json:"permKey"`
+	PermName     string `json:"permName"`
+	SourceType   string `json:"sourceType"` // direct=直接授权, role=角色继承, group=分组继承
+	SourceID     int64  `json:"sourceId"`   // 授权来源ID（角色ID或分组ID）
+	SourceName   string `json:"sourceName"` // 授权来源名称
+}
+
+// ResourceUserPermVO 资源用户权限视图（按资源视角）
+type ResourceUserPermVO struct {
+	UserID     int64  `json:"userId"`
+	Username   string `json:"username"`
+	NickName   string `json:"nickName"`
+	PermKey    string `json:"permKey"`
+	PermName   string `json:"permName"`
+	SourceType string `json:"sourceType"` // direct=直接授权, role=角色继承
+	SourceID   int64  `json:"sourceId"`   // 授权来源ID
+	SourceName string `json:"sourceName"` // 授权来源名称
+}
+
+// UserPerspectiveRequest 按用户视角查询请求
+type UserPerspectiveRequest struct {
+	UserID       int64   `json:"userId" binding:"required"`
+	ResourceType *string `json:"resourceType"` // 可选过滤：dashboard, dataset, datasource
+}
+
+// ResourcePerspectiveRequest 按资源视角查询请求
+type ResourcePerspectiveRequest struct {
+	ResourceID   int64  `json:"resourceId" binding:"required"`
+	ResourceType string `json:"resourceType" binding:"required"`
+}
+
+// ResourceGroupPermVO 资源分组权限
+type ResourceGroupPermVO struct {
+	GroupID      int64                      `json:"groupId"`
+	GroupName    string                     `json:"groupName"`
+	ResourceType string                     `json:"resourceType"`
+	Permissions  []*ResourceGroupPermItemVO `json:"permissions"`
+}
+
+// ResourceGroupPermItemVO 资源分组权限项
+type ResourceGroupPermItemVO struct {
+	TargetType string `json:"targetType"` // user=用户, role=角色
+	TargetID   int64  `json:"targetId"`
+	TargetName string `json:"targetName"`
+	PermKey    string `json:"permKey"`
+	PermName   string `json:"permName"`
+}
+
+// ApplyGroupPermRequest 应用分组权限到资源请求
+type ApplyGroupPermRequest struct {
+	ResourceID   int64  `json:"resourceId" binding:"required"`
+	ResourceType string `json:"resourceType" binding:"required"`
+	GroupID      int64  `json:"groupId" binding:"required"`
+}
+
+// PermissionConsistencyResult 双视角一致性校验结果
+type PermissionConsistencyResult struct {
+	Consistent      bool                         `json:"consistent"`
+	UserCount       int                          `json:"userCount"`
+	ResourceCount   int                          `json:"resourceCount"`
+	Inconsistencies []*PermissionInconsistencyVO `json:"inconsistencies"`
+}
+
+// PermissionInconsistencyVO 权限不一致项
+type PermissionInconsistencyVO struct {
+	UserID       int64  `json:"userId"`
+	ResourceID   int64  `json:"resourceId"`
+	ResourceType string `json:"resourceType"`
+	UserView     string `json:"userView"`     // 用户视角的权限状态
+	ResourceView string `json:"resourceView"` // 资源视角的权限状态
+	Description  string `json:"description"`
+}

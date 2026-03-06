@@ -204,4 +204,12 @@ var menuTitleMap = map[string]string{
 	"msg":              "消息中心",
 	"parameter":        "系统参数",
 	"font":             "字体设置",
+	"system":           "系统管理",
+	"user":             "用户管理",
+	"role":             "角色管理",
+	"org":              "组织管理",
+	"permission":       "权限管理",
+	"audit":            "审计日志",
+	"audit-dashboard":  "审计仪表板",
+	"audit-settings":   "审计设置",
 }

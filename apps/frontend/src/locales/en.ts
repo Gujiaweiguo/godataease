@@ -101,7 +101,7 @@ export default {
   toolbox: {
     name: 'Toolbox',
     template_center: 'Template center',
-    org_center: 'Organization Management Center'
+    org_center: 'System Management Center'
   },
   api_pagination: {
     help_documentation: 'Doc',

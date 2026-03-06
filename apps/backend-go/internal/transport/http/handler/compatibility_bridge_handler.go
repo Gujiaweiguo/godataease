@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -953,6 +955,16 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			userGroup.GET("/options", user.GetUserOptions)
 			userGroup.GET("/org/option", user.GetUserOptions)
 			userGroup.POST("/byCurOrg", user.ListUsers)
+			userGroup.POST("/excelTemplate", user.DownloadExcelTemplate)
+			userGroup.POST("/batchImport", user.BatchImportUsers)
+			userGroup.GET("/errorRecord/:key", user.DownloadErrorRecord)
+			userGroup.GET("/clearErrorRecord/:key", user.ClearErrorRecord)
+			userGroup.GET("/defaultPwd", user.GetDefaultPassword)
+			userGroup.POST("/resetPwd/:uid", middleware.AuditLog(middleware.AuditConfig{
+				ActionType:   audit.ActionTypeUserAction,
+				ActionName:   "RESET_USER_PASSWORD",
+				ResourceType: audit.ResourceTypeUser,
+			}), user.ResetPasswordCompat)
 		}
 	}
 

@@ -112,6 +112,11 @@ func (s *MenuService) convertToVO(m *menu.CoreMenu, childMap map[int64][]*menu.C
 
 	vo := &menu.MenuVO{
 		ID:        m.ID,
+		Pid:       m.Pid,
+		Type:      m.Type,
+		MenuSort:  m.MenuSort,
+		Icon:      m.Icon,
+		Auth:      m.Auth,
 		Path:      path,
 		Component: m.Component,
 		Hidden:    m.Hidden,

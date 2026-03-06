@@ -1,7 +1,7 @@
 # dataset-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-dataset-datasource-module. Update Purpose after archive.
+Define dataset tree, field, and preview operation requirements including permission-aware access paths.
 ## Requirements
 ### Requirement: Dataset Tree Query
 The system SHALL provide dataset tree query capability in Go backend.
@@ -26,4 +26,3 @@ The system SHALL provide dataset preview query capability for development and ve
 - **WHEN** client calls `POST /api/dataset/preview` with preview parameters
 - **THEN** the system returns sampled rows under configurable row limit
 - **AND** query timeout and error handling are consistent with migration baseline
-

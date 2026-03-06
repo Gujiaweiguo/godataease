@@ -1,7 +1,7 @@
 # license-management Specification
 
 ## Purpose
-TBD - created by archiving change implement-go-platform-ops-module. Update Purpose after archive.
+Define license validation and update requirements to control feature availability and compliance status.
 ## Requirements
 ### Requirement: License Information Query
 The system SHALL provide license information query capability in Go backend.
@@ -17,4 +17,3 @@ The system SHALL verify license validity before serving protected capabilities.
 - **WHEN** protected capability requires license check
 - **THEN** the system verifies signature and expiration status
 - **AND** returns actionable error when license is invalid or expired
-

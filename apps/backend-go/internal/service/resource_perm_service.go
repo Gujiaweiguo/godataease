@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	"dataease/backend/internal/domain/permission"
 )
 
@@ -20,6 +22,11 @@ type ResourcePermRepo interface {
 	RevokePermFromUser(userID, permID int64) error
 	GrantPermToRole(roleID, permID int64) error
 	RevokePermFromRole(roleID, permID int64) error
+	// 双视角接口
+	GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error)
+	GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error)
+	ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error
+	CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error)
 }
 
 type AdminChecker interface {
@@ -106,4 +113,49 @@ func (s *ResourcePermissionService) GrantPermissionToRole(roleID, permID int64) 
 
 func (s *ResourcePermissionService) RevokePermissionFromRole(roleID, permID int64) error {
 	return s.repo.RevokePermFromRole(roleID, permID)
+}
+
+// ========== 双视角接口实现 ==========
+
+// GetUserPerspective 获取用户视角的权限列表
+func (s *ResourcePermissionService) GetUserPerspective(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository not initialized")
+	}
+
+	// 管理员返回所有权限标识
+	if s.adminChecker != nil && s.adminChecker.IsAdmin(userID) {
+		return []*permission.UserResourcePermVO{
+			{PermKey: "*", PermName: "全部权限", SourceType: "admin"},
+		}, nil
+	}
+
+	return s.repo.GetUserResources(userID, resourceType)
+}
+
+// GetResourcePerspective 获取资源视角的授权列表
+func (s *ResourcePermissionService) GetResourcePerspective(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository not initialized")
+	}
+
+	return s.repo.GetResourceUsers(resourceID, resourceType)
+}
+
+// ApplyGroupPermissionsToResource 将分组权限应用到新资源
+func (s *ResourcePermissionService) ApplyGroupPermissionsToResource(groupID, resourceID int64, resourceType string) error {
+	if s.repo == nil {
+		return fmt.Errorf("repository not initialized")
+	}
+
+	return s.repo.ApplyGroupPermissions(groupID, resourceID, resourceType)
+}
+
+// CheckPermissionConsistency 校验双视角权限一致性
+func (s *ResourcePermissionService) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository not initialized")
+	}
+
+	return s.repo.CheckPermissionConsistency()
 }

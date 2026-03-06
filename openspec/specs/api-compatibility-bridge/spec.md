@@ -1,7 +1,7 @@
 # api-compatibility-bridge Specification
 
 ## Purpose
-TBD - created by archiving change add-go-api-compatibility-bridge. Update Purpose after archive.
+Define compatibility bridge requirements that map legacy endpoints to Go backend behavior without breaking existing clients.
 ## Requirements
 ### Requirement: Java Route Compatibility Bridge
 The Go backend SHALL provide compatibility route mappings for Java-era API prefixes during migration.

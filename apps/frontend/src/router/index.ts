@@ -184,57 +184,6 @@ export const routes: AppRouteRecordRaw[] = [
     hidden: true,
     meta: {},
     component: () => import('@/views/visualized/data/datasource/index.vue')
-  },
-  {
-    path: '/system',
-    name: 'system',
-    redirect: '/system/user',
-    component: () => import('@/layout/index.vue'),
-    meta: {},
-    children: [
-      {
-        path: 'user',
-        name: 'system-user',
-        component: () => import('@/views/system/user/index.vue'),
-        meta: { title: '用户管理' }
-      },
-      {
-        path: 'role',
-        name: 'system-role',
-        component: () => import('@/views/system/role/index.vue'),
-        meta: { title: '角色管理' }
-      },
-      {
-        path: 'org',
-        name: 'system-org',
-        component: () => import('@/views/system/org/index.vue'),
-        meta: { title: '组织管理' }
-      },
-      {
-        path: 'permission',
-        name: 'system-permission',
-        component: () => import('@/views/system/permission/index.vue'),
-        meta: { title: '权限管理' }
-      },
-      {
-        path: 'audit',
-        name: 'system-audit',
-        component: () => import('@/views/audit/index.vue'),
-        meta: { title: '审计日志' }
-      },
-      {
-        path: 'audit-dashboard',
-        name: 'system-audit-dashboard',
-        component: () => import('@/views/audit/dashboard.vue'),
-        meta: { title: '审计仪表板' }
-      },
-      {
-        path: 'audit-settings',
-        name: 'system-audit-settings',
-        component: () => import('@/views/audit/settings.vue'),
-        meta: { title: '审计设置' }
-      }
-    ]
   }
 ]
 

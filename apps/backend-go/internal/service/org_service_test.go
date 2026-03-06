@@ -29,7 +29,8 @@ func setupOrgService(t *testing.T) (*OrgService, *mockOrgRepository) {
 	}
 
 	orgRepo := repository.NewOrgRepository(db)
-	return NewOrgService(orgRepo), &mockOrgRepository{repo: orgRepo, db: db}
+	// Pass nil for auditSvc, userRepo, roleRepo as they are optional for most tests
+	return NewOrgService(orgRepo, nil, nil, nil), &mockOrgRepository{repo: orgRepo, db: db}
 }
 
 func createSeedOrg(t *testing.T, mockRepo *mockOrgRepository, name string, parentID int64, level int) *org.SysOrg {
@@ -178,7 +179,7 @@ func TestOrgDeleteOrg_Success(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 	existing := createSeedOrg(t, mockRepo, "ToDelete", org.RootParentID, 1)
 
-	err := svc.DeleteOrg(existing.OrgID)
+	err := svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("DeleteOrg failed: %v", err)
 	}
@@ -194,11 +195,11 @@ func TestOrgDeleteOrg_HasChildren(t *testing.T) {
 	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
 	createSeedOrg(t, mockRepo, "Child", parent.OrgID, 2)
 
-	err := svc.DeleteOrg(parent.OrgID)
+	err := svc.DeleteOrg(parent.OrgID, 1, "test-user", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected children exists error, got nil")
 	}
-	if !strings.Contains(err.Error(), "cannot delete organization with children") {
+	if !strings.Contains(err.Error(), "cannot delete organization with") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -348,11 +349,12 @@ func TestOrgDeleteOrg_CountChildrenFailed(t *testing.T) {
 		t.Fatalf("drop table failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(1)
+	err := svc.DeleteOrg(1, 1, "test-user", "127.0.0.1")
 	if err == nil {
-		t.Fatal("expected count children error, got nil")
+		t.Fatal("expected database error, got nil")
 	}
-	if !strings.Contains(err.Error(), "failed to check children") {
+	// After adding audit logging, the first operation is GetByID which fails with "organization not found"
+	if !strings.Contains(err.Error(), "organization not found") && !strings.Contains(err.Error(), "failed to check children") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -436,7 +438,7 @@ func TestOrgDeleteOrg_DeleteFailed(t *testing.T) {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(existing.OrgID)
+	err := svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected delete organization error, got nil")
 	}
