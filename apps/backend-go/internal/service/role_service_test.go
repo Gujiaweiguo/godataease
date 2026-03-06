@@ -859,6 +859,76 @@ func TestValidatePermissionInheritance_NoParent(t *testing.T) {
 	}
 }
 
+func TestValidatePermissionInheritance_WithParent(t *testing.T) {
+	svc, store, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	parentID := store.add(&role.SysRole{RoleName: "Root", RoleCode: "root", Status: role.StatusEnabled, ParentID: ptrInt64(0)})
+	childID := store.add(&role.SysRole{RoleName: "Child", RoleCode: "child", Status: role.StatusEnabled, ParentID: &parentID})
+
+	err := svc.ValidatePermissionInheritance(childID, []int64{1, 2})
+	if err != nil {
+		t.Fatalf("ValidatePermissionInheritance failed for role with parent: %v", err)
+	}
+}
+
+func TestValidatePermissionInheritance_RoleNotFound(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	err := svc.ValidatePermissionInheritance(99999, []int64{1})
+	if err == nil {
+		t.Fatal("expected error when role not found")
+	}
+	if !strings.Contains(err.Error(), "role not found") {
+		t.Fatalf("expected role not found error, got: %v", err)
+	}
+}
+
+func TestCreateRoleWithInheritance_InvalidGrandparent(t *testing.T) {
+	svc, store, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	missingGrandparentID := int64(99998)
+	parentID := store.add(&role.SysRole{RoleName: "Parent", RoleCode: "parent", Status: role.StatusEnabled, ParentID: &missingGrandparentID})
+
+	_, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildWithBadGrandparent"}, &parentID, "tester")
+	if err == nil {
+		t.Fatal("expected error when inheriting with invalid grandparent")
+	}
+	if !strings.Contains(err.Error(), "grandparent role inheritance invalid") {
+		t.Fatalf("expected invalid grandparent error, got: %v", err)
+	}
+}
+
+func TestMountUsers_UserRoleRepoNil(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	svc.userRoleRepo = nil
+	err := svc.MountUsers(&role.MountUserRequest{Rid: 1, OrgId: 1, Uids: []int64{1}})
+	if err == nil {
+		t.Fatal("expected error when userRoleRepo is nil")
+	}
+	if !strings.Contains(err.Error(), "userRoleRepo not initialized") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMountExternalUser_UserRoleRepoNil(t *testing.T) {
+	svc, _, cleanup := setupRoleService(t)
+	defer cleanup()
+
+	svc.userRoleRepo = nil
+	err := svc.MountExternalUser(&role.MountExternalUserRequest{Rid: 1, Uid: 1}, 1)
+	if err == nil {
+		t.Fatal("expected error when userRoleRepo is nil")
+	}
+	if !strings.Contains(err.Error(), "userRoleRepo not initialized") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func ptrInt64(v int64) *int64 {
 	return &v
 }
