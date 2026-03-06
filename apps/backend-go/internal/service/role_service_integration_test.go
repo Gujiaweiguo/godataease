@@ -7,15 +7,23 @@ import (
 
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/repository"
-
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRoleServiceIntegration_Create(t *testing.T) {
+// Helper function to create RoleService with all dependencies
+func newTestRoleService(t *testing.T) *RoleService {
 	cleanupTables(&role.SysRole{})
 
 	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+
+	return NewRoleService(repo, userRepo, userRoleRepo)
+}
+
+func TestRoleServiceIntegration_Create(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
 
 	desc := "Test role description"
 	req := &role.RoleCreator{
@@ -40,10 +48,7 @@ func TestRoleServiceIntegration_Create(t *testing.T) {
 }
 
 func TestRoleServiceIntegration_Edit(t *testing.T) {
-	cleanupTables(&role.SysRole{})
-
-	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
+	svc := newTestRoleService(t)
 
 	// Create role
 	initialDesc := "Initial description"
@@ -59,6 +64,7 @@ func TestRoleServiceIntegration_Edit(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify
+	repo := repository.NewRoleRepository(testDB)
 	updated, err := repo.GetByID(id)
 	assert.NoError(t, err)
 	assert.Equal(t, "EditedRole", updated.RoleName)
@@ -70,10 +76,7 @@ func TestRoleServiceIntegration_Edit(t *testing.T) {
 }
 
 func TestRoleServiceIntegration_EditNotFound(t *testing.T) {
-	cleanupTables(&role.SysRole{})
-
-	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
+	svc := newTestRoleService(t)
 
 	err := svc.EditRole(&role.RoleEditor{ID: 9999, Name: "NotFound"}, "editor")
 	assert.Error(t, err)
@@ -81,10 +84,7 @@ func TestRoleServiceIntegration_EditNotFound(t *testing.T) {
 }
 
 func TestRoleServiceIntegration_Delete(t *testing.T) {
-	cleanupTables(&role.SysRole{})
-
-	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
+	svc := newTestRoleService(t)
 
 	// Create role
 	id, _ := svc.CreateRole(&role.RoleCreator{Name: "ToDelete"}, "tester")
@@ -94,15 +94,13 @@ func TestRoleServiceIntegration_Delete(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify deleted
+	repo := repository.NewRoleRepository(testDB)
 	_, err = repo.GetByID(id)
 	assert.Error(t, err)
 }
 
 func TestRoleServiceIntegration_GetRoleByID(t *testing.T) {
-	cleanupTables(&role.SysRole{})
-
-	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
+	svc := newTestRoleService(t)
 
 	// Create role
 	id, _ := svc.CreateRole(&role.RoleCreator{
@@ -120,10 +118,7 @@ func TestRoleServiceIntegration_GetRoleByID(t *testing.T) {
 }
 
 func TestRoleServiceIntegration_GetRoleByIDNotFound(t *testing.T) {
-	cleanupTables(&role.SysRole{})
-
-	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
+	svc := newTestRoleService(t)
 
 	_, err := svc.GetRoleByID(9999)
 	assert.Error(t, err)
@@ -131,10 +126,8 @@ func TestRoleServiceIntegration_GetRoleByIDNotFound(t *testing.T) {
 }
 
 func TestRoleServiceIntegration_QueryRoles(t *testing.T) {
-	cleanupTables(&role.SysRole{})
-
+	svc := newTestRoleService(t)
 	repo := repository.NewRoleRepository(testDB)
-	svc := NewRoleService(repo)
 
 	// Create multiple roles
 	zeroParent := int64(0)
