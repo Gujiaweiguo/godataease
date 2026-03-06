@@ -1,23 +1,14 @@
 import { expect, test } from '@playwright/test'
-
-const hasLoginForm = async page => {
-  const passwordCount = await page.locator('input[type="password"]').count()
-  const loginButtonCount = await page
-    .locator('button:has-text("Login")')
-    .or(page.locator('button:has-text("登录")'))
-    .count()
-
-  return passwordCount > 0 && loginButtonCount > 0
-}
+import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
 
 const loginWithValidCredentials = async page => {
   const username = process.env.E2E_USERNAME || 'admin'
   const password = process.env.E2E_PASSWORD || 'DataEase123456'
 
-  await page.locator('input[type="text"]').first().fill(username)
-  await page.locator('input[type="password"]').first().fill(password)
+  await getUsernameInput(page).fill(username)
+  await getPasswordInput(page).fill(password)
 
-  const loginButton = page.locator('button:has-text("Login")').or(page.locator('button:has-text("登录")'))
+  const loginButton = getLoginButton(page)
   await loginButton.click()
 }
 
@@ -28,8 +19,8 @@ test.describe('Authentication', () => {
 
   test('should display login page', async ({ page }) => {
     if (await hasLoginForm(page)) {
-      await expect(page.locator('input[type="text"]').first()).toBeVisible()
-      await expect(page.locator('input[type="password"]').first()).toBeVisible()
+      await expect(getUsernameInput(page)).toBeVisible()
+      await expect(getPasswordInput(page)).toBeVisible()
       return
     }
 
@@ -43,10 +34,10 @@ test.describe('Authentication', () => {
       return
     }
 
-    await page.locator('input[type="text"]').first().fill('invalid_user')
-    await page.locator('input[type="password"]').first().fill('invalid_password')
+    await getUsernameInput(page).fill('invalid_user')
+    await getPasswordInput(page).fill('invalid_password')
 
-    const loginButton = page.locator('button:has-text("Login")').or(page.locator('button:has-text("登录")'))
+    const loginButton = getLoginButton(page)
     await loginButton.click()
 
     await page.waitForTimeout(2000)
@@ -61,8 +52,8 @@ test.describe('Authentication', () => {
     await context.clearCookies()
     await page.goto('/')
 
-    await expect(page.locator('input[type="text"]').first()).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('input[type="password"]').first()).toBeVisible({ timeout: 10000 })
+    await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
+    await expect(getPasswordInput(page)).toBeVisible({ timeout: 10000 })
 
     await loginWithValidCredentials(page)
 

@@ -106,7 +106,7 @@ jobs:
 
       - name: Datasource benchmark
         id: bench
-        if: steps.changes.outputs.datasource == 'true' || steps.changes.outputs.shared == 'true'
+        if: steps.changes.outputs.datasource == 'true'
         run: |
           mkdir -p benchmark-results
           set -o pipefail
@@ -114,7 +114,7 @@ jobs:
 
       - name: Datasource benchmark compare
         id: bench_compare
-        if: steps.changes.outputs.datasource == 'true' || steps.changes.outputs.shared == 'true'
+        if: steps.changes.outputs.datasource == 'true'
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             node scripts/benchmark-compare.cjs \
@@ -136,7 +136,7 @@ jobs:
           fi
 
       - name: Upload datasource benchmark artifact
-        if: always() && (steps.changes.outputs.datasource == 'true' || steps.changes.outputs.shared == 'true')
+        if: always() && steps.changes.outputs.datasource == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: datasource-tree-benchmark-${{ github.run_id }}

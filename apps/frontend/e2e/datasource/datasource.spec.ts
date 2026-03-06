@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { getLoginButton, getPasswordInput, getUsernameInput } from '../utils/auth'
 
 // Note: These tests require backend service for authentication
 // Run with: E2E_BASE_URL=http://localhost:8080 E2E_USERNAME=admin E2E_PASSWORD=your_password npm run e2e
@@ -20,18 +21,18 @@ const loginWithValidCredentials = async page => {
   const username = process.env.E2E_USERNAME || 'admin'
   const password = process.env.E2E_PASSWORD || 'DataEase123456'
 
-  await page.locator('input[type="text"]').first().fill(username)
-  await page.locator('input[type="password"]').first().fill(password)
+  await getUsernameInput(page).fill(username)
+  await getPasswordInput(page).fill(password)
 
-  const loginButton = page.locator('button:has-text("Login")').or(page.locator('button:has-text("登录")'))
+  const loginButton = getLoginButton(page)
   await loginButton.click()
 }
 
 const ensureLoggedIn = async page => {
   await page.goto('/#/login')
 
-  await expect(page.locator('input[type="text"]').first()).toBeVisible({ timeout: 10000 })
-  await expect(page.locator('input[type="password"]').first()).toBeVisible({ timeout: 10000 })
+  await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
+  await expect(getPasswordInput(page)).toBeVisible({ timeout: 10000 })
 
   await loginWithValidCredentials(page)
 
