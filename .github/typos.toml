@@ -1,0 +1,9 @@
+[default]
+extend-words = []
+[files]
+extend-exclude-files = []
+[type]
+extend-ignore-re = [
+    # Go SQL table aliases (not typos)
+    "sur",
+]
