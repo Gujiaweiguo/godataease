@@ -138,12 +138,12 @@ func (r *UserRepository) SearchExternalUser(keyword string, excludeOrgID int64) 
 	db := r.db.Model(&user.SysUser{}).
 		Where("del_flag = ?", user.DelFlagNormal).
 		Where("user_id NOT IN (SELECT user_id FROM sys_user_role WHERE org_id = ?)", excludeOrgID)
-	
+
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		db = db.Where("username LIKE ? OR nick_name LIKE ? OR email LIKE ?", kw, kw, kw)
 	}
-	
+
 	err := db.Limit(20).Find(&users).Error
 	return users, err
 }

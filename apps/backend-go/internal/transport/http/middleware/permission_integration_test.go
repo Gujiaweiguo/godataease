@@ -97,7 +97,6 @@ func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.Permiss
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }
 
-
 func TestDatasetPreviewWithPerm_401_Unauthenticated(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

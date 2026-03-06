@@ -250,7 +250,7 @@ func RegisterRoleRoutes(r *gin.RouterGroup, h *RoleHandler) {
 	systemRoleGroup := r.Group("/system/role")
 	{
 		systemRoleGroup.POST("/create", h.Create)
-		systemRoleGroup.POST("/update", h.Edit)  // Map to edit
+		systemRoleGroup.POST("/update", h.Edit) // Map to edit
 		systemRoleGroup.POST("/delete/:id", h.Delete)
 	}
 }

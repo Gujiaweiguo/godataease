@@ -5,6 +5,7 @@ import (
 
 	"dataease/backend/internal/domain/permission"
 )
+
 type ResourcePermRepo interface {
 	GetPermByID(permID int64) (*permission.SysPerm, error)
 	GetPermByKey(permKey string) (*permission.SysPerm, error)
@@ -121,14 +122,14 @@ func (s *ResourcePermissionService) GetUserPerspective(userID int64, resourceTyp
 	if s.repo == nil {
 		return nil, fmt.Errorf("repository not initialized")
 	}
-	
+
 	// 管理员返回所有权限标识
 	if s.adminChecker != nil && s.adminChecker.IsAdmin(userID) {
 		return []*permission.UserResourcePermVO{
 			{PermKey: "*", PermName: "全部权限", SourceType: "admin"},
 		}, nil
 	}
-	
+
 	return s.repo.GetUserResources(userID, resourceType)
 }
 
@@ -137,7 +138,7 @@ func (s *ResourcePermissionService) GetResourcePerspective(resourceID int64, res
 	if s.repo == nil {
 		return nil, fmt.Errorf("repository not initialized")
 	}
-	
+
 	return s.repo.GetResourceUsers(resourceID, resourceType)
 }
 
@@ -146,7 +147,7 @@ func (s *ResourcePermissionService) ApplyGroupPermissionsToResource(groupID, res
 	if s.repo == nil {
 		return fmt.Errorf("repository not initialized")
 	}
-	
+
 	return s.repo.ApplyGroupPermissions(groupID, resourceID, resourceType)
 }
 
@@ -155,6 +156,6 @@ func (s *ResourcePermissionService) CheckPermissionConsistency() (*permission.Pe
 	if s.repo == nil {
 		return nil, fmt.Errorf("repository not initialized")
 	}
-	
+
 	return s.repo.CheckPermissionConsistency()
 }

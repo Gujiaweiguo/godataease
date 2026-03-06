@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"net/http/httptest"
 	"encoding/json"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -180,7 +180,6 @@ func (m *mockResourcePermRepoForExport) CheckPermissionConsistency() (*permissio
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }
 
-
 func TestExportDownload_TaskToResourceMapping(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -259,7 +258,6 @@ func TestExportDownload_Dataset_NoPermission(t *testing.T) {
 		t.Errorf("expected code 403001 for denied export permission, got %v", resp["code"])
 	}
 
-
 }
 
 func TestExportDownload_Dashboard_AdminBypass(t *testing.T) {
@@ -332,7 +330,6 @@ func TestExportDownload_TaskNotFound(t *testing.T) {
 		t.Errorf("expected code 404001 for task not found, got %v", resp["code"])
 	}
 
-
 }
 
 func TestExportDownload_UnauthorizedUser(t *testing.T) {
@@ -375,7 +372,6 @@ func TestExportDownload_UnauthorizedUser(t *testing.T) {
 	if resp["code"] != "403001" {
 		t.Errorf("expected code 403001 for unauthorized task access, got %v", resp["code"])
 	}
-
 
 }
 

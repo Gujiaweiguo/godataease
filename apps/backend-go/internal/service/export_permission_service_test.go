@@ -110,7 +110,6 @@ func (m *mockExportResourcePermRepo) CheckPermissionConsistency() (*permission.P
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }
 
-
 func TestExportPermissionService_CheckDashboardExport(t *testing.T) {
 	mockRepo := newMockExportResourcePermRepo()
 	mockRepo.userPermOk[1] = map[int64]bool{1: true}

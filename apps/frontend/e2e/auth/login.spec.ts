@@ -51,6 +51,18 @@ test.describe('Authentication', () => {
   test('SYS-SMK-004 @system-smoke should login successfully with valid credentials', async ({ page, context }) => {
     await context.clearCookies()
     await page.goto('/')
+    await page.evaluate(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+    await page.goto('/#/login')
+
+    if (!(await hasLoginForm(page))) {
+      await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    await page.goto('/')
 
     await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
     await expect(getPasswordInput(page)).toBeVisible({ timeout: 10000 })

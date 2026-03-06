@@ -121,24 +121,8 @@ func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.F
 		}
 
 		result.TotalRows++
-		if strings.TrimSpace(record.Username) == "" {
-			importErrors = append(importErrors, userImportError{Line: record.Line, Username: record.Username, Reason: "username is required"})
-			continue
-		}
-		if record.Email != "" && !emailRegexp.MatchString(record.Email) {
-			importErrors = append(importErrors, userImportError{Line: record.Line, Username: record.Username, Reason: "invalid email format"})
-			continue
-		}
-
-		req := &user.UserCreateRequest{
-			Username: record.Username,
-			Password: defaultPassword,
-			RealName: record.RealName,
-			Email:    stringPtr(record.Email),
-			Phone:    stringPtr(record.Phone),
-		}
-		if _, err = s.userService.CreateUser(req); err != nil {
-			importErrors = append(importErrors, userImportError{Line: record.Line, Username: record.Username, Reason: err.Error()})
+		if importErr := s.importRecord(record, defaultPassword); importErr != nil {
+			importErrors = append(importErrors, userImportError{Line: record.Line, Username: record.Username, Reason: importErr.Error()})
 			continue
 		}
 
@@ -156,6 +140,25 @@ func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.F
 	}
 
 	return result, nil
+}
+
+func (s *UserImportService) importRecord(record userImportRecord, defaultPassword string) error {
+	if strings.TrimSpace(record.Username) == "" {
+		return fmt.Errorf("username is required")
+	}
+	if record.Email != "" && !emailRegexp.MatchString(record.Email) {
+		return fmt.Errorf("invalid email format")
+	}
+
+	req := &user.UserCreateRequest{
+		Username: record.Username,
+		Password: defaultPassword,
+		RealName: record.RealName,
+		Email:    stringPtr(record.Email),
+		Phone:    stringPtr(record.Phone),
+	}
+	_, err := s.userService.CreateUser(req)
+	return err
 }
 
 func (s *UserImportService) GetErrorReport(key string) ([]byte, string, error) {

@@ -13,10 +13,10 @@ import (
 )
 
 type OrgService struct {
-	orgRepo    *repository.OrgRepository
-	auditSvc   *AuditService
-	userRepo   *repository.UserRepository
-	roleRepo   *repository.RoleRepository
+	orgRepo  *repository.OrgRepository
+	auditSvc *AuditService
+	userRepo *repository.UserRepository
+	roleRepo *repository.RoleRepository
 }
 
 func NewOrgService(orgRepo *repository.OrgRepository, auditSvc *AuditService, userRepo *repository.UserRepository, roleRepo *repository.RoleRepository) *OrgService {
@@ -117,16 +117,16 @@ func (s *OrgService) DeleteOrg(orgID int64, operatorID int64, operatorName strin
 		if s.auditSvc != nil {
 			resourceType := string(audit.ResourceTypeOrganization)
 			_, _ = s.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
-				UserID:       &operatorID,
-				Username:     &operatorName,
-				ActionType:   audit.ActionTypeSystemConfig,
-				ActionName:   "删除组织",
-				ResourceType: &resourceType,
-				ResourceID:   &orgID,
-				ResourceName: &orgInfo.OrgName,
-				Operation:    audit.OperationDelete,
-				IPAddress:    &ipAddress,
-				Status:       ptrStatus(audit.StatusFailed),
+				UserID:        &operatorID,
+				Username:      &operatorName,
+				ActionType:    audit.ActionTypeSystemConfig,
+				ActionName:    "删除组织",
+				ResourceType:  &resourceType,
+				ResourceID:    &orgID,
+				ResourceName:  &orgInfo.OrgName,
+				Operation:     audit.OperationDelete,
+				IPAddress:     &ipAddress,
+				Status:        ptrStatus(audit.StatusFailed),
 				FailureReason: ptrStr(fmt.Sprintf("组织下存在 %d 个子组织，无法删除", childrenCount)),
 			})
 		}
@@ -173,11 +173,6 @@ func (s *OrgService) DeleteOrg(orgID int64, operatorID int64, operatorName strin
 	}
 	logger.Info("Organization deleted", zap.Int64("orgId", orgID), zap.String("orgName", orgInfo.OrgName))
 	return nil
-}
-
-// ptrInt 辅助函数
-func ptrInt(v int) *int {
-	return &v
 }
 
 // ptrStr 辅助函数

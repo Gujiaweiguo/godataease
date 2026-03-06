@@ -140,7 +140,7 @@ func (r *ResourcePermissionRepository) RevokePermFromRole(roleID, permID int64) 
 // GetUserResources 获取用户可访问的资源列表（按用户视角）
 func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
 	var results []*permission.UserResourcePermVO
-	
+
 	// 1. 直接授权给用户的资源
 	var userPerms []struct {
 		PermID   int64  `gorm:"column:perm_id"`
@@ -155,7 +155,7 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, up := range userPerms {
 		results = append(results, &permission.UserResourcePermVO{
 			PermKey:    up.PermKey,
@@ -163,7 +163,7 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 			SourceType: "direct",
 		})
 	}
-	
+
 	// 2. 通过角色继承的资源
 	var rolePerms []struct {
 		PermID   int64  `gorm:"column:perm_id"`
@@ -182,7 +182,7 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, rp := range rolePerms {
 		results = append(results, &permission.UserResourcePermVO{
 			PermKey:    rp.PermKey,
@@ -192,17 +192,17 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 			SourceName: rp.RoleName,
 		})
 	}
-	
+
 	return results, nil
 }
 
 // GetResourceUsers 获取资源的授权用户列表（按资源视角）
 func (r *ResourcePermissionRepository) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
 	var results []*permission.ResourceUserPermVO
-	
+
 	// TODO: 需要根据 resource_id 和 resource_type 查询实际资源权限
 	// 当前版本返回基础结构，后续需要扩展资源权限表
-	
+
 	return results, nil
 }
 

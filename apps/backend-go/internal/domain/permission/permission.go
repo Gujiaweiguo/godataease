@@ -89,14 +89,14 @@ type UserResourcePermVO struct {
 
 // ResourceUserPermVO 资源用户权限视图（按资源视角）
 type ResourceUserPermVO struct {
-	UserID       int64  `json:"userId"`
-	Username     string `json:"username"`
-	NickName     string `json:"nickName"`
-	PermKey      string `json:"permKey"`
-	PermName     string `json:"permName"`
-	SourceType   string `json:"sourceType"` // direct=直接授权, role=角色继承
-	SourceID     int64  `json:"sourceId"`   // 授权来源ID
-	SourceName   string `json:"sourceName"` // 授权来源名称
+	UserID     int64  `json:"userId"`
+	Username   string `json:"username"`
+	NickName   string `json:"nickName"`
+	PermKey    string `json:"permKey"`
+	PermName   string `json:"permName"`
+	SourceType string `json:"sourceType"` // direct=直接授权, role=角色继承
+	SourceID   int64  `json:"sourceId"`   // 授权来源ID
+	SourceName string `json:"sourceName"` // 授权来源名称
 }
 
 // UserPerspectiveRequest 按用户视角查询请求
@@ -107,16 +107,16 @@ type UserPerspectiveRequest struct {
 
 // ResourcePerspectiveRequest 按资源视角查询请求
 type ResourcePerspectiveRequest struct {
-	ResourceID   int64   `json:"resourceId" binding:"required"`
-	ResourceType string  `json:"resourceType" binding:"required"`
+	ResourceID   int64  `json:"resourceId" binding:"required"`
+	ResourceType string `json:"resourceType" binding:"required"`
 }
 
 // ResourceGroupPermVO 资源分组权限
 type ResourceGroupPermVO struct {
-	GroupID      int64                        `json:"groupId"`
-	GroupName    string                       `json:"groupName"`
-	ResourceType string                       `json:"resourceType"`
-	Permissions  []*ResourceGroupPermItemVO   `json:"permissions"`
+	GroupID      int64                      `json:"groupId"`
+	GroupName    string                     `json:"groupName"`
+	ResourceType string                     `json:"resourceType"`
+	Permissions  []*ResourceGroupPermItemVO `json:"permissions"`
 }
 
 // ResourceGroupPermItemVO 资源分组权限项
@@ -137,9 +137,9 @@ type ApplyGroupPermRequest struct {
 
 // PermissionConsistencyResult 双视角一致性校验结果
 type PermissionConsistencyResult struct {
-	Consistent     bool                         `json:"consistent"`
-	UserCount      int                          `json:"userCount"`
-	ResourceCount  int                          `json:"resourceCount"`
+	Consistent      bool                         `json:"consistent"`
+	UserCount       int                          `json:"userCount"`
+	ResourceCount   int                          `json:"resourceCount"`
 	Inconsistencies []*PermissionInconsistencyVO `json:"inconsistencies"`
 }
 
@@ -152,4 +152,3 @@ type PermissionInconsistencyVO struct {
 	ResourceView string `json:"resourceView"` // 资源视角的权限状态
 	Description  string `json:"description"`
 }
-
