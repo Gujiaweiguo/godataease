@@ -66,17 +66,12 @@ test.describe('Authentication', () => {
 
     await loginWithValidCredentials(page)
 
-    await expect
-      .poll(async () => {
-        return await page.evaluate(() => Object.keys(localStorage).includes('user.token'))
-      }, { timeout: 20000 })
-      .toBe(true)
+    // Wait for navigation to complete after login
+    await page.waitForURL(/#\/workbranch|data\/datasource|module-datasource/, { timeout: 20000 })
 
-    await expect
-      .poll(async () => {
-        return await page.evaluate(() => window.location.hash)
-      }, { timeout: 20000 })
-      .toContain('/workbranch/index')
+    // Verify token exists in localStorage
+    const hasToken = await page.evaluate(() => Object.keys(localStorage).includes('user.token'))
+    expect(hasToken).toBeTruthy()
 
     const hasAppShell =
       (await page.locator('#app').count()) > 0 ||

@@ -13,6 +13,7 @@ import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { useEmbedded } from '@/store/modules/embedded'
 import { useLoading } from '@/hooks/web/useLoading'
+import { isDynamicNavigationEnabled } from '@/utils/featureFlags'
 const appearanceStore = useAppearanceStoreWithOut()
 const { wsCache } = useCache()
 const permissionStore = usePermissionStoreWithOut()
@@ -123,13 +124,13 @@ router.beforeEach(async (to, from, next) => {
       }
 
       let roleRouters = (await getRoleRouters()) || []
-      console.log('Role routers from API:', roleRouters)
-      if (isDesktop) {
+      if (!isDynamicNavigationEnabled() && isDesktop) {
         roleRouters = roleRouters.filter(item => item.name !== 'system')
       }
       const routers: any[] = roleRouters as AppCustomRouteRecordRaw[]
-      routers.forEach(item => (item['top'] = true))
-      console.log('Routers with top=true:', routers)
+      routers.forEach(item => {
+        item.top = true
+      })
       await permissionStore.generateRoutes(routers as AppCustomRouteRecordRaw[])
 
       permissionStore.getAddRouters.forEach(route => {

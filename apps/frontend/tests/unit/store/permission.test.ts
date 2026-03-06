@@ -215,6 +215,42 @@ describe('pathValid', () => {
 
     expect(pathValid('/dataset-form')).toBe(false)
   })
+
+  it('should deny direct access after menu authorization is revoked', async () => {
+    const store = usePermissionStore()
+
+    await store.generateRoutes([
+      {
+        path: '/system',
+        name: 'System',
+        hidden: false,
+        children: [
+          {
+            path: 'menu',
+            name: 'Menu',
+            hidden: false
+          }
+        ]
+      }
+    ])
+    expect(store.getRouters.some(route => route.path === '/system')).toBe(true)
+
+    await store.generateRoutes([
+      {
+        path: '/system',
+        name: 'System',
+        hidden: false,
+        children: [
+          {
+            path: 'user',
+            name: 'User',
+            hidden: false
+          }
+        ]
+      }
+    ])
+    expect(pathValid('/system/menu')).toBe(false)
+  })
 })
 
 describe('getFirstAuthMenu', () => {
@@ -317,5 +353,35 @@ describe('Permission Store Integration', () => {
     await store.generateRoutes(updatedRouters)
 
     expect(store.getRouters.length).toBeGreaterThanOrEqual(initialCount)
+  })
+
+  it('should sync visible navigation with role-menu authorization updates', async () => {
+    const store = usePermissionStore()
+
+    await store.generateRoutes([
+      {
+        path: '/system',
+        name: 'System',
+        hidden: false,
+        children: [
+          { path: 'menu', name: 'Menu', hidden: false },
+          { path: 'user', name: 'User', hidden: false }
+        ]
+      }
+    ])
+    expect(store.getRoutersNotHidden.some(route => route.path === '/system')).toBe(true)
+
+    await store.generateRoutes([
+      {
+        path: '/system',
+        name: 'System',
+        hidden: true,
+        children: [
+          { path: 'menu', name: 'Menu', hidden: false },
+          { path: 'user', name: 'User', hidden: false }
+        ]
+      }
+    ])
+    expect(store.getRoutersNotHidden.some(route => route.path === '/system')).toBe(false)
   })
 })

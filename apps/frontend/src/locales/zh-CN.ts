@@ -99,7 +99,7 @@ export default {
   toolbox: {
     name: '工具箱',
     template_center: '模板中心',
-    org_center: '组织管理中心'
+    org_center: '系统管理中心'
   },
   api_pagination: {
     help_documentation: '帮助文档',

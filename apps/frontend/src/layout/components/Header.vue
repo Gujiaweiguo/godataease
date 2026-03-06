@@ -3,27 +3,24 @@ import logo from '@/assets/svg/logo.svg'
 import logo_sqlbot from '@/assets/svg/logo_sqlbot.svg'
 import msgNotice from '@/assets/svg/icon_notification_outlined.svg'
 import dvAi from '@/assets/svg/dv-ai.svg'
-import dvPreviewDownload from '@/assets/svg/icon_download_outlined.svg'
 import { computed, onMounted, ref } from 'vue'
 import { usePermissionStore } from '@/store/modules/permission'
 import { isExternal } from '@/utils/validate'
-import { formatRoute } from '@/router/establish'
 import HeaderMenuItem from './HeaderMenuItem.vue'
+import { resolveActiveTopPath, resolveTopMenus } from './menu-utils'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { Icon } from '@/components/icon-custom'
-import SystemCfg from './SystemCfg.vue'
-import ToolboxCfg from './ToolboxCfg.vue'
+import MoreMenu from './MoreMenu.vue'
 import { useRouter, useRoute } from 'vue-router_2'
-import TopDoc from '@/layout/components/TopDoc.vue'
 import AccountOperator from '@/layout/components/AccountOperator.vue'
 import { isDesktop } from '@/utils/ModelUtil'
 import { XpackComponent } from '@/components/plugin'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import AiComponent from '@/layout/components/AiComponent.vue'
 import { findBaseParams } from '@/api/aiComponent'
-import AiTips from '@/layout/components/AiTips.vue'
 import DesktopSetting from './DesktopSetting.vue'
 import request from '@/config/axios'
+import { isDynamicNavigationEnabled } from '@/utils/featureFlags'
 
 const appearanceStore = useAppearanceStoreWithOut()
 const { push } = useRouter()
@@ -48,19 +45,42 @@ const handleSQLBotClick = () => {
 }
 const sqlbotEnabled = ref(false)
 const desktop = isDesktop()
-const activeIndex = computed(() => {
-  if (route.path.includes('system')) {
-    return '/system/user'
+const permissionStore = usePermissionStore()
+
+const dynamicNavigationEnabled = computed(() => isDynamicNavigationEnabled())
+
+const topMenuOrder = ['/workbranch', '/panel', '/screen', '/data', '/system']
+const topMenuOrderMap = topMenuOrder.reduce<Record<string, number>>((acc, path, index) => {
+  acc[path] = index
+  return acc
+}, {})
+const resolveTopMenuBase = (path: string) => {
+  return topMenuOrder.find(base => path === base || path.startsWith(`${base}/`))
+}
+
+const routers = computed(() => {
+  const source = permissionStore.getRoutersNotHidden as AppCustomRouteRecordRaw[]
+  if (dynamicNavigationEnabled.value) {
+    return resolveTopMenus(source)
   }
-  return route.path
+  const allRouters = resolveTopMenus(source)
+  return allRouters
+    .map(route => ({ route, basePath: resolveTopMenuBase(route.path) }))
+    .filter(item => !!item.basePath)
+    .sort((a, b) => topMenuOrderMap[a.basePath as string] - topMenuOrderMap[b.basePath as string])
+    .map(item => item.route)
 })
 
-const permissionStore = usePermissionStore()
-const downloadClick = params => {
-  useEmitt().emitter.emit('data-export-center', params)
-}
-const routers: any[] = formatRoute(permissionStore.getRoutersNotHidden as AppCustomRouteRecordRaw[])
-const showSystem = ref(false)
+const activeIndex = computed(() => {
+  if (!dynamicNavigationEnabled.value) {
+    if (route.path.includes('system')) {
+      return '/system/user'
+    }
+    return route.path
+  }
+  const activeTopPath = resolveActiveTopPath(route.path, routers.value)
+  return activeTopPath || route.path
+})
 const showMsg = ref(false)
 const showToolbox = ref(false)
 const showOverlay = ref(false)
@@ -73,15 +93,6 @@ const handleSelect = (index: string) => {
     push(index)
   }
 }
-const initShowSystem = () => {
-  const routers = permissionStore.getRouters
-  console.log('All routers:', routers)
-  console.log(
-    'Checking for /system route:',
-    routers.some(route => route.path === '/system')
-  )
-  showSystem.value = routers.some(route => route.path === '/system')
-}
 const initShowMsg = () => {
   showMsg.value = permissionStore.getRouters.some(route => route.path === '/msg')
 }
@@ -92,12 +103,6 @@ const navigateBg = computed(() => appearanceStore.getNavigateBg)
 const navigate = computed(() => appearanceStore.getNavigate)
 
 const initAiBase = async () => {
-  // const aiTipsCheck = wsCache.get('DE-AI-TIPS-CHECK')
-  // if (aiTipsCheck === 'CHECKED') {
-  //   showOverlay.value = false
-  // } else {
-  //   showOverlay.value = true
-  // }
   await findBaseParams().then(rsp => {
     const params = rsp.data
     if (params && params['ai.baseUrl']) {
@@ -108,10 +113,6 @@ const initAiBase = async () => {
   })
 }
 
-const aiTipsConfirm = () => {
-  wsCache.set('DE-AI-TIPS-CHECK', 'CHECKED')
-  showOverlay.value = false
-}
 
 const msgNoticePush = () => {
   push('/msg/msg-fill')
@@ -129,7 +130,6 @@ const loadSqlbotInfo = () => {
 }
 onMounted(() => {
   loadSqlbotInfo()
-  initShowSystem()
   initShowToolbox()
   initShowMsg()
   initAiBase()
@@ -171,24 +171,7 @@ onMounted(() => {
           <Icon name="dv-ai"><dvAi @click="handleAiClick" class="svg-icon" /></Icon>
         </el-icon>
       </el-tooltip>
-      <el-tooltip effect="dark" :content="t('data_export.export_center')" placement="bottom">
-        <el-icon
-          class="preview-download_icon"
-          :class="navigateBg === 'light' && 'is-light-setting'"
-        >
-          <Icon name="dv-preview-download"
-            ><dvPreviewDownload @click="downloadClick" class="svg-icon"
-          /></Icon>
-        </el-icon>
-      </el-tooltip>
-
-      <ai-tips
-        @confirm="aiTipsConfirm"
-        v-if="showOverlay && appearanceStore.getShowAi"
-        class="ai-icon-tips"
-      />
-      <ToolboxCfg v-if="showToolbox" />
-      <TopDoc v-if="appearanceStore.getShowDoc" />
+      <MoreMenu />
       <el-tooltip
         v-if="showMsg"
         effect="dark"
@@ -210,7 +193,6 @@ onMounted(() => {
         </el-badge>
       </el-tooltip>
 
-      <SystemCfg v-if="showSystem" />
       <AccountOperator />
       <ai-component
         v-if="aiBaseUrl && appearanceStore.getShowAi"
