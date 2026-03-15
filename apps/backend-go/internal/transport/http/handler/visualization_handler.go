@@ -66,6 +66,11 @@ type treeNode struct {
 	Children   []treeNode `json:"children,omitempty"`
 }
 
+const (
+	visualizationNodeTypeFolder = "folder"
+	visualizationNodeTypePanel  = "panel"
+)
+
 func (h *VisualizationHandler) Tree(c *gin.Context) {
 	var req treeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -118,7 +123,7 @@ func resolveBusiTypes(busiFlag string) ([]string, error) {
 	if flag == "" || flag == "dashboard-dataV" {
 		return []string{"dashboard", "dataV"}, nil
 	}
-	if flag == "panel" {
+	if flag == visualizationNodeTypePanel {
 		return []string{"dashboard"}, nil
 	}
 	if flag == "screen" {
@@ -133,7 +138,7 @@ func resolveBusiTypes(busiFlag string) ([]string, error) {
 
 func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFilter *bool) ([]treeNode, error) {
 	childrenMap := make(map[string][]treeNode)
-	roots := make([]treeNode, 0)
+	var roots []treeNode
 
 	for _, item := range items {
 		if item == nil {
@@ -149,10 +154,10 @@ func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFi
 		if item.NodeType != nil {
 			nodeType = *item.NodeType
 		}
-		if nodeType != "folder" && nodeType != "panel" {
+		if nodeType != visualizationNodeTypeFolder && nodeType != visualizationNodeTypePanel {
 			return nil, fmt.Errorf("invalid nodeType: %s", nodeType)
 		}
-		leaf := nodeType != "folder"
+		leaf := nodeType != visualizationNodeTypeFolder
 		if leafFilter != nil && *leafFilter != leaf {
 			continue
 		}
@@ -230,6 +235,34 @@ func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
 	response.Success(c, strconv.FormatInt(id, 10))
 }
 
+func (h *VisualizationHandler) FindDvType(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid ID")
+		return
+	}
+	result, err := h.service.FindDvType(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
+	var req visualization.CanvasChangeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.CheckCanvasChange(&req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -243,6 +276,64 @@ func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
 		return
 	}
 	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) UpdateBase(c *gin.Context) {
+	var req visualization.UpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	updateBy := h.getUpdateBy(c)
+	if err := h.service.UpdateBase(&req, updateBy); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) Move(c *gin.Context) {
+	var req visualization.MoveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	updateBy := h.getUpdateBy(c)
+	if err := h.service.Move(&req, updateBy); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) UpdatePublishStatus(c *gin.Context) {
+	var req visualization.UpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	updateBy := h.getUpdateBy(c)
+	result, err := h.service.UpdatePublishStatus(&req, updateBy)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *VisualizationHandler) RecoverToPublished(c *gin.Context) {
+	var req visualization.DetailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	updateBy := h.getUpdateBy(c)
+	result, err := h.service.RecoverToPublished(req.ID, updateBy)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *VisualizationHandler) DeleteLogic(c *gin.Context) {
@@ -259,6 +350,20 @@ func (h *VisualizationHandler) DeleteLogic(c *gin.Context) {
 		return
 	}
 	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) NameCheck(c *gin.Context) {
+	var req visualization.NameCheckRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.NameCheck(&req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
@@ -278,11 +383,19 @@ func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
 func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler) {
 	vg := r.Group("/dataVisualization")
 	{
+		vg.GET("/findDvType/:id", h.FindDvType)
 		vg.POST("/tree", h.Tree)
+		vg.POST("/nameCheck", h.NameCheck)
+		vg.POST("/checkCanvasChange", h.CheckCanvasChange)
 		vg.POST("/findById", h.FindByID)
 		vg.POST("/list", h.List)
+		vg.POST("/updateBase", h.UpdateBase)
+		vg.POST("/move", h.Move)
+		vg.POST("/updatePublishStatus", h.UpdatePublishStatus)
+		vg.POST("/recoverToPublished", h.RecoverToPublished)
 		vg.POST("/saveCanvas", h.SaveCanvas)
 		vg.POST("/updateCanvas", h.UpdateCanvas)
 		vg.POST("/deleteLogic/:id", h.DeleteLogic)
+		vg.POST("/deleteLogic/:id/:busiFlag", h.DeleteLogic)
 	}
 }

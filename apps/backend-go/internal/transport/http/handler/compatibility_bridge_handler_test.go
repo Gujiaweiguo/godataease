@@ -705,6 +705,7 @@ func TestApiAliasDatasetTree(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != 404 {
+		t.Logf("Route /api/datasetTree/tree registered, status: %d", w.Code)
 	}
 }
 

@@ -18,6 +18,11 @@ type LicenseRepository interface {
 	Clear() error
 }
 
+const (
+	licenseStatusValid     = "valid"
+	licenseWarningCritical = "critical"
+)
+
 type LicenseService struct {
 	repo LicenseRepository
 }
@@ -48,7 +53,7 @@ func (s *LicenseService) Update(req *license.LicenseRequest) (*license.ValidateR
 	}
 
 	result := buildLicenseResult(req.License)
-	if result.Status != "valid" {
+	if result.Status != licenseStatusValid {
 		return result, nil
 	}
 
@@ -77,7 +82,7 @@ func (s *LicenseService) IsLicenseValid() bool {
 	if err != nil || result == nil {
 		return false
 	}
-	if result.Status != "valid" || result.License == nil {
+	if result.Status != licenseStatusValid || result.License == nil {
 		return false
 	}
 	expiredDate, err := time.Parse("2006-01-02", result.License.Expired)
@@ -97,8 +102,8 @@ func (s *LicenseService) GetExpiryWarning() *license.ExpiryWarning {
 		Message:        "",
 	}
 
-	if err != nil || result == nil || result.Status != "valid" || result.License == nil {
-		warning.WarningLevel = "critical"
+	if err != nil || result == nil || result.Status != licenseStatusValid || result.License == nil {
+		warning.WarningLevel = licenseWarningCritical
 		warning.Message = "License is invalid or not found"
 		return warning
 	}
@@ -107,7 +112,7 @@ func (s *LicenseService) GetExpiryWarning() *license.ExpiryWarning {
 
 	expiredDate, err := time.Parse("2006-01-02", result.License.Expired)
 	if err != nil {
-		warning.WarningLevel = "critical"
+		warning.WarningLevel = licenseWarningCritical
 		warning.Message = "Invalid license expiry date format"
 		return warning
 	}
@@ -118,14 +123,14 @@ func (s *LicenseService) GetExpiryWarning() *license.ExpiryWarning {
 
 	if daysRemaining <= 0 {
 		warning.IsExpiringSoon = true
-		warning.WarningLevel = "critical"
+		warning.WarningLevel = licenseWarningCritical
 		warning.Message = "License has expired"
 		return warning
 	}
 
 	if daysRemaining < 7 {
 		warning.IsExpiringSoon = true
-		warning.WarningLevel = "critical"
+		warning.WarningLevel = licenseWarningCritical
 		warning.Message = "License expires in less than 7 days"
 		return warning
 	}

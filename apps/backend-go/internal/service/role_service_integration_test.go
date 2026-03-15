@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create RoleService with all dependencies
@@ -157,6 +158,34 @@ func TestRoleServiceIntegration_QueryRoles(t *testing.T) {
 	assert.Len(t, emptyResult, 0)
 }
 
+func TestRoleServiceIntegration_QueryRolesPage(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	systemType := "system"
+	customType := "custom"
+	zeroParent := int64(0)
+
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "Admin Root", RoleCode: "admin-root", RoleType: &systemType, Status: role.StatusEnabled, ParentID: &zeroParent}))
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "Admin Custom", RoleCode: "admin-custom", RoleType: &customType, Status: role.StatusEnabled}))
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "Viewer", RoleCode: "viewer", RoleType: &systemType, Status: role.StatusEnabled}))
+
+	keyword := "Admin"
+	result, err := svc.QueryRolesPage(&role.RolePageRequest{Keyword: &keyword, Current: 1, Size: 10})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), result.Total)
+	assert.Len(t, result.List, 2)
+
+	result, err = svc.QueryRolesPage(&role.RolePageRequest{RoleType: &systemType, Current: 1, Size: 10})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), result.Total)
+	assert.Len(t, result.List, 2)
+	for _, item := range result.List {
+		require.NotNil(t, item.RoleType)
+		assert.Equal(t, systemType, *item.RoleType)
+	}
+}
+
 func pStr(v string) *string {
 	return &v
 }
@@ -206,7 +235,7 @@ func TestRoleServiceIntegration_MountExternalUser(t *testing.T) {
 	testUser := &user.SysUser{
 		Username: "external_mount_user",
 		NickName: "External Mount User",
-		Email: pStr("external@test.com"),
+		Email:    pStr("external@test.com"),
 		Status:   1,
 	}
 	err := userRepo.Create(testUser)
@@ -240,7 +269,7 @@ func TestRoleServiceIntegration_UnmountUser(t *testing.T) {
 	testUser := &user.SysUser{
 		Username: "unmount_test_user",
 		NickName: "Unmount Test User",
-		Email: pStr("unmount@test.com"),
+		Email:    pStr("unmount@test.com"),
 		Status:   1,
 	}
 	err := userRepo.Create(testUser)
@@ -280,7 +309,7 @@ func TestRoleServiceIntegration_UnmountUserLastRole(t *testing.T) {
 	testUser := &user.SysUser{
 		Username: "last_role_user",
 		NickName: "Last Role User",
-		Email: pStr("last@test.com"),
+		Email:    pStr("last@test.com"),
 		Status:   1,
 	}
 	err := userRepo.Create(testUser)
@@ -312,7 +341,7 @@ func TestRoleServiceIntegration_BeforeUnmountInfo(t *testing.T) {
 	testUser := &user.SysUser{
 		Username: "before_unmount_user",
 		NickName: "Before Unmount User",
-		Email: pStr("before@test.com"),
+		Email:    pStr("before@test.com"),
 		Status:   1,
 	}
 	err := userRepo.Create(testUser)
@@ -345,13 +374,13 @@ func TestRoleServiceIntegration_SearchExternalUser(t *testing.T) {
 	testUser1 := &user.SysUser{
 		Username: "search_ext_user1",
 		NickName: "Search External User1",
-		Email: pStr("search1@test.com"),
+		Email:    pStr("search1@test.com"),
 		Status:   1,
 	}
 	testUser2 := &user.SysUser{
 		Username: "search_ext_user2",
 		NickName: "Search External User2",
-		Email: pStr("search2@test.com"),
+		Email:    pStr("search2@test.com"),
 		Status:   1,
 	}
 	userRepo.Create(testUser1)
@@ -389,7 +418,7 @@ func TestRoleServiceIntegration_SelectedForUser(t *testing.T) {
 	testUser := &user.SysUser{
 		Username: "selected_user",
 		NickName: "Selected User",
-		Email: pStr("selected@test.com"),
+		Email:    pStr("selected@test.com"),
 		Status:   1,
 	}
 	err := userRepo.Create(testUser)
@@ -440,7 +469,7 @@ func TestRoleServiceIntegration_SelectedForUserNoRoles(t *testing.T) {
 	testUser := &user.SysUser{
 		Username: "no_roles_user",
 		NickName: "No Roles User",
-		Email: pStr("noroles@test.com"),
+		Email:    pStr("noroles@test.com"),
 		Status:   1,
 	}
 	err := userRepo.Create(testUser)

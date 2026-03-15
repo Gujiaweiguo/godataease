@@ -2,6 +2,7 @@ package repository
 
 import (
 	"dataease/backend/internal/domain/role"
+
 	"gorm.io/gorm"
 )
 
@@ -104,4 +105,40 @@ func (r *RoleRepository) QueryByOrgID(orgID int64, keyword string) ([]*role.SysR
 	}
 	err := db.Order("create_time DESC").Find(&roles).Error
 	return roles, err
+}
+
+// QueryWithPage 分页查询角色
+func (r *RoleRepository) QueryWithPage(keyword, roleType string, current, size int) ([]*role.SysRole, int64, error) {
+	var roles []*role.SysRole
+	var total int64
+
+	db := r.db.Model(&role.SysRole{})
+
+	if keyword != "" {
+		db = db.Where("role_name LIKE ? OR role_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	}
+	if roleType != "" {
+		db = db.Where("role_type = ?", roleType)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if size < 1 {
+		size = 10
+	}
+	if size > 100 {
+		size = 100
+	}
+	offset := (current - 1) * size
+	if offset < 0 {
+		offset = 0
+	}
+
+	if err := db.Order("role_type ASC, create_time DESC").Offset(offset).Limit(size).Find(&roles).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return roles, total, nil
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const embeddedDefaultUpdateBy = "system"
+
 type EmbeddedHandler struct {
 	service *service.EmbeddedService
 }
@@ -173,7 +175,7 @@ func (h *EmbeddedHandler) getUpdateBy(c *gin.Context) string {
 	if userId, exists := c.Get("userId"); exists {
 		return toString(userId)
 	}
-	return "system"
+	return embeddedDefaultUpdateBy
 }
 
 func (h *EmbeddedHandler) getCurrentUser(c *gin.Context) (int64, int64) {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"dataease/backend/internal/domain/embedded"
+
 	"gorm.io/gorm"
 )
 

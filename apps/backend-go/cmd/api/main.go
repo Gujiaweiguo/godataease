@@ -48,8 +48,5 @@ func main() {
 	<-quit
 
 	logger.Info("Shutting down server...")
-	if err := logger.Sync(); err != nil {
-		// Ignore sync errors during shutdown
-	}
-	logger.Sync()
+	_ = logger.Sync()
 }

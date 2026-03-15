@@ -253,7 +253,9 @@ func TestExportDownload_Dataset_NoPermission(t *testing.T) {
 		t.Errorf("expected HTTP 200, got %d", w.Code)
 	}
 	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
 	if resp["code"] != "403001" {
 		t.Errorf("expected code 403001 for denied export permission, got %v", resp["code"])
 	}
@@ -325,7 +327,9 @@ func TestExportDownload_TaskNotFound(t *testing.T) {
 		t.Errorf("expected HTTP 200, got %d", w.Code)
 	}
 	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
 	if resp["code"] != "404001" {
 		t.Errorf("expected code 404001 for task not found, got %v", resp["code"])
 	}
@@ -368,7 +372,9 @@ func TestExportDownload_UnauthorizedUser(t *testing.T) {
 		t.Errorf("expected HTTP 200, got %d", w.Code)
 	}
 	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
 	if resp["code"] != "403001" {
 		t.Errorf("expected code 403001 for unauthorized task access, got %v", resp["code"])
 	}

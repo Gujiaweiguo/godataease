@@ -6,6 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const msgStatusRead = "read"
+
 type coreMsgSetting struct {
 	ID     int64      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	MsgID  string     `gorm:"column:msg_id;size:100;uniqueIndex:idx_msg_user" json:"msgId"`
@@ -35,7 +37,7 @@ func (r *MsgCenterRepository) MarkAsRead(msgID string, userID int64) error {
 		record := coreMsgSetting{
 			MsgID:  msgID,
 			UserID: userID,
-			Status: "read",
+			Status: msgStatusRead,
 			ReadAt: &now,
 		}
 		return r.db.Create(&record).Error
@@ -43,7 +45,7 @@ func (r *MsgCenterRepository) MarkAsRead(msgID string, userID int64) error {
 	if err != nil {
 		return err
 	}
-	existing.Status = "read"
+	existing.Status = msgStatusRead
 	existing.ReadAt = &now
 	return r.db.Save(&existing).Error
 }
@@ -68,7 +70,7 @@ func (r *MsgCenterRepository) MarkBatchAsRead(msgIDs []string, userID int64) (in
 			record := coreMsgSetting{
 				MsgID:  msgID,
 				UserID: userID,
-				Status: "read",
+				Status: msgStatusRead,
 				ReadAt: &now,
 			}
 			if createErr := r.db.Create(&record).Error; createErr == nil {
@@ -80,11 +82,11 @@ func (r *MsgCenterRepository) MarkBatchAsRead(msgIDs []string, userID int64) (in
 			continue
 		}
 		// Skip if already read
-		if existing.Status == "read" {
+		if existing.Status == msgStatusRead {
 			continue
 		}
 		// Update existing record
-		existing.Status = "read"
+		existing.Status = msgStatusRead
 		existing.ReadAt = &now
 		if saveErr := r.db.Save(&existing).Error; saveErr == nil {
 			updated++
@@ -97,7 +99,7 @@ func (r *MsgCenterRepository) MarkBatchAsRead(msgIDs []string, userID int64) (in
 // IsRead checks if a message has been read by a specific user
 func (r *MsgCenterRepository) IsRead(msgID string, userID int64) (bool, error) {
 	var record coreMsgSetting
-	err := r.db.Where("msg_id = ? AND user_id = ? AND status = ?", msgID, userID, "read").First(&record).Error
+	err := r.db.Where("msg_id = ? AND user_id = ? AND status = ?", msgID, userID, msgStatusRead).First(&record).Error
 	if err == gorm.ErrRecordNotFound {
 		return false, nil
 	}
@@ -115,7 +117,7 @@ func (r *MsgCenterRepository) GetReadStatusMap(msgIDs []string, userID int64) (m
 	}
 
 	var records []coreMsgSetting
-	err := r.db.Where("msg_id IN ? AND user_id = ? AND status = ?", msgIDs, userID, "read").Find(&records).Error
+	err := r.db.Where("msg_id IN ? AND user_id = ? AND status = ?", msgIDs, userID, msgStatusRead).Find(&records).Error
 	if err != nil {
 		return nil, err
 	}

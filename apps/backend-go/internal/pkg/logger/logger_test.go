@@ -91,7 +91,10 @@ func TestS_AutoInit(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	Init(nil)
+	err := Init(nil)
+	if err != nil {
+		t.Fatalf("Init with nil config failed: %v", err)
+	}
 	_ = Sync()
 }
 
@@ -104,28 +107,43 @@ func TestSync_NilLogger(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	Init(nil)
+	err := Init(nil)
+	if err != nil {
+		t.Fatalf("Init with nil config failed: %v", err)
+	}
 	Info("test info message", zap.String("key", "value"))
 }
 
 func TestError(t *testing.T) {
-	Init(nil)
+	err := Init(nil)
+	if err != nil {
+		t.Fatalf("Init with nil config failed: %v", err)
+	}
 	Error("test error message", zap.String("key", "value"))
 }
 
 func TestDebug(t *testing.T) {
 	cfg := &Config{Level: "debug", Format: "console"}
-	Init(cfg)
+	err := Init(cfg)
+	if err != nil {
+		t.Fatalf("Init with debug config failed: %v", err)
+	}
 	Debug("test debug message", zap.String("key", "value"))
 }
 
 func TestWarn(t *testing.T) {
-	Init(nil)
+	err := Init(nil)
+	if err != nil {
+		t.Fatalf("Init with nil config failed: %v", err)
+	}
 	Warn("test warn message", zap.String("key", "value"))
 }
 
 func TestWith(t *testing.T) {
-	Init(nil)
+	err := Init(nil)
+	if err != nil {
+		t.Fatalf("Init with nil config failed: %v", err)
+	}
 	logger := With(zap.String("service", "test"))
 	if logger == nil {
 		t.Fatal("Expected logger from With(), got nil")

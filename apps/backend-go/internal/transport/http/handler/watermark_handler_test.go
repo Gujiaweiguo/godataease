@@ -35,17 +35,30 @@ func (m *mockWatermarkService) Save(req *visualization.WatermarkSaveRequest, cre
 }
 
 func setupWatermarkTestRouter(svc *mockWatermarkService) *gin.Engine {
+	return setupWatermarkTestRouterWithContext(svc, nil)
+}
+
+func setupWatermarkTestRouterWithContext(svc *mockWatermarkService, contextSetter gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	if contextSetter != nil {
+		r.Use(contextSetter)
+	}
 
 	var watermarkSvc *service.WatermarkService
 	if svc != nil {
-		// Create a wrapper that uses the mock
 		watermarkSvc = service.NewWatermarkService(&mockWatermarkRepoAdapter{svc: svc})
 	}
 	h := NewWatermarkHandler(watermarkSvc)
 	RegisterWatermarkRoutes(r, h)
 	return r
+}
+
+func authenticatedWatermarkContext() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}
 }
 
 type mockWatermarkRepoAdapter struct {
@@ -70,7 +83,7 @@ func TestWatermarkHandler_Find_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupWatermarkTestRouter(mock)
+	router := setupWatermarkTestRouterWithContext(mock, authenticatedWatermarkContext())
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/watermark/find", nil)
@@ -84,15 +97,17 @@ func TestWatermarkHandler_Find_Success(t *testing.T) {
 }
 
 func TestWatermarkHandler_Save_Success(t *testing.T) {
+	var savedBy string
 	mock := &mockWatermarkService{
 		saveFunc: func(req *visualization.WatermarkSaveRequest, createBy string) (*visualization.Watermark, error) {
+			savedBy = createBy
 			return &visualization.Watermark{
 				ID:             "default",
 				SettingContent: req.SettingContent,
 			}, nil
 		},
 	}
-	router := setupWatermarkTestRouter(mock)
+	router := setupWatermarkTestRouterWithContext(mock, authenticatedWatermarkContext())
 
 	body := map[string]string{"settingContent": `{"enable":true}`}
 	jsonBody, _ := json.Marshal(body)
@@ -106,10 +121,11 @@ func TestWatermarkHandler_Save_Success(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "000000", resp["code"])
+	assert.Equal(t, "100", savedBy)
 }
 
 func TestWatermarkHandler_Save_InvalidJSON(t *testing.T) {
-	router := setupWatermarkTestRouter(nil)
+	router := setupWatermarkTestRouterWithContext(nil, authenticatedWatermarkContext())
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/watermark/save", bytes.NewBuffer([]byte("invalid json")))
@@ -121,4 +137,18 @@ func TestWatermarkHandler_Save_InvalidJSON(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.NotEqual(t, "000000", resp["code"])
+}
+
+func TestWatermarkHandler_Find_Unauthorized(t *testing.T) {
+	router := setupWatermarkTestRouter(nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/watermark/find", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, "20001", resp["code"])
 }

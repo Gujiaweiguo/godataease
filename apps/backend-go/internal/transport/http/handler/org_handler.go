@@ -62,7 +62,7 @@ func (h *OrgHandler) DeleteOrg(c *gin.Context) {
 
 	// 获取操作者信息
 	operatorID := int64(0)
-	operatorName := "system"
+	operatorName := embeddedDefaultUpdateBy
 	if userId, exists := c.Get("userId"); exists {
 		switch v := userId.(type) {
 		case int64:

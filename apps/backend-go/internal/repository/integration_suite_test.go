@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
@@ -21,7 +22,6 @@ import (
 	"dataease/backend/internal/domain/system"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/domain/visualization"
-	"dataease/backend/internal/domain/auto"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -69,6 +69,7 @@ func TestMain(m *testing.M) {
 		&audit.AuditLog{}, &audit.AuditLogDetail{}, &audit.LoginFailure{},
 		&permission.SysPerm{},
 		&visualization.DataVisualizationInfo{},
+		&visualization.Watermark{},
 		&system.SysVariable{}, &system.SysVariableValue{},
 		&coreShare{}, &coreShareTicket{},
 		&coreVisualizationTemplate{},

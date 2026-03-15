@@ -2,6 +2,7 @@ package repository
 
 import (
 	"dataease/backend/internal/domain/permission"
+
 	"gorm.io/gorm"
 )
 

@@ -1,0 +1,44 @@
+server:
+  port: 8088
+  mode: debug
+
+database:
+  host: 172.19.0.2
+  port: 3306
+  name: dataease_dev
+  user: root
+  password: Admin168
+  max_open_conns: 100
+  max_idle_conns: 10
+
+redis:
+  host: 172.19.0.2
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 100
+
+jwt:
+  secret: dev-secret-key-for-local-development
+  expire: 86400
+
+log:
+  level: info
+  format: console
+
+telemetry:
+  enabled: false
+  endpoint: ""
+
+integration:
+  calcite:
+    address: ""
+    timeout_sec: 10
+    max_retries: 1
+  seatunnel:
+    address: ""
+    timeout_sec: 15
+    max_retries: 1
+
+menu:
+  hardcoded_fallback: false

@@ -1,0 +1,198 @@
+[GET] http://localhost:8080/de2api/sysParameter/requestTimeOut => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/i18nOptions => [200] OK
+[GET] http://localhost:8080/de2api/typeface/defaultFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/ui => [200] OK
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773104988031 => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[POST] http://localhost:8080/websocket/432/qrwkh24x/xhr_streaming?userId=1&t=1773104988035 => [204] No Content
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/de2api/user/info => [200] OK
+[GET] http://localhost:8080/de2api/roleRouter/query => [200] OK
+[POST] http://localhost:8080/de2api/dataVisualization/interactiveTree => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed => [FAILED] net::ERR_ABORTED
+[POST] http://localhost:8080/de2api/datasetTree/tree => [200] OK
+[POST] http://localhost:8080/de2api/exportCenter/exportLimit => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/xvJgHE1Y2dgEOmMM => [501] Not Implemented
+[GET] http://localhost:8080/de2api/license/version => [200] OK
+[POST] http://localhost:8080/de2api/license/validate => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/sqlbot => [200] OK
+[GET] http://localhost:8080/de2api/aiBase/findTargetUrl => [200] OK
+[POST] http://localhost:8080/de2api/msg-center/count => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/iuHddKYIL => [501] Not Implemented
+[GET] https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/432/1gfmvil5/htmlfile?userId=1&c=_jp.apaw4lg => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/432/1gfmvil5/htmlfile?userId=1&c=_jp.apaw4lg => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/de2api/sysParameter/requestTimeOut => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/i18nOptions => [200] OK
+[GET] http://localhost:8080/de2api/model => [200] OK
+[GET] http://localhost:8080/de2api/typeface/defaultFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/ui => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/xpackModel => [200] OK
+[GET] http://localhost:8080/de2api/xpackModel => [200] OK
+[GET] http://localhost:8080/de2api/dekey => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/JUw0ENsgpZJr8gx => [501] Not Implemented
+[GET] http://localhost:8080/de2api/xpackComponent/content/um0O1r96 => [501] Not Implemented
+[GET] http://localhost:8080/de2api/dekey => [200] OK
+[POST] http://localhost:8080/de2api/login/localLogin => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/de2api/user/info => [200] OK
+[GET] http://localhost:8080/de2api/roleRouter/query => [200] OK
+[POST] http://localhost:8080/de2api/dataVisualization/interactiveTree => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/de2api/sysParameter/requestTimeOut => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/i18nOptions => [200] OK
+[GET] http://localhost:8080/de2api/typeface/defaultFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/ui => [200] OK
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105027845 => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[POST] http://localhost:8080/websocket/477/rd5reioe/xhr_streaming?userId=1&t=1773105027849 => [204] No Content
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/de2api/user/info => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/de2api/roleRouter/query => [200] OK
+[POST] http://localhost:8080/de2api/dataVisualization/interactiveTree => [200] OK
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/de2api/templateMarket/searchRecommend => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/shareBase => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/84V4E63MnBV => [501] Not Implemented
+[GET] http://localhost:8080/de2api/license/version => [200] OK
+[POST] http://localhost:8080/de2api/license/validate => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/sqlbot => [200] OK
+[GET] http://localhost:8080/de2api/aiBase/findTargetUrl => [200] OK
+[POST] http://localhost:8080/de2api/msg-center/count => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/QNE9LCJeN8K => [501] Not Implemented
+[GET] http://localhost:8080/de2api/xpackComponent/content/w3UG7dB8OlR => [501] Not Implemented
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/websocket/477/4jllw5ud/htmlfile?userId=1&c=_jp.a2obsch => [204] No Content
+[GET] http://localhost:8080/websocket/477/4jllw5ud/htmlfile?userId=1&c=_jp.a2obsch => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/477/k4xegyk3/xhr?userId=1&t=1773105028988 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105032839 => [200] OK
+[POST] http://localhost:8080/websocket/402/fq2mzba4/xhr_streaming?userId=1&t=1773105032841 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/402/eolawtqa/htmlfile?userId=1&c=_jp.azsc4cq => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/402/eolawtqa/htmlfile?userId=1&c=_jp.azsc4cq => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/402/ve4wbhvu/xhr?userId=1&t=1773105033951 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105037839 => [200] OK
+[POST] http://localhost:8080/websocket/411/foq3cpvq/xhr_streaming?userId=1&t=1773105037841 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/411/klddhfdh/htmlfile?userId=1&c=_jp.aomak4j => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/411/klddhfdh/htmlfile?userId=1&c=_jp.aomak4j => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/411/254p3e3r/xhr?userId=1&t=1773105038951 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/de2api/typeface/listFont => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/defaultSettings => [200] OK
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105042840 => [200] OK
+[POST] http://localhost:8080/websocket/047/5pnlddc2/xhr_streaming?userId=1&t=1773105042854 => [204] No Content
+[GET] https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed => [FAILED] net::ERR_ABORTED
+[POST] http://localhost:8080/de2api/datasetTree/tree => [200] OK
+[POST] http://localhost:8080/de2api/exportCenter/exportLimit => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/m7Et6Vguu => [501] Not Implemented
+[GET] http://localhost:8080/de2api/license/version => [200] OK
+[POST] http://localhost:8080/de2api/license/validate => [200] OK
+[GET] http://localhost:8080/de2api/sysParameter/sqlbot => [200] OK
+[GET] http://localhost:8080/de2api/aiBase/findTargetUrl => [200] OK
+[POST] http://localhost:8080/de2api/msg-center/count => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/IYtvpBds9s3 => [501] Not Implemented
+[GET] https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/047/fpiyidcx/htmlfile?userId=1&c=_jp.aj1vqtf => [204] No Content
+[GET] http://localhost:8080/websocket/047/fpiyidcx/htmlfile?userId=1&c=_jp.aj1vqtf => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/047/dkrklnrg/xhr?userId=1&t=1773105044065 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105049692 => [200] OK
+[POST] http://localhost:8080/websocket/377/o1phibii/xhr_streaming?userId=1&t=1773105049695 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/377/2eg5qxfc/htmlfile?userId=1&c=_jp.auxx3pz => [204] No Content
+[GET] http://localhost:8080/websocket/377/2eg5qxfc/htmlfile?userId=1&c=_jp.auxx3pz => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/377/c4nijr35/xhr?userId=1&t=1773105050805 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105054696 => [200] OK
+[POST] http://localhost:8080/websocket/990/lwb13v3i/xhr_streaming?userId=1&t=1773105054699 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/990/144zxlqq/htmlfile?userId=1&c=_jp.awbqeka => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/990/144zxlqq/htmlfile?userId=1&c=_jp.awbqeka => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/990/3kochgg5/xhr?userId=1&t=1773105055820 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105059700 => [200] OK
+[POST] http://localhost:8080/websocket/877/sgkmgxiv/xhr_streaming?userId=1&t=1773105059703 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/877/ru3uujrf/htmlfile?userId=1&c=_jp.ak0trmz => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/877/ru3uujrf/htmlfile?userId=1&c=_jp.ak0trmz => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/877/ncexx2ln/xhr?userId=1&t=1773105060825 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/de2api/datasetTree/barInfo/985188400292302861 => [200] OK
+[POST] http://localhost:8080/de2api/datasetTree/get/985188400292302800 => [200] OK
+[POST] http://localhost:8080/de2api/datasetData/getDatasetTotal => [200] OK
+[GET] http://localhost:8080/de2api/xpackComponent/content/omtAA3Kwvh => [501] Not Implemented
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105064700 => [200] OK
+[POST] http://localhost:8080/websocket/403/bzzlrajd/xhr_streaming?userId=1&t=1773105064703 => [204] No Content
+[GET] http://localhost:8080/websocket/403/f2emloso/eventsource?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/403/f2emloso/eventsource?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/403/jv5uy2fl/htmlfile?userId=1&c=_jp.ahzqzlz => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/403/jv5uy2fl/htmlfile?userId=1&c=_jp.ahzqzlz => [FAILED] net::ERR_ABORTED
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/403/0x1sysng/xhr?userId=1&t=1773105065825 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/info?userId=1&t=1773105069700 => [200] OK
+[POST] http://localhost:8080/websocket/875/lh5phqqd/xhr_streaming?userId=1&t=1773105069702 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/875/4mlscfy1/htmlfile?userId=1&c=_jp.akek1yv => [204] No Content
+[GET] http://localhost:8080/websocket/875/4mlscfy1/htmlfile?userId=1&c=_jp.akek1yv => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[POST] http://localhost:8080/websocket/875/v2ivdtx3/xhr?userId=1&t=1773105070825 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
+[GET] http://localhost:8080/websocket/iframe.html?userId=1 => [204] No Content
