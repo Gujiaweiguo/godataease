@@ -14,6 +14,7 @@ const (
 	basicPrefix  = "basic."
 	mapPrefix    = "map."
 	sqlbotPrefix = "sqlbot."
+	mapTypeGaode = "gaode"
 )
 
 type coreSysSetting struct {
@@ -82,7 +83,7 @@ func (r *SystemParamRepository) GetOnlineMap() (*system.OnlineMapEditor, error) 
 		return nil, err
 	}
 	if strings.TrimSpace(mt) == "" {
-		mt = "gaode"
+		mt = mapTypeGaode
 	}
 	return r.GetOnlineMapByType(mt)
 }
@@ -90,7 +91,7 @@ func (r *SystemParamRepository) GetOnlineMap() (*system.OnlineMapEditor, error) 
 func (r *SystemParamRepository) GetOnlineMapByType(mapType string) (*system.OnlineMapEditor, error) {
 	mt := strings.TrimSpace(mapType)
 	if mt == "" {
-		mt = "gaode"
+		mt = mapTypeGaode
 	}
 	prefix := mapKeyPrefixByType(mt)
 
@@ -112,7 +113,7 @@ func (r *SystemParamRepository) SaveOnlineMap(editor *system.OnlineMapEditor) er
 	}
 	mt := strings.TrimSpace(editor.MapType)
 	if mt == "" {
-		mt = "gaode"
+		mt = mapTypeGaode
 	}
 
 	return r.db.Transaction(func(tx *gorm.DB) error {
@@ -123,7 +124,7 @@ func (r *SystemParamRepository) SaveOnlineMap(editor *system.OnlineMapEditor) er
 		}
 		for field, val := range fields {
 			prefix := mapPrefix
-			if field != "mapType" && mt != "gaode" {
+			if field != "mapType" && mt != mapTypeGaode {
 				prefix = mt + "." + mapPrefix
 			}
 			if err := upsertByPkey(tx, prefix+field, val, "text", 1); err != nil {

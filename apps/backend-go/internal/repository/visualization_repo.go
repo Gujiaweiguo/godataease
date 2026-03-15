@@ -84,3 +84,20 @@ func (r *VisualizationRepository) Query(req *visualization.ListRequest) ([]*visu
 
 	return list, total, nil
 }
+
+func (r *VisualizationRepository) CountByNameAndPID(name string, pid *int64, excludeID *int64) (int64, error) {
+	var count int64
+	normalizedPID := int64(0)
+	if pid != nil {
+		normalizedPID = *pid
+	}
+
+	query := r.db.Model(&visualization.DataVisualizationInfo{}).
+		Where("name = ? AND COALESCE(pid, 0) = ? AND COALESCE(delete_flag, 0) = 0", name, normalizedPID)
+	if excludeID != nil && *excludeID > 0 {
+		query = query.Where("id != ?", *excludeID)
+	}
+
+	err := query.Count(&count).Error
+	return count, err
+}

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/role"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func ptrTimeRole(t time.Time) *time.Time { return &t }
@@ -164,4 +166,46 @@ func TestRoleRepository_CountByRoleCode(t *testing.T) {
 	if count != 0 {
 		t.Errorf("Expected count 0, got %d", count)
 	}
+}
+
+func TestRoleRepository_QueryWithPage(t *testing.T) {
+	if testDB == nil {
+		t.Skip("Test database not available")
+	}
+
+	repo := NewRoleRepository(testDB)
+	cleanupTables("sys_role")
+
+	systemType := "system"
+	customType := "custom"
+	now := time.Now()
+
+	seed := []*role.SysRole{
+		{RoleName: "Admin Root", RoleCode: "ROLE_ADMIN_ROOT", RoleType: &systemType, Status: role.StatusEnabled, CreateTime: ptrTimeRole(now.Add(3 * time.Second))},
+		{RoleName: "Admin Custom", RoleCode: "ROLE_ADMIN_CUSTOM", RoleType: &customType, Status: role.StatusEnabled, CreateTime: ptrTimeRole(now.Add(2 * time.Second))},
+		{RoleName: "Viewer", RoleCode: "ROLE_VIEWER", RoleType: &systemType, Status: role.StatusEnabled, CreateTime: ptrTimeRole(now.Add(1 * time.Second))},
+	}
+
+	for _, item := range seed {
+		require.NoError(t, repo.Create(item))
+	}
+
+	roles, total, err := repo.QueryWithPage("Admin", "", 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, roles, 2)
+
+	roles, total, err = repo.QueryWithPage("", systemType, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, roles, 2)
+	for _, item := range roles {
+		require.NotNil(t, item.RoleType)
+		assert.Equal(t, systemType, *item.RoleType)
+	}
+
+	roles, total, err = repo.QueryWithPage("", "", 2, 2)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Len(t, roles, 1)
 }

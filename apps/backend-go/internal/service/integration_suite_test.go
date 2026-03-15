@@ -75,6 +75,7 @@ func TestMain(m *testing.M) {
 		&template.Template{},
 		&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{},
 		&visualization.DataVisualizationInfo{},
+		&visualization.Watermark{},
 		&datasource.CoreDatasource{}, &auto.CoreDatasourceTaskLog{},
 		&dataset.CoreDatasetGroup{},
 		&auto.CoreExportTask{},
@@ -213,6 +214,8 @@ func cleanupTables(tables ...interface{}) {
 			testDB.Exec("DELETE FROM core_visualization_template")
 		case *visualization.DataVisualizationInfo, visualization.DataVisualizationInfo:
 			testDB.Exec("DELETE FROM data_visualization_info")
+		case *visualization.Watermark, visualization.Watermark:
+			testDB.Exec("DELETE FROM visualization_watermark")
 		case *datasource.CoreDatasource, datasource.CoreDatasource:
 			testDB.Exec("DELETE FROM core_datasource")
 			testDB.Exec("DELETE FROM core_datasource_task_log")

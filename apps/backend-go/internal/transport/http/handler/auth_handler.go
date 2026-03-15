@@ -21,6 +21,11 @@ import (
 
 const pkSeparator = "-pk_separator-"
 
+const (
+	defaultAdminCredential   = "admin"
+	defaultBuiltInCredential = "dataease"
+)
+
 var (
 	cryptoOnce       sync.Once
 	rsaPrivateKey    *rsa.PrivateKey
@@ -125,7 +130,7 @@ func decryptCredentialIfNeeded(v string) string {
 	}
 	plain, err := rsa.DecryptPKCS1v15(rand.Reader, rsaPrivateKey, decoded)
 	if err != nil {
-		if v == "admin" || v == "dataease" {
+		if v == defaultAdminCredential || v == defaultBuiltInCredential {
 			return v
 		}
 		return v

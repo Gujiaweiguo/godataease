@@ -113,6 +113,7 @@ type Router struct {
 	datasetHandler          *handler.DatasetHandler
 	chartHandler            *handler.ChartHandler
 	visualHandler           *handler.VisualizationHandler
+	watermarkHandler        *handler.WatermarkHandler
 	systemParamHandler      *handler.SystemParamHandler
 	systemVariableHandler   *handler.SystemVariableHandler
 	licenseHandler          *handler.LicenseHandler
@@ -231,6 +232,9 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	visualRepo := repository.NewVisualizationRepository(db)
 	visualService := service.NewVisualizationService(visualRepo)
 	visualHandler := handler.NewVisualizationHandler(visualService)
+	watermarkRepo := repository.NewWatermarkRepository(db)
+	watermarkService := service.NewWatermarkService(watermarkRepo)
+	watermarkHandler := handler.NewWatermarkHandler(watermarkService)
 
 	systemParamRepo := repository.NewSystemParamRepository(db)
 	systemVariableRepo := repository.NewSystemVariableRepository(db)
@@ -315,6 +319,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		datasetHandler:          datasetHandler,
 		chartHandler:            chartHandler,
 		visualHandler:           visualHandler,
+		watermarkHandler:        watermarkHandler,
 		systemParamHandler:      systemParamHandler,
 		systemVariableHandler:   systemVariableHandler,
 		licenseHandler:          licenseHandler,
@@ -365,6 +370,12 @@ func metricsMiddleware() gin.HandlerFunc {
 }
 
 func (r *Router) RegisterRoutes() {
+	r.registerRootRoutes()
+	r.registerAPIRoutes()
+	r.registerFrontendFallback()
+}
+
+func (r *Router) registerRootRoutes() {
 	r.engine.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
@@ -384,9 +395,12 @@ func (r *Router) RegisterRoutes() {
 	handler.RegisterLicenseRoutes(r.engine, r.licenseHandler)
 	handler.RegisterMsgCenterRoutes(r.engine, r.msgCenterHandler)
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
+	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
 	handler.RegisterFrontendCompatRoutes(r.engine, r.frontendCompatHandler)
+}
 
+func (r *Router) registerAPIRoutes() {
 	api := r.engine.Group("/api")
 	{
 		api.GET("/ping", func(c *gin.Context) {
@@ -410,6 +424,7 @@ func (r *Router) RegisterRoutes() {
 		r.registerDatasetRoutes(api)
 		handler.RegisterChartRoutes(api, r.chartHandler)
 		r.registerVisualizationRoutes(api)
+		handler.RegisterWatermarkRoutes(api, r.watermarkHandler)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)
 		handler.RegisterSystemVariableRoutes(api, r.systemVariableHandler)
 		handler.RegisterLicenseRoutes(api, r.licenseHandler)
@@ -424,7 +439,9 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
 	}
+}
 
+func (r *Router) registerFrontendFallback() {
 	frontendDir := os.Getenv("FRONTEND_DIST_PATH")
 	if frontendDir == "" {
 		frontendDir = "/opt/module/dataease2.0/frontend"
@@ -433,64 +450,82 @@ func (r *Router) RegisterRoutes() {
 	r.engine.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
 
-		if strings.HasPrefix(path, "/de2api/") {
-			mappedPath := strings.TrimPrefix(path, "/de2api")
-			if mappedPath == "" {
-				mappedPath = "/"
-			}
-			if !strings.HasPrefix(mappedPath, "/") {
-				mappedPath = "/" + mappedPath
-			}
-			if !strings.HasPrefix(mappedPath, "/api/") {
-				mappedPath = "/api" + mappedPath
-			}
+		if mappedPath, handled := rewriteCompatibilityPath(path); handled {
 			c.Request.URL.Path = mappedPath
 			r.engine.HandleContext(c)
 			return
 		}
 
-		if strings.HasPrefix(path, "/login/websocket/") {
-			c.Request.URL.Path = strings.TrimPrefix(path, "/login")
-			r.engine.HandleContext(c)
+		if handleSpecialFrontendPath(c, path) {
 			return
 		}
 
-		if path == "/websocket" || path == "/websocket/" || strings.HasPrefix(path, "/websocket/") {
-			c.Status(http.StatusNoContent)
-			return
-		}
+		serveFrontendAsset(c, path, frontendDir)
+	})
+}
 
-		switch path {
-		case "/login", "/login/":
-			c.Redirect(http.StatusFound, "/#/login")
-			return
-		case "/admin-login", "/admin-login/":
-			c.Redirect(http.StatusFound, "/#/admin-login")
-			return
+func rewriteCompatibilityPath(path string) (string, bool) {
+	if strings.HasPrefix(path, "/de2api/") {
+		mappedPath := strings.TrimPrefix(path, "/de2api")
+		if mappedPath == "" {
+			mappedPath = "/"
 		}
-
-		if strings.HasPrefix(path, "/api/") || path == "/health" || path == "/ready" || path == "/metrics" {
-			c.String(http.StatusNotFound, "404 page not found")
-			return
+		if !strings.HasPrefix(mappedPath, "/") {
+			mappedPath = "/" + mappedPath
 		}
-
-		cleanPath := strings.TrimPrefix(filepath.Clean(path), "/")
-		if cleanPath == "" || cleanPath == "." {
-			c.Header("Cache-Control", "no-store")
-			c.File(filepath.Join(frontendDir, "index.html"))
-			return
+		if !strings.HasPrefix(mappedPath, "/api/") {
+			mappedPath = "/api" + mappedPath
 		}
+		return mappedPath, true
+	}
 
-		assetPath := filepath.Join(frontendDir, cleanPath)
-		if info, err := os.Stat(assetPath); err == nil && !info.IsDir() {
-			c.Header("Cache-Control", "no-store")
-			c.File(assetPath)
-			return
-		}
+	if strings.HasPrefix(path, "/login/websocket/") {
+		return strings.TrimPrefix(path, "/login"), true
+	}
 
+	return "", false
+}
+
+func handleSpecialFrontendPath(c *gin.Context, path string) bool {
+	if path == "/websocket" || path == "/websocket/" || strings.HasPrefix(path, "/websocket/") {
+		c.Status(http.StatusNoContent)
+		return true
+	}
+
+	switch path {
+	case "/login", "/login/":
+		c.Redirect(http.StatusFound, "/#/login")
+		return true
+	case "/admin-login", "/admin-login/":
+		c.Redirect(http.StatusFound, "/#/admin-login")
+		return true
+	default:
+		return false
+	}
+}
+
+func serveFrontendAsset(c *gin.Context, path, frontendDir string) {
+	if strings.HasPrefix(path, "/api/") || path == "/health" || path == "/ready" || path == "/metrics" {
+		c.String(http.StatusNotFound, "404 page not found")
+		return
+	}
+
+	cleanPath := strings.TrimPrefix(filepath.Clean(path), "/")
+	if cleanPath == "" || cleanPath == "." {
 		c.Header("Cache-Control", "no-store")
 		c.File(filepath.Join(frontendDir, "index.html"))
-	})
+		return
+	}
+
+	assetPath := filepath.Join(frontendDir, cleanPath)
+	if info, err := os.Stat(assetPath); err == nil && !info.IsDir() {
+		c.Header("Cache-Control", "no-store")
+		c.File(assetPath)
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	c.File(filepath.Join(frontendDir, "index.html"))
 }
 
 func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {

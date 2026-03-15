@@ -12,6 +12,11 @@ type ColumnPermissionService struct {
 	columnPermRepo *repository.ColumnPermissionRepository
 }
 
+const (
+	defaultMaskValue     = "******"
+	defaultRangeMaskText = "*** ***"
+)
+
 func NewColumnPermissionService(columnPermRepo *repository.ColumnPermissionRepository) *ColumnPermissionService {
 	return &ColumnPermissionService{columnPermRepo: columnPermRepo}
 }
@@ -67,7 +72,7 @@ func (s *ColumnPermissionService) parseMaskRule(maskRuleJSON string) *permission
 
 func (s *ColumnPermissionService) ApplyMask(value string, rule *permission.DesensitizationRule) string {
 	if rule == nil {
-		return "******"
+		return defaultMaskValue
 	}
 
 	if rule.BuiltInRule != permission.BuiltInRuleCustom {
@@ -79,13 +84,13 @@ func (s *ColumnPermissionService) ApplyMask(value string, rule *permission.Desen
 func (s *ColumnPermissionService) applyBuiltInRule(value, builtInRule string) string {
 	switch builtInRule {
 	case permission.BuiltInRuleCompleteDesensitization:
-		return "******"
+		return defaultMaskValue
 	case permission.BuiltInRuleKeepFirstAndLastThree:
 		return s.keepFirstAndLastThree(value)
 	case permission.BuiltInRuleKeepMiddleThree:
 		return s.keepMiddleThree(value)
 	default:
-		return "******"
+		return defaultMaskValue
 	}
 }
 
@@ -106,7 +111,7 @@ func (s *ColumnPermissionService) keepMiddleThree(value string) string {
 
 func (s *ColumnPermissionService) applyCustomRule(value string, rule *permission.DesensitizationRule) string {
 	if rule == nil {
-		return "******"
+		return defaultMaskValue
 	}
 
 	switch rule.CustomBuiltInRule {
@@ -115,13 +120,13 @@ func (s *ColumnPermissionService) applyCustomRule(value string, rule *permission
 	case permission.CustomRuleRetainMToN:
 		return s.retainMToN(value, rule.M, rule.N)
 	default:
-		return "******"
+		return defaultMaskValue
 	}
 }
 
 func (s *ColumnPermissionService) retainBeforeMAndAfterN(value string, m, n int) string {
 	if m <= 0 && n <= 0 {
-		return "******"
+		return defaultMaskValue
 	}
 	if m < 0 {
 		m = 0
@@ -141,16 +146,16 @@ func (s *ColumnPermissionService) retainBeforeMAndAfterN(value string, m, n int)
 
 func (s *ColumnPermissionService) retainMToN(value string, m, n int) string {
 	if m <= 0 && n <= 0 {
-		return "******"
+		return defaultMaskValue
 	}
 	if m < 1 {
 		m = 1
 	}
 	if n < m {
-		return "*** ***"
+		return defaultRangeMaskText
 	}
 	if value == "" || len(value) < m {
-		return "*** ***"
+		return defaultRangeMaskText
 	}
 
 	endIdx := n

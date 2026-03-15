@@ -151,6 +151,7 @@ func (s *RoleService) QueryRoles(req *role.RoleQueryRequest) ([]*role.RoleVO, er
 			ID:       rle.RoleID,
 			Name:     rle.RoleName,
 			Code:     rle.RoleCode,
+			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
 			ReadOnly: false,
@@ -158,6 +159,51 @@ func (s *RoleService) QueryRoles(req *role.RoleQueryRequest) ([]*role.RoleVO, er
 		})
 	}
 	return result, nil
+}
+
+func (s *RoleService) QueryRolesPage(req *role.RolePageRequest) (*role.RolePageResult, error) {
+	keyword := ""
+	if req.Keyword != nil {
+		keyword = *req.Keyword
+	}
+	roleType := ""
+	if req.RoleType != nil {
+		roleType = *req.RoleType
+	}
+	current := req.Current
+	if current < 1 {
+		current = 1
+	}
+	size := req.Size
+	if size < 1 {
+		size = 10
+	}
+
+	roles, total, err := s.repo.QueryWithPage(keyword, roleType, current, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query roles: %w", err)
+	}
+
+	list := make([]*role.RoleVO, 0, len(roles))
+	for _, rle := range roles {
+		list = append(list, &role.RoleVO{
+			ID:       rle.RoleID,
+			Name:     rle.RoleName,
+			Code:     rle.RoleCode,
+			RoleType: rle.RoleType,
+			Desc:     rle.RoleDesc,
+			Status:   rle.Status,
+			ReadOnly: false,
+			Root:     rle.ParentID == nil || *rle.ParentID == 0,
+		})
+	}
+
+	return &role.RolePageResult{
+		List:    list,
+		Total:   total,
+		Current: current,
+		Size:    size,
+	}, nil
 }
 
 func strPtr(s string) *string {
@@ -278,6 +324,7 @@ func (s *RoleService) OptionForUser(req *role.RoleRequest, orgID int64) ([]*role
 			ID:       rle.RoleID,
 			Name:     rle.RoleName,
 			Code:     rle.RoleCode,
+			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
 			ReadOnly: false,
@@ -313,6 +360,7 @@ func (s *RoleService) SelectedForUser(req *role.RoleRequest) ([]*role.RoleVO, er
 			ID:       rle.RoleID,
 			Name:     rle.RoleName,
 			Code:     rle.RoleCode,
+			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
 			ReadOnly: false,

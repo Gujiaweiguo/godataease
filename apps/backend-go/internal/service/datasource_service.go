@@ -31,6 +31,8 @@ var repeatCheckSchemaTypes = map[string]struct{}{
 	"redshift":  {},
 }
 
+const apiDefinitionTypeTable = "table"
+
 type DatasourceService struct {
 	repo             *repository.DatasourceRepository
 	excelService     *ExcelService
@@ -215,8 +217,28 @@ func (s *DatasourceService) compatDatasourceID(id int64) (int64, error) {
 }
 
 func (s *DatasourceService) CheckRepeat(req *datasource.WriteRequest) (bool, error) {
-	if req == nil {
+	dsType, currentCfg := resolveRepeatCheckInput(req)
+	if dsType == "" || currentCfg == nil {
 		return false, nil
+	}
+
+	candidates, err := s.repo.ListByType(dsType, repeatCheckExcludeID(req))
+	if err != nil {
+		return false, err
+	}
+
+	for _, item := range candidates {
+		if compareCfg := candidateRepeatCheckConfig(item); isSameDatasourceConnection(dsType, currentCfg, compareCfg) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func resolveRepeatCheckInput(req *datasource.WriteRequest) (string, *datasource.ConnectionConfig) {
+	if req == nil {
+		return "", nil
 	}
 
 	dsType := strings.TrimSpace(req.Type)
@@ -224,44 +246,39 @@ func (s *DatasourceService) CheckRepeat(req *datasource.WriteRequest) (bool, err
 		dsType = strings.TrimSpace(req.NodeType)
 	}
 	if dsType == "" || shouldSkipRepeatCheck(dsType) {
-		return false, nil
+		return "", nil
+	}
+	if req.Configuration == nil || strings.TrimSpace(*req.Configuration) == "" {
+		return "", nil
 	}
 
-	if req.Configuration == nil || strings.TrimSpace(*req.Configuration) == "" {
-		return false, nil
-	}
 	currentCfg, err := decodeConfig(*req.Configuration)
 	if err != nil {
-		return false, nil
+		return "", nil
+	}
+	return dsType, currentCfg
+}
+
+func repeatCheckExcludeID(req *datasource.WriteRequest) *int64 {
+	if req == nil || req.ID <= 0 {
+		return nil
+	}
+	return &req.ID
+}
+
+func candidateRepeatCheckConfig(item *datasource.CoreDatasource) *datasource.ConnectionConfig {
+	if item == nil || shouldSkipRepeatCheck(item.Type) {
+		return nil
+	}
+	if item.Configuration == nil || strings.TrimSpace(*item.Configuration) == "" {
+		return nil
 	}
 
-	var excludeID *int64
-	if req.ID > 0 {
-		excludeID = &req.ID
-	}
-
-	candidates, err := s.repo.ListByType(dsType, excludeID)
+	compareCfg, err := decodeConfig(*item.Configuration)
 	if err != nil {
-		return false, err
+		return nil
 	}
-
-	for _, item := range candidates {
-		if item == nil || shouldSkipRepeatCheck(item.Type) {
-			continue
-		}
-		if item.Configuration == nil || strings.TrimSpace(*item.Configuration) == "" {
-			continue
-		}
-		compareCfg, cfgErr := decodeConfig(*item.Configuration)
-		if cfgErr != nil {
-			continue
-		}
-		if isSameDatasourceConnection(dsType, currentCfg, compareCfg) {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return compareCfg
 }
 
 func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.CoreDatasource, error) {
@@ -681,7 +698,7 @@ func (s *DatasourceService) CheckAPIDatasource(req map[string]string) (map[strin
 		return nil, fmt.Errorf("invalid api definition: %w", err)
 	}
 
-	apiDefinition["type"] = "table"
+	apiDefinition["type"] = apiDefinitionTypeTable
 	apiDefinition["showApiStructure"] = strings.EqualFold(strings.TrimSpace(req["type"]), "apiStructure")
 	if _, ok := apiDefinition["name"]; !ok {
 		apiDefinition["name"] = "api_table"
@@ -691,7 +708,7 @@ func (s *DatasourceService) CheckAPIDatasource(req map[string]string) (map[strin
 }
 
 func (s *DatasourceService) SyncAPITable(req map[string]string) (map[string]interface{}, error) {
-	return s.submitSyncTask(req, "table")
+	return s.submitSyncTask(req, apiDefinitionTypeTable)
 }
 
 func (s *DatasourceService) SyncAPIDs(req map[string]string) (map[string]interface{}, error) {

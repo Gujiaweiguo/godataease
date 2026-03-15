@@ -44,7 +44,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				return s
 			}
 		}
-		return "admin"
+		return defaultAdminCredential
 	}
 
 	if datasourceHandler != nil {

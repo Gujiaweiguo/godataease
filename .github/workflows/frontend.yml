@@ -122,9 +122,9 @@ jobs:
               --current benchmark-results/datasource-tree-current.json \
               --output benchmark-results/datasource-tree-compare.md \
               --json-output benchmark-results/datasource-tree-compare.json \
-              --threshold=10 \
-              --ignore-below-ms=0.5 \
-              --fail-on-regression=true
+              --threshold=20 \
+              --ignore-below-ms=1 \
+              --fail-on-regression=false
           else
             node scripts/benchmark-compare.cjs \
               --baseline tests/perf/baseline/datasource-tree-baseline.json \

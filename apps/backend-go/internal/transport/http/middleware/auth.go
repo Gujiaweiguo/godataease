@@ -26,7 +26,7 @@ func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
 			return
 		}
 
-	token = strings.TrimPrefix(token, "Bearer ")
+		token = strings.TrimPrefix(token, "Bearer ")
 
 		claims, err := jwtInstance.ParseToken(token)
 		if err != nil {

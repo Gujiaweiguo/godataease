@@ -31,6 +31,22 @@ func (h *RoleHandler) Query(c *gin.Context) {
 	response.Success(c, gin.H{"list": result})
 }
 
+func (h *RoleHandler) Page(c *gin.Context) {
+	var req role.RolePageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.QueryRolesPage(&req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func (h *RoleHandler) Create(c *gin.Context) {
 	var req role.RoleCreator
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -108,7 +124,7 @@ func (h *RoleHandler) getCreateBy(c *gin.Context) string {
 			return strconv.Itoa(v)
 		}
 	}
-	return "system"
+	return embeddedDefaultUpdateBy
 }
 
 // MountUser 绑定用户到角色
@@ -233,6 +249,7 @@ func RegisterRoleRoutes(r *gin.RouterGroup, h *RoleHandler) {
 	roleGroup := r.Group("/role")
 	{
 		roleGroup.POST("/query", h.Query)
+		roleGroup.POST("/page", h.Page)
 		roleGroup.POST("/byCurOrg", h.Query)
 		roleGroup.POST("/create", h.Create)
 		roleGroup.POST("/edit", h.Edit)

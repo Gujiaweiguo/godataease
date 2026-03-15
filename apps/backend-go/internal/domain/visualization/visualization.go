@@ -37,6 +37,8 @@ type SaveRequest struct {
 	CanvasStyleData *string `json:"canvasStyleData"`
 	ComponentData   *string `json:"componentData"`
 	MobileLayout    *bool   `json:"mobileLayout"`
+	ContentID       *string `json:"contentId"`
+	CheckVersion    *string `json:"checkVersion"`
 }
 
 type UpdateRequest struct {
@@ -48,6 +50,27 @@ type UpdateRequest struct {
 	ComponentData   *string `json:"componentData"`
 	MobileLayout    *bool   `json:"mobileLayout"`
 	Status          *int    `json:"status"`
+	ContentID       *string `json:"contentId"`
+	CheckVersion    *string `json:"checkVersion"`
+}
+
+type NameCheckRequest struct {
+	ID   int64   `json:"id"`
+	Name string  `json:"name" binding:"required"`
+	PID  *int64  `json:"pid"`
+	Opt  *string `json:"opt"`
+	Type *string `json:"type"`
+}
+
+type CanvasChangeRequest struct {
+	ID           int64   `json:"id" binding:"required"`
+	ContentID    *string `json:"contentId"`
+	CheckVersion *string `json:"checkVersion"`
+}
+
+type MoveRequest struct {
+	ID  int64  `json:"id" binding:"required"`
+	PID *int64 `json:"pid"`
 }
 
 type DetailRequest struct {

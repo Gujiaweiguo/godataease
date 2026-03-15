@@ -2,6 +2,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAppearanceStore } from '@/store/modules/appearance'
 
+// Mock Less.js modules to avoid circular dependency issues in CI
+vi.mock('less/lib/less/functions/color.js', () => ({
+  default: {
+    mix: vi.fn((color1, color2, options) => ({
+      toRGB: () => `rgb(${options.value}, ${options.value}, ${options.value})`
+    }))
+  }
+}))
+
+vi.mock('less/lib/less/tree/color.js', () => ({
+  default: vi.fn((color) => ({ color }))
+}))
+
 // Mock dependencies
 vi.mock('@/hooks/web/useCache', async () => {
   const { createUseCacheModuleMock } = await import('../helpers')

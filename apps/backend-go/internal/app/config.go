@@ -136,7 +136,7 @@ func bindEnvKeys() error {
 		"integration.seatunnel.address":     "SEATUNNEL_GRPC_ADDR",
 		"integration.seatunnel.timeout_sec": "SEATUNNEL_GRPC_TIMEOUT_SEC",
 		"integration.seatunnel.max_retries": "SEATUNNEL_GRPC_MAX_RETRIES",
-		"menu.hardcoded_fallback":          "MENU_HARDCODED_FALLBACK",
+		"menu.hardcoded_fallback":           "MENU_HARDCODED_FALLBACK",
 	}
 
 	for key, envName := range keys {

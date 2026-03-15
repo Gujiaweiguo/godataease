@@ -144,7 +144,7 @@ func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 		return
 	}
 
-	operator := "system"
+	operator := embeddedDefaultUpdateBy
 	if username, exists := c.Get("username"); exists {
 		if value, ok := username.(string); ok && value != "" {
 			operator = value

@@ -19,6 +19,7 @@ type SysRole struct {
 	RoleID     int64      `gorm:"column:role_id;primaryKey;autoIncrement" json:"roleId"`
 	RoleName   string     `gorm:"column:role_name;size:100;not null" json:"roleName"`
 	RoleCode   string     `gorm:"column:role_code;size:100" json:"roleCode"`
+	RoleType   *string    `gorm:"column:role_type;size:50" json:"roleType"`
 	RoleDesc   *string    `gorm:"column:role_desc;size:255" json:"roleDesc"`
 	ParentID   *int64     `gorm:"column:parent_id" json:"parentId"`
 	Level      *int       `gorm:"column:level" json:"level"`
@@ -58,6 +59,7 @@ type RoleVO struct {
 	ID       int64   `json:"roleId"`
 	Name     string  `json:"roleName"`
 	Code     string  `json:"roleKey"`
+	RoleType *string `json:"roleType"`
 	Desc     *string `json:"roleDesc"`
 	Status   int     `json:"status"`
 	ReadOnly bool    `json:"readonly"`
@@ -104,11 +106,24 @@ type RoleRequest struct {
 	Uid     *int64  `json:"uid"`
 }
 
-// ExternalUserVO 组织外用户VO
 type ExternalUserVO struct {
 	Uid     int64   `json:"uid"`
 	Account string  `json:"account"`
 	Name    string  `json:"name"`
 	Email   *string `json:"email"`
 	Phone   *string `json:"phone"`
+}
+
+type RolePageRequest struct {
+	Keyword  *string `json:"keyword"`
+	RoleType *string `json:"roleType"`
+	Current  int     `json:"current"`
+	Size     int     `json:"size"`
+}
+
+type RolePageResult struct {
+	List    []*RoleVO `json:"list"`
+	Total   int64     `json:"total"`
+	Current int       `json:"current"`
+	Size    int       `json:"size"`
 }
