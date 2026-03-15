@@ -114,6 +114,7 @@ type Router struct {
 	chartHandler            *handler.ChartHandler
 	visualHandler           *handler.VisualizationHandler
 	systemParamHandler      *handler.SystemParamHandler
+	systemVariableHandler   *handler.SystemVariableHandler
 	licenseHandler          *handler.LicenseHandler
 	msgCenterHandler        *handler.MsgCenterHandler
 	shareHandler            *handler.ShareHandler
@@ -232,8 +233,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	visualHandler := handler.NewVisualizationHandler(visualService)
 
 	systemParamRepo := repository.NewSystemParamRepository(db)
+	systemVariableRepo := repository.NewSystemVariableRepository(db)
 	systemParamService := service.NewSystemParamService(systemParamRepo, auditService)
+	systemVariableService := service.NewSystemVariableService(systemVariableRepo)
 	systemParamHandler := handler.NewSystemParamHandler(systemParamService)
+	systemVariableHandler := handler.NewSystemVariableHandler(systemVariableService)
 
 	licenseRepo := repository.NewLicenseRepository(db)
 	licenseService := service.NewLicenseService(licenseRepo)
@@ -312,6 +316,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		chartHandler:            chartHandler,
 		visualHandler:           visualHandler,
 		systemParamHandler:      systemParamHandler,
+		systemVariableHandler:   systemVariableHandler,
 		licenseHandler:          licenseHandler,
 		msgCenterHandler:        msgCenterHandler,
 		shareHandler:            shareHandler,
@@ -406,6 +411,7 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterChartRoutes(api, r.chartHandler)
 		r.registerVisualizationRoutes(api)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)
+		handler.RegisterSystemVariableRoutes(api, r.systemVariableHandler)
 		handler.RegisterLicenseRoutes(api, r.licenseHandler)
 		handler.RegisterMsgCenterRoutes(api, r.msgCenterHandler)
 		handler.RegisterShareRoutes(api, r.shareHandler)
