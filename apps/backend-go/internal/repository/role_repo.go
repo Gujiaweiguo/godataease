@@ -27,8 +27,7 @@ func (r *RoleRepository) Delete(roleID int64) error {
 
 func (r *RoleRepository) GetByID(roleID int64) (*role.SysRole, error) {
 	var rle role.SysRole
-	err := r.db.Where("role_id = ? AND status = ?", roleID, role.StatusEnabled).
-		First(&rle).Error
+	err := r.db.Where("role_id = ?", roleID).First(&rle).Error
 	if err != nil {
 		return nil, err
 	}
@@ -37,11 +36,11 @@ func (r *RoleRepository) GetByID(roleID int64) (*role.SysRole, error) {
 
 func (r *RoleRepository) Query(keyword string) ([]*role.SysRole, error) {
 	var roles []*role.SysRole
-	db := r.db.Model(&role.SysRole{}).Where("status = ?", role.StatusEnabled)
+	db := r.db.Model(&role.SysRole{})
 	if keyword != "" {
 		db = db.Where("role_name LIKE ?", "%"+keyword+"%")
 	}
-	err := db.Order("create_time DESC").Find(&roles).Error
+	err := db.Order("role_type ASC, create_time DESC").Find(&roles).Error
 	return roles, err
 }
 
