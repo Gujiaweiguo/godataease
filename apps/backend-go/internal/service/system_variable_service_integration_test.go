@@ -63,3 +63,38 @@ func TestSystemVariableService_FullLifecycle(t *testing.T) {
 	_, err = svc.Detail(created.ID)
 	assert.Error(t, err)
 }
+
+func TestSystemVariableService_InvalidRequests(t *testing.T) {
+	if testDB == nil {
+		t.Skip("Test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&system.SysVariable{}, &system.SysVariableValue{}))
+	cleanupTables(&system.SysVariable{})
+
+	repo := repository.NewSystemVariableRepository(testDB)
+	svc := NewSystemVariableService(repo)
+
+	_, err := svc.Create(&system.SysVariable{})
+	assert.Error(t, err)
+
+	created, err := svc.Create(&system.SysVariable{Type: "text", Name: "region"})
+	require.NoError(t, err)
+
+	_, err = svc.Edit(&system.SysVariable{ID: created.ID, Type: "", Name: "bad"})
+	assert.Error(t, err)
+
+	_, err = svc.Edit(&system.SysVariable{ID: 0, Type: "text", Name: "bad"})
+	assert.Error(t, err)
+
+	_, err = svc.CreateValue(&system.SysVariableValue{SysVariableID: 0, Value: "x"})
+	assert.Error(t, err)
+
+	_, err = svc.CreateValue(&system.SysVariableValue{SysVariableID: 99999, Value: "x"})
+	assert.Error(t, err)
+
+	_, err = svc.EditValue(&system.SysVariableValue{ID: 0, SysVariableID: created.ID, Value: "x"})
+	assert.Error(t, err)
+
+	_, err = svc.EditValue(&system.SysVariableValue{ID: 1, SysVariableID: 99999, Value: "x"})
+	assert.Error(t, err)
+}

@@ -112,6 +112,19 @@ func TestTemplateServiceIntegration_ListTemplates_Empty(t *testing.T) {
 	assert.Len(t, resp.List, 0)
 }
 
+func TestTemplateServiceIntegration_ListTemplates_InvalidPidFallsBack(t *testing.T) {
+	cleanupTables(&template.Template{})
+
+	repo := repository.NewTemplateRepository(testDB)
+	svc := NewTemplateService(repo)
+
+	_, _ = svc.CreateTemplate(&template.TemplateCreateRequest{Name: "InvalidPid", Pid: 0, DvType: "dashboard", NodeType: "leaf"}, "tester")
+
+	resp, err := svc.ListTemplates(&template.TemplateListRequest{Pid: "bad", DvType: "dashboard"})
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, resp.Total, int64(1))
+}
+
 func TestTemplateServiceIntegration_UpdateTemplate(t *testing.T) {
 	cleanupTables(&template.Template{})
 
@@ -153,6 +166,19 @@ func TestTemplateServiceIntegration_UpdateTemplate_NotFound(t *testing.T) {
 	}
 	_, err := svc.UpdateTemplate(updateReq)
 	assert.Error(t, err)
+}
+
+func TestTemplateServiceIntegration_UpdateTemplate_EmptyFieldsKeepOriginal(t *testing.T) {
+	cleanupTables(&template.Template{})
+
+	repo := repository.NewTemplateRepository(testDB)
+	svc := NewTemplateService(repo)
+	created, _ := svc.CreateTemplate(&template.TemplateCreateRequest{Name: "Keep Name", Pid: 0, DvType: "dashboard", NodeType: "leaf", Snapshot: "snap"}, "tester")
+
+	updated, err := svc.UpdateTemplate(&template.TemplateUpdateRequest{ID: created.ID})
+	assert.NoError(t, err)
+	assert.Equal(t, "Keep Name", updated.Name)
+	assert.Equal(t, "snap", updated.Snapshot)
 }
 
 func TestTemplateServiceIntegration_DeleteTemplate(t *testing.T) {

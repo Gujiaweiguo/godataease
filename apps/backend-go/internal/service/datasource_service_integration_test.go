@@ -761,6 +761,13 @@ func (m *mockSeatunnelSyncServiceServer) SubmitTask(context.Context, *seatunnelv
 	return &seatunnelv1.SubmitTaskResponse{TaskId: "99001"}, nil
 }
 
+func (m *mockSeatunnelSyncServiceServer) CancelTask(context.Context, *seatunnelv1.CancelTaskRequest) (*seatunnelv1.CancelTaskResponse, error) {
+	if m.fail {
+		return nil, status.Error(codes.Internal, "cancel failed")
+	}
+	return &seatunnelv1.CancelTaskResponse{Success: true}, nil
+}
+
 func startSeatunnelServerForIntegration(t *testing.T, fail bool) (string, func()) {
 	t.Helper()
 

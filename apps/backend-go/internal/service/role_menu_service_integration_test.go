@@ -333,13 +333,9 @@ func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth(t *testing.T) {
 func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth_InvalidRoleID(t *testing.T) {
 	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
 
-	roleRepo := repository.NewRoleRepository(testDB)
-	menuRepo := repository.NewMenuRepository(testDB)
-	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
-
-	err := svc.DeleteRoleMenuAuth(0)
-	assert.Equal(t, ErrInvalidRoleID, err)
+	svc := NewRoleMenuService(repository.NewRoleMenuRepository(testDB), repository.NewRoleRepository(testDB), repository.NewMenuRepository(testDB))
+	assert.Equal(t, ErrInvalidRoleID, svc.DeleteRoleMenuAuth(0))
+	assert.Equal(t, ErrInvalidRoleID, svc.DeleteRoleMenuAuth(-1))
 }
 
 func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_RoleNotFound(t *testing.T) {
