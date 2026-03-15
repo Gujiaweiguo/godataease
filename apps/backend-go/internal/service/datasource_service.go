@@ -871,11 +871,3 @@ func (s *DatasourceService) CancelSyncTask(taskID string) error {
 	}
 	return client.CancelTask(context.Background(), taskID)
 }
-
-func (s *DatasourceService) CancelSyncTask(taskID string) error {
-	client, err := s.ensureSeatunnelClient()
-	if err != nil {
-		return err
-	}
-	return client.CancelTask(context.Background(), taskID)
-}
