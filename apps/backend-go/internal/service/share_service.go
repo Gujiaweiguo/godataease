@@ -3,13 +3,19 @@ package service
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"regexp"
+	"strings"
 	"time"
+	"unicode"
 
 	"dataease/backend/internal/domain/share"
 	"dataease/backend/internal/repository"
 
 	"gorm.io/gorm"
 )
+
+var shareUUIDPattern = regexp.MustCompile(`^[a-zA-Z0-9]{8,16}$`)
 
 type ShareService struct {
 	repo *repository.ShareRepository
@@ -66,7 +72,7 @@ func (s *ShareService) ValidateShare(req *share.ShareValidateRequest) (*share.Sh
 		return nil, err
 	}
 
-	if sh.Exp > 0 && time.Now().Unix() > sh.Exp {
+	if isShareExpired(sh.Exp) {
 		return &share.ShareValidateResponse{Valid: false}, nil
 	}
 
@@ -100,6 +106,16 @@ func (s *ShareService) RevokeShare(id int64, creator int64) (*share.ShareRevokeR
 	}
 
 	return &share.ShareRevokeResponse{Success: true}, nil
+}
+
+func (s *ShareService) ensureShareOwner(sh *share.Share, creator int64) error {
+	if sh == nil {
+		return gorm.ErrRecordNotFound
+	}
+	if creator <= 0 || sh.Creator != creator {
+		return fmt.Errorf("forbidden")
+	}
+	return nil
 }
 
 func (s *ShareService) GetDetail(resourceID int64) (*share.ShareDetailResponse, error) {
@@ -175,7 +191,7 @@ func (s *ShareService) ValidateTicket(req *share.TicketValidateRequest) (*share.
 		return &share.TicketValidateResponse{TicketValid: false, TicketExp: false}, nil
 	}
 
-	if t.Exp > 0 && time.Now().Unix() > t.Exp {
+	if isShareExpired(t.Exp) {
 		return &share.TicketValidateResponse{TicketValid: true, TicketExp: true}, nil
 	}
 
@@ -186,6 +202,81 @@ func (s *ShareService) ValidateTicket(req *share.TicketValidateRequest) (*share.
 		TicketExp:   false,
 		Args:        t.Args,
 	}, nil
+}
+
+func (s *ShareService) EditUUID(req *share.ShareEditUUIDRequest, creator int64) (string, error) {
+	sh, err := s.repo.GetByResourceID(req.ResourceID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return "share not found", nil
+		}
+		return "", err
+	}
+	if err = s.ensureShareOwner(sh, creator); err != nil {
+		return "", err
+	}
+
+	candidate := strings.TrimSpace(req.UUID)
+	if candidate == "" {
+		return "uuid cannot be empty", nil
+	}
+	if candidate == sh.UUID {
+		return "", nil
+	}
+	if !shareUUIDPattern.MatchString(candidate) {
+		return "invalid uuid format", nil
+	}
+	exists, err := s.repo.ExistsByUUID(candidate, sh.ID)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return "uuid already exists", nil
+	}
+	oldUUID := sh.UUID
+	if oldUUID != candidate {
+		if err = s.repo.UpdateUUIDWithTickets(sh.ID, oldUUID, candidate); err != nil {
+			return "", err
+		}
+	}
+	return "", nil
+}
+
+func (s *ShareService) EditExp(req *share.ShareEditExpRequest, creator int64) error {
+	sh, err := s.repo.GetByResourceID(req.ResourceID)
+	if err != nil {
+		return err
+	}
+	if err = s.ensureShareOwner(sh, creator); err != nil {
+		return err
+	}
+	if req.Exp > 0 && req.Exp < time.Now().UnixMilli() {
+		return fmt.Errorf("invalid expiration")
+	}
+	sh.Exp = req.Exp
+	return s.repo.Update(sh)
+}
+
+func (s *ShareService) EditPwd(req *share.ShareEditPwdRequest, creator int64) error {
+	sh, err := s.repo.GetByResourceID(req.ResourceID)
+	if err != nil {
+		return err
+	}
+	if err = s.ensureShareOwner(sh, creator); err != nil {
+		return err
+	}
+	pwd := strings.TrimSpace(req.Pwd)
+	if pwd == "" {
+		sh.Pwd = ""
+		sh.AutoPwd = req.AutoPwd
+		return s.repo.Update(sh)
+	}
+	if !req.AutoPwd && !isValidSharePassword(pwd) {
+		return fmt.Errorf("invalid password format")
+	}
+	sh.Pwd = pwd
+	sh.AutoPwd = req.AutoPwd
+	return s.repo.Update(sh)
 }
 
 func generateUUID() (string, error) {
@@ -202,4 +293,36 @@ func generatePassword(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes)[:length], nil
+}
+
+func isShareExpired(exp int64) bool {
+	if exp <= 0 {
+		return false
+	}
+	if exp >= 1_000_000_000_000 {
+		return time.Now().UnixMilli() > exp
+	}
+	return time.Now().Unix() > exp
+}
+
+func isValidSharePassword(pwd string) bool {
+	if len(pwd) < 4 || len(pwd) > 10 {
+		return false
+	}
+	hasLetter := false
+	hasDigit := false
+	hasSpecial := false
+	for _, r := range pwd {
+		switch {
+		case unicode.IsLetter(r):
+			hasLetter = true
+		case unicode.IsDigit(r):
+			hasDigit = true
+		case strings.ContainsRune("!@#$%^&*()_+", r):
+			hasSpecial = true
+		default:
+			return false
+		}
+	}
+	return hasLetter && hasDigit && hasSpecial
 }
