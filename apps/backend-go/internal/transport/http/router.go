@@ -114,6 +114,7 @@ type Router struct {
 	chartHandler            *handler.ChartHandler
 	visualHandler           *handler.VisualizationHandler
 	systemParamHandler      *handler.SystemParamHandler
+	systemVariableHandler   *handler.SystemVariableHandler
 	licenseHandler          *handler.LicenseHandler
 	msgCenterHandler        *handler.MsgCenterHandler
 	shareHandler            *handler.ShareHandler
@@ -124,6 +125,7 @@ type Router struct {
 	engineHandler           *handler.EngineHandler
 	driverHandler           *handler.DriverHandler
 	templateHandler         *handler.TemplateHandler
+	syncHandler             *handler.SyncHandler
 	frontendCompatHandler   *handler.FrontendCompatHandler
 	permissionCompatHandler *handler.PermissionCompatHandler
 }
@@ -191,6 +193,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	authHandler := handler.NewAuthHandler(authService)
 
 	datasourceRepo := repository.NewDatasourceRepository(db)
+	syncRepo := repository.NewSyncRepository(db)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	if application != nil && application.Config != nil {
 		seatunnelCfg := application.Config.Integration.Seatunnel
@@ -201,6 +204,8 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		)
 	}
 	datasourceHandler := handler.NewDatasourceHandler(datasourceService)
+	syncService := service.NewSyncService(syncRepo, datasourceRepo, datasourceService)
+	syncHandler := handler.NewSyncHandler(syncService)
 	adminChecker := middleware.NewDefaultAdminChecker([]int64{1})
 
 	// Dataset with row permission integration
@@ -228,8 +233,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	visualHandler := handler.NewVisualizationHandler(visualService)
 
 	systemParamRepo := repository.NewSystemParamRepository(db)
+	systemVariableRepo := repository.NewSystemVariableRepository(db)
 	systemParamService := service.NewSystemParamService(systemParamRepo, auditService)
+	systemVariableService := service.NewSystemVariableService(systemVariableRepo)
 	systemParamHandler := handler.NewSystemParamHandler(systemParamService)
+	systemVariableHandler := handler.NewSystemVariableHandler(systemVariableService)
 
 	licenseRepo := repository.NewLicenseRepository(db)
 	licenseService := service.NewLicenseService(licenseRepo)
@@ -308,6 +316,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		chartHandler:            chartHandler,
 		visualHandler:           visualHandler,
 		systemParamHandler:      systemParamHandler,
+		systemVariableHandler:   systemVariableHandler,
 		licenseHandler:          licenseHandler,
 		msgCenterHandler:        msgCenterHandler,
 		shareHandler:            shareHandler,
@@ -318,6 +327,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		engineHandler:           engineHandler,
 		driverHandler:           driverHandler,
 		templateHandler:         templateHandler,
+		syncHandler:             syncHandler,
 		frontendCompatHandler:   frontendCompatHandler,
 		permissionCompatHandler: permissionCompatHandler,
 	}
@@ -396,10 +406,12 @@ func (r *Router) RegisterRoutes() {
 		handler.RegisterPermissionCompatRoutes(api, r.permissionCompatHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
 		handler.RegisterDatasourceRoutes(api, r.datasourceHandler)
+		handler.RegisterSyncRoutes(api, r.syncHandler)
 		r.registerDatasetRoutes(api)
 		handler.RegisterChartRoutes(api, r.chartHandler)
 		r.registerVisualizationRoutes(api)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)
+		handler.RegisterSystemVariableRoutes(api, r.systemVariableHandler)
 		handler.RegisterLicenseRoutes(api, r.licenseHandler)
 		handler.RegisterMsgCenterRoutes(api, r.msgCenterHandler)
 		handler.RegisterShareRoutes(api, r.shareHandler)

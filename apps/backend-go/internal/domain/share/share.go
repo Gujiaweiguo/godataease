@@ -97,3 +97,19 @@ type ShareDetailResponse struct {
 	AutoPwd       bool   `json:"autoPwd"`
 	TicketRequire bool   `json:"ticketRequire"`
 }
+
+type ShareEditUUIDRequest struct {
+	ResourceID int64  `json:"resourceId" binding:"required"`
+	UUID       string `json:"uuid" binding:"required"`
+}
+
+type ShareEditExpRequest struct {
+	ResourceID int64 `json:"resourceId" binding:"required"`
+	Exp        int64 `json:"exp"`
+}
+
+type ShareEditPwdRequest struct {
+	ResourceID int64  `json:"resourceId" binding:"required"`
+	Pwd        string `json:"pwd"`
+	AutoPwd    bool   `json:"autoPwd"`
+}

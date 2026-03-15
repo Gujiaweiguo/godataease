@@ -137,6 +137,52 @@ func (h *ShareHandler) Switcher(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func (h *ShareHandler) EditUUID(c *gin.Context) {
+	var req share.ShareEditUUIDRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	msg, err := h.service.EditUUID(&req, shareUserID(c))
+	if err != nil {
+		response.InternalError(c, "Failed to edit share uuid: "+err.Error())
+		return
+	}
+
+	response.Success(c, msg)
+}
+
+func (h *ShareHandler) EditExp(c *gin.Context) {
+	var req share.ShareEditExpRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.service.EditExp(&req, shareUserID(c)); err != nil {
+		response.InternalError(c, "Failed to edit share expiration: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *ShareHandler) EditPwd(c *gin.Context) {
+	var req share.ShareEditPwdRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.service.EditPwd(&req, shareUserID(c)); err != nil {
+		response.InternalError(c, "Failed to edit share password: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func (h *ShareHandler) CreateTicket(c *gin.Context) {
 	var req share.TicketCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -178,7 +224,30 @@ func RegisterShareRoutes(r gin.IRouter, h *ShareHandler) {
 		group.GET("/status/:resourceId", h.Status)
 		group.GET("/detail/:resourceId", h.Detail)
 		group.POST("/switcher/:resourceId", h.Switcher)
+		group.POST("/editUuid", h.EditUUID)
+		group.POST("/editExp", h.EditExp)
+		group.POST("/editPwd", h.EditPwd)
 		group.POST("/ticket/create", h.CreateTicket)
 		group.POST("/ticket/validate", h.ValidateTicket)
 	}
+}
+
+func shareUserID(c *gin.Context) int64 {
+	if uid, exists := c.Get("userId"); exists {
+		if id, ok := uid.(int64); ok {
+			return id
+		}
+		if id, ok := uid.(uint64); ok {
+			return int64(id)
+		}
+	}
+	if uid, exists := c.Get("user_id"); exists {
+		if id, ok := uid.(uint64); ok {
+			return int64(id)
+		}
+		if id, ok := uid.(int64); ok {
+			return id
+		}
+	}
+	return 0
 }

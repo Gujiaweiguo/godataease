@@ -10,6 +10,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShareServiceIntegration_CreateShare(t *testing.T) {
@@ -215,6 +216,113 @@ func TestShareServiceIntegration_GetDetail_NotFound(t *testing.T) {
 	detail, err := svc.GetDetail(999)
 	assert.NoError(t, err)
 	assert.Nil(t, detail)
+}
+
+func TestShareServiceIntegration_EditUUID(t *testing.T) {
+	cleanupTables(&share.Share{}, &share.ShareTicket{})
+
+	repo := repository.NewShareRepository(testDB)
+	svc := NewShareService(repo)
+
+	first, err := svc.CreateShare(&share.ShareCreateRequest{ResourceID: 5001, ResourceType: "dashboard", AutoPwd: true}, 1)
+	require.NoError(t, err)
+	_, err = svc.CreateShare(&share.ShareCreateRequest{ResourceID: 5002, ResourceType: "dashboard", AutoPwd: true}, 1)
+	require.NoError(t, err)
+
+	ticket, err := svc.CreateTicket(&share.TicketCreateRequest{UUID: first.UUID, Ticket: "ticket-edit-uuid", Exp: time.Now().UnixMilli() + 60000})
+	require.NoError(t, err)
+
+	msg, err := svc.EditUUID(&share.ShareEditUUIDRequest{ResourceID: 5001, UUID: "newuuid88"}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "", msg)
+
+	detail, err := svc.GetDetail(5001)
+	require.NoError(t, err)
+	require.NotNil(t, detail)
+	assert.Equal(t, "newuuid88", detail.UUID)
+
+	updatedTicket, err := repo.GetTicketByTicket(ticket.Ticket)
+	require.NoError(t, err)
+	assert.Equal(t, "newuuid88", updatedTicket.UUID)
+
+	msg, err = svc.EditUUID(&share.ShareEditUUIDRequest{ResourceID: 5001, UUID: "bad-uuid"}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid uuid format", msg)
+
+	msg, err = svc.EditUUID(&share.ShareEditUUIDRequest{ResourceID: 5002, UUID: "otheruuid9"}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "", msg)
+
+	msg, err = svc.EditUUID(&share.ShareEditUUIDRequest{ResourceID: 5001, UUID: "otheruuid9"}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "uuid already exists", msg)
+
+	msg, err = svc.EditUUID(&share.ShareEditUUIDRequest{ResourceID: 5001, UUID: "newuuid88"}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "", msg)
+}
+
+func TestShareServiceIntegration_EditExpAndPwdReflectInDetail(t *testing.T) {
+	cleanupTables(&share.Share{})
+
+	repo := repository.NewShareRepository(testDB)
+	svc := NewShareService(repo)
+
+	_, err := svc.CreateShare(&share.ShareCreateRequest{ResourceID: 6001, ResourceType: "dashboard", AutoPwd: true}, 1)
+	require.NoError(t, err)
+
+	newExp := time.Now().Add(time.Hour).UnixMilli()
+	require.NoError(t, svc.EditExp(&share.ShareEditExpRequest{ResourceID: 6001, Exp: newExp}, 1))
+	require.NoError(t, svc.EditPwd(&share.ShareEditPwdRequest{ResourceID: 6001, Pwd: "Ab1!", AutoPwd: false}, 1))
+
+	detail, err := svc.GetDetail(6001)
+	require.NoError(t, err)
+	require.NotNil(t, detail)
+	assert.Equal(t, newExp, detail.Exp)
+	assert.Equal(t, "Ab1!", detail.Pwd)
+	assert.False(t, detail.AutoPwd)
+
+	require.NoError(t, svc.EditPwd(&share.ShareEditPwdRequest{ResourceID: 6001, Pwd: "", AutoPwd: true}, 1))
+	detail, err = svc.GetDetail(6001)
+	require.NoError(t, err)
+	require.NotNil(t, detail)
+	assert.Empty(t, detail.Pwd)
+	assert.True(t, detail.AutoPwd)
+}
+
+func TestShareServiceIntegration_EditExpAndPwdRejectInvalidInput(t *testing.T) {
+	cleanupTables(&share.Share{})
+
+	repo := repository.NewShareRepository(testDB)
+	svc := NewShareService(repo)
+
+	_, err := svc.CreateShare(&share.ShareCreateRequest{ResourceID: 7001, ResourceType: "dashboard", AutoPwd: true}, 1)
+	require.NoError(t, err)
+
+	err = svc.EditExp(&share.ShareEditExpRequest{ResourceID: 7001, Exp: time.Now().Add(-time.Hour).UnixMilli()}, 1)
+	assert.EqualError(t, err, "invalid expiration")
+
+	err = svc.EditPwd(&share.ShareEditPwdRequest{ResourceID: 7001, Pwd: "bad", AutoPwd: false}, 1)
+	assert.EqualError(t, err, "invalid password format")
+}
+
+func TestShareServiceIntegration_EditRejectedForNonCreator(t *testing.T) {
+	cleanupTables(&share.Share{})
+
+	repo := repository.NewShareRepository(testDB)
+	svc := NewShareService(repo)
+
+	_, err := svc.CreateShare(&share.ShareCreateRequest{ResourceID: 7101, ResourceType: "dashboard", AutoPwd: true}, 1)
+	require.NoError(t, err)
+
+	_, err = svc.EditUUID(&share.ShareEditUUIDRequest{ResourceID: 7101, UUID: "secure888"}, 2)
+	assert.EqualError(t, err, "forbidden")
+
+	err = svc.EditExp(&share.ShareEditExpRequest{ResourceID: 7101, Exp: time.Now().Add(time.Hour).UnixMilli()}, 2)
+	assert.EqualError(t, err, "forbidden")
+
+	err = svc.EditPwd(&share.ShareEditPwdRequest{ResourceID: 7101, Pwd: "Ab1!", AutoPwd: false}, 2)
+	assert.EqualError(t, err, "forbidden")
 }
 
 func TestShareServiceIntegration_SwitchStatus_Create(t *testing.T) {

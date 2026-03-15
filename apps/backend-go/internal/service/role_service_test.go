@@ -197,36 +197,71 @@ func (c *roleMockConn) QueryContext(_ context.Context, query string, args []driv
 	c.store.mu.Lock()
 	defer c.store.mu.Unlock()
 
-	if strings.Contains(q, "where role_id = ? and status = ?") {
+	if strings.Contains(q, "from `sys_role`") && strings.Contains(q, "where role_id = ?") {
 		if c.store.failGet != nil {
 			return nil, c.store.failGet
 		}
-		if len(args) < 2 {
+		if len(args) < 1 {
 			return newRoleMockRows(nil), nil
 		}
 		id := mockToInt64(args[0].Value)
-		status := int(mockToInt64(args[1].Value))
 		rle, ok := c.store.roles[id]
-		if !ok || rle.Status != status {
+		if !ok {
 			return newRoleMockRows(nil), nil
+		}
+		if strings.Contains(q, "and status = ?") {
+			if len(args) < 2 {
+				return newRoleMockRows(nil), nil
+			}
+			status := int(mockToInt64(args[1].Value))
+			if rle.Status != status {
+				return newRoleMockRows(nil), nil
+			}
 		}
 		return newRoleMockRows([]*role.SysRole{cloneRole(rle)}), nil
 	}
 
-	if strings.Contains(q, "from `sys_role`") && strings.Contains(q, "where status = ?") {
+	if strings.Contains(q, "from `sys_role`") {
 		if c.store.failQuery != nil {
 			return nil, c.store.failQuery
 		}
 		roles := make([]*role.SysRole, 0, len(c.store.roles))
 		keyword := ""
-		if len(args) >= 2 {
-			keyword = strings.Trim(mockToString(args[1].Value), "%")
+		for _, arg := range args {
+			val := mockToString(arg.Value)
+			if strings.Contains(val, "%") {
+				keyword = strings.Trim(val, "%")
+				break
+			}
+		}
+
+		var statusFilter *int
+		if strings.Contains(q, "status = ?") && len(args) > 0 {
+			status := int(mockToInt64(args[len(args)-1].Value))
+			statusFilter = &status
+		}
+
+		hasIDFilter := strings.Contains(q, "role_id in") || strings.Contains(q, "`role_id` in")
+		idFilter := make(map[int64]bool)
+		if hasIDFilter {
+			limit := len(args)
+			if statusFilter != nil && limit > 0 {
+				limit--
+			}
+			for i := 0; i < limit; i++ {
+				idFilter[mockToInt64(args[i].Value)] = true
+			}
 		}
 		for _, rle := range c.store.roles {
-			if rle.Status != role.StatusEnabled {
+			if statusFilter != nil && rle.Status != *statusFilter {
 				continue
 			}
-			if keyword != "" && !strings.Contains(strings.ToLower(rle.RoleName), strings.ToLower(keyword)) {
+			if hasIDFilter && !idFilter[rle.RoleID] {
+				continue
+			}
+			if keyword != "" &&
+				!strings.Contains(strings.ToLower(rle.RoleName), strings.ToLower(keyword)) &&
+				!strings.Contains(strings.ToLower(rle.RoleCode), strings.ToLower(keyword)) {
 				continue
 			}
 			roles = append(roles, cloneRole(rle))
@@ -627,8 +662,9 @@ func TestRoleDeleteRole_Fail(t *testing.T) {
 	svc, store, cleanup := setupRoleService(t)
 	defer cleanup()
 
+	id := store.add(&role.SysRole{RoleName: "待删除失败角色", RoleCode: "to_delete_fail", Status: role.StatusEnabled})
 	store.failDelete = errors.New("delete failed")
-	err := svc.DeleteRole(1)
+	err := svc.DeleteRole(id)
 	if err == nil || !strings.Contains(err.Error(), "failed to delete role") {
 		t.Fatalf("expected delete error, got %v", err)
 	}

@@ -95,11 +95,40 @@ func (r *ShareRepository) GetByResourceID(resourceID int64) (*share.Share, error
 
 func (r *ShareRepository) Update(s *share.Share) error {
 	return r.db.Model(&coreShare{}).Where("id = ?", s.ID).Updates(map[string]interface{}{
+		"uuid":           s.UUID,
 		"exp":            s.Exp,
 		"pwd":            s.Pwd,
 		"auto_pwd":       s.AutoPwd,
 		"ticket_require": s.TicketRequire,
 	}).Error
+}
+
+func (r *ShareRepository) ExistsByUUID(uuid string, excludeID int64) (bool, error) {
+	var count int64
+	query := r.db.Model(&coreShare{}).Where("uuid = ?", uuid)
+	if excludeID > 0 {
+		query = query.Where("id <> ?", excludeID)
+	}
+	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *ShareRepository) UpdateTicketUUID(oldUUID string, newUUID string) error {
+	return r.db.Model(&coreShareTicket{}).Where("uuid = ?", oldUUID).Update("uuid", newUUID).Error
+}
+
+func (r *ShareRepository) UpdateUUIDWithTickets(shareID int64, oldUUID string, newUUID string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&coreShare{}).Where("id = ?", shareID).Update("uuid", newUUID).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&coreShareTicket{}).Where("uuid = ?", oldUUID).Update("uuid", newUUID).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *ShareRepository) Delete(id int64) error {

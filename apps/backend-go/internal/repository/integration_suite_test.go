@@ -18,6 +18,7 @@ import (
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
+	"dataease/backend/internal/domain/system"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/domain/auto"
@@ -68,6 +69,7 @@ func TestMain(m *testing.M) {
 		&audit.AuditLog{}, &audit.AuditLogDetail{}, &audit.LoginFailure{},
 		&permission.SysPerm{},
 		&visualization.DataVisualizationInfo{},
+		&system.SysVariable{}, &system.SysVariableValue{},
 		&coreShare{}, &coreShareTicket{},
 		&coreVisualizationTemplate{},
 		&auto.CoreDatasourceTaskLog{},

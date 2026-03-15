@@ -24,6 +24,7 @@ import (
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/share"
 	"dataease/backend/internal/domain/static"
+	"dataease/backend/internal/domain/system"
 	"dataease/backend/internal/domain/template"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/domain/visualization"
@@ -83,6 +84,7 @@ func TestMain(m *testing.M) {
 		&areamap.Area{}, &areamap.CoreAreaCustom{},
 		&embedded.CoreEmbedded{},
 		&static.StaticResource{}, &static.Store{}, &static.Typeface{},
+		&system.SysVariable{}, &system.SysVariableValue{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v\n", err)
 	}
@@ -218,6 +220,11 @@ func cleanupTables(tables ...interface{}) {
 			testDB.Exec("DELETE FROM core_datasource_task_log")
 		case *dataset.CoreDatasetGroup, dataset.CoreDatasetGroup:
 			testDB.Exec("DELETE FROM core_dataset_group")
+		case *system.SysVariable, system.SysVariable:
+			testDB.Exec("DELETE FROM sys_variable_value")
+			testDB.Exec("DELETE FROM sys_variable")
+		case *system.SysVariableValue, system.SysVariableValue:
+			testDB.Exec("DELETE FROM sys_variable_value")
 		default:
 			// Use GORM's Unscoped delete for other types with soft delete support
 			testDB.Unscoped().Where("1 = 1").Delete(table)
