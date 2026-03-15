@@ -40,7 +40,7 @@ func (r *RoleRepository) Query(keyword string) ([]*role.SysRole, error) {
 	if keyword != "" {
 		db = db.Where("role_name LIKE ?", "%"+keyword+"%")
 	}
-	err := db.Order("role_type ASC, create_time DESC").Find(&roles).Error
+	err := db.Order("create_time DESC").Find(&roles).Error
 	return roles, err
 }
 
