@@ -439,6 +439,51 @@ func toTaskRow(req *syncmodule.TaskInfo, existing *auto.CoreDatasourceTask) (*au
 	if name == "" && existing == nil {
 		return nil, fmt.Errorf("task name is required")
 	}
+	row := &auto.CoreDatasourceTask{}
+	if existing != nil {
+		*row = *existing
+	}
+	if err := applyTaskDatasource(row, req, existing); err != nil {
+		return nil, err
+	}
+	applyTaskIdentity(row, req, name)
+	if err := applyTaskSchedule(row, req); err != nil {
+		return nil, err
+	}
+	applyTaskRuntime(row, req)
+	now := time.Now().UnixMilli()
+	if row.CreateTime == 0 {
+		row.CreateTime = now
+	}
+	return row, nil
+}
+
+func applyTaskDatasource(row *auto.CoreDatasourceTask, req *syncmodule.TaskInfo, existing *auto.CoreDatasourceTask) error {
+	dsID, err := parseStringID(req.Source.DatasourceID)
+	if err != nil {
+		if existing == nil {
+			return fmt.Errorf("source datasourceId is required")
+		}
+		return nil
+	}
+	row.DsID = dsID
+	return nil
+}
+
+func applyTaskIdentity(row *auto.CoreDatasourceTask, req *syncmodule.TaskInfo, name string) {
+	if name != "" {
+		row.Name = name
+	}
+	if strings.TrimSpace(req.TaskKey) != "" {
+		row.UpdateType = req.TaskKey
+		return
+	}
+	if row.UpdateType == "" {
+		row.UpdateType = "sync"
+	}
+}
+
+func applyTaskSchedule(row *auto.CoreDatasourceTask, req *syncmodule.TaskInfo) error {
 	persisted := syncmodule.TaskPersistedData{
 		TaskKey:                req.TaskKey,
 		Desc:                   req.Desc,
@@ -454,32 +499,17 @@ func toTaskRow(req *syncmodule.TaskInfo, existing *auto.CoreDatasourceTask) (*au
 	}
 	extraData, err := json.Marshal(persisted)
 	if err != nil {
-		return nil, err
-	}
-	row := &auto.CoreDatasourceTask{}
-	if existing != nil {
-		*row = *existing
-	}
-	dsID, err := parseStringID(req.Source.DatasourceID)
-	if err != nil && existing == nil {
-		return nil, fmt.Errorf("source datasourceId is required")
-	}
-	if err == nil {
-		row.DsID = dsID
-	}
-	if name != "" {
-		row.Name = name
-	}
-	if strings.TrimSpace(req.TaskKey) != "" {
-		row.UpdateType = req.TaskKey
-	} else if row.UpdateType == "" {
-		row.UpdateType = "sync"
+		return err
 	}
 	row.SyncRate = schedulerRate(req.SchedulerType)
 	row.Cron = req.SchedulerConf
 	row.SimpleCronValue = int64(req.SchedulerOption.Interval)
 	row.SimpleCronType = req.SchedulerOption.Unit
 	row.ExtraData = string(extraData)
+	return nil
+}
+
+func applyTaskRuntime(row *auto.CoreDatasourceTask, req *syncmodule.TaskInfo) {
 	if ts := parseMillis(req.StartTime); ts > 0 {
 		row.StartTime = ts
 	}
@@ -488,14 +518,11 @@ func toTaskRow(req *syncmodule.TaskInfo, existing *auto.CoreDatasourceTask) (*au
 	}
 	if strings.TrimSpace(req.Status) != "" {
 		row.TaskStatus = req.Status
-	} else if row.TaskStatus == "" {
+		return
+	}
+	if row.TaskStatus == "" {
 		row.TaskStatus = seatunnel.StatusPending
 	}
-	now := time.Now().UnixMilli()
-	if row.CreateTime == 0 {
-		row.CreateTime = now
-	}
-	return row, nil
 }
 
 func toTaskInfo(row auto.CoreDatasourceTask) syncmodule.TaskInfo {
