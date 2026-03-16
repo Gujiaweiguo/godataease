@@ -228,15 +228,17 @@ The system SHALL enforce exception approval and time-bounded waiver governance f
 - **AND** release MUST require renewed approval or fully passing gate results
 
 ### Requirement: Frontend Compatibility Endpoints
-The system SHALL provide frontend compatibility endpoints to support Java-to-Go migration.
+The system SHALL provide frontend compatibility endpoints to support Java-to-Go migration and SHALL preserve locale-aware contract semantics for navigation metadata returned to migrated frontend clients.
 
 #### Scenario: Role router query endpoint
 - **WHEN** GET request to `/api/roleRouter/query`
 - **THEN** returns route configuration with system menu structure
+- **AND** localized menu titles in `meta.title` MUST use the effective locale for that request instead of fixed-language labels or untranslated i18n keys
 
 #### Scenario: Menu resource endpoint
 - **WHEN** GET request to `/api/auth/menuResource`
 - **THEN** returns menu tree with items containing path and meta fields
+- **AND** localized menu titles in `meta.title` MUST use the effective locale for that request instead of fixed-language labels or untranslated i18n keys
 
 #### Scenario: Interactive tree endpoint
 - **WHEN** POST request to `/api/dataVisualization/interactiveTree` with JSON body
@@ -278,6 +280,14 @@ The system SHALL keep menu authorization semantics equivalent between compatibil
 - **WHEN** the same authenticated user requests both canonical and compatibility menu endpoints
 - **THEN** the visible menu scope is consistent across endpoints
 - **AND** differences are limited to contract shape fields required by each endpoint
+
+### Requirement: Locale-Aware Compatibility Navigation Fallback
+Compatibility navigation endpoints SHALL apply the governed locale fallback policy consistently whenever request locale input is missing, unsupported, or incomplete.
+
+#### Scenario: Compatibility menu endpoints fall back deterministically
+- **WHEN** a client calls `/api/roleRouter/query` or `/api/auth/menuResource` without a supported request locale
+- **THEN** both endpoints MUST resolve the same effective locale for that request context
+- **AND** both endpoints MUST return navigation titles localized with the same fallback result
 
 ### Requirement: Placeholder Success Prohibition for Compatibility Endpoints
 Migration-scoped compatibility endpoints SHALL NOT return placeholder success responses when core behavior is not implemented.

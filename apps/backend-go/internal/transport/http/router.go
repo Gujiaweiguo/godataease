@@ -298,7 +298,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateService := service.NewTemplateService(templateRepo)
 	templateHandler := handler.NewTemplateHandler(templateService)
 
-	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService)
+	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, userService)
 
 	return &Router{
 		engine:                  engine,

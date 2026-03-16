@@ -1,8 +1,5 @@
-# navigation-rendering Specification
+## MODIFIED Requirements
 
-## Purpose
-Define unified, backend-driven navigation rendering rules so top and side menus stay authorization-consistent and avoid frontend hardcoded visibility logic.
-## Requirements
 ### Requirement: Unified Dynamic Navigation Source
 The system SHALL render top navigation and side navigation from the same authorized menu tree response, and that response SHALL provide locale-consistent menu metadata for the effective locale.
 
@@ -16,11 +13,3 @@ The system SHALL render top navigation and side navigation from the same authori
 - **WHEN** the frontend switches locale and refetches the authorized menu tree
 - **THEN** top and side navigation MUST continue to use the same authorized menu nodes as before the switch
 - **AND** user-visible menu titles MUST update to the newly effective locale without requiring frontend hardcoded title overrides
-
-### Requirement: Remove Frontend Hardcoded Filters
-The system SHALL NOT rely on frontend hardcoded menu whitelist or static exclusion rules for runtime menu visibility.
-
-#### Scenario: Menu visibility controlled by backend flags
-- **WHEN** backend marks a menu node hidden or revokes authorization for the role
-- **THEN** the node MUST disappear from both top and side navigation after refresh
-- **AND** direct route access MUST remain blocked by authorization checks

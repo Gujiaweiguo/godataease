@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,12 +15,19 @@ import (
 type UserHandler struct {
 	userService       *service.UserService
 	userImportService *service.UserImportService
+	loadUserByID      userByIDLoader
 }
 
 func NewUserHandler(userService *service.UserService, userImportService *service.UserImportService) *UserHandler {
+	var loadUserByID userByIDLoader
+	if userService != nil {
+		loadUserByID = userService.GetUserByID
+	}
+
 	return &UserHandler{
 		userService:       userService,
 		userImportService: userImportService,
+		loadUserByID:      loadUserByID,
 	}
 }
 
@@ -99,11 +107,31 @@ func (h *UserHandler) GetUserOptions(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserInfo(c *gin.Context) {
+	userID := int64(middleware.GetUserID(c))
+	username := middleware.GetUsername(c)
+	locale := requestLocale(c, h.loadUserByID)
+	current := currentUser(c, h.loadUserByID)
+
+	if current != nil {
+		if current.UserID > 0 {
+			userID = current.UserID
+		}
+		if current.Username != "" {
+			username = current.Username
+		}
+	}
+	if userID == 0 {
+		userID = 1
+	}
+	if username == "" {
+		username = "admin"
+	}
+
 	response.Success(c, map[string]interface{}{
-		"id":       1,
-		"name":     "admin",
+		"id":       userID,
+		"name":     username,
 		"oid":      1,
-		"language": "zh-CN",
+		"language": locale,
 	})
 }
 
