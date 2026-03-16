@@ -11,23 +11,36 @@ import (
 )
 
 type FrontendCompatHandler struct {
-	menuService *service.MenuService
+	menuService   *service.MenuService
+	loadUserByID  userByIDLoader
+	queryMenuTree func() ([]*menu.MenuVO, error)
 }
 
-func NewFrontendCompatHandler(menuService *service.MenuService) *FrontendCompatHandler {
-	return &FrontendCompatHandler{menuService: menuService}
+func NewFrontendCompatHandler(menuService *service.MenuService, userService *service.UserService) *FrontendCompatHandler {
+	h := &FrontendCompatHandler{
+		menuService:  menuService,
+		loadUserByID: nil,
+	}
+	if userService != nil {
+		h.loadUserByID = userService.GetUserByID
+	}
+	if menuService != nil {
+		h.queryMenuTree = menuService.Query
+	}
+	return h
 }
 
 func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
+	locale := requestLocale(c, h.loadUserByID)
 	routers := make([]map[string]interface{}, 0)
-	if h.menuService != nil {
-		menus, err := h.menuService.Query()
+	if h.queryMenuTree != nil {
+		menus, err := h.queryMenuTree()
 		if err != nil {
 			response.Error(c, "500000", "failed to load role routers")
 			return
 		}
 		for _, m := range menus {
-			routers = append(routers, toRoleRouter(m, true))
+			routers = append(routers, toRoleRouter(m, true, locale))
 		}
 	}
 
@@ -35,15 +48,16 @@ func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
 }
 
 func (h *FrontendCompatHandler) GetMenuResource(c *gin.Context) {
+	locale := requestLocale(c, h.loadUserByID)
 	menuTree := make([]map[string]interface{}, 0)
-	if h.menuService != nil {
-		menus, err := h.menuService.Query()
+	if h.queryMenuTree != nil {
+		menus, err := h.queryMenuTree()
 		if err != nil {
 			response.Error(c, "500000", "failed to load menu resource")
 			return
 		}
 		for _, m := range menus {
-			menuTree = append(menuTree, toMenuResource(m))
+			menuTree = append(menuTree, toMenuResource(m, locale))
 		}
 	}
 
@@ -106,7 +120,7 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, h *FrontendCompatHandler) 
 	engine.GET("/api/websocket/info", h.GetWebSocketInfo)
 }
 
-func toRoleRouter(m *menu.MenuVO, isRoot bool) map[string]interface{} {
+func toRoleRouter(m *menu.MenuVO, isRoot bool, locale string) map[string]interface{} {
 	path := normalizePath(m.Path, isRoot)
 	result := map[string]interface{}{
 		"path":     path,
@@ -114,7 +128,7 @@ func toRoleRouter(m *menu.MenuVO, isRoot bool) map[string]interface{} {
 		"hidden":   m.Hidden,
 		"inLayout": m.InLayout,
 		"meta": map[string]interface{}{
-			"title": displayTitle(m),
+			"title": displayTitle(m, locale),
 			"icon":  m.Meta.Icon,
 		},
 	}
@@ -132,7 +146,7 @@ func toRoleRouter(m *menu.MenuVO, isRoot bool) map[string]interface{} {
 	if len(m.Children) > 0 {
 		children := make([]map[string]interface{}, 0, len(m.Children))
 		for _, child := range m.Children {
-			children = append(children, toRoleRouter(child, false))
+			children = append(children, toRoleRouter(child, false, locale))
 		}
 		result["children"] = children
 	}
@@ -140,11 +154,11 @@ func toRoleRouter(m *menu.MenuVO, isRoot bool) map[string]interface{} {
 	return result
 }
 
-func toMenuResource(m *menu.MenuVO) map[string]interface{} {
+func toMenuResource(m *menu.MenuVO, locale string) map[string]interface{} {
 	result := map[string]interface{}{
 		"path": m.Path,
 		"meta": map[string]interface{}{
-			"title": displayTitle(m),
+			"title": displayTitle(m, locale),
 			"icon":  m.Meta.Icon,
 		},
 	}
@@ -152,7 +166,7 @@ func toMenuResource(m *menu.MenuVO) map[string]interface{} {
 	if len(m.Children) > 0 {
 		children := make([]map[string]interface{}, 0, len(m.Children))
 		for _, child := range m.Children {
-			children = append(children, toMenuResource(child))
+			children = append(children, toMenuResource(child, locale))
 		}
 		result["children"] = children
 	}
@@ -177,20 +191,55 @@ func safeName(name string, path string) string {
 	return strings.ReplaceAll(strings.Trim(path, "/"), "/", "-")
 }
 
-func displayTitle(m *menu.MenuVO) string {
+func displayTitle(m *menu.MenuVO, locale string) string {
 	if m.Meta != nil && m.Meta.Title != "" {
-		if title, ok := menuTitleMap[m.Meta.Title]; ok {
-			return title
-		}
-		return m.Meta.Title
+		return resolveMenuTitle(m.Meta.Title, locale)
 	}
-	if title, ok := menuTitleMap[m.Name]; ok {
-		return title
-	}
-	return m.Name
+	return resolveMenuTitle(m.Name, locale)
 }
 
-var menuTitleMap = map[string]string{
+func resolveMenuTitle(key string, locale string) string {
+	titleMap := menuTitleMapForLocale(locale)
+	leafMap := menuTitleLeafMapForLocale(locale)
+
+	if title, ok := titleMap[key]; ok {
+		return title
+	}
+
+	lastDot := strings.LastIndex(key, ".")
+	if lastDot >= 0 && lastDot < len(key)-1 {
+		leaf := key[lastDot+1:]
+		if title, ok := leafMap[leaf]; ok {
+			return title
+		}
+	}
+
+	return key
+}
+
+func menuTitleMapForLocale(locale string) map[string]string {
+	switch locale {
+	case localeEn:
+		return menuTitleMapEn
+	case localeTw:
+		return menuTitleMapTw
+	default:
+		return menuTitleMapZhCN
+	}
+}
+
+func menuTitleLeafMapForLocale(locale string) map[string]string {
+	switch locale {
+	case localeEn:
+		return menuTitleLeafMapEn
+	case localeTw:
+		return menuTitleLeafMapTw
+	default:
+		return menuTitleLeafMapZhCN
+	}
+}
+
+var menuTitleMapZhCN = map[string]string{
 	"workbranch":       "工作台",
 	"panel":            "仪表板",
 	"screen":           "数据大屏",
@@ -205,6 +254,7 @@ var menuTitleMap = map[string]string{
 	"parameter":        "系统参数",
 	"font":             "字体设置",
 	"system":           "系统管理",
+	"menu":             "菜单管理",
 	"user":             "用户管理",
 	"role":             "角色管理",
 	"org":              "组织管理",
@@ -212,4 +262,102 @@ var menuTitleMap = map[string]string{
 	"audit":            "审计日志",
 	"audit-dashboard":  "审计仪表板",
 	"audit-settings":   "审计设置",
+	"datasource-form":  "数据源表单",
+	"dataset-form":     "数据集表单",
+}
+
+var menuTitleMapEn = map[string]string{
+	"workbranch":       "Workbench",
+	"panel":            "Dashboard",
+	"screen":           "Data Screen",
+	"data":             "Data Preparation",
+	"dataset":          "Dataset",
+	"datasource":       "Data Source",
+	"sys-setting":      "System Settings",
+	"template-market":  "Template Market",
+	"toolbox":          "Toolbox",
+	"template-setting": "Template Management",
+	"msg":              "Message Center",
+	"parameter":        "System Parameters",
+	"font":             "Font Settings",
+	"system":           "System Management",
+	"menu":             "Menu Management",
+	"user":             "User Management",
+	"role":             "Role Management",
+	"org":              "Organization Management",
+	"permission":       "Permission Management",
+	"audit":            "Audit Log",
+	"audit-dashboard":  "Audit Dashboard",
+	"audit-settings":   "Audit Settings",
+	"datasource-form":  "Data Source Form",
+	"dataset-form":     "Dataset Form",
+}
+
+var menuTitleMapTw = map[string]string{
+	"workbranch":       "工作台",
+	"panel":            "儀表板",
+	"screen":           "數據大屏",
+	"data":             "數據準備",
+	"dataset":          "數據集",
+	"datasource":       "數據源",
+	"sys-setting":      "系統設置",
+	"template-market":  "模板市場",
+	"toolbox":          "工具箱",
+	"template-setting": "模板管理",
+	"msg":              "消息中心",
+	"parameter":        "系統參數",
+	"font":             "字體設置",
+	"system":           "系統管理",
+	"menu":             "菜單管理",
+	"user":             "用戶管理",
+	"role":             "角色管理",
+	"org":              "組織管理",
+	"permission":       "權限管理",
+	"audit":            "審計日誌",
+	"audit-dashboard":  "審計儀表板",
+	"audit-settings":   "審計設置",
+	"datasource-form":  "數據源表單",
+	"dataset-form":     "數據集表單",
+}
+
+var menuTitleLeafMapZhCN = map[string]string{
+	"about":                    "关于",
+	"change_password":          "修改密码",
+	"enterprise_edition_trial": "企业版试用",
+	"exit_system":              "退出系统",
+	"export_center":            "数据导出中心",
+	"help_documentation":       "帮助文档",
+	"language":                 "语言",
+	"mine":                     "我的",
+	"product_forum":            "产品论坛",
+	"system_setting":           "系统设置",
+	"technical_blog":           "技术博客",
+}
+
+var menuTitleLeafMapEn = map[string]string{
+	"about":                    "About",
+	"change_password":          "Change Password",
+	"enterprise_edition_trial": "Enterprise Trial",
+	"exit_system":              "Log Out",
+	"export_center":            "Data Export Center",
+	"help_documentation":       "Help Documentation",
+	"language":                 "Language",
+	"mine":                     "Mine",
+	"product_forum":            "Product Forum",
+	"system_setting":           "System Settings",
+	"technical_blog":           "Technical Blog",
+}
+
+var menuTitleLeafMapTw = map[string]string{
+	"about":                    "關於",
+	"change_password":          "修改密碼",
+	"enterprise_edition_trial": "企業版試用",
+	"exit_system":              "退出系統",
+	"export_center":            "資料匯出中心",
+	"help_documentation":       "幫助文檔",
+	"language":                 "語言",
+	"mine":                     "我的",
+	"product_forum":            "產品論壇",
+	"system_setting":           "系統設定",
+	"technical_blog":           "技術部落格",
 }
