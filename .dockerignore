@@ -7,6 +7,8 @@
 target
 node_modules
 dist
+!apps/frontend/dist
+!apps/frontend/dist/**
 *.log
 
 # Environment files
@@ -32,6 +34,7 @@ de-xpack
 
 # Go build artifacts
 apps/backend-go/dataease-backend
+!apps/backend-go/dataease-backend
 apps/backend-go/tmp
 apps/backend-go/coverage.out
 

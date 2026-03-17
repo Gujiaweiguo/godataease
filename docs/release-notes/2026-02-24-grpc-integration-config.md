@@ -48,7 +48,7 @@ Scope: Go backend config and deployment docs
 ## Operational Notes
 
 - Configuration now has a single source of truth: app config.
-- Compose templates now pass the integration env vars into `dataease-app` container.
+- Compose templates now pass the integration env vars into `godataease-app` container.
 - If `*_ADDR` is empty, corresponding integration remains disabled without fallback implicit reads.
 
 ## Verification

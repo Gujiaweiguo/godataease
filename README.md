@@ -147,8 +147,8 @@ docker compose -f infra/compose/docker-compose.yml up -d --build
 ```
 
 当前 `infra/compose/docker-compose.yml` 默认启动：
-- **redis**: Redis 7.0 缓存（默认映射到宿主机 `16379`）
-- **dataease-app**: DataEase 应用（默认端口 `8080`）
+- **godataease-redis**: Redis 7.0 缓存（默认映射到宿主机 `16379`）
+- **godataease-app**: DataEase 应用（默认端口 `8080`）
 
 说明：MySQL 需提前可用，并可在 `my-net` 网络内通过主机名 `mysql8` 访问。
 
@@ -167,7 +167,7 @@ REDIS_PASSWORD=
 REDIS_EXTERNAL_PORT=16379
 ```
 
-如果你的 MySQL 主机名不是 `mysql8`，请修改 `infra/compose/docker-compose.yml` 中 `dataease-app.environment.DATABASE_HOST`。
+如果你的 MySQL 主机名不是 `mysql8`，请修改 `infra/compose/docker-compose.yml` 中 `godataease-app.environment.DATABASE_HOST`。
 
 6. 访问服务
 
@@ -181,8 +181,8 @@ REDIS_EXTERNAL_PORT=16379
 docker compose logs -f
 
 # 查看特定服务日志
-docker compose logs -f dataease-app
-docker compose logs -f redis
+docker compose logs -f godataease-app
+docker compose logs -f godataease-redis
 ```
 
 8. 停止服务

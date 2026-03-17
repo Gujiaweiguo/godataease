@@ -1,6 +1,6 @@
 # DataEase Go Backend Docker Image (Production Ready)
-# Build: docker build -t dataease:latest .
-# Run: docker run -p 8080:8080 dataease:latest
+# Build: docker build -t godataease:latest .
+# Run: docker run -p 8080:8080 godataease:latest
 
 # Build stage
 FROM golang:1.24-alpine AS builder
