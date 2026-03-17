@@ -269,6 +269,7 @@ const handleMenuAuthSave = async () => {
     if (res.code === '000000') {
       ElMessage.success('菜单授权成功')
       menuAuthDialogVisible.value = false
+      window.dispatchEvent(new Event('de:permission-refresh'))
     }
   } catch (error) {
     ElMessage.error('菜单授权失败')

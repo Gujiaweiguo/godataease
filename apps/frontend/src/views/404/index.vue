@@ -1,7 +1,7 @@
 <template>
   <div class="page-not-found">
-    <Icon className="login-logo-icon" name="403"><Four class="svg-icon login-logo-icon" /></Icon>
-    <span class="span-403">{{ t('common.no_auth_tips') }}</span>
+    <Icon className="login-logo-icon" name="404"><Four class="svg-icon login-logo-icon" /></Icon>
+    <span class="span-404">{{ t('common.no_menu_tips') }}</span>
   </div>
 </template>
 
@@ -18,7 +18,7 @@ const { t } = useI18n()
   position: absolute;
   text-align: center;
 }
-.span-403 {
+.span-404 {
   display: block;
   margin: 0;
   font-size: var(--ed-font-size-base);

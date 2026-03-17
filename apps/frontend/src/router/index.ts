@@ -58,6 +58,13 @@ export const routes: AppRouteRecordRaw[] = [
     component: () => import('@/views/401/index.vue')
   },
   {
+    path: '/404',
+    name: '404',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/404/index.vue')
+  },
+  {
     path: '/dvCanvas',
     name: 'dvCanvas',
     hidden: true,

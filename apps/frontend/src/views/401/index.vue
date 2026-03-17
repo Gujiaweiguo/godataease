@@ -1,7 +1,7 @@
 <template>
   <div class="page-not-found">
     <Icon className="login-logo-icon" name="401"><Four class="svg-icon login-logo-icon" /></Icon>
-    <span class="span-403">{{ t('common.no_menu_tips') }}</span>
+    <span class="span-403">{{ t('common.no_auth_tips') }}</span>
   </div>
 </template>
 
