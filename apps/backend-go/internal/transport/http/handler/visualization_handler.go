@@ -249,6 +249,39 @@ func (h *VisualizationHandler) FindDvType(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *VisualizationHandler) UpdateCheckVersion(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid ID")
+		return
+	}
+	result, err := h.service.Detail(&visualization.DetailRequest{ID: id})
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	if result == nil || result.CheckVersion == nil {
+		response.Success(c, "")
+		return
+	}
+	response.Success(c, *result.CheckVersion)
+}
+
+func (h *VisualizationHandler) Copy(c *gin.Context) {
+	var req visualization.CopyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	updateBy := h.getUpdateBy(c)
+	id, err := h.service.Copy(&req, updateBy)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, id)
+}
+
 func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
 	var req visualization.CanvasChangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -384,11 +417,14 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler) {
 	vg := r.Group("/dataVisualization")
 	{
 		vg.GET("/findDvType/:id", h.FindDvType)
+		vg.GET("/updateCheckVersion/:id", h.UpdateCheckVersion)
 		vg.POST("/tree", h.Tree)
 		vg.POST("/nameCheck", h.NameCheck)
 		vg.POST("/checkCanvasChange", h.CheckCanvasChange)
 		vg.POST("/findById", h.FindByID)
 		vg.POST("/list", h.List)
+		vg.POST("/save", h.SaveCanvas)
+		vg.POST("/copy", h.Copy)
 		vg.POST("/updateBase", h.UpdateBase)
 		vg.POST("/move", h.Move)
 		vg.POST("/updatePublishStatus", h.UpdatePublishStatus)

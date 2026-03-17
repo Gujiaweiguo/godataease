@@ -22,6 +22,9 @@ func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if token == "" {
+			token = c.GetHeader("X-DE-TOKEN")
+		}
+		if token == "" {
 			response.Unauthorized(c, "missing authorization header")
 			return
 		}

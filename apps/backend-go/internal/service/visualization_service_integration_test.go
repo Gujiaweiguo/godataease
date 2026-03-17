@@ -63,6 +63,53 @@ func TestVisualizationServiceIntegration_Save_Folder(t *testing.T) {
 	}
 }
 
+func TestVisualizationServiceIntegration_Copy(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	nodeType := "panel"
+	visType := "dashboard"
+	mobileLayout := true
+	createReq := &visualization.SaveRequest{
+		Name:            "Copy Source",
+		NodeType:        &nodeType,
+		Type:            &visType,
+		CanvasStyleData: strPtr("{\"style\":\"source\"}"),
+		ComponentData:   strPtr("{\"components\":[1]}"),
+		MobileLayout:    &mobileLayout,
+		ContentID:       strPtr("content-1"),
+		CheckVersion:    strPtr("ver-1"),
+	}
+	sourceID, err := svc.Save(createReq, "creator")
+	require.NoError(t, err)
+
+	newPID := int64(100)
+	copyID, err := svc.Copy(&visualization.CopyRequest{
+		ID:           sourceID,
+		Name:         "Copy Target",
+		PID:          &newPID,
+		Type:         &visType,
+		NodeType:     &nodeType,
+		MobileLayout: &mobileLayout,
+	}, "copier")
+	require.NoError(t, err)
+	assert.NotEqual(t, sourceID, copyID)
+
+	copied, err := repo.GetByID(copyID)
+	require.NoError(t, err)
+	assert.Equal(t, "Copy Target", copied.Name)
+	assert.Equal(t, newPID, *copied.PID)
+	assert.Equal(t, "dashboard", *copied.Type)
+	assert.Equal(t, "panel", *copied.NodeType)
+	assert.Equal(t, "{\"style\":\"source\"}", *copied.CanvasStyleData)
+	assert.Equal(t, "{\"components\":[1]}", *copied.ComponentData)
+	assert.Equal(t, "content-1", *copied.ContentID)
+	assert.Equal(t, "ver-1", *copied.CheckVersion)
+	assert.Equal(t, "copier", *copied.CreateBy)
+}
+
 func TestVisualizationServiceIntegration_Update(t *testing.T) {
 	cleanupTables(&visualization.DataVisualizationInfo{})
 

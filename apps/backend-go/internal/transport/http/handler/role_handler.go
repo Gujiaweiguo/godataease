@@ -113,6 +113,24 @@ func (h *RoleHandler) Detail(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *RoleHandler) QueryWithOrgID(c *gin.Context) {
+	oidStr := c.Param("oid")
+	oid, err := strconv.ParseInt(oidStr, 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid org ID")
+		return
+	}
+
+	keyword := c.Query("keyword")
+	result, err := h.service.QueryRolesByOrgID(oid, keyword)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func (h *RoleHandler) getCreateBy(c *gin.Context) string {
 	if userId, exists := c.Get("userId"); exists {
 		switch v := userId.(type) {
@@ -251,6 +269,7 @@ func RegisterRoleRoutes(r *gin.RouterGroup, h *RoleHandler) {
 		roleGroup.POST("/query", h.Query)
 		roleGroup.POST("/page", h.Page)
 		roleGroup.POST("/byCurOrg", h.Query)
+		roleGroup.GET("/queryWithOid/:oid", h.QueryWithOrgID)
 		roleGroup.POST("/create", h.Create)
 		roleGroup.POST("/edit", h.Edit)
 		roleGroup.POST("/delete/:id", h.Delete)

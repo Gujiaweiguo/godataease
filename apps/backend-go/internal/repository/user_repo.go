@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 
 	"gorm.io/gorm"
@@ -196,7 +197,11 @@ func (r *UserPermRepository) GetByUserID(userID int64) ([]*user.SysUserPerm, err
 
 func (r *UserRoleRepository) GetRoleIDsByUserID(userID int64) ([]int64, error) {
 	var roleIDs []int64
-	err := r.db.Model(&user.SysUserRole{}).Where("user_id = ?", userID).Pluck("role_id", &roleIDs).Error
+	err := r.db.Model(&user.SysUserRole{}).
+		Joins("JOIN sys_role sr ON sr.role_id = sys_user_role.role_id").
+		Where("sys_user_role.user_id = ? AND sr.status = ?", userID, role.StatusEnabled).
+		Distinct("sys_user_role.role_id").
+		Pluck("sys_user_role.role_id", &roleIDs).Error
 	return roleIDs, err
 }
 

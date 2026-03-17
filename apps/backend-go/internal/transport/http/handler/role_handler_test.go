@@ -82,3 +82,36 @@ func TestRoleHandler_Page_InvalidRequest(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "500000", resp["code"])
 }
+
+func TestRoleHandler_QueryWithOrgID_Success(t *testing.T) {
+	r := setupRoleHandlerTestRouter(t)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/role/queryWithOid/1", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string `json:"code"`
+		Data []struct {
+			Name string `json:"roleName"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Len(t, resp.Data, 1)
+	assert.Equal(t, "Admin", resp.Data[0].Name)
+}
+
+func TestRoleHandler_QueryWithOrgID_InvalidOID(t *testing.T) {
+	r := setupRoleHandlerTestRouter(t)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/role/queryWithOid/bad", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp["code"])
+}

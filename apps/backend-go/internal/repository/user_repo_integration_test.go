@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 )
 
@@ -261,5 +262,82 @@ func TestUserRepository_ListUsersByIds(t *testing.T) {
 
 	if len(users) != 3 {
 		t.Errorf("Expected 3 users, got %d", len(users))
+	}
+}
+
+func TestUserRoleRepository_GetRoleIDsByUserID_IgnoresDanglingAndDisabledRoles(t *testing.T) {
+	if testDB == nil {
+		t.Skip("Test database not available")
+	}
+
+	cleanupTables("sys_user_role", "sys_role", "sys_user")
+
+	userRepo := NewUserRepository(testDB)
+	userRoleRepo := NewUserRoleRepository(testDB)
+
+	u := &user.SysUser{
+		Username:   "rolefilteruser",
+		NickName:   "Role Filter User",
+		Status:     user.StatusEnabled,
+		DelFlag:    user.DelFlagNormal,
+		CreateTime: time.Now(),
+	}
+	if err := userRepo.Create(u); err != nil {
+		t.Fatalf("Create user failed: %v", err)
+	}
+
+	enabledRole := &role.SysRole{
+		RoleID:   2001,
+		RoleName: "Enabled Role",
+		RoleCode: "enabled-role",
+		Status:   role.StatusEnabled,
+		CreateTime: func() *time.Time {
+			now := time.Now()
+			return &now
+		}(),
+	}
+	disabledRole := &role.SysRole{
+		RoleID:   2002,
+		RoleName: "Disabled Role",
+		RoleCode: "disabled-role",
+		Status:   role.StatusDisabled,
+		CreateTime: func() *time.Time {
+			now := time.Now()
+			return &now
+		}(),
+	}
+	if err := testDB.Create(enabledRole).Error; err != nil {
+		t.Fatalf("Create enabled role failed: %v", err)
+	}
+	if err := testDB.Create(disabledRole).Error; err != nil {
+		t.Fatalf("Create disabled role failed: %v", err)
+	}
+	if err := testDB.Model(&role.SysRole{}).
+		Where("role_id = ?", disabledRole.RoleID).
+		Update("status", role.StatusDisabled).Error; err != nil {
+		t.Fatalf("Disable role failed: %v", err)
+	}
+
+	bindings := []*user.SysUserRole{
+		{UserID: u.UserID, RoleID: enabledRole.RoleID, OrgID: 1},
+		{UserID: u.UserID, RoleID: disabledRole.RoleID, OrgID: 1},
+		{UserID: u.UserID, RoleID: 2999, OrgID: 1},
+	}
+	for _, binding := range bindings {
+		if err := userRoleRepo.Create(binding); err != nil {
+			t.Fatalf("Create user-role binding failed: %v", err)
+		}
+	}
+
+	roleIDs, err := userRoleRepo.GetRoleIDsByUserID(u.UserID)
+	if err != nil {
+		t.Fatalf("GetRoleIDsByUserID failed: %v", err)
+	}
+
+	if len(roleIDs) != 1 {
+		t.Fatalf("Expected exactly 1 enabled existing role, got %v", roleIDs)
+	}
+	if roleIDs[0] != enabledRole.RoleID {
+		t.Fatalf("Expected role ID %d, got %v", enabledRole.RoleID, roleIDs)
 	}
 }

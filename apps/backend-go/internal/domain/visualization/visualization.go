@@ -41,6 +41,15 @@ type SaveRequest struct {
 	CheckVersion    *string `json:"checkVersion"`
 }
 
+type CopyRequest struct {
+	ID           int64   `json:"id" binding:"required"`
+	Name         string  `json:"name" binding:"required"`
+	PID          *int64  `json:"pid"`
+	Type         *string `json:"type"`
+	NodeType     *string `json:"nodeType"`
+	MobileLayout *bool   `json:"mobileLayout"`
+}
+
 type UpdateRequest struct {
 	ID              int64   `json:"id" binding:"required"`
 	Name            *string `json:"name"`

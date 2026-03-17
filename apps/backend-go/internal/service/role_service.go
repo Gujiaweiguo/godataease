@@ -312,6 +312,10 @@ func (s *RoleService) OptionForUser(req *role.RoleRequest, orgID int64) ([]*role
 	if req.Keyword != nil {
 		keyword = *req.Keyword
 	}
+	return s.QueryRolesByOrgID(orgID, keyword)
+}
+
+func (s *RoleService) QueryRolesByOrgID(orgID int64, keyword string) ([]*role.RoleVO, error) {
 
 	roles, err := s.repo.QueryByOrgID(orgID, keyword)
 	if err != nil {

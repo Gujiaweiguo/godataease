@@ -6,42 +6,61 @@ import (
 	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
 type FrontendCompatHandler struct {
-	menuService   *service.MenuService
-	loadUserByID  userByIDLoader
-	queryMenuTree func() ([]*menu.MenuVO, error)
+	menuService            *service.MenuService
+	loadUserByID           userByIDLoader
+	loadRoleIDsByUserID    func(userID int64) ([]int64, error)
+	queryMenuTree          func() ([]*menu.MenuVO, error)
+	queryMenuTreeByRoleIDs func(roleIDs []int64) ([]*menu.MenuVO, error)
 }
 
-func NewFrontendCompatHandler(menuService *service.MenuService, userService *service.UserService) *FrontendCompatHandler {
+type interactiveTreeNode struct {
+	ID         string                `json:"id"`
+	PID        string                `json:"pid"`
+	Name       string                `json:"name"`
+	Leaf       bool                  `json:"leaf"`
+	Weight     int                   `json:"weight"`
+	ExtraFlag  int                   `json:"extraFlag"`
+	ExtraFlag1 int                   `json:"extraFlag1"`
+	Children   []interactiveTreeNode `json:"children,omitempty"`
+}
+
+func NewFrontendCompatHandler(
+	menuService *service.MenuService,
+	userService *service.UserService,
+	loadRoleIDsByUserID func(userID int64) ([]int64, error),
+) *FrontendCompatHandler {
 	h := &FrontendCompatHandler{
-		menuService:  menuService,
-		loadUserByID: nil,
+		menuService:         menuService,
+		loadUserByID:        nil,
+		loadRoleIDsByUserID: loadRoleIDsByUserID,
 	}
 	if userService != nil {
 		h.loadUserByID = userService.GetUserByID
 	}
 	if menuService != nil {
 		h.queryMenuTree = menuService.Query
+		h.queryMenuTreeByRoleIDs = menuService.QueryByRoleIDs
 	}
 	return h
 }
 
 func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
 	locale := requestLocale(c, h.loadUserByID)
+	menus, err := h.loadRuntimeMenus(c)
+	if err != nil {
+		response.Error(c, "500000", "failed to load role routers")
+		return
+	}
+
 	routers := make([]map[string]interface{}, 0)
-	if h.queryMenuTree != nil {
-		menus, err := h.queryMenuTree()
-		if err != nil {
-			response.Error(c, "500000", "failed to load role routers")
-			return
-		}
-		for _, m := range menus {
-			routers = append(routers, toRoleRouter(m, true, locale))
-		}
+	for _, m := range menus {
+		routers = append(routers, toRoleRouter(m, true, locale))
 	}
 
 	response.Success(c, routers)
@@ -49,19 +68,36 @@ func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
 
 func (h *FrontendCompatHandler) GetMenuResource(c *gin.Context) {
 	locale := requestLocale(c, h.loadUserByID)
+	menus, err := h.loadRuntimeMenus(c)
+	if err != nil {
+		response.Error(c, "500000", "failed to load menu resource")
+		return
+	}
+
 	menuTree := make([]map[string]interface{}, 0)
-	if h.queryMenuTree != nil {
-		menus, err := h.queryMenuTree()
-		if err != nil {
-			response.Error(c, "500000", "failed to load menu resource")
-			return
-		}
-		for _, m := range menus {
-			menuTree = append(menuTree, toMenuResource(m, locale))
-		}
+	for _, m := range menus {
+		menuTree = append(menuTree, toMenuResource(m, locale))
 	}
 
 	response.Success(c, menuTree)
+}
+
+func (h *FrontendCompatHandler) loadRuntimeMenus(c *gin.Context) ([]*menu.MenuVO, error) {
+	if h.queryMenuTree == nil {
+		return []*menu.MenuVO{}, nil
+	}
+
+	userID := int64(middleware.GetUserID(c))
+	if userID <= 0 || h.loadRoleIDsByUserID == nil || h.queryMenuTreeByRoleIDs == nil {
+		return h.queryMenuTree()
+	}
+
+	roleIDs, err := h.loadRoleIDsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.queryMenuTreeByRoleIDs(roleIDs)
 }
 
 func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
@@ -71,6 +107,15 @@ func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
 	}
 
 	result := make(map[string]interface{})
+	menus, err := h.loadRuntimeMenus(c)
+	if err != nil {
+		response.Error(c, "500000", "failed to load interactive tree")
+		return
+	}
+	authorized := collectAuthorizedBusiFlags(menus)
+	for busiFlag := range requestMap {
+		result[busiFlag] = buildInteractiveTreeResponse(busiFlag, authorized[busiFlag])
+	}
 	response.Success(c, result)
 }
 
@@ -102,22 +147,73 @@ func (h *FrontendCompatHandler) GetWebSocketInfo(c *gin.Context) {
 	})
 }
 
-func RegisterFrontendCompatRoutes(engine *gin.Engine, h *FrontendCompatHandler) {
-	engine.GET("/roleRouter/query", h.GetRoleRouters)
-	engine.GET("/auth/menuResource", h.GetMenuResource)
-	engine.POST("/dataVisualization/interactiveTree", h.InteractiveTree)
+func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *FrontendCompatHandler) {
+	protected.GET("/roleRouter/query", h.GetRoleRouters)
+	protected.GET("/auth/menuResource", h.GetMenuResource)
+	protected.POST("/dataVisualization/interactiveTree", h.InteractiveTree)
 	engine.GET("/aiBase/findTargetUrl", h.FindTargetUrl)
 	engine.GET("/xpackComponent/content/:id", h.GetXpackContent)
 	engine.GET("/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
 	engine.GET("/websocket/info", h.GetWebSocketInfo)
 
-	engine.GET("/api/roleRouter/query", h.GetRoleRouters)
-	engine.GET("/api/auth/menuResource", h.GetMenuResource)
-	engine.POST("/api/dataVisualization/interactiveTree", h.InteractiveTree)
+	protected.GET("/api/roleRouter/query", h.GetRoleRouters)
+	protected.GET("/api/auth/menuResource", h.GetMenuResource)
+	protected.POST("/api/dataVisualization/interactiveTree", h.InteractiveTree)
 	engine.GET("/api/aiBase/findTargetUrl", h.FindTargetUrl)
 	engine.GET("/api/xpackComponent/content/:id", h.GetXpackContent)
 	engine.GET("/api/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
 	engine.GET("/api/websocket/info", h.GetWebSocketInfo)
+}
+
+func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
+	authorized := map[string]bool{
+		"dashboard":  false,
+		"dataV":      false,
+		"dataset":    false,
+		"datasource": false,
+	}
+	var walk func(nodes []*menu.MenuVO)
+	walk = func(nodes []*menu.MenuVO) {
+		for _, node := range nodes {
+			if node == nil {
+				continue
+			}
+			path := strings.TrimSpace(node.Path)
+			switch {
+			case strings.HasPrefix(path, "/panel"):
+				authorized["dashboard"] = true
+			case strings.HasPrefix(path, "/screen"):
+				authorized["dataV"] = true
+			case strings.HasPrefix(path, "/data/dataset"):
+				authorized["dataset"] = true
+			case strings.HasPrefix(path, "/data/datasource"):
+				authorized["datasource"] = true
+			}
+			if len(node.Children) > 0 {
+				walk(node.Children)
+			}
+		}
+	}
+	walk(menus)
+	return authorized
+}
+
+func buildInteractiveTreeResponse(busiFlag string, authorized bool) []interactiveTreeNode {
+	if !authorized {
+		return []interactiveTreeNode{}
+	}
+	return []interactiveTreeNode{
+		{
+			ID:         "0",
+			PID:        "-1",
+			Name:       busiFlag,
+			Leaf:       false,
+			Weight:     9,
+			ExtraFlag:  1,
+			ExtraFlag1: 0,
+			Children:   []interactiveTreeNode{},
+		},
+	}
 }
 
 func toRoleRouter(m *menu.MenuVO, isRoot bool, locale string) map[string]interface{} {

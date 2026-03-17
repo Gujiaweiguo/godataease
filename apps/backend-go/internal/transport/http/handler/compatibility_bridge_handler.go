@@ -437,6 +437,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, result)
 			})
 		}
+
 	}
 
 	if datasetHandler != nil {
@@ -942,6 +943,60 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, nil)
 			})
 		}
+
+		datasetFieldGroup := r.Group("/datasetField")
+		{
+			datasetFieldGroup.POST("/listByDatasetGroup/:datasetId", func(c *gin.Context) {
+				datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid dataset ID")
+					return
+				}
+				result, err := chartHandler.service.ListByDQ(datasetID, 0)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, flattenChartFieldList(result))
+			})
+			datasetFieldGroup.GET("/listWithPermissions/:datasetId", func(c *gin.Context) {
+				datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid dataset ID")
+					return
+				}
+				result, err := chartHandler.service.ListByDQ(datasetID, 0)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, flattenChartFieldList(result))
+			})
+			datasetFieldGroup.POST("/delete/:id", func(c *gin.Context) {
+				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid field ID")
+					return
+				}
+				if err = chartHandler.service.DeleteField(id); err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, nil)
+			})
+			datasetFieldGroup.POST("/deleteByChartId/:id", func(c *gin.Context) {
+				chartID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid chart ID")
+					return
+				}
+				if err = chartHandler.service.DeleteFieldByChart(chartID); err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, nil)
+			})
+		}
 	}
 
 	if user != nil {
@@ -990,6 +1045,16 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			})
 		}
 	}
+}
+
+func flattenChartFieldList(result *chart.ChartFieldListResponse) []chart.ChartField {
+	if result == nil {
+		return []chart.ChartField{}
+	}
+	fields := make([]chart.ChartField, 0, len(result.DimensionList)+len(result.QuotaList))
+	fields = append(fields, result.DimensionList...)
+	fields = append(fields, result.QuotaList...)
+	return fields
 }
 
 type datasourceTreeNode struct {

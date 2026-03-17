@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"dataease/backend/internal/app"
+	pkgauth "dataease/backend/internal/pkg/auth"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/metrics"
 	"dataease/backend/internal/repository"
@@ -177,11 +178,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	// Menu module initialization
 	menuRepo := repository.NewMenuRepository(db)
-	menuService := service.NewMenuService(menuRepo)
+	roleMenuRepo := repository.NewRoleMenuRepository(db)
+	menuService := service.NewMenuServiceWithRoleFilter(menuRepo, roleMenuRepo)
 	menuHandler := handler.NewMenuHandler(menuService)
 
 	// RoleMenu module initialization
-	roleMenuRepo := repository.NewRoleMenuRepository(db)
 	roleMenuService := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
 	roleMenuHandler := handler.NewRoleMenuHandler(roleMenuService)
 
@@ -190,7 +191,15 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	mapService := service.NewMapService(areaRepo)
 	mapHandler := handler.NewMapHandler(mapService)
 
-	authService := service.NewAuthService(userRepo)
+	jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{})
+	if application != nil && application.Config != nil {
+		jwtInstance = pkgauth.NewJWT(&pkgauth.JWTConfig{
+			Secret: application.Config.JWT.Secret,
+			Expire: application.Config.JWT.Expire,
+		})
+	}
+
+	authService := service.NewAuthService(userRepo, jwtInstance)
 	authHandler := handler.NewAuthHandler(authService)
 
 	datasourceRepo := repository.NewDatasourceRepository(db)
@@ -298,7 +307,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateService := service.NewTemplateService(templateRepo)
 	templateHandler := handler.NewTemplateHandler(templateService)
 
-	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, userService)
+	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, userService, userRoleRepo.GetRoleIDsByUserID)
 
 	return &Router{
 		engine:                  engine,
@@ -376,6 +385,15 @@ func (r *Router) RegisterRoutes() {
 }
 
 func (r *Router) registerRootRoutes() {
+	protected := r.engine.Group("")
+	if r.app != nil && r.app.Config != nil {
+		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
+			Secret: r.app.Config.JWT.Secret,
+			Expire: r.app.Config.JWT.Expire,
+		})
+		protected.Use(middleware.Auth(jwtInstance))
+	}
+
 	r.engine.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
@@ -397,7 +415,7 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
 	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
-	handler.RegisterFrontendCompatRoutes(r.engine, r.frontendCompatHandler)
+	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
 }
 
 func (r *Router) registerAPIRoutes() {

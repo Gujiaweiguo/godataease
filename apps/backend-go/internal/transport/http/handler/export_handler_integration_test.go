@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -90,6 +91,45 @@ func (m *mockExportRepo) CountByStatus() (map[string]int64, error) {
 }
 
 var _ repository.ExportRepositoryInterface = (*mockExportRepo)(nil)
+
+func TestRegisterExportRoutes_ExportCenterAliases(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := newMockExportRepo()
+	repo.AddTask(&export.ExportTask{ID: "task-1", UserID: 1, ExportStatus: "FAILED", ExportFromType: "dataset"})
+	h := NewExportHandler(service.NewExportService(repo), nil, nil)
+	r := gin.New()
+	RegisterExportRoutes(r, h)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "records alias", method: http.MethodPost, path: "/exportCenter/exportTasks/records", body: `{}`},
+		{name: "pager alias", method: http.MethodPost, path: "/exportCenter/exportTasks/all/1/10", body: `{}`},
+		{name: "delete alias", method: http.MethodGet, path: "/exportCenter/delete/task-1"},
+		{name: "batch delete alias", method: http.MethodPost, path: "/exportCenter/delete", body: `{"ids":["task-1"]}`},
+		{name: "delete all alias", method: http.MethodPost, path: "/exportCenter/deleteAll/all", body: `{}`},
+		{name: "retry alias", method: http.MethodPost, path: "/exportCenter/retry/task-1", body: `{}`},
+		{name: "export limit alias", method: http.MethodPost, path: "/exportCenter/exportLimit", body: `{}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			if tt.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected 200 for %s %s, got %d", tt.method, tt.path, w.Code)
+			}
+		})
+	}
+}
 
 type mockResourcePermRepoForExport struct {
 	hasPermission bool

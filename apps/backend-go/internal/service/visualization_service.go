@@ -50,6 +50,48 @@ func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy str
 	return v.ID, nil
 }
 
+func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy string) (int64, error) {
+	if req == nil {
+		return 0, fmt.Errorf("copy request is required")
+	}
+	if req.ID <= 0 {
+		return 0, fmt.Errorf("source id is required")
+	}
+	if req.Name == "" {
+		return 0, fmt.Errorf("name is required")
+	}
+
+	source, err := s.repo.GetByID(req.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	nodeType := source.NodeType
+	if req.NodeType != nil && *req.NodeType != "" {
+		nodeType = req.NodeType
+	}
+	typ := source.Type
+	if req.Type != nil && *req.Type != "" {
+		typ = req.Type
+	}
+	mobileLayout := source.MobileLayout
+	if req.MobileLayout != nil {
+		mobileLayout = req.MobileLayout
+	}
+
+	return s.Save(&visualization.SaveRequest{
+		Name:            req.Name,
+		PID:             req.PID,
+		Type:            typ,
+		NodeType:        nodeType,
+		CanvasStyleData: source.CanvasStyleData,
+		ComponentData:   source.ComponentData,
+		MobileLayout:    mobileLayout,
+		ContentID:       source.ContentID,
+		CheckVersion:    source.CheckVersion,
+	}, updateBy)
+}
+
 func (s *VisualizationService) Update(req *visualization.UpdateRequest, updateBy string) error {
 	v, err := s.repo.GetByID(req.ID)
 	if err != nil {
