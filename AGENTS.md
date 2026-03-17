@@ -41,6 +41,37 @@ Run in `/opt/code/godataease`:
 - Docker API docs: `http://localhost:8080/doc.html`
 - Legacy Java emergency operations: see `legacy/README-READONLY.md`
 
+### 开发模式（推荐）
+
+**快速入口脚本**：
+```bash
+./scripts/dev.sh build     # 构建前后端产物
+./scripts/dev.sh start     # 启动开发容器
+./scripts/dev.sh stop      # 停止开发容器
+./scripts/dev.sh restart   # 重建并重启
+```
+
+**手动方式**：
+```bash
+# 1. 构建产物（首次或代码变更后）
+cd apps/backend-go && make build-static && cd ../..
+cd apps/frontend && npm run build:base && cd ..
+
+# 2. 启动开发模式（挂载产物，无需重建镜像）
+docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d
+
+# 3. 验证
+curl http://localhost:8080/health
+```
+
+**开发模式 vs 生产模式**：
+| 模式 | 命令 | 镜像重建 | 适用场景 |
+|------|------|----------|----------|
+| 开发 | `dev.sh start` | ❌ | 日常开发、快速迭代 |
+| 生产 | `docker compose up --build` | ✅ | 集成验证、部署 |
+
+**注意**：开发模式需要静态编译后端（`make build-static`），因为 Alpine 容器使用 musl 而非 glibc。
+
 ### Go Backend (`apps/backend-go`)
 Run in `/opt/code/godataease/apps/backend-go`:
 - Build: `make build`
