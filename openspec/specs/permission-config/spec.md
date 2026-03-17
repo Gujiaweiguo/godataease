@@ -33,6 +33,7 @@ The system SHALL provide menu permission management including:
 - **THEN** system denies access
 - **THEN** system displays "Insufficient permissions" error
 - **THEN** system redirects to previous page or home page
+- **AND** system MUST NOT misclassify the authorization failure as a generic `404`
 
 ### Requirement: Resource Permission Control
 The system SHALL provide resource permission management including:
@@ -207,6 +208,7 @@ The system SHALL persist role-to-menu authorization mappings and use them as the
 - **WHEN** an administrator revokes one or more menus from a role
 - **THEN** users with that role lose visibility to revoked menus on next authorization fetch
 - **AND** direct access to revoked menu routes is denied by authorization policy
+- **AND** revoked access MUST NOT degrade into a misleading `404` caused by permission-path confusion
 
 ### Requirement: Role-Menu Authorization APIs
 The system SHALL provide APIs to query and save role-menu authorization state.
@@ -234,7 +236,7 @@ The system SHALL provide menu-permission and business-permission query APIs used
 #### Scenario: Query menu and business permission trees
 - **WHEN** frontend requests `/auth/menuPermission` or `/auth/busiPermission`
 - **THEN** backend MUST return permission dataset in contract-compatible structure
-- **AND** not fallback to static file route or generic `404`
+- **AND** the request MUST NOT fallback to static file route or generic `404`
 
 ### Requirement: Menu and Business Permission Save APIs
 The system SHALL provide save APIs for menu and business permission assignments.
@@ -243,6 +245,21 @@ The system SHALL provide save APIs for menu and business permission assignments.
 - **WHEN** frontend posts permission updates to `/auth/saveMenuPer` or `/auth/saveBusiPer`
 - **THEN** backend MUST persist effective authorization state or return explicit validation/auth error
 - **AND** MUST NOT return placeholder success for unimplemented logic
+- **AND** MUST NOT return generic `404` for supported permission flows
+
+### Requirement: Authorization Result Must Be Semantically Distinguishable
+The system SHALL keep authorization denial distinguishable from missing resource errors across menu access flows.
+
+#### Scenario: Protected resource exists but user lacks permission
+- **WHEN** a protected page or API exists but the current user lacks permission
+- **THEN** the system MUST return authorization-denied behavior
+- **AND** frontend and backend logs SHOULD preserve that semantic distinction
+- **AND** operators MUST be able to distinguish this case from resource absence during troubleshooting
+
+#### Scenario: Protected resource does not exist
+- **WHEN** frontend requests a page or API that is not implemented or no longer registered
+- **THEN** the system MAY return `404`
+- **AND** the result MUST remain distinguishable from authorization denial
 
 ### Requirement: Permission Dual-Perspective Consistency
 The system SHALL provide both "configure by user" and "configure by resource" views, and both views SHALL persist to the same authorization model with equivalent effective results.
@@ -277,4 +294,3 @@ The system SHALL bind role-menu authorization outcomes to navigation visibility 
 - **WHEN** an administrator revokes a previously granted menu node from a role
 - **THEN** users with that role MUST no longer see the menu in navigation
 - **AND** direct navigation to revoked route MUST be denied
-
