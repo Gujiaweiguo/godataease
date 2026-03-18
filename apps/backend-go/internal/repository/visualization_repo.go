@@ -85,6 +85,19 @@ func (r *VisualizationRepository) Query(req *visualization.ListRequest) ([]*visu
 	return list, total, nil
 }
 
+func (r *VisualizationRepository) ListAllByTypes(types []string) ([]*visualization.DataVisualizationInfo, error) {
+	var list []*visualization.DataVisualizationInfo
+
+	q := r.db.Model(&visualization.DataVisualizationInfo{}).
+		Where("COALESCE(delete_flag, 0) = 0")
+	if len(types) > 0 {
+		q = q.Where("type IN ?", types)
+	}
+
+	err := q.Order("COALESCE(pid, 0) ASC").Order("COALESCE(sort, 0) ASC").Order("update_time DESC").Find(&list).Error
+	return list, err
+}
+
 func (r *VisualizationRepository) CountByNameAndPID(name string, pid *int64, excludeID *int64) (int64, error) {
 	var count int64
 	normalizedPID := int64(0)

@@ -159,6 +159,14 @@ func (s *VisualizationService) List(req *visualization.ListRequest) (*visualizat
 	}, nil
 }
 
+func (s *VisualizationService) InteractiveTree(busiFlag string) ([]*visualization.DataVisualizationInfo, error) {
+	types, err := resolveInteractiveVisualizationTypes(busiFlag)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListAllByTypes(types)
+}
+
 func (s *VisualizationService) DeleteLogic(id int64, updateBy string) error {
 	return s.repo.DeleteLogic(id, updateBy)
 }
@@ -172,6 +180,20 @@ func (s *VisualizationService) FindDvType(id int64) (string, error) {
 		return "", nil
 	}
 	return *item.Type, nil
+}
+
+func resolveInteractiveVisualizationTypes(busiFlag string) ([]string, error) {
+	flag := busiFlag
+	switch flag {
+	case "", "dashboard-dataV":
+		return []string{"dashboard", "dataV"}, nil
+	case "panel", "dashboard":
+		return []string{"dashboard"}, nil
+	case "screen", "dataV":
+		return []string{"dataV"}, nil
+	default:
+		return nil, fmt.Errorf("unsupported busiFlag: %s", flag)
+	}
 }
 
 func (s *VisualizationService) NameCheck(req *visualization.NameCheckRequest) (string, error) {

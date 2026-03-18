@@ -173,8 +173,8 @@ func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFi
 			Name:       item.Name,
 			Leaf:       leaf,
 			Weight:     9,
-			ExtraFlag:  0,
-			ExtraFlag1: 0,
+			ExtraFlag:  visualizationExtraFlag(item.MobileLayout),
+			ExtraFlag1: visualizationPublishFlag(item.Status),
 			Children:   []treeNode{},
 		}
 
@@ -196,6 +196,20 @@ func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFi
 
 	roots = attach("0")
 	return roots, nil
+}
+
+func visualizationExtraFlag(mobileLayout *bool) int {
+	if mobileLayout != nil && *mobileLayout {
+		return 1
+	}
+	return 0
+}
+
+func visualizationPublishFlag(status *int) int {
+	if status != nil && *status > 0 {
+		return 1
+	}
+	return 0
 }
 
 func validateTreeNodes(nodes []treeNode) error {

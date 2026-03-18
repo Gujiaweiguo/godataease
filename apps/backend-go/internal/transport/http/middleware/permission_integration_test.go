@@ -536,6 +536,40 @@ func TestScreenView_401_Unauthenticated(t *testing.T) {
 	}
 }
 
+func TestScreenView_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/screen/:id", func(c *gin.Context) {
+		c.Set("user_id", uint64(500))
+		c.Next()
+	}, permMiddleware.CheckScreenView(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/screen/123", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden screen view, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "70001" {
+		t.Fatalf("expected code 70001, got %#v", resp["code"])
+	}
+}
+
 func TestDatasourceView_401_Unauthenticated(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -555,6 +589,40 @@ func TestDatasourceView_401_Unauthenticated(t *testing.T) {
 
 	if w.Code != 401 {
 		t.Errorf("expected 401 for unauthenticated datasource view, got %d", w.Code)
+	}
+}
+
+func TestDatasourceView_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/datasource/:id", func(c *gin.Context) {
+		c.Set("user_id", uint64(300))
+		c.Next()
+	}, permMiddleware.CheckDatasourceView(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/datasource/123", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden datasource view, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "70001" {
+		t.Fatalf("expected code 70001, got %#v", resp["code"])
 	}
 }
 

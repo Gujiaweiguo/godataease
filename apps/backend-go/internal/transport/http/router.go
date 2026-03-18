@@ -283,6 +283,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
 	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
+	datasetService.SetResourcePermissionService(resourcePermService)
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
@@ -307,7 +308,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateService := service.NewTemplateService(templateRepo)
 	templateHandler := handler.NewTemplateHandler(templateService)
 
-	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, userService, userRoleRepo.GetRoleIDsByUserID)
+	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
 	return &Router{
 		engine:                  engine,

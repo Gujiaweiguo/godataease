@@ -1,9 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 
+	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/menu"
+	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
@@ -13,10 +18,16 @@ import (
 
 type FrontendCompatHandler struct {
 	menuService            *service.MenuService
+	datasetService         *service.DatasetService
+	datasourceService      *service.DatasourceService
+	visualizationService   *service.VisualizationService
 	loadUserByID           userByIDLoader
 	loadRoleIDsByUserID    func(userID int64) ([]int64, error)
 	queryMenuTree          func() ([]*menu.MenuVO, error)
 	queryMenuTreeByRoleIDs func(roleIDs []int64) ([]*menu.MenuVO, error)
+	loadDatasetTree        func(keyword *string) ([]dataset.TreeNode, error)
+	loadDatasourceTree     func(keyword *string) ([]*datasource.CoreDatasource, error)
+	loadVisualizationTree  func(busiFlag string) ([]*visualization.DataVisualizationInfo, error)
 }
 
 type interactiveTreeNode struct {
@@ -30,15 +41,27 @@ type interactiveTreeNode struct {
 	Children   []interactiveTreeNode `json:"children,omitempty"`
 }
 
+type interactiveRequest struct {
+	BusiFlag string  `json:"busiFlag"`
+	Leaf     *bool   `json:"leaf"`
+	Keyword  *string `json:"keyword"`
+}
+
 func NewFrontendCompatHandler(
 	menuService *service.MenuService,
+	datasetService *service.DatasetService,
+	datasourceService *service.DatasourceService,
+	visualizationService *service.VisualizationService,
 	userService *service.UserService,
 	loadRoleIDsByUserID func(userID int64) ([]int64, error),
 ) *FrontendCompatHandler {
 	h := &FrontendCompatHandler{
-		menuService:         menuService,
-		loadUserByID:        nil,
-		loadRoleIDsByUserID: loadRoleIDsByUserID,
+		menuService:          menuService,
+		datasetService:       datasetService,
+		datasourceService:    datasourceService,
+		visualizationService: visualizationService,
+		loadUserByID:         nil,
+		loadRoleIDsByUserID:  loadRoleIDsByUserID,
 	}
 	if userService != nil {
 		h.loadUserByID = userService.GetUserByID
@@ -46,6 +69,19 @@ func NewFrontendCompatHandler(
 	if menuService != nil {
 		h.queryMenuTree = menuService.Query
 		h.queryMenuTreeByRoleIDs = menuService.QueryByRoleIDs
+	}
+	if visualizationService != nil {
+		h.loadVisualizationTree = visualizationService.InteractiveTree
+	}
+	if datasetService != nil {
+		h.loadDatasetTree = func(keyword *string) ([]dataset.TreeNode, error) {
+			return datasetService.Tree(&dataset.TreeRequest{Keyword: keyword})
+		}
+	}
+	if datasourceService != nil {
+		h.loadDatasourceTree = func(keyword *string) ([]*datasource.CoreDatasource, error) {
+			return datasourceService.Tree(&datasource.ListRequest{Keyword: keyword})
+		}
 	}
 	return h
 }
@@ -83,12 +119,15 @@ func (h *FrontendCompatHandler) GetMenuResource(c *gin.Context) {
 }
 
 func (h *FrontendCompatHandler) loadRuntimeMenus(c *gin.Context) ([]*menu.MenuVO, error) {
-	if h.queryMenuTree == nil {
+	if h.queryMenuTree == nil && h.queryMenuTreeByRoleIDs == nil {
 		return []*menu.MenuVO{}, nil
 	}
 
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 || h.loadRoleIDsByUserID == nil || h.queryMenuTreeByRoleIDs == nil {
+		if h.queryMenuTree == nil {
+			return []*menu.MenuVO{}, nil
+		}
 		return h.queryMenuTree()
 	}
 
@@ -113,15 +152,83 @@ func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
 		return
 	}
 	authorized := collectAuthorizedBusiFlags(menus)
-	for busiFlag := range requestMap {
+	for busiFlag, rawReq := range requestMap {
+		req := interactiveRequest{BusiFlag: busiFlag}
+		if rawReq != nil {
+			payload, _ := json.Marshal(rawReq)
+			_ = json.Unmarshal(payload, &req)
+			if strings.TrimSpace(req.BusiFlag) == "" {
+				req.BusiFlag = busiFlag
+			}
+		}
+
+		normalizedFlag := normalizeInteractiveBusiFlag(req.BusiFlag)
+		if isVisualizationInteractiveBusiFlag(normalizedFlag) {
+			result[busiFlag] = h.buildVisualizationInteractiveTree(normalizedFlag, req.Leaf, authorized[normalizedFlag])
+			continue
+		}
+		if normalizedFlag == "dataset" {
+			result[busiFlag] = h.buildDatasetInteractiveTree(req.Keyword, authorized[normalizedFlag])
+			continue
+		}
+		if normalizedFlag == "datasource" {
+			result[busiFlag] = h.buildDatasourceInteractiveTree(req.Keyword, authorized[normalizedFlag])
+			continue
+		}
+
 		result[busiFlag] = buildInteractiveTreeResponse(busiFlag, authorized[busiFlag])
 	}
 	response.Success(c, result)
 }
 
+func (h *FrontendCompatHandler) buildDatasetInteractiveTree(keyword *string, authorized bool) []interactiveTreeNode {
+	if !authorized || h.loadDatasetTree == nil {
+		return []interactiveTreeNode{}
+	}
+	items, err := h.loadDatasetTree(keyword)
+	if err != nil {
+		return []interactiveTreeNode{}
+	}
+	return convertDatasetTreeNodes(items)
+}
+
+func (h *FrontendCompatHandler) buildDatasourceInteractiveTree(keyword *string, authorized bool) []datasourceTreeNode {
+	if !authorized || h.loadDatasourceTree == nil {
+		return []datasourceTreeNode{}
+	}
+	items, err := h.loadDatasourceTree(keyword)
+	if err != nil {
+		return []datasourceTreeNode{}
+	}
+	return buildDatasourceTreeResponse(items)
+}
+
+func (h *FrontendCompatHandler) buildVisualizationInteractiveTree(
+	busiFlag string,
+	leaf *bool,
+	authorized bool,
+) []treeNode {
+	if !authorized || h.loadVisualizationTree == nil {
+		return []treeNode{}
+	}
+	items, err := h.loadVisualizationTree(busiFlag)
+	if err != nil {
+		return []treeNode{}
+	}
+	nodes, err := buildVisualizationTree(items, leaf)
+	if err != nil {
+		return []treeNode{}
+	}
+	return nodes
+}
+
 func (h *FrontendCompatHandler) FindTargetUrl(c *gin.Context) {
 	result := make(map[string]string)
 	response.Success(c, result)
+}
+
+func (h *FrontendCompatHandler) QueryStore(c *gin.Context) {
+	response.Success(c, []map[string]any{})
 }
 
 func (h *FrontendCompatHandler) GetXpackContent(c *gin.Context) {
@@ -151,6 +258,11 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.GET("/roleRouter/query", h.GetRoleRouters)
 	protected.GET("/auth/menuResource", h.GetMenuResource)
 	protected.POST("/dataVisualization/interactiveTree", h.InteractiveTree)
+	protected.POST("/store/query", h.QueryStore)
+	protected.GET("/de2api/roleRouter/query", h.GetRoleRouters)
+	protected.GET("/de2api/auth/menuResource", h.GetMenuResource)
+	protected.POST("/de2api/dataVisualization/interactiveTree", h.InteractiveTree)
+	protected.POST("/de2api/store/query", h.QueryStore)
 	engine.GET("/aiBase/findTargetUrl", h.FindTargetUrl)
 	engine.GET("/xpackComponent/content/:id", h.GetXpackContent)
 	engine.GET("/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
@@ -159,6 +271,7 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.GET("/api/roleRouter/query", h.GetRoleRouters)
 	protected.GET("/api/auth/menuResource", h.GetMenuResource)
 	protected.POST("/api/dataVisualization/interactiveTree", h.InteractiveTree)
+	protected.POST("/api/store/query", h.QueryStore)
 	engine.GET("/api/aiBase/findTargetUrl", h.FindTargetUrl)
 	engine.GET("/api/xpackComponent/content/:id", h.GetXpackContent)
 	engine.GET("/api/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
@@ -196,6 +309,44 @@ func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 	}
 	walk(menus)
 	return authorized
+}
+
+func normalizeInteractiveBusiFlag(busiFlag string) string {
+	flag := strings.TrimSpace(busiFlag)
+	switch flag {
+	case "panel":
+		return "dashboard"
+	case "screen":
+		return "dataV"
+	default:
+		return flag
+	}
+}
+
+func isVisualizationInteractiveBusiFlag(busiFlag string) bool {
+	return busiFlag == "dashboard" || busiFlag == "dataV"
+}
+
+func convertDatasetTreeNodes(items []dataset.TreeNode) []interactiveTreeNode {
+	result := make([]interactiveTreeNode, 0, len(items))
+	for _, item := range items {
+		leaf := !strings.EqualFold(strings.TrimSpace(item.NodeType), "folder")
+		node := interactiveTreeNode{
+			ID:         strconv.FormatInt(item.ID, 10),
+			PID:        "0",
+			Name:       item.Name,
+			Leaf:       leaf,
+			Weight:     9,
+			ExtraFlag:  0,
+			ExtraFlag1: 0,
+			Children:   convertDatasetTreeNodes(item.Children),
+		}
+		for idx := range node.Children {
+			node.Children[idx].PID = node.ID
+		}
+		result = append(result, node)
+	}
+	return result
 }
 
 func buildInteractiveTreeResponse(busiFlag string, authorized bool) []interactiveTreeNode {

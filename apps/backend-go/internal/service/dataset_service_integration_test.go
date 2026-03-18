@@ -54,7 +54,10 @@ func TestDatasetServiceIntegration_Tree(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, foundFolder)
+	assert.Equal(t, "folder", foundFolder.NodeType)
 	assert.NotEmpty(t, foundFolder.Children)
+	assert.Equal(t, ds.ID, foundFolder.Children[0].ID)
+	assert.Equal(t, "dataset", foundFolder.Children[0].NodeType)
 }
 
 func TestDatasetServiceIntegration_Tree_Empty(t *testing.T) {
@@ -381,6 +384,42 @@ func TestDatasetServiceIntegration_Fields(t *testing.T) {
 	assert.Empty(t, fields)
 }
 
+func TestDatasetServiceIntegration_Fields_WithMetadata(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	group, err := svc.Save(&dataset.WriteRequest{Name: "FieldsMeta", NodeType: "dataset"})
+	assert.NoError(t, err)
+
+	table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_fields_meta")}
+	err = testDB.Create(table).Error
+	assert.NoError(t, err)
+
+	deTypeText := 0
+	deTypeNumber := 2
+	fieldA := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("region"), Name: dsSvcStrPtr("region"), DeType: &deTypeText}
+	fieldB := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("amount"), Name: dsSvcStrPtr("amount"), DeType: &deTypeNumber}
+	err = testDB.Create(fieldA).Error
+	assert.NoError(t, err)
+	err = testDB.Create(fieldB).Error
+	assert.NoError(t, err)
+
+	fields, err := svc.Fields(&dataset.FieldsRequest{DatasetGroupID: group.ID})
+	assert.NoError(t, err)
+	assert.Len(t, fields, 2)
+	if assert.NotNil(t, fields[0].OriginName) {
+		assert.Equal(t, "region", *fields[0].OriginName)
+	}
+	if assert.NotNil(t, fields[1].OriginName) {
+		assert.Equal(t, "amount", *fields[1].OriginName)
+	}
+}
+
 func TestDatasetServiceIntegration_PreviewAndPreviewWithPermission(t *testing.T) {
 	cleanupTables(&dataset.CoreDatasetGroup{})
 	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &chart.CoreChartView{})
@@ -431,6 +470,61 @@ func TestDatasetServiceIntegration_PreviewAndPreviewWithPermission(t *testing.T)
 	assert.NotContains(t, previewWithPerm.Columns, "amount")
 
 	err = testDB.Exec("DROP TABLE IF EXISTS it_preview_ds").Error
+	assert.NoError(t, err)
+}
+
+func TestDatasetServiceIntegration_Preview_MissingPhysicalTableReturnsError(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	group, err := svc.Save(&dataset.WriteRequest{Name: "PreviewMissingTable", NodeType: "dataset"})
+	assert.NoError(t, err)
+
+	err = testDB.Create(&dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_preview_missing_table")}).Error
+	assert.NoError(t, err)
+
+	preview, err := svc.Preview(&dataset.PreviewRequest{DatasetGroupID: group.ID, Limit: 10})
+	assert.Error(t, err)
+	assert.Nil(t, preview)
+	assert.Contains(t, err.Error(), "doesn't exist")
+}
+
+func TestDatasetServiceIntegration_PreviewWithPermission_DeniesUnauthorizedDatasourceDependency(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_preview_perm_ds").Error
+	err := testDB.Exec("CREATE TABLE it_preview_perm_ds (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64))").Error
+	assert.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_preview_perm_ds (region) VALUES ('East')").Error
+	assert.NoError(t, err)
+
+	repo := repository.NewDatasetRepository(testDB)
+	group, err := NewDatasetService(repo).Save(&dataset.WriteRequest{Name: "PreviewPermDS", NodeType: "dataset"})
+	assert.NoError(t, err)
+
+	datasourceID := int64(8081)
+	err = testDB.Create(&dataset.CoreDatasetTable{DatasetGroupID: group.ID, DatasourceID: &datasourceID, PhysicalTable: dsSvcStrPtr("it_preview_perm_ds")}).Error
+	assert.NoError(t, err)
+
+	permRepo := newMockResourcePermRepo()
+	permRepo.permKeys[permission.PermKeyView] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyView}
+	resourcePermSvc := NewResourcePermissionService(permRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+
+	permSvc := NewDatasetServiceWithPermission(repo, nil)
+	permSvc.SetResourcePermissionService(resourcePermSvc)
+
+	preview, err := permSvc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: group.ID, Limit: 10}, 30002)
+	assert.ErrorIs(t, err, ErrDatasetDatasourcePermissionDenied)
+	assert.Nil(t, preview)
+
+	err = testDB.Exec("DROP TABLE IF EXISTS it_preview_perm_ds").Error
 	assert.NoError(t, err)
 }
 
