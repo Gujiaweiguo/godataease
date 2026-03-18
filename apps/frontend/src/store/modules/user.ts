@@ -61,14 +61,10 @@ export const userStore = defineStore('user', {
       data.time = wsCache.get('user.time')
       const keys: string[] = ['token', 'uid', 'name', 'oid', 'language', 'exp', 'time']
 
-      keys.forEach(key => {
+      for (const key of keys) {
         const dkey = key === 'uid' ? 'id' : key
         this[key] = data[dkey]
         wsCache.set('user.' + key, this[key])
-      })
-      const locale = useLocaleStoreWithOut()
-      if (locale.getCurrentLocale?.lang !== this.language && !window.DataEaseBi) {
-        window.location.reload()
       }
       this.setLanguage(this.language)
     },
@@ -108,7 +104,9 @@ export const userStore = defineStore('user', {
     },
     clear() {
       const keys: string[] = ['token', 'uid', 'name', 'oid', 'language', 'exp', 'time']
-      keys.forEach(key => wsCache.delete('user.' + key))
+      for (const key of keys) {
+        wsCache.delete('user.' + key)
+      }
     }
   }
 })

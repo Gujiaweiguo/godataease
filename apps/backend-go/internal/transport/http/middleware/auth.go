@@ -26,6 +26,7 @@ func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
 		}
 		if token == "" {
 			response.Unauthorized(c, "missing authorization header")
+			c.Abort()
 			return
 		}
 
@@ -35,9 +36,11 @@ func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
 		if err != nil {
 			if err == auth.ErrTokenExpired {
 				response.Unauthorized(c, "token has expired")
+				c.Abort()
 				return
 			}
 			response.Unauthorized(c, "invalid token")
+			c.Abort()
 			return
 		}
 

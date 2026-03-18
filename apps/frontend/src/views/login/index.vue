@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import DataEase from '@/assets/svg/DataEase.svg'
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { FormRules, FormInstance } from 'element-plus-secondary'
 import { Icon } from '@/components/icon-custom'
@@ -60,7 +60,7 @@ const rules = reactive<FormRules>({
 const activeName = ref('simple')
 
 const getCurLocation = () => {
-  let queryRedirectPath = '/workbranch/index'
+  let queryRedirectPath = '/workbranch'
   if (router.currentRoute.value.query.redirect) {
     queryRedirectPath = router.currentRoute.value.query.redirect as string
   }
@@ -134,6 +134,7 @@ const xpackLoadFail = ref(false)
 const loadingText = ref('加载中...')
 const loginContainer = ref()
 const loginContainerWidth = ref(0)
+let preheatFallbackTimer: ReturnType<typeof setTimeout> | null = null
 const showLoginImage = computed<boolean>(() => {
   return !(loginContainerWidth.value < 889)
 })
@@ -213,6 +214,10 @@ const switchTab = (name: string) => {
   activeName.value = name || 'simple'
 }
 const autoCallback = (param: any) => {
+  if (preheatFallbackTimer) {
+    clearTimeout(preheatFallbackTimer)
+    preheatFallbackTimer = null
+  }
   activeName.value = param.activeName || 'simple'
   preheat.value = param.preheat
   if (param.loadingText) {
@@ -220,6 +225,10 @@ const autoCallback = (param: any) => {
   }
 }
 const handlerFail = () => {
+  if (preheatFallbackTimer) {
+    clearTimeout(preheatFallbackTimer)
+    preheatFallbackTimer = null
+  }
   const param = {
     activeName: 'simple',
     preheat: false
@@ -227,6 +236,11 @@ const handlerFail = () => {
   autoCallback(param)
 }
 onMounted(async () => {
+  preheatFallbackTimer = setTimeout(() => {
+    if (preheat.value) {
+      handlerFail()
+    }
+  }, 3000)
   loadArrearance()
   duringLogin.value = false
   if (localStorage.getItem('DE-GATEWAY-FLAG')) {
@@ -247,6 +261,13 @@ onMounted(async () => {
       loginContainerWidth.value = loginContainer.value?.offsetWidth
     })
   })
+})
+
+onUnmounted(() => {
+  if (preheatFallbackTimer) {
+    clearTimeout(preheatFallbackTimer)
+    preheatFallbackTimer = null
+  }
 })
 </script>
 

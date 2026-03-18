@@ -188,7 +188,7 @@ router.beforeEach(async (to, from, next) => {
       await userStore.setUser()
     }
     if (to.path === '/login') {
-      next({ path: '/workbranch/index' })
+      next({ path: '/workbranch' })
     } else {
       permissionStore.setCurrentPath(to.path)
       if (permissionStore.getIsAddRouters) {
@@ -217,18 +217,19 @@ router.beforeEach(async (to, from, next) => {
 
       await loadAuthorizedRoutes()
 
-      const redirectPath = from.query.redirect || to.path
-      const redirect = decodeURIComponent(redirectPath as string)
-      const nextData = to.path === redirect ? { ...to, replace: true } : { path: redirect }
-
-      permissionStore.setIsAddRouters(true)
-      await interactiveStore.initInteractive(true)
+      const redirectPath = (from.query.redirect as string) || to.fullPath || to.path
+      const redirect = decodeURIComponent(redirectPath)
+      const resolvedRedirect = router.resolve(redirect)
 
       if (!pathValid(to.path) && to.path !== '/404' && !to.path.startsWith('/de-link')) {
 	        next({ path: resolveUnauthorizedTarget(to.path), replace: true })
         return
       }
-      next(nextData)
+      if (to.path === redirect && resolvedRedirect.matched.length > 0) {
+        next()
+        return
+      }
+      next({ path: redirect, replace: true })
     }
   } else {
     const embeddedStore = useEmbedded()
