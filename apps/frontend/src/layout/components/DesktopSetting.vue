@@ -16,7 +16,7 @@ import { msgCountApi } from '@/api/msg'
 import { computed, ref, onMounted } from 'vue'
 import { useEmitt } from '@/hooks/web/useEmitt'
 
-const aiBaseUrl = ref('https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed')
+const aiBaseUrl = ref<string | null>(null)
 const showToolbox = ref(false)
 
 const badgeCount = ref('0')

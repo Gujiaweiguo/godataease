@@ -47,7 +47,13 @@ onMounted(() => {
             class="svg-icon"
           ></component></Icon
       ></el-icon>
-      <iframe :src="baseUrl" style="width: 100%; height: 100%" frameborder="0" allow="microphone">
+      <iframe
+        v-if="aiDialogShow && baseUrl"
+        :src="baseUrl"
+        style="width: 100%; height: 100%"
+        frameborder="0"
+        allow="microphone"
+      >
       </iframe>
     </div>
   </div>

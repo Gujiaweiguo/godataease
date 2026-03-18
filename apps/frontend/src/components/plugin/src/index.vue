@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import noLic from './nolic.vue'
 import { ref, useAttrs, onMounted } from 'vue'
-import { execute, randomKey, formatArray } from './convert'
-import { load, loadDistributed, xpackModelApi } from '@/api/plugin'
+import { loadDistributed, xpackModelApi } from '@/api/plugin'
 import configGlobal from '@/components/config-global/src/ConfigGlobal.vue'
 import { useCache } from '@/hooks/web/useCache'
 import { i18n } from '@/plugins/vue-i18n'
@@ -27,30 +26,6 @@ const showNolic = () => {
   plugin.value = noLic
   loading.value = false
 }
-const generateRamStr = (len: number) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let randomStr = ''
-  for (var i = 0; i < len; i++) {
-    randomStr += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return randomStr
-}
-
-const importProxy = (bytesArray: any[]) => {
-  const promise = import(
-    `../../../../../../${formatArray(bytesArray[6])}/${formatArray(bytesArray[7])}/${formatArray(
-      bytesArray[8]
-    )}/${formatArray(bytesArray[9])}/${formatArray(bytesArray[10])}.vue`
-  )
-  promise
-    .then((res: any) => {
-      plugin.value = res.default
-    })
-    .catch(e => {
-      console.error(e)
-      showNolic()
-    })
-}
 
 const loadXpack = async () => {
   if (window['DEXPack']) {
@@ -64,37 +39,6 @@ useEmitt({
   callback: loadXpack
 })
 
-const loadComponent = () => {
-  loading.value = true
-  const byteArray = wsCache.get(`de-plugin-proxy`)
-  if (byteArray) {
-    importProxy(JSON.parse(byteArray))
-    loading.value = false
-    return
-  }
-  const key = generateRamStr(randomKey())
-  load(key)
-    .then(response => {
-      let code = response.data
-      const byteArray = execute(code, key)
-      storeCacheProxy(byteArray)
-      importProxy(byteArray)
-    })
-    .catch(() => {
-      emits('loadFail')
-      showNolic()
-    })
-    .finally(() => {
-      loading.value = false
-    })
-}
-const storeCacheProxy = byteArray => {
-  const result = []
-  byteArray.forEach(item => {
-    result.push([...item])
-  })
-  wsCache.set(`de-plugin-proxy`, JSON.stringify(result))
-}
 const pluginProxy = ref(null)
 const invokeMethod = param => {
   if (pluginProxy.value && pluginProxy.value['invokeMethod']) {
@@ -147,7 +91,8 @@ onMounted(async () => {
       })
     }
   } else {
-    loadComponent()
+    emits('loadFail')
+    showNolic()
   }
 })
 </script>

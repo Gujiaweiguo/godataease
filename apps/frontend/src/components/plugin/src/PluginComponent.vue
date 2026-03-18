@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import noLic from './nolic.vue'
 import { ref, useAttrs, onMounted } from 'vue'
-import { execute, randomKey, formatArray } from './convert'
-import { loadPluginApi, xpackModelApi } from '@/api/plugin'
+import { xpackModelApi } from '@/api/plugin'
 import { useCache } from '@/hooks/web/useCache'
 import { i18n } from '@/plugins/vue-i18n'
 import * as Vue from 'vue'
@@ -24,71 +23,10 @@ const showNolic = () => {
   plugin.value = noLic
   loading.value = false
 }
-const generateRamStr = (len: number) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let randomStr = ''
-  for (var i = 0; i < len; i++) {
-    randomStr += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return randomStr
-}
-
-const importProxy = (bytesArray: any[]) => {
-  const promise = import(
-    `../../../../../../../extensions/${formatArray(bytesArray[8])}/${formatArray(
-      bytesArray[9]
-    )}/${formatArray(bytesArray[10])}/${formatArray(bytesArray[11])}/${formatArray(
-      bytesArray[12]
-    )}.vue`
-  )
-  promise
-    .then((res: any) => {
-      plugin.value = res.default
-    })
-    .catch(e => {
-      console.error(e)
-      showNolic()
-    })
-}
 
 const getModuleName = () => {
   const jsPath = window.atob(attrs.jsname.toString())
   return jsPath.split('/')[0]
-}
-const loadComponent = () => {
-  const moduleName = getModuleName()
-  loading.value = true
-  const byteArray = wsCache.get(`de-plugin-proxy-${moduleName}`)
-  if (byteArray) {
-    importProxy(JSON.parse(byteArray))
-    loading.value = false
-    return
-  }
-  const key = generateRamStr(randomKey())
-  const moduleNameKey = window.btoa(moduleName)
-  const saltKey = `${key},${moduleNameKey}`
-  loadPluginApi(saltKey)
-    .then(response => {
-      let code = response.data
-      const byteArray = execute(code, key)
-      storeCacheProxy(byteArray)
-      importProxy(byteArray)
-    })
-    .catch(() => {
-      emits('loadFail')
-      showNolic()
-    })
-    .finally(() => {
-      loading.value = false
-    })
-}
-const storeCacheProxy = byteArray => {
-  const result = []
-  byteArray.forEach(item => {
-    result.push([...item])
-  })
-  const moduleName = getModuleName()
-  wsCache.set(`de-plugin-proxy-${moduleName}`, JSON.stringify(result))
 }
 const pluginProxy = ref(null)
 const invokeMethod = param => {
@@ -136,7 +74,8 @@ onMounted(async () => {
       })
     }
   } else {
-    loadComponent()
+    emits('loadFail')
+    showNolic()
   }
 })
 
