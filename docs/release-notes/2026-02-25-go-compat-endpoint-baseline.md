@@ -61,7 +61,7 @@ curl -i -s -X POST http://localhost:8080/de2api/dataVisualization/tree -H "Conte
 
 建议每次发版后执行一次浏览器链路回归：
 
-1. `http://localhost:8080/login` 登录（`admin / Dataease@123`）
+1. `http://localhost:8080/login` 登录（`admin / DataEase123456`）
 2. 进入角色管理页，确认无 `404/500`
 3. 进入仪表板页，确认资源树加载成功
 

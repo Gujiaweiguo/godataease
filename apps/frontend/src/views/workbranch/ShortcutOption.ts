@@ -67,13 +67,29 @@ class ShortcutOption {
         return res(result)
       })
     }
-    return request.post({ url, data: param }).then(res => {
-      const data = res.data
-      if (this.emptyParam(param)) {
-        this.busiRecordMap[this.busiFlag].dataCache = data
-      }
-      return res
-    })
+    return request
+      .post({ url, data: param })
+      .then(res => {
+        const data = res.data
+        if (this.emptyParam(param)) {
+          this.busiRecordMap[this.busiFlag].dataCache = data
+        }
+        return res
+      })
+      .catch(error => {
+        if (this.busiFlag === 'store' && error?.response?.status === 404) {
+          const result = {
+            code: 200,
+            data: [],
+            msg: null
+          }
+          if (this.emptyParam(param)) {
+            this.busiRecordMap[this.busiFlag].dataCache = []
+          }
+          return result as IResponse
+        }
+        return Promise.reject(error)
+      })
   }
   getCacheData() {
     return this.busiRecordMap[this.busiFlag].dataCache

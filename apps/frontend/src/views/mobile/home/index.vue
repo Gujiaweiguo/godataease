@@ -106,6 +106,9 @@ const shortName = {
 }
 
 const loadedDataFilling = data => {
+  if (!data?.name || !data?.title) {
+    return
+  }
   dfTablePaneList.value.push(data)
   shortName[data.name] = data.shortName
 }
