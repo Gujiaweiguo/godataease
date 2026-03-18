@@ -1,4 +1,4 @@
-.PHONY: build test lint run run-local clean fmt vet test-integration drift-check sync-whitelist
+.PHONY: build test lint run run-local clean fmt vet test-integration drift-check sync-whitelist build-static
 
 # Go parameters
 GOCMD?=$(shell command -v go 2>/dev/null)
@@ -86,3 +86,6 @@ sync-whitelist:
 # Build for production
 build-prod:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags="-s -w" -o $(BINARY_NAME) $(MAIN_PACKAGE)
+
+# Build static binary (alias for build-prod, used by docker-compose.dev.yml)
+build-static: build-prod

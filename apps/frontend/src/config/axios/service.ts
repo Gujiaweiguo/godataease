@@ -201,16 +201,12 @@ service.interceptors.response.use(
         })
         if (response.data.code === 80001) {
           clearCache()
-          let queryRedirectPath = '/workbranch/index'
+          let queryRedirectPath = '/workbranch'
           if (router.currentRoute.value.fullPath) {
             queryRedirectPath = router.currentRoute.value.fullPath as string
           }
           router.push(`/login?redirect=${queryRedirectPath}`)
         }
-      } else if (response?.config?.url.startsWith('/xpackComponent/content')) {
-        console.error(
-          "never mind this error about '/xpackComponent/content', just a reminder to support the official license"
-        )
       }
 
       return Promise.reject(response.data.msg)
@@ -250,10 +246,6 @@ service.interceptors.response.use(
         message: responseData?.msg ? responseData.msg : error.message,
         showClose: true
       })
-    } else if (error?.config?.url.startsWith('/xpackComponent/content')) {
-      console.error(
-        "never mind this error about '/xpackComponent/content', just a reminder to support the official license"
-      )
     }
 
     error.config.loading && tryHideLoading(permissionStore.getCurrentPath)
@@ -265,7 +257,7 @@ service.interceptors.response.use(
         const flag = header.get('DE-GATEWAY-FLAG')
         localStorage.setItem('DE-GATEWAY-FLAG', flag.toString())
       }
-      let queryRedirectPath = '/workbranch/index'
+      let queryRedirectPath = '/workbranch'
       if (router.currentRoute.value.fullPath) {
         queryRedirectPath = router.currentRoute.value.fullPath as string
       }

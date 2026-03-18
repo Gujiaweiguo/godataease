@@ -94,7 +94,7 @@ export default {
     filter: '筛选',
     filter_condition: '筛选条件',
     no_auth_tips: '缺少菜单权限，请联系管理员',
-    no_menu_tips: '未找到资源 401错误'
+    no_menu_tips: '未找到资源，请检查访问地址是否正确'
   },
   toolbox: {
     name: '工具箱',

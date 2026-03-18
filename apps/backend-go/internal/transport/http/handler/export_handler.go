@@ -245,7 +245,15 @@ func RegisterExportRoutes(r gin.IRouter, h *ExportHandler) {
 
 	exportCenter := r.Group("/exportCenter")
 	{
+		exportCenter.POST("/exportLimit", h.ExportLimit)
+		exportCenter.POST("/exportTasks/records", h.ExportTasks)
+		exportCenter.POST("/exportTasks/:status/:goPage/:pageSize", h.Pager)
 		exportCenter.GET("/exportTasks", h.ExportTasks)
+		exportCenter.GET("/delete/:id", h.Delete)
+		exportCenter.POST("/delete", h.DeleteBatch)
+		exportCenter.POST("/deleteAll/:type", h.DeleteAll)
 		exportCenter.GET("/download/:id", h.Download)
+		exportCenter.GET("/generateDownloadUri/:id", h.GenerateDownloadURI)
+		exportCenter.POST("/retry/:id", h.Retry)
 	}
 }

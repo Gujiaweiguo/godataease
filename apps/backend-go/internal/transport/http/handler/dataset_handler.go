@@ -5,6 +5,7 @@ import (
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -80,6 +81,10 @@ func (h *DatasetHandler) PreviewWithPermission(c *gin.Context) {
 
 	result, err := h.service.PreviewWithPermission(&req, userID)
 	if err != nil {
+		if errors.Is(err, service.ErrDatasetDatasourcePermissionDenied) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}

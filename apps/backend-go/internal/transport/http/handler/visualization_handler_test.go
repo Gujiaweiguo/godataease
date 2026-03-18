@@ -108,3 +108,90 @@ func TestBuildVisualizationTreeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildVisualizationTreeContractShape(t *testing.T) {
+	folderType := visualizationNodeTypeFolder
+	panelType := visualizationNodeTypePanel
+	rootID := int64(10)
+	published := 1
+	mobileLayout := true
+
+	nodes, err := buildVisualizationTree([]*visualization.DataVisualizationInfo{
+		{
+			ID:       rootID,
+			Name:     "Dashboard Folder",
+			NodeType: &folderType,
+			Status:   &published,
+		},
+		{
+			ID:           11,
+			PID:          &rootID,
+			Name:         "Dashboard A",
+			NodeType:     &panelType,
+			Status:       &published,
+			MobileLayout: &mobileLayout,
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertVisualizationTreeRootShape(t, nodes)
+
+	leafOnly, err := buildVisualizationTree([]*visualization.DataVisualizationInfo{
+		{
+			ID:       rootID,
+			Name:     "Dashboard Folder",
+			NodeType: &folderType,
+		},
+		{
+			ID:       11,
+			PID:      &rootID,
+			Name:     "Dashboard A",
+			NodeType: &panelType,
+		},
+	}, boolPtr(true))
+	if err != nil {
+		t.Fatalf("unexpected leaf-filter error: %v", err)
+	}
+	assertVisualizationLeafOnlyTree(t, leafOnly)
+}
+
+func assertVisualizationTreeRootShape(t *testing.T, nodes []treeNode) {
+	t.Helper()
+	if len(nodes) != 1 {
+		t.Fatalf("expected 1 root node, got %d", len(nodes))
+	}
+	if nodes[0].ID != "10" || nodes[0].Name != "Dashboard Folder" {
+		t.Fatalf("unexpected root node: %+v", nodes[0])
+	}
+	if nodes[0].Leaf {
+		t.Fatalf("expected folder root to be non-leaf: %+v", nodes[0])
+	}
+	if nodes[0].ExtraFlag1 != 1 {
+		t.Fatalf("expected published folder extraFlag1=1: %+v", nodes[0])
+	}
+	if len(nodes[0].Children) != 1 {
+		t.Fatalf("expected one child node, got %d", len(nodes[0].Children))
+	}
+	child := nodes[0].Children[0]
+	if child.ID != "11" || child.PID != "10" || child.Name != "Dashboard A" {
+		t.Fatalf("unexpected child node: %+v", child)
+	}
+	if !child.Leaf {
+		t.Fatalf("expected panel child to be leaf: %+v", child)
+	}
+	if child.ExtraFlag != 1 || child.ExtraFlag1 != 1 {
+		t.Fatalf("expected mobile published child flags, got %+v", child)
+	}
+}
+
+func assertVisualizationLeafOnlyTree(t *testing.T, nodes []treeNode) {
+	t.Helper()
+	if len(nodes) != 0 {
+		t.Fatalf("expected no root nodes after leaf-only filter, got %+v", nodes)
+	}
+}
+
+func boolPtr(v bool) *bool {
+	return &v
+}

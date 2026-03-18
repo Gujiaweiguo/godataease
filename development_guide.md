@@ -98,7 +98,7 @@ docker compose -f infra/compose/docker-compose.yml up -d --build
 # 后端 API: http://localhost:8080/api
 ```
 
-说明：当前 `infra/compose/docker-compose.yml` 启动 `dataease-app + redis`，MySQL 需要提前可用，且可在 `my-net` 网络中通过 `mysql8:3306` 访问。
+说明：当前 `infra/compose/docker-compose.yml` 启动 `godataease-app + godataease-redis`，MySQL 需要提前可用，且可在 `my-net` 网络中通过 `mysql8:3306` 访问。
 
 ### 3. 前端开发模式
 

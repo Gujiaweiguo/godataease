@@ -63,6 +63,53 @@ func TestVisualizationServiceIntegration_Save_Folder(t *testing.T) {
 	}
 }
 
+func TestVisualizationServiceIntegration_Copy(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	nodeType := "panel"
+	visType := "dashboard"
+	mobileLayout := true
+	createReq := &visualization.SaveRequest{
+		Name:            "Copy Source",
+		NodeType:        &nodeType,
+		Type:            &visType,
+		CanvasStyleData: strPtr("{\"style\":\"source\"}"),
+		ComponentData:   strPtr("{\"components\":[1]}"),
+		MobileLayout:    &mobileLayout,
+		ContentID:       strPtr("content-1"),
+		CheckVersion:    strPtr("ver-1"),
+	}
+	sourceID, err := svc.Save(createReq, "creator")
+	require.NoError(t, err)
+
+	newPID := int64(100)
+	copyID, err := svc.Copy(&visualization.CopyRequest{
+		ID:           sourceID,
+		Name:         "Copy Target",
+		PID:          &newPID,
+		Type:         &visType,
+		NodeType:     &nodeType,
+		MobileLayout: &mobileLayout,
+	}, "copier")
+	require.NoError(t, err)
+	assert.NotEqual(t, sourceID, copyID)
+
+	copied, err := repo.GetByID(copyID)
+	require.NoError(t, err)
+	assert.Equal(t, "Copy Target", copied.Name)
+	assert.Equal(t, newPID, *copied.PID)
+	assert.Equal(t, "dashboard", *copied.Type)
+	assert.Equal(t, "panel", *copied.NodeType)
+	assert.Equal(t, "{\"style\":\"source\"}", *copied.CanvasStyleData)
+	assert.Equal(t, "{\"components\":[1]}", *copied.ComponentData)
+	assert.Equal(t, "content-1", *copied.ContentID)
+	assert.Equal(t, "ver-1", *copied.CheckVersion)
+	assert.Equal(t, "copier", *copied.CreateBy)
+}
+
 func TestVisualizationServiceIntegration_Update(t *testing.T) {
 	cleanupTables(&visualization.DataVisualizationInfo{})
 
@@ -127,6 +174,54 @@ func TestVisualizationServiceIntegration_Detail(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "Detail Test", detail.Name)
 	assert.Equal(t, id, detail.ID)
+}
+
+func TestVisualizationServiceIntegration_Detail_Completeness(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	nodeType := "panel"
+	visType := "dashboard"
+	mobileLayout := true
+	createReq := &visualization.SaveRequest{
+		Name:            "Detail Complete",
+		NodeType:        &nodeType,
+		Type:            &visType,
+		CanvasStyleData: strPtr("{\"theme\":\"dark\"}"),
+		ComponentData:   strPtr("{\"views\":[1,2]}"),
+		MobileLayout:    &mobileLayout,
+		ContentID:       strPtr("content-complete"),
+		CheckVersion:    strPtr("v-check-1"),
+	}
+	id, err := svc.Save(createReq, "tester")
+	assert.NoError(t, err)
+
+	detail, err := svc.Detail(&visualization.DetailRequest{ID: id})
+	assert.NoError(t, err)
+	assert.Equal(t, "Detail Complete", detail.Name)
+	if assert.NotNil(t, detail.NodeType) {
+		assert.Equal(t, "panel", *detail.NodeType)
+	}
+	if assert.NotNil(t, detail.Type) {
+		assert.Equal(t, "dashboard", *detail.Type)
+	}
+	if assert.NotNil(t, detail.CanvasStyleData) {
+		assert.Equal(t, "{\"theme\":\"dark\"}", *detail.CanvasStyleData)
+	}
+	if assert.NotNil(t, detail.ComponentData) {
+		assert.Equal(t, "{\"views\":[1,2]}", *detail.ComponentData)
+	}
+	if assert.NotNil(t, detail.MobileLayout) {
+		assert.True(t, *detail.MobileLayout)
+	}
+	if assert.NotNil(t, detail.ContentID) {
+		assert.Equal(t, "content-complete", *detail.ContentID)
+	}
+	if assert.NotNil(t, detail.CheckVersion) {
+		assert.Equal(t, "v-check-1", *detail.CheckVersion)
+	}
 }
 
 func TestVisualizationServiceIntegration_Detail_NotFound(t *testing.T) {
@@ -343,4 +438,68 @@ func TestVisualizationServiceIntegration_List_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 10, resp.Size) // Should default to 10
 	})
+}
+
+func TestVisualizationServiceIntegration_InteractiveTree(t *testing.T) {
+	cleanupTables(&visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	folderType := "folder"
+	panelType := "panel"
+	dashboardType := "dashboard"
+	dataVType := "dataV"
+	mobileLayout := true
+
+	dashboardFolderID, err := svc.Save(&visualization.SaveRequest{
+		Name:     "Dashboard Root",
+		NodeType: &folderType,
+		Type:     &dashboardType,
+	}, "tester")
+	require.NoError(t, err)
+
+	dashboardPanelID, err := svc.Save(&visualization.SaveRequest{
+		Name:         "Dashboard Child",
+		PID:          &dashboardFolderID,
+		NodeType:     &panelType,
+		Type:         &dashboardType,
+		MobileLayout: &mobileLayout,
+	}, "tester")
+	require.NoError(t, err)
+
+	dataVID, err := svc.Save(&visualization.SaveRequest{
+		Name:     "Big Screen A",
+		NodeType: &panelType,
+		Type:     &dataVType,
+	}, "tester")
+	require.NoError(t, err)
+
+	published := 1
+	err = svc.Update(&visualization.UpdateRequest{ID: dashboardPanelID, Status: &published}, "tester")
+	require.NoError(t, err)
+	err = svc.Update(&visualization.UpdateRequest{ID: dataVID, Status: &published}, "tester")
+	require.NoError(t, err)
+
+	deleted := true
+	err = repo.Create(&visualization.DataVisualizationInfo{Name: "Deleted Dashboard", NodeType: &panelType, Type: &dashboardType, DeleteFlag: &deleted})
+	require.NoError(t, err)
+
+	dashboardItems, err := svc.InteractiveTree("dashboard")
+	require.NoError(t, err)
+	assert.Len(t, dashboardItems, 2)
+	for _, item := range dashboardItems {
+		if assert.NotNil(t, item.Type) {
+			assert.Equal(t, "dashboard", *item.Type)
+		}
+		assert.NotEqual(t, "Deleted Dashboard", item.Name)
+	}
+
+	dataVItems, err := svc.InteractiveTree("dataV")
+	require.NoError(t, err)
+	assert.Len(t, dataVItems, 1)
+	assert.Equal(t, "Big Screen A", dataVItems[0].Name)
+	if assert.NotNil(t, dataVItems[0].Type) {
+		assert.Equal(t, "dataV", *dataVItems[0].Type)
+	}
 }

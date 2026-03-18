@@ -647,6 +647,78 @@ func TestApiAliasChartCopyAndDeleteFieldByChart(t *testing.T) {
 	}
 }
 
+func TestDatasetFieldAliasRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	name := "profit"
+	origin := "profit"
+	dataeaseName := "profit"
+	groupType := "q"
+	typeName := "DECIMAL"
+	deType := 3
+	checked := true
+
+	repo := &fakeBridgeChartRepo{
+		charts:        map[int64]*chart.CoreChartView{},
+		dsFields:      map[int64][]*dataset.CoreDatasetTableField{},
+		chartFields:   map[int64][]*dataset.CoreDatasetTableField{},
+		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
+		nextFieldID:   5000,
+	}
+	field := &dataset.CoreDatasetTableField{
+		ID:             21,
+		DatasetGroupID: 41,
+		Name:           &name,
+		OriginName:     &origin,
+		DataeaseName:   &dataeaseName,
+		GroupType:      &groupType,
+		Type:           &typeName,
+		DeType:         &deType,
+		Checked:        &checked,
+	}
+	repo.fieldRegistry[21] = field
+	repo.dsFields[41] = []*dataset.CoreDatasetTableField{field}
+	chartHandler := NewChartHandler(service.NewChartService(repo))
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler)
+
+	listReq := httptest.NewRequest("POST", "/datasetField/listByDatasetGroup/41", strings.NewReader("{}"))
+	listReq.Header.Set("Content-Type", "application/json")
+	listW := httptest.NewRecorder()
+	r.ServeHTTP(listW, listReq)
+	if listW.Code != 200 {
+		t.Fatalf("expected status 200, got %d", listW.Code)
+	}
+	var listResp struct {
+		Code string             `json:"code"`
+		Data []chart.ChartField `json:"data"`
+	}
+	if err := json.Unmarshal(listW.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("unmarshal dataset field list failed: %v", err)
+	}
+	if listResp.Code != "000000" {
+		t.Fatalf("expected list code 000000, got %s", listResp.Code)
+	}
+	if len(listResp.Data) != 2 {
+		t.Fatalf("expected flattened field count 2, got %d", len(listResp.Data))
+	}
+
+	delReq := httptest.NewRequest("POST", "/datasetField/delete/21", strings.NewReader("{}"))
+	delReq.Header.Set("Content-Type", "application/json")
+	delW := httptest.NewRecorder()
+	r.ServeHTTP(delW, delReq)
+	if delW.Code != 200 {
+		t.Fatalf("expected delete status 200, got %d", delW.Code)
+	}
+	delResp := bridgeCodeResp{}
+	if err := json.Unmarshal(delW.Body.Bytes(), &delResp); err != nil {
+		t.Fatalf("unmarshal dataset field delete failed: %v", err)
+	}
+	if delResp.Code != "000000" {
+		t.Fatalf("expected delete code 000000, got %s", delResp.Code)
+	}
+}
+
 func TestOldPathDatasourceList(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

@@ -67,7 +67,7 @@ build_backend() {
     echo "[5/6] Building backend image..."
     
     cd "$PROJECT_ROOT"
-    docker build -t dataease:${DATAEASE_VERSION:-latest} .
+    docker build -t godataease:${DATAEASE_VERSION:-latest} .
     
     echo "  ✓ Backend image built"
 }

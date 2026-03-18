@@ -5,6 +5,14 @@ const modules = import.meta.glob('../views/**/*.vue')
 export const Layout = () => import('@/layout/index.vue')
 const xpackComName = 'components/plugin'
 export const LayoutTransition = () => import('@/layout/components/LayoutTransition.vue')
+
+export const resolveViewComponent = (
+  component: string,
+  moduleMap: Record<string, unknown> = modules
+) => {
+  return moduleMap[`../views/${component}.vue`] || moduleMap[`../views/${component}/index.vue`] || null
+}
+
 // 后端控制路由生成
 export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRecordRaw[] => {
   const res: AppRouteRecordRaw[] = []
@@ -39,7 +47,7 @@ export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRe
       if (route.component === xpackComName) {
         comModule = XpackComponent
       } else if (!route.component.startsWith('Layout')) {
-        comModule = modules[`../views/${route.component}/index.vue`]
+        comModule = resolveViewComponent(route.component)
       }
 
       if (route.component === 'Layout') {
@@ -51,9 +59,19 @@ export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRe
         data.component = comModule
       }
     }
+
     if (route.children) {
       data.children = generateRoutesFn2(route.children)
     }
+
+    const hasResolvedChildren = !!data.children?.length
+    const hasRouteComponent = !!data.component
+    const missingDeclaredComponent = !!route.component && !hasRouteComponent
+
+    if (missingDeclaredComponent && !hasResolvedChildren) {
+      continue
+    }
+
     res.push(data as AppRouteRecordRaw)
   }
 

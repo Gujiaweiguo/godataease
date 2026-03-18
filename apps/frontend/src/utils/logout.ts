@@ -17,7 +17,7 @@ export const logoutHandler = (justClean?: boolean, save_platform_status = false)
   interactiveStore.clear()
   interactiveStore.$reset()
   removeCache()
-  let queryRedirectPath = '/workbranch/index'
+  let queryRedirectPath = '/workbranch'
   // 如果redirect参数中有值
   if (router.currentRoute.value.fullPath) {
     queryRedirectPath = router.currentRoute.value.fullPath as string

@@ -4,7 +4,11 @@ import { useAppStoreWithOut } from '@/store/modules/app'
 import type { RouteRecordRaw } from 'vue-router_2'
 import { getDefaultSettings } from '@/api/common'
 import { useNProgress } from '@/hooks/web/useNProgress'
-import { usePermissionStoreWithOut, pathValid, getFirstAuthMenu } from '@/store/modules/permission'
+import {
+  DYNAMIC_NOT_FOUND_ROUTE_NAME,
+  usePermissionStoreWithOut,
+  pathValid
+} from '@/store/modules/permission'
 import { usePageLoading } from '@/hooks/web/usePageLoading'
 import { getRoleRouters } from '@/api/common'
 import { useCache } from '@/hooks/web/useCache'
@@ -25,7 +29,7 @@ const { start, done } = useNProgress()
 const { open } = useLoading()
 const { loadStart, loadDone } = usePageLoading()
 
-const whiteList = ['/login', '/de-link', '/chart-view', '/admin-login', '/401'] // 不重定向白名单
+const whiteList = ['/login', '/de-link', '/chart-view', '/admin-login', '/401', '/404'] // 不重定向白名单
 const embeddedWindowWhiteList = ['/dvCanvas', '/dashboard', '/preview', '/dataset-embedded-form']
 const embeddedRouteWhiteList = [
   '/dataset-embedded',
@@ -33,6 +37,95 @@ const embeddedRouteWhiteList = [
   '/dataset-embedded-form',
   '/datasource-embedded'
 ]
+const PERMISSION_REFRESH_EVENT = 'de:permission-refresh'
+const MIN_PERMISSION_REFRESH_INTERVAL = 3000
+let permissionRefreshPromise: Promise<void> | null = null
+let lastPermissionRefreshAt = 0
+
+const resolveUnauthorizedTarget = (path: string) => {
+  if (whiteList.includes(path) || path.startsWith('/de-link')) {
+    return '/404'
+  }
+  return '/401'
+}
+
+const removeDynamicRoutes = () => {
+  permissionStore.getAddRouters.forEach(route => {
+    const routeName = route.name as string | undefined
+    if (routeName && router.hasRoute(routeName)) {
+      router.removeRoute(routeName)
+    }
+  })
+  if (router.hasRoute(DYNAMIC_NOT_FOUND_ROUTE_NAME)) {
+    router.removeRoute(DYNAMIC_NOT_FOUND_ROUTE_NAME)
+  }
+}
+
+const loadAuthorizedRoutes = async () => {
+  let roleRouters = (await getRoleRouters()) || []
+  if (!isDynamicNavigationEnabled() && wsCache.get('app.desktop')) {
+    roleRouters = roleRouters.filter(item => item.name !== 'system')
+  }
+  const routers: AppCustomRouteRecordRaw[] = (roleRouters as AppCustomRouteRecordRaw[]).map(item => ({
+    ...item,
+    top: true
+  }))
+
+  removeDynamicRoutes()
+  permissionStore.clear()
+  await permissionStore.generateRoutes(routers)
+  permissionStore.getAddRouters.forEach(route => {
+    router.addRoute(route as unknown as RouteRecordRaw)
+  })
+  permissionStore.setIsAddRouters(true)
+  interactiveStore.clear()
+  await interactiveStore.initInteractive(true)
+}
+
+const refreshPermissionRoutes = async (force = false) => {
+  const hasSession = !!(wsCache.get('user.token') || wsCache.get('app.desktop'))
+  if (!hasSession || (!force && !permissionStore.getIsAddRouters)) {
+    return
+  }
+
+  const now = Date.now()
+  if (!force && now - lastPermissionRefreshAt < MIN_PERMISSION_REFRESH_INTERVAL) {
+    return
+  }
+
+  if (permissionRefreshPromise) {
+    return permissionRefreshPromise
+  }
+
+  permissionRefreshPromise = (async () => {
+    await loadAuthorizedRoutes()
+    lastPermissionRefreshAt = Date.now()
+
+    const currentPath = router.currentRoute.value.path
+    if (
+      currentPath &&
+      !whiteList.includes(currentPath) &&
+      !currentPath.startsWith('/de-link') &&
+      !pathValid(currentPath)
+    ) {
+	    await router.replace(resolveUnauthorizedTarget(currentPath))
+    }
+  })().finally(() => {
+    permissionRefreshPromise = null
+  })
+
+  return permissionRefreshPromise
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', () => {
+    void refreshPermissionRoutes()
+  })
+  window.addEventListener(PERMISSION_REFRESH_EVENT, () => {
+    void refreshPermissionRoutes(true)
+  })
+}
+
 router.beforeEach(async (to, from, next) => {
   if (['/chart-view'].includes(to.path) || to.path.startsWith('/de-link/')) {
     open()
@@ -95,7 +188,7 @@ router.beforeEach(async (to, from, next) => {
       await userStore.setUser()
     }
     if (to.path === '/login') {
-      next({ path: '/workbranch/index' })
+      next({ path: '/workbranch' })
     } else {
       permissionStore.setCurrentPath(to.path)
       if (permissionStore.getIsAddRouters) {
@@ -115,41 +208,28 @@ router.beforeEach(async (to, from, next) => {
           }, {})
         }
         if (!pathValid(to.path) && to.path !== '/404' && !to.path.startsWith('/de-link')) {
-          const firstPath = getFirstAuthMenu()
-          next({ path: firstPath || '/404' })
+	          next({ path: resolveUnauthorizedTarget(to.path), replace: true })
           return
         }
         next()
         return
       }
 
-      let roleRouters = (await getRoleRouters()) || []
-      if (!isDynamicNavigationEnabled() && isDesktop) {
-        roleRouters = roleRouters.filter(item => item.name !== 'system')
-      }
-      const routers: any[] = roleRouters as AppCustomRouteRecordRaw[]
-      routers.forEach(item => {
-        item.top = true
-      })
-      await permissionStore.generateRoutes(routers as AppCustomRouteRecordRaw[])
+      await loadAuthorizedRoutes()
 
-      permissionStore.getAddRouters.forEach(route => {
-        router.addRoute(route as unknown as RouteRecordRaw) // 动态添加可访问路由表
-      })
-
-      const redirectPath = from.query.redirect || to.path
-      const redirect = decodeURIComponent(redirectPath as string)
-      const nextData = to.path === redirect ? { ...to, replace: true } : { path: redirect }
-
-      permissionStore.setIsAddRouters(true)
-      await interactiveStore.initInteractive(true)
+      const redirectPath = (from.query.redirect as string) || to.fullPath || to.path
+      const redirect = decodeURIComponent(redirectPath)
+      const resolvedRedirect = router.resolve(redirect)
 
       if (!pathValid(to.path) && to.path !== '/404' && !to.path.startsWith('/de-link')) {
-        const firstPath = getFirstAuthMenu()
-        next({ path: firstPath || '/404' })
+	        next({ path: resolveUnauthorizedTarget(to.path), replace: true })
         return
       }
-      next(nextData)
+      if (to.path === redirect && resolvedRedirect.matched.length > 0) {
+        next()
+        return
+      }
+      next({ path: redirect, replace: true })
     }
   } else {
     const embeddedStore = useEmbedded()

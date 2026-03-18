@@ -169,7 +169,7 @@ func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, []map[string]interface{}{})
+	response.Error(c, "501000", "Not Implemented: menu target permission compatibility is unavailable")
 }
 
 func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
@@ -179,7 +179,7 @@ func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, []map[string]interface{}{})
+	response.Error(c, "501000", "Not Implemented: business target permission compatibility is unavailable")
 }
 
 func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
@@ -189,7 +189,7 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	response.Error(c, "501000", "Not Implemented: save menu target permission compatibility is unavailable")
 }
 
 func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
@@ -199,7 +199,7 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	response.Error(c, "501000", "Not Implemented: save business target permission compatibility is unavailable")
 }
 
 func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []int64) error {

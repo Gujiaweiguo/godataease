@@ -40,6 +40,7 @@ func BadRequest(c *gin.Context, message string) {
 }
 
 func Unauthorized(c *gin.Context, message string) {
+	c.Header("DE-GATEWAY-FLAG", "1")
 	c.JSON(http.StatusUnauthorized, Response{
 		Code:    "20001",
 		Message: message,

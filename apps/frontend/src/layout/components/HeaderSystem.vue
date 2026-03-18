@@ -19,7 +19,7 @@ withDefaults(
   {}
 )
 const backToMain = () => {
-  push('/workbranch/index')
+  push('/workbranch')
 }
 const navigateBg = computed(() => appearanceStore.getNavigateBg)
 const navigate = computed(() => appearanceStore.getNavigate)

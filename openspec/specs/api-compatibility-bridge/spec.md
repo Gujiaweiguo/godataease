@@ -335,3 +335,50 @@ The compatibility bridge SHALL support legacy `/system/role/*` API paths used by
 - **WHEN** a client calls `/de2api/system/role/create`, `/de2api/system/role/update`, or `/de2api/system/role/delete/:roleId`
 - **THEN** the backend MUST map these requests to canonical Go role operations
 - **AND** return Java-compatible response envelope
+
+### Requirement: Core BI Compatibility Gate Scope
+The compatibility bridge SHALL define datasource, dataset, dashboard, and big-screen endpoints as a governed critical-flow scope for migration release readiness.
+
+#### Scenario: Govern core BI routes as required verification scope
+- **WHEN** compatibility gate scope is prepared for release or merge validation
+- **THEN** the scope MUST identify the canonical route, compatibility alias, owner, and blocking level for each in-scope BI endpoint family
+- **AND** the governed scope MUST be reviewable in version control with evidence references
+
+#### Scenario: Block release on missing core BI verification
+- **WHEN** any governed datasource, dataset, dashboard, or big-screen endpoint is not evaluated or fails required parity checks
+- **THEN** release readiness MUST be treated as failed
+- **AND** the system MUST provide actionable evidence for the missing or failing route family
+
+### Requirement: Core BI Compatibility Endpoints Must Not Be Stub-Success
+Compatibility endpoints that participate in the critical BI flow SHALL return implemented behavior or explicit non-success semantics.
+
+#### Scenario: Reject placeholder success for critical BI compatibility route
+- **WHEN** an in-scope BI compatibility endpoint lacks required business implementation
+- **THEN** the endpoint MUST return deterministic non-success behavior
+- **AND** MUST NOT return `code=000000` with placeholder payload to simulate parity
+
+#### Scenario: Keep alias and canonical route semantics aligned for critical BI flows
+- **WHEN** both canonical and compatibility forms of an in-scope BI route are invoked with equivalent inputs
+- **THEN** status, envelope semantics, and business result shape MUST remain aligned
+- **AND** divergence MUST be treated as a governed compatibility regression
+
+### Requirement: Interactive Tree Compatibility Status Promotion
+The compatibility bridge SHALL treat `dataVisualization/interactiveTree` as a governed parity endpoint once real resource-tree behavior is implemented.
+
+#### Scenario: Promote interactive tree from partial to full
+- **WHEN** interactive tree behavior is backed by implementation and regression evidence
+- **THEN** governed whitelist or matrix metadata MUST be updated from `partial` to `full`
+- **AND** the metadata update MUST reference the evidence proving parity scope completion
+
+#### Scenario: Block governance promotion without parity evidence
+- **WHEN** interactive tree still depends on synthetic placeholders or lacks regression evidence
+- **THEN** governance metadata MUST remain non-full
+- **AND** release documentation MUST NOT claim complete parity for the endpoint
+
+### Requirement: Dataset and Datasource Interactive Governance Consistency
+The compatibility and governance model SHALL describe dataset and datasource interactive discovery in a way that is consistent with the interactive aggregate view used by the frontend.
+
+#### Scenario: Interactive aggregate governance covers dataset and datasource discovery
+- **WHEN** interactive discovery behavior is evaluated for release readiness
+- **THEN** dataset and datasource discovery paths used by the aggregate interactive loader MUST be documented with implementation evidence and governed status
+- **AND** the documented status MUST match the actual runtime loading path used by the frontend

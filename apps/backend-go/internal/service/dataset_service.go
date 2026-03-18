@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
 	calciteintegration "dataease/backend/internal/integration/calcite"
 	"dataease/backend/internal/repository"
 
@@ -23,12 +24,15 @@ import (
 type DatasetService struct {
 	repo                 *repository.DatasetRepository
 	rowPermissionService *RowPermissionService
+	resourcePermService  *ResourcePermissionService
 	calciteAddress       string
 	calciteTimeout       time.Duration
 	calciteRetries       int
 	calciteClient        *calciteintegration.Client
 	calciteMu            sync.Mutex
 }
+
+var ErrDatasetDatasourcePermissionDenied = errors.New("insufficient datasource permissions")
 
 type sqlVariableDetailRaw struct {
 	VariableName string        `json:"variableName"`
@@ -53,6 +57,10 @@ func NewDatasetServiceWithPermission(repo *repository.DatasetRepository, rowPerm
 		calciteTimeout:       10 * time.Second,
 		calciteRetries:       1,
 	}
+}
+
+func (s *DatasetService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
+	s.resourcePermService = resourcePermSvc
 }
 
 func (s *DatasetService) SetCalciteConfig(address string, timeout time.Duration, retries int) {
@@ -173,6 +181,10 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 		limit = 100
 	}
 
+	if err := s.ensureDatasourceDependenciesViewable(req.DatasetGroupID, userID); err != nil {
+		return nil, err
+	}
+
 	tableName, err := s.repo.FindPrimaryTableName(req.DatasetGroupID)
 	if err != nil {
 		return nil, err
@@ -213,6 +225,34 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 		Rows:    rows,
 		Total:   total,
 	}, nil
+}
+
+func (s *DatasetService) ensureDatasourceDependenciesViewable(datasetGroupID, userID int64) error {
+	if s.resourcePermService == nil || s.repo == nil || datasetGroupID <= 0 || userID <= 0 {
+		return nil
+	}
+
+	tables, err := s.repo.ListTablesByDatasetGroupID(datasetGroupID)
+	if err != nil {
+		return err
+	}
+
+	seen := make(map[int64]struct{})
+	for _, table := range tables {
+		if table == nil || table.DatasourceID == nil || *table.DatasourceID <= 0 {
+			continue
+		}
+		datasourceID := *table.DatasourceID
+		if _, ok := seen[datasourceID]; ok {
+			continue
+		}
+		seen[datasourceID] = struct{}{}
+		if !s.resourcePermService.CheckViewPermission(userID, permission.ResourceTypeDatasource, datasourceID) {
+			return ErrDatasetDatasourcePermissionDenied
+		}
+	}
+
+	return nil
 }
 
 func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]interface{}, error) {

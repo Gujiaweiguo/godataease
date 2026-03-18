@@ -16,14 +16,14 @@
 ### Step 1: 停止 Java 后端
 ```
 Time: 09:20
-Command: docker compose -f infra/compose/docker-compose.yml stop dataease-app
+Command: docker compose -f infra/compose/docker-compose.yml stop godataease-app
 Result: ✅ Java backend stopped
 ```
 
 ### Step 2: 构建 Go 后端镜像
 ```
 Time: 09:22
-Command: docker build -t dataease:latest -f Dockerfile .
+Command: docker build -t godataease:latest -f Dockerfile .
 Result: ✅ Image built successfully (6.3MB compressed)
 ```
 
@@ -56,8 +56,8 @@ Result: ✅ API working correctly
 
 | 服务 | 状态 | 端口 |
 |------|------|------|
-| dataease-app (Go) | ✅ healthy | 8080 |
-| redis-dataease | ✅ healthy | 16379 |
+| godataease-app (Go) | ✅ healthy | 8080 |
+| godataease-redis | ✅ healthy | 16379 |
 
 ---
 

@@ -6,6 +6,8 @@ import { store } from '../index'
 import { cloneDeep } from 'lodash-es'
 import NotFoundPage from '@/views/404/index.vue'
 
+export const DYNAMIC_NOT_FOUND_ROUTE_NAME = 'dynamic-not-found'
+
 export interface PermissionState {
   routers: AppRouteRecordRaw[]
   addRouters: AppRouteRecordRaw[]
@@ -52,6 +54,7 @@ export const usePermissionStore = defineStore('permission', {
         this.addRouters = routerMap.concat([
           {
             path: '/:catchAll(.*)',
+            name: DYNAMIC_NOT_FOUND_ROUTE_NAME,
             component: NotFoundPage,
             meta: {
               hidden: true

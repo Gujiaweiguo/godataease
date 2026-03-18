@@ -352,7 +352,7 @@ export const exportRetry = async (id): Promise<IResponse> => {
 }
 
 export const downloadFile = async (id): Promise<Blob> => {
-  return request.get({ url: 'exportCenter/download/' + id, responseType: 'blob' }).then(res => {
+  return request.get({ url: '/exportCenter/download/' + id, responseType: 'blob' }).then(res => {
     return res?.data
   })
 }
@@ -382,13 +382,13 @@ export const exportDeletePost = async (data): Promise<IResponse> => {
 }
 
 export const listByDsIds = async (data): Promise<IResponse> => {
-  return request.post({ url: 'datasetField/listByDsIds', data }).then(res => {
+  return request.post({ url: '/datasetField/listByDsIds', data }).then(res => {
     return res?.data
   })
 }
 
 export const getFieldTree = async (data): Promise<IResponse> => {
-  return request.post({ url: 'datasetData/getFieldTree', data }).then(res => {
+  return request.post({ url: '/datasetData/getFieldTree', data }).then(res => {
     return res?.data
   })
 }

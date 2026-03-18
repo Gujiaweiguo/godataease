@@ -29,10 +29,10 @@ import { useCache } from '@/hooks/web/useCache'
 import { useI18n } from '@/hooks/web/useI18n'
 import { msgCountApi } from '@/api/msg'
 const { wsCache } = useCache('localStorage')
-const aiBaseUrl = ref('https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed')
+const aiBaseUrl = ref<string | null>(null)
 const handleIconClick = () => {
-  if (route.path === '/workbranch/index') return
-  push('/workbranch/index')
+  if (route.path === '/workbranch') return
+  push('/workbranch')
 }
 
 const handleAiClick = () => {

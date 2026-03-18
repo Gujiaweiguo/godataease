@@ -154,6 +154,9 @@ const baseTablePaneList = ref([
 const dfTablePaneList = ref([])
 
 const loadedDataFilling = data => {
+  if (!data?.name || !data?.title) {
+    return
+  }
   dfTablePaneList.value.push(data)
 }
 
@@ -289,7 +292,7 @@ const getEmptyDesc = (): string => {
   >
     <el-tabs v-model="activeName" class="dashboard-type-tabs" @tab-click="handleClick">
       <el-tab-pane
-        v-for="item in tablePaneList.filter(panel => !shareDisable || panel.name !== 'share')"
+        v-for="item in tablePaneList.filter(panel => panel && (!shareDisable || panel.name !== 'share'))"
         :key="item.name"
         :disabled="item.disabled"
         :label="item.title"

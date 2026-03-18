@@ -50,6 +50,48 @@ func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy str
 	return v.ID, nil
 }
 
+func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy string) (int64, error) {
+	if req == nil {
+		return 0, fmt.Errorf("copy request is required")
+	}
+	if req.ID <= 0 {
+		return 0, fmt.Errorf("source id is required")
+	}
+	if req.Name == "" {
+		return 0, fmt.Errorf("name is required")
+	}
+
+	source, err := s.repo.GetByID(req.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	nodeType := source.NodeType
+	if req.NodeType != nil && *req.NodeType != "" {
+		nodeType = req.NodeType
+	}
+	typ := source.Type
+	if req.Type != nil && *req.Type != "" {
+		typ = req.Type
+	}
+	mobileLayout := source.MobileLayout
+	if req.MobileLayout != nil {
+		mobileLayout = req.MobileLayout
+	}
+
+	return s.Save(&visualization.SaveRequest{
+		Name:            req.Name,
+		PID:             req.PID,
+		Type:            typ,
+		NodeType:        nodeType,
+		CanvasStyleData: source.CanvasStyleData,
+		ComponentData:   source.ComponentData,
+		MobileLayout:    mobileLayout,
+		ContentID:       source.ContentID,
+		CheckVersion:    source.CheckVersion,
+	}, updateBy)
+}
+
 func (s *VisualizationService) Update(req *visualization.UpdateRequest, updateBy string) error {
 	v, err := s.repo.GetByID(req.ID)
 	if err != nil {
@@ -117,6 +159,14 @@ func (s *VisualizationService) List(req *visualization.ListRequest) (*visualizat
 	}, nil
 }
 
+func (s *VisualizationService) InteractiveTree(busiFlag string) ([]*visualization.DataVisualizationInfo, error) {
+	types, err := resolveInteractiveVisualizationTypes(busiFlag)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListAllByTypes(types)
+}
+
 func (s *VisualizationService) DeleteLogic(id int64, updateBy string) error {
 	return s.repo.DeleteLogic(id, updateBy)
 }
@@ -130,6 +180,20 @@ func (s *VisualizationService) FindDvType(id int64) (string, error) {
 		return "", nil
 	}
 	return *item.Type, nil
+}
+
+func resolveInteractiveVisualizationTypes(busiFlag string) ([]string, error) {
+	flag := busiFlag
+	switch flag {
+	case "", "dashboard-dataV":
+		return []string{"dashboard", "dataV"}, nil
+	case "panel", "dashboard":
+		return []string{"dashboard"}, nil
+	case "screen", "dataV":
+		return []string{"dataV"}, nil
+	default:
+		return nil, fmt.Errorf("unsupported busiFlag: %s", flag)
+	}
 }
 
 func (s *VisualizationService) NameCheck(req *visualization.NameCheckRequest) (string, error) {

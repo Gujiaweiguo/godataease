@@ -6,7 +6,7 @@ export const routes: AppRouteRecordRaw[] = [
   {
     path: '/',
     name: 'index',
-    redirect: '/workbranch/index',
+    redirect: '/workbranch',
     component: () => import('@/layout/index.vue'),
     hidden: true,
     meta: {},
@@ -56,6 +56,13 @@ export const routes: AppRouteRecordRaw[] = [
     hidden: true,
     meta: {},
     component: () => import('@/views/401/index.vue')
+  },
+  {
+    path: '/404',
+    name: '404',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/404/index.vue')
   },
   {
     path: '/dvCanvas',

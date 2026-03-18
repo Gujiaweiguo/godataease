@@ -12,7 +12,7 @@
 ## Compatibility Endpoint Regression
 
 - Command: `docker compose -f infra/compose/docker-compose.yml up -d`
-  - Result: `dataease-app` and `redis-dataease` started
+  - Result: `godataease-app` and `godataease-redis` started
 - Command: `./scripts/compat-checks/run_auth_visualization_compat.sh`
   - Result: PASS (`18/18`)
   - Coverage: `/api/*` and `/de2api/*` for auth permission family, role aliases, and `/dataVisualization/tree`

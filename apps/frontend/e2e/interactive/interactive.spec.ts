@@ -27,7 +27,7 @@ test.describe('Interactive Tree', () => {
    * Smoke tests that don't require authentication
    */
   test.describe('Unauthenticated Access', () => {
-    test('should redirect to login when accessing resource tree without auth', async ({ page }) => {
+    test('SYS-SMK-007 @system-smoke should redirect to login when accessing resource tree without auth', async ({ page }) => {
       await page.context().clearCookies()
       await page.goto('/DeResourceTree')
 
@@ -45,7 +45,7 @@ test.describe('Interactive Tree', () => {
     })
 
     for (const treeType of treeTypes) {
-      test(`should redirect to login when accessing ${treeType.name} tree without auth`, async ({ page }) => {
+      test(`SYS-SMK-008 @system-smoke should redirect to login when accessing ${treeType.name} tree without auth`, async ({ page }) => {
         await page.context().clearCookies()
         await page.goto(treeType.path)
 

@@ -2,9 +2,9 @@
 # Usage: docker compose -f docker-compose.prod.yml up -d
 
 services:
-  dataease-app:
-    image: dataease:${DATAEASE_VERSION:-latest}
-    container_name: dataease-app
+  godataease-app:
+    image: godataease:${DATAEASE_VERSION:-latest}
+    container_name: godataease-app
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-8080}:8080"
@@ -14,7 +14,7 @@ services:
       - DB_NAME=${DB_NAME:-dataease10}
       - DB_USER=${DB_USER:-root}
       - DB_PASSWORD=${DB_PASSWORD}
-      - REDIS_HOST=${REDIS_HOST:-redis-dataease}
+      - REDIS_HOST=${REDIS_HOST:-godataease-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - TZ=Asia/Shanghai
@@ -43,9 +43,9 @@ services:
         reservations:
           memory: 512M
 
-  dataease-nginx:
+  godataease-nginx:
     image: nginx:alpine
-    container_name: dataease-nginx
+    container_name: godataease-nginx
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
@@ -58,7 +58,7 @@ services:
     networks:
       - dataease-net
     depends_on:
-      dataease-app:
+      godataease-app:
         condition: service_healthy
     logging:
       driver: "json-file"
@@ -101,9 +101,9 @@ services:
         max-size: "100m"
         max-file: "3"
 
-  redis:
+  godataease-redis:
     image: redis:7-alpine
-    container_name: redis-dataease
+    container_name: godataease-redis
     restart: unless-stopped
     ports:
       - "${REDIS_EXTERNAL_PORT:-16379}:6379"

@@ -4,6 +4,7 @@ import { useCache } from '@/hooks/web/useCache'
 import { useEmitt } from '@/hooks/web/useEmitt'
 const { wsCache } = useCache()
 let stompClient: Stomp.Client
+let websocketSupported: boolean | null = null
 import dev from '../../config/dev'
 const env = import.meta.env
 const basePath = env.VITE_API_BASEPATH
@@ -27,18 +28,11 @@ export default {
       return wsCache.get('user.token') && wsCache.get('user.uid')
     }
 
-    function connection() {
-      if (!isLoginStatus()) {
-        return
-      }
-      if (stompClient && stompClient.connected) {
-        return
-      }
+    function resolvePrefix() {
       let prefix = '/'
       if (window.DataEaseBi?.baseUrl) {
         prefix = window.DataEaseBi.baseUrl
       } else {
-        // const href = window.location.href
         prefix = location.origin + location.pathname
         if (env.MODE === 'dev') {
           prefix = dev.server.proxy[basePath].target + '/'
@@ -47,7 +41,44 @@ export default {
       if (!prefix.endsWith('/')) {
         prefix += '/'
       }
+      return prefix
+    }
+
+    async function canUseWebsocket(prefix: string, userId: string | number) {
+      if (websocketSupported !== null) {
+        return websocketSupported
+      }
+      try {
+        const response = await fetch(`${prefix}websocket/info?userId=${userId}`, {
+          credentials: 'include'
+        })
+        if (!response.ok) {
+          websocketSupported = false
+          return false
+        }
+        const data = await response.json()
+        websocketSupported = data?.websocket !== false
+        return websocketSupported
+      } catch (error) {
+        console.info('websocket capability detection failed:', error)
+        websocketSupported = false
+        return false
+      }
+    }
+
+    async function connection() {
+      if (!isLoginStatus()) {
+        return
+      }
+      if (stompClient && stompClient.connected) {
+        return
+      }
+      const prefix = resolvePrefix()
       const userId = wsCache.get('app.desktop') ? 1 : wsCache.get('user.uid')
+      if (!(await canUseWebsocket(prefix, userId))) {
+        disconnect()
+        return
+      }
       const socket = new SockJS(prefix + 'websocket?userId=' + userId)
       stompClient = Stomp.over(socket)
       const heads = {
@@ -84,14 +115,14 @@ export default {
     }
 
     function initialize() {
-      connection()
+      void connection()
       setInterval(() => {
         if (!isLoginStatus()) {
           disconnect()
           return
         }
         if (!stompClient || !stompClient.connected) {
-          connection()
+          void connection()
         }
       }, 5000)
     }
