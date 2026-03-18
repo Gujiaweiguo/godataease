@@ -47,6 +47,19 @@ type interactiveRequest struct {
 	Keyword  *string `json:"keyword"`
 }
 
+const (
+	interactiveBusiFlagDashboard  = "dashboard"
+	interactiveBusiFlagDataV      = "dataV"
+	interactiveBusiFlagDataset    = "dataset"
+	interactiveBusiFlagDatasource = "datasource"
+	interactiveMenuPathPanel      = "/panel"
+	interactiveMenuPathScreen     = "/screen"
+	interactiveMenuPathDataset    = "/data/dataset"
+	interactiveMenuPathDatasource = "/data/datasource"
+	interactivePanelAlias         = "panel"
+	interactiveScreenAlias        = "screen"
+)
+
 func NewFrontendCompatHandler(
 	menuService *service.MenuService,
 	datasetService *service.DatasetService,
@@ -167,11 +180,11 @@ func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
 			result[busiFlag] = h.buildVisualizationInteractiveTree(normalizedFlag, req.Leaf, authorized[normalizedFlag])
 			continue
 		}
-		if normalizedFlag == "dataset" {
+		if normalizedFlag == interactiveBusiFlagDataset {
 			result[busiFlag] = h.buildDatasetInteractiveTree(req.Keyword, authorized[normalizedFlag])
 			continue
 		}
-		if normalizedFlag == "datasource" {
+		if normalizedFlag == interactiveBusiFlagDatasource {
 			result[busiFlag] = h.buildDatasourceInteractiveTree(req.Keyword, authorized[normalizedFlag])
 			continue
 		}
@@ -280,10 +293,10 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 
 func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 	authorized := map[string]bool{
-		"dashboard":  false,
-		"dataV":      false,
-		"dataset":    false,
-		"datasource": false,
+		interactiveBusiFlagDashboard:  false,
+		interactiveBusiFlagDataV:      false,
+		interactiveBusiFlagDataset:    false,
+		interactiveBusiFlagDatasource: false,
 	}
 	var walk func(nodes []*menu.MenuVO)
 	walk = func(nodes []*menu.MenuVO) {
@@ -293,14 +306,14 @@ func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 			}
 			path := strings.TrimSpace(node.Path)
 			switch {
-			case strings.HasPrefix(path, "/panel"):
-				authorized["dashboard"] = true
-			case strings.HasPrefix(path, "/screen"):
-				authorized["dataV"] = true
-			case strings.HasPrefix(path, "/data/dataset"):
-				authorized["dataset"] = true
-			case strings.HasPrefix(path, "/data/datasource"):
-				authorized["datasource"] = true
+			case strings.HasPrefix(path, interactiveMenuPathPanel):
+				authorized[interactiveBusiFlagDashboard] = true
+			case strings.HasPrefix(path, interactiveMenuPathScreen):
+				authorized[interactiveBusiFlagDataV] = true
+			case strings.HasPrefix(path, interactiveMenuPathDataset):
+				authorized[interactiveBusiFlagDataset] = true
+			case strings.HasPrefix(path, interactiveMenuPathDatasource):
+				authorized[interactiveBusiFlagDatasource] = true
 			}
 			if len(node.Children) > 0 {
 				walk(node.Children)
@@ -314,17 +327,17 @@ func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 func normalizeInteractiveBusiFlag(busiFlag string) string {
 	flag := strings.TrimSpace(busiFlag)
 	switch flag {
-	case "panel":
-		return "dashboard"
-	case "screen":
-		return "dataV"
+	case interactivePanelAlias:
+		return interactiveBusiFlagDashboard
+	case interactiveScreenAlias:
+		return interactiveBusiFlagDataV
 	default:
 		return flag
 	}
 }
 
 func isVisualizationInteractiveBusiFlag(busiFlag string) bool {
-	return busiFlag == "dashboard" || busiFlag == "dataV"
+	return busiFlag == interactiveBusiFlagDashboard || busiFlag == interactiveBusiFlagDataV
 }
 
 func convertDatasetTreeNodes(items []dataset.TreeNode) []interactiveTreeNode {

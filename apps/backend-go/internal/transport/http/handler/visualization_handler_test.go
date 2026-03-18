@@ -110,8 +110,8 @@ func TestBuildVisualizationTreeValidation(t *testing.T) {
 }
 
 func TestBuildVisualizationTreeContractShape(t *testing.T) {
-	folderType := "folder"
-	panelType := "panel"
+	folderType := visualizationNodeTypeFolder
+	panelType := visualizationNodeTypePanel
 	rootID := int64(10)
 	published := 1
 	mobileLayout := true
@@ -135,6 +135,29 @@ func TestBuildVisualizationTreeContractShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	assertVisualizationTreeRootShape(t, nodes)
+
+	leafOnly, err := buildVisualizationTree([]*visualization.DataVisualizationInfo{
+		{
+			ID:       rootID,
+			Name:     "Dashboard Folder",
+			NodeType: &folderType,
+		},
+		{
+			ID:       11,
+			PID:      &rootID,
+			Name:     "Dashboard A",
+			NodeType: &panelType,
+		},
+	}, boolPtr(true))
+	if err != nil {
+		t.Fatalf("unexpected leaf-filter error: %v", err)
+	}
+	assertVisualizationLeafOnlyTree(t, leafOnly)
+}
+
+func assertVisualizationTreeRootShape(t *testing.T, nodes []treeNode) {
+	t.Helper()
 	if len(nodes) != 1 {
 		t.Fatalf("expected 1 root node, got %d", len(nodes))
 	}
@@ -160,25 +183,12 @@ func TestBuildVisualizationTreeContractShape(t *testing.T) {
 	if child.ExtraFlag != 1 || child.ExtraFlag1 != 1 {
 		t.Fatalf("expected mobile published child flags, got %+v", child)
 	}
+}
 
-	leafOnly, err := buildVisualizationTree([]*visualization.DataVisualizationInfo{
-		{
-			ID:       rootID,
-			Name:     "Dashboard Folder",
-			NodeType: &folderType,
-		},
-		{
-			ID:       11,
-			PID:      &rootID,
-			Name:     "Dashboard A",
-			NodeType: &panelType,
-		},
-	}, boolPtr(true))
-	if err != nil {
-		t.Fatalf("unexpected leaf-filter error: %v", err)
-	}
-	if len(leafOnly) != 0 {
-		t.Fatalf("expected no root nodes after leaf-only filter, got %+v", leafOnly)
+func assertVisualizationLeafOnlyTree(t *testing.T, nodes []treeNode) {
+	t.Helper()
+	if len(nodes) != 0 {
+		t.Fatalf("expected no root nodes after leaf-only filter, got %+v", nodes)
 	}
 }
 

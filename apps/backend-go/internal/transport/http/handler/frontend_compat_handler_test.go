@@ -272,9 +272,9 @@ func TestRegisterFrontendCompatRoutes_ProtectsMenuEndpoints(t *testing.T) {
 
 func TestFrontendCompatHandler_InteractiveTreeUsesAuthorizedMenus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	dashboardType := "dashboard"
-	folderType := "folder"
-	panelType := "panel"
+	dashboardType := interactiveBusiFlagDashboard
+	folderType := visualizationNodeTypeFolder
+	panelType := visualizationNodeTypePanel
 	rootID := int64(10)
 
 	h := &FrontendCompatHandler{
@@ -283,18 +283,18 @@ func TestFrontendCompatHandler_InteractiveTreeUsesAuthorizedMenus(t *testing.T) 
 		},
 		queryMenuTreeByRoleIDs: func(roleIDs []int64) ([]*menu.MenuVO, error) {
 			return []*menu.MenuVO{
-				{Path: "/panel/index"},
-				{Path: "/data/dataset"},
+				{Path: interactiveMenuPathPanel + "/index"},
+				{Path: interactiveMenuPathDataset},
 			}, nil
 		},
 		loadRoleIDsByUserID: func(userID int64) ([]int64, error) {
 			return []int64{2}, nil
 		},
 		loadDatasetTree: func(keyword *string) ([]dataset.TreeNode, error) {
-			return []dataset.TreeNode{{ID: 12, Name: "Dataset Folder", NodeType: "folder"}}, nil
+			return []dataset.TreeNode{{ID: 12, Name: "Dataset Folder", NodeType: visualizationNodeTypeFolder}}, nil
 		},
 		loadVisualizationTree: func(busiFlag string) ([]*visualization.DataVisualizationInfo, error) {
-			if busiFlag != "dashboard" {
+			if busiFlag != interactiveBusiFlagDashboard {
 				return []*visualization.DataVisualizationInfo{}, nil
 			}
 			return []*visualization.DataVisualizationInfo{
@@ -324,56 +324,25 @@ func TestFrontendCompatHandler_InteractiveTreeUsesAuthorizedMenus(t *testing.T) 
 		t.Fatalf("unmarshal interactive tree response: %v", err)
 	}
 	data := resp["data"].(map[string]interface{})
-	if len(data["dashboard"].([]interface{})) != 1 {
-		t.Fatalf("expected authorized dashboard tree")
-	}
-	dashboardNode := data["dashboard"].([]interface{})[0].(map[string]interface{})
-	if dashboardNode["id"] != "10" || dashboardNode["pid"] != "0" || dashboardNode["name"] != "Dashboard Folder" {
-		t.Fatalf("unexpected dashboard node contract: %#v", dashboardNode)
-	}
-	if dashboardNode["leaf"] != false {
-		t.Fatalf("expected dashboard node to remain non-leaf: %#v", dashboardNode)
-	}
-	if dashboardNode["weight"] != float64(9) || dashboardNode["extraFlag"] != float64(0) || dashboardNode["extraFlag1"] != float64(0) {
-		t.Fatalf("unexpected dashboard node extras: %#v", dashboardNode)
-	}
-	children := dashboardNode["children"].([]interface{})
-	if len(children) != 1 {
-		t.Fatalf("expected one real dashboard child node, got %#v", children)
-	}
-	child := children[0].(map[string]interface{})
-	if child["id"] != "11" || child["pid"] != "10" || child["name"] != "Revenue Dashboard" || child["leaf"] != true {
-		t.Fatalf("unexpected real dashboard child node contract: %#v", child)
-	}
-	if len(data["dataset"].([]interface{})) != 1 {
-		t.Fatalf("expected authorized dataset tree")
-	}
-	datasetNode := data["dataset"].([]interface{})[0].(map[string]interface{})
-	if datasetNode["id"] != "12" || datasetNode["pid"] != "0" || datasetNode["name"] != "Dataset Folder" {
-		t.Fatalf("unexpected dataset node contract: %#v", datasetNode)
-	}
-	if datasetNode["leaf"] != false {
-		t.Fatalf("expected dataset folder node to be non-leaf: %#v", datasetNode)
-	}
-	if len(data["datasource"].([]interface{})) != 0 {
-		t.Fatalf("expected unauthorized datasource tree to be empty")
-	}
+	assertDashboardInteractiveTree(t, data)
+	assertDatasetInteractiveTree(t, data)
+	assertEmptyInteractiveTreeScope(t, data, interactiveBusiFlagDatasource)
 }
 
 func TestFrontendCompatHandler_InteractiveTreeReturnsRealDataVNodes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	dataVType := "dataV"
-	panelType := "panel"
+	dataVType := interactiveBusiFlagDataV
+	panelType := visualizationNodeTypePanel
 
 	h := &FrontendCompatHandler{
 		queryMenuTreeByRoleIDs: func(roleIDs []int64) ([]*menu.MenuVO, error) {
-			return []*menu.MenuVO{{Path: "/screen/index"}}, nil
+			return []*menu.MenuVO{{Path: interactiveMenuPathScreen + "/index"}}, nil
 		},
 		loadRoleIDsByUserID: func(userID int64) ([]int64, error) {
 			return []int64{2}, nil
 		},
 		loadVisualizationTree: func(busiFlag string) ([]*visualization.DataVisualizationInfo, error) {
-			if busiFlag != "dataV" {
+			if busiFlag != interactiveBusiFlagDataV {
 				return []*visualization.DataVisualizationInfo{}, nil
 			}
 			return []*visualization.DataVisualizationInfo{{ID: 21, Name: "Executive Screen", NodeType: &panelType, Type: &dataVType}}, nil
@@ -411,12 +380,12 @@ func TestFrontendCompatHandler_InteractiveTreeReturnsRealDataVNodes(t *testing.T
 
 func TestFrontendCompatHandler_InteractiveTreeFiltersUnauthorizedVisualizationScopes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	dashboardType := "dashboard"
-	panelType := "panel"
+	dashboardType := interactiveBusiFlagDashboard
+	panelType := visualizationNodeTypePanel
 
 	h := &FrontendCompatHandler{
 		queryMenuTreeByRoleIDs: func(roleIDs []int64) ([]*menu.MenuVO, error) {
-			return []*menu.MenuVO{{Path: "/panel/index"}}, nil
+			return []*menu.MenuVO{{Path: interactiveMenuPathPanel + "/index"}}, nil
 		},
 		loadRoleIDsByUserID: func(userID int64) ([]int64, error) {
 			return []int64{2}, nil
@@ -455,7 +424,7 @@ func TestFrontendCompatHandler_InteractiveTreeReturnsDatasetAndDatasourceNodes(t
 
 	h := &FrontendCompatHandler{
 		queryMenuTreeByRoleIDs: func(roleIDs []int64) ([]*menu.MenuVO, error) {
-			return []*menu.MenuVO{{Path: "/data/dataset"}, {Path: "/data/datasource"}}, nil
+			return []*menu.MenuVO{{Path: interactiveMenuPathDataset}, {Path: interactiveMenuPathDatasource}}, nil
 		},
 		loadRoleIDsByUserID: func(userID int64) ([]int64, error) {
 			return []int64{2}, nil
@@ -464,8 +433,8 @@ func TestFrontendCompatHandler_InteractiveTreeReturnsDatasetAndDatasourceNodes(t
 			return []dataset.TreeNode{{
 				ID:       101,
 				Name:     "Dataset Folder",
-				NodeType: "folder",
-				Children: []dataset.TreeNode{{ID: 102, Name: "Orders Dataset", NodeType: "dataset"}},
+				NodeType: visualizationNodeTypeFolder,
+				Children: []dataset.TreeNode{{ID: 102, Name: "Orders Dataset", NodeType: interactiveBusiFlagDataset}},
 			}}, nil
 		},
 		loadDatasourceTree: func(keyword *string) ([]*datasource.CoreDatasource, error) {
@@ -531,7 +500,7 @@ func TestFrontendCompatHandler_InteractiveTreeHandlesDatasetAndDatasourceLoaderE
 
 	h := &FrontendCompatHandler{
 		queryMenuTreeByRoleIDs: func(roleIDs []int64) ([]*menu.MenuVO, error) {
-			return []*menu.MenuVO{{Path: "/data/dataset"}, {Path: "/data/datasource"}}, nil
+			return []*menu.MenuVO{{Path: interactiveMenuPathDataset}, {Path: interactiveMenuPathDatasource}}, nil
 		},
 		loadRoleIDsByUserID: func(userID int64) ([]int64, error) {
 			return []int64{2}, nil
@@ -569,6 +538,52 @@ func TestFrontendCompatHandler_InteractiveTreeHandlesDatasetAndDatasourceLoaderE
 	}
 	if len(data["datasource"].([]interface{})) != 0 {
 		t.Fatalf("expected datasource loader failure to yield empty list, got %#v", data["datasource"])
+	}
+}
+
+func assertDashboardInteractiveTree(t *testing.T, data map[string]interface{}) {
+	t.Helper()
+	if len(data[interactiveBusiFlagDashboard].([]interface{})) != 1 {
+		t.Fatalf("expected authorized dashboard tree")
+	}
+	dashboardNode := data[interactiveBusiFlagDashboard].([]interface{})[0].(map[string]interface{})
+	if dashboardNode["id"] != "10" || dashboardNode["pid"] != "0" || dashboardNode["name"] != "Dashboard Folder" {
+		t.Fatalf("unexpected dashboard node contract: %#v", dashboardNode)
+	}
+	if dashboardNode["leaf"] != false {
+		t.Fatalf("expected dashboard node to remain non-leaf: %#v", dashboardNode)
+	}
+	if dashboardNode["weight"] != float64(9) || dashboardNode["extraFlag"] != float64(0) || dashboardNode["extraFlag1"] != float64(0) {
+		t.Fatalf("unexpected dashboard node extras: %#v", dashboardNode)
+	}
+	children := dashboardNode["children"].([]interface{})
+	if len(children) != 1 {
+		t.Fatalf("expected one real dashboard child node, got %#v", children)
+	}
+	child := children[0].(map[string]interface{})
+	if child["id"] != "11" || child["pid"] != "10" || child["name"] != "Revenue Dashboard" || child["leaf"] != true {
+		t.Fatalf("unexpected real dashboard child node contract: %#v", child)
+	}
+}
+
+func assertDatasetInteractiveTree(t *testing.T, data map[string]interface{}) {
+	t.Helper()
+	if len(data[interactiveBusiFlagDataset].([]interface{})) != 1 {
+		t.Fatalf("expected authorized dataset tree")
+	}
+	datasetNode := data[interactiveBusiFlagDataset].([]interface{})[0].(map[string]interface{})
+	if datasetNode["id"] != "12" || datasetNode["pid"] != "0" || datasetNode["name"] != "Dataset Folder" {
+		t.Fatalf("unexpected dataset node contract: %#v", datasetNode)
+	}
+	if datasetNode["leaf"] != false {
+		t.Fatalf("expected dataset folder node to be non-leaf: %#v", datasetNode)
+	}
+}
+
+func assertEmptyInteractiveTreeScope(t *testing.T, data map[string]interface{}, busiFlag string) {
+	t.Helper()
+	if len(data[busiFlag].([]interface{})) != 0 {
+		t.Fatalf("expected %s scope to be empty", busiFlag)
 	}
 }
 
