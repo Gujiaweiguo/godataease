@@ -104,7 +104,7 @@ func (h *ExportHandler) Download(c *gin.Context) {
 
 	userID := int64(middleware.GetUserID(c))
 	role := middleware.GetRole(c)
-	isAdmin := role == "admin"
+	isAdmin := role == defaultAdminCredential
 
 	if err := h.service.CheckAccess(task, userID, isAdmin); err != nil {
 		if err == service.ErrUnauthorized {
@@ -137,7 +137,7 @@ func (h *ExportHandler) GenerateDownloadURI(c *gin.Context) {
 
 	userID := int64(middleware.GetUserID(c))
 	role := middleware.GetRole(c)
-	isAdmin := role == "admin"
+	isAdmin := role == defaultAdminCredential
 
 	if err = h.service.CheckAccess(task, userID, isAdmin); err != nil {
 		if err == service.ErrUnauthorized {
