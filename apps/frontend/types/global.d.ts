@@ -4,6 +4,11 @@ declare global {
     DataEaseBi: any
     _de_get_time_out: number
   }
+
+  interface Date {
+    format(fmt?: string): string
+  }
+
   interface Fn<T = any> {
     (...arg: T[]): T
   }

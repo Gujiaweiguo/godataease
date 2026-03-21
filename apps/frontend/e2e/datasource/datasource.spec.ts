@@ -29,16 +29,11 @@ const loginWithValidCredentials = async page => {
 }
 
 const detectDatasourcePageState = async page => {
-  const hasDatasourceText =
-    (await page.locator('text=数据源').or(page.locator('text=Datasource')).count()) > 0
-  const hasLoginForm =
-    (await getUsernameInput(page).count()) > 0 &&
-    (await getPasswordInput(page).count()) > 0 &&
-    (await getLoginButton(page).count()) > 0
-  const hasApiError =
-    (await page.locator('text=500').count()) > 0 || (await page.locator('text=Request failed').count()) > 0
-  const hasWorkbenchText =
-    (await page.locator('text=工作台').count()) > 0 || (await page.locator('text=Workbench').count()) > 0
+  const bodyText = await page.locator('body').innerText()
+  const hasDatasourceText = /数据源|Datasource/.test(bodyText)
+  const hasLoginForm = /Account Login|登录/.test(bodyText)
+  const hasApiError = /500|Request failed/.test(bodyText)
+  const hasWorkbenchText = /工作台|Workbench/.test(bodyText)
 
   return {
     hasDatasourceText,
@@ -57,11 +52,6 @@ const ensureLoggedIn = async page => {
       sessionStorage.clear()
     })
     await page.goto('/#/login')
-
-    if (!(await getUsernameInput(page).isVisible().catch(() => false))) {
-      await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
-      return
-    }
   }
 
   await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
@@ -92,9 +82,17 @@ test.describe('Datasource Management', () => {
     await expect
       .poll(async () => {
         const state = await detectDatasourcePageState(page)
-        return state.hasDatasourceText || state.hasLoginForm || state.hasApiError || state.hasWorkbenchText
+        return state.hasDatasourceText
       }, { timeout: 15000 })
       .toBeTruthy()
+
+    const state = await detectDatasourcePageState(page)
+    expect(state.hasDatasourceText).toBeTruthy()
+    expect(state.hasLoginForm).toBeFalsy()
+    expect(state.hasApiError).toBeFalsy()
+    expect(state.hasWorkbenchText).toBeFalsy()
+
+    await expect(page.locator('.resource-tree .tree-header .title')).toContainText(/数据源|Datasource/)
   })
 
   test('SYS-SMK-006 @system-smoke should display create datasource button', async ({ page }) => {

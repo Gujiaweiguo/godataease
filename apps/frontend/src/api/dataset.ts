@@ -69,6 +69,17 @@ export interface Dataset {
   allFields?: Array<{}>
 }
 
+const normalizeDatasetTree = (nodes = []) => {
+  return nodes.map(node => {
+    const children = normalizeDatasetTree(node.children || [])
+    return {
+      ...node,
+      leaf: children.length === 0 && node.nodeType !== 'folder',
+      children
+    }
+  })
+}
+
 export interface Table {
   datasourceId: string
   name: string
@@ -132,7 +143,7 @@ export const moveDatasetTree = async (data: DatasetOrFolder): Promise<IResponse>
 export const getDatasetTree = async (data: BusiTreeRequest): Promise<IResponse> => {
   data.busiFlag = 'dataset'
   return request.post({ url: '/datasetTree/tree', data }).then(res => {
-    return res?.data
+    return normalizeDatasetTree(res?.data || [])
   })
 }
 
@@ -340,13 +351,13 @@ export const getFunction = async (): Promise<DatasetDetail[]> => {
 }
 
 export const exportTasksRecords = () =>
-  request.post({ url: `/exportCenter/exportTasks/records`, data: {} })
+  request.post({ url: `/api/exportCenter/exportTasks/records`, data: {} })
 
 export const exportTasks = (page: number, limit: number, status: string) =>
-  request.post({ url: `/exportCenter/exportTasks/${status}/${page}/${limit}`, data: {} })
+  request.post({ url: `/api/exportCenter/exportTasks/${status}/${page}/${limit}`, data: {} })
 
 export const exportRetry = async (id): Promise<IResponse> => {
-  return request.post({ url: '/exportCenter/retry/' + id, data: {} }).then(res => {
+  return request.post({ url: '/api/exportCenter/retry/' + id, data: {} }).then(res => {
     return res?.data
   })
 }

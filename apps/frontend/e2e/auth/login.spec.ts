@@ -83,4 +83,31 @@ test.describe('Authentication', () => {
 
     expect(hasAppShell).toBeTruthy()
   })
+
+  test('should honor protected redirect after login without falling into 401 or 404', async ({ page, context }) => {
+    await context.clearCookies()
+    await page.goto('/')
+    await page.evaluate(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+
+    await page.goto('/#/login?redirect=%2Fsystem%2Fuser')
+
+    if (!(await hasLoginForm(page))) {
+      await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
+    await expect(getPasswordInput(page)).toBeVisible({ timeout: 10000 })
+
+    await loginWithValidCredentials(page)
+
+    await page.waitForURL(url => !url.toString().includes('/login'), { timeout: 20000 })
+
+    const finalUrl = page.url()
+    expect(finalUrl.includes('/401')).toBeFalsy()
+    expect(finalUrl.includes('/404')).toBeFalsy()
+  })
 })

@@ -254,11 +254,11 @@ const checkParent = params => {
 const saveResource = () => {
   resource.value.validate(async result => {
     if (result) {
-      const params: ResourceOrFolder = {
-        nodeType: nodeType.value as 'folder' | 'leaf',
-        name: resourceForm.name,
-        type: curCanvasType.value,
-        mobileLayout: state.targetInfo?.extraFlag,
+        const params: ResourceOrFolder = {
+          nodeType: nodeType.value === 'leaf' ? 'panel' : 'folder',
+          name: resourceForm.name,
+          type: curCanvasType.value,
+          mobileLayout: state.targetInfo?.extraFlag,
         status: state.targetInfo?.extraFlag1
       }
 

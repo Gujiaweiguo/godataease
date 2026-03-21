@@ -33,6 +33,14 @@ const emptyInteractiveState = (menuAuth = true): InnerInteractive => ({
   menuAuth
 })
 
+const authorizedEmptyInteractiveState = (): InnerInteractive => ({
+  rootManage: true,
+  anyManage: true,
+  treeNodes: [],
+  leafNodeCount: 0,
+  menuAuth: true
+})
+
 export const interactiveStore = defineStore('interactive', {
   state: (): InteractiveState => ({
     data: {}
@@ -84,7 +92,11 @@ export const interactiveStore = defineStore('interactive', {
           return []
         }
       }
-      this.data[flag] = convertInteractive(res)
+      if (Array.isArray(res) && res.length === 0) {
+        this.data[flag] = authorizedEmptyInteractiveState()
+      } else {
+        this.data[flag] = convertInteractive(res)
+      }
       if (flag === 0) {
         wsCache.set('panel-weight', convertLocalStorage(this.data[flag]))
       }

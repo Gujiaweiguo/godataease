@@ -5,7 +5,7 @@ import { useAppearanceStore } from '@/store/modules/appearance'
 // Mock Less.js modules to avoid circular dependency issues in CI
 vi.mock('less/lib/less/functions/color.js', () => ({
   default: {
-    mix: vi.fn((color1, color2, options) => ({
+    mix: vi.fn((_color1, _color2, options) => ({
       toRGB: () => `rgb(${options.value}, ${options.value}, ${options.value})`
     }))
   }
