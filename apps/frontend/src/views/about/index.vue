@@ -9,8 +9,7 @@ import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { useI18n } from '@/hooks/web/useI18n'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { useCache } from '@/hooks/web/useCache'
-import { logoutApi } from '@/api/login'
-import { logoutHandler } from '@/utils/logout'
+import { performLogout } from '@/utils/logout'
 const dialogVisible = ref(false)
 const { wsCache } = useCache('localStorage')
 const { t } = useI18n()
@@ -79,8 +78,7 @@ const back2Community = () => {
     })
 }
 const logout = async () => {
-  await logoutApi()
-  logoutHandler()
+  await performLogout()
 }
 const getLicenseInfo = () => {
   validateHandler({}, res => {

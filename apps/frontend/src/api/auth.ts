@@ -1,7 +1,6 @@
 import request from '@/config/axios'
 
 export const queryUserApi = data => request.post({ url: '/user/byCurOrg', data })
-export const queryUserOptionsApi = () => request.get({ url: '/user/org/option' })
 export const queryRoleApi = data => request.post({ url: '/role/byCurOrg', data })
 
 export const userCreateApi = (data: any) => request.post({ url: '/system/user/create', data })

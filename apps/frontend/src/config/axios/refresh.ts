@@ -46,14 +46,14 @@ const cacheRequest = cb => {
 
 export const configHandler = config => {
   const desktop = wsCache.get('app.desktop')
-  if (desktop) {
-    return config
-  }
   if (isLink()) {
     return config
   }
   if (wsCache.get('user.token')) {
     config.headers['X-DE-TOKEN'] = wsCache.get('user.token')
+    if (desktop) {
+      return config
+    }
     const expired = isExpired()
     if (expired && !config.url.includes(refreshUrl)) {
       if (!getRefreshStatus()) {

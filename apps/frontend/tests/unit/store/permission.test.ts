@@ -81,11 +81,13 @@ describe('Permission Store', () => {
         {
           path: '/dashboard',
           name: 'Dashboard',
+          hidden: false,
           component: 'Layout',
           children: [
             {
               path: 'index',
               name: 'DashboardIndex',
+              hidden: false,
               component: 'dashboard/index'
             }
           ]
@@ -117,15 +119,18 @@ describe('Permission Store', () => {
         {
           path: '/data',
           name: 'Data',
+          hidden: false,
           component: 'Layout',
           children: [
             {
               path: 'dataset',
               name: 'Dataset',
+              hidden: false,
               children: [
                 {
                   path: 'list',
-                  name: 'DatasetList'
+                  name: 'DatasetList',
+                  hidden: false
                 }
               ]
             }
@@ -144,7 +149,7 @@ describe('Permission Store', () => {
       store.setCurrentPath('/dashboard')
       store.setIsAddRouters(true)
       await store.generateRoutes([
-        { path: '/test', name: 'Test' }
+        { path: '/test', name: 'Test', hidden: false }
       ])
 
       store.clear()
@@ -191,7 +196,7 @@ describe('pathValid', () => {
   it('should return false for non-existent path', () => {
     const store = usePermissionStore()
     store.generateRoutes([
-      { path: '/dashboard', name: 'Dashboard' }
+      { path: '/dashboard', name: 'Dashboard', hidden: false }
     ])
 
     expect(pathValid('/nonexistent')).toBe(false)
@@ -203,10 +208,12 @@ describe('pathValid', () => {
       {
         path: '/data',
         name: 'Data',
+        hidden: false,
         children: [
           {
             path: 'dataset',
-            name: 'Dataset'
+            name: 'Dataset',
+            hidden: false
           }
         ]
       }
@@ -304,22 +311,26 @@ describe('Permission Store Integration', () => {
       {
         path: '/dashboard',
         name: 'Dashboard',
+        hidden: false,
         component: 'Layout',
         children: [
           {
             path: 'index',
-            name: 'DashboardIndex'
+            name: 'DashboardIndex',
+            hidden: false
           }
         ]
       },
       {
         path: '/data',
         name: 'Data',
+        hidden: false,
         component: 'Layout',
         children: [
           {
             path: 'dataset',
-            name: 'Dataset'
+            name: 'Dataset',
+            hidden: false
           }
         ]
       }
@@ -341,14 +352,14 @@ describe('Permission Store Integration', () => {
     const store = usePermissionStore()
 
     const initialRouters = [
-      { path: '/dashboard', name: 'Dashboard' }
+      { path: '/dashboard', name: 'Dashboard', hidden: false }
     ]
     await store.generateRoutes(initialRouters)
     const initialCount = store.getRouters.length
 
     const updatedRouters = [
-      { path: '/dashboard', name: 'Dashboard' },
-      { path: '/data', name: 'Data' }
+      { path: '/dashboard', name: 'Dashboard', hidden: false },
+      { path: '/data', name: 'Data', hidden: false }
     ]
     await store.generateRoutes(updatedRouters)
 

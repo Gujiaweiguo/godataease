@@ -11,16 +11,16 @@ const userStore = useUserStoreWithOut()
 const localeStore = useLocaleStoreWithOut()
 
 const language = ref(null)
-const handleSetLanguage = lang => {
+const handleSetLanguage = async lang => {
+  if (!lang || language.value === lang) {
+    return
+  }
   const param = { lang }
-  switchLangApi(param).then(res => {
-    if (!res.msg) {
-      language.value = lang
-      userStore.setLanguage(lang)
-      permissionStore.$reset()
-      window.location.reload()
-    }
-  })
+  await switchLangApi(param)
+  language.value = lang
+  await userStore.setLanguage(lang)
+  permissionStore.$reset()
+  window.location.reload()
 }
 
 const options = reactive([])

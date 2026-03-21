@@ -6,8 +6,7 @@ import { mountedOrg, switchOrg } from '@/api/user'
 import { ref, onMounted, computed } from 'vue'
 import OrgCell from '@/views/mobile/components/OrgCell.vue'
 import { useRouter } from 'vue-router_2'
-import { logoutApi } from '@/api/login'
-import { logoutHandler } from '@/utils/logout'
+import { performLogout } from '@/utils/logout'
 import VanNavBar from 'vant/es/nav-bar'
 import VanImage from 'vant/es/image'
 import 'vant/es/image/style'
@@ -25,8 +24,7 @@ const navBarTitle = ref('组织')
 const name = ref('')
 const showNavBar = ref(true)
 const logout = async () => {
-  await logoutApi()
-  logoutHandler()
+  await performLogout()
   push('/login')
 }
 
@@ -45,7 +43,9 @@ const findName = () => {
       break
     }
     if (item?.children?.length) {
-      item.children.forEach(kid => stack.push(kid))
+      item.children.forEach(kid => {
+        stack.push(kid)
+      })
     }
   }
 }

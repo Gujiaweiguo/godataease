@@ -107,26 +107,16 @@ onMounted(() => {
             }"
           ></TopDesktopCard>
         </div>
-        <div class="border-top">
-          <el-popover
-            :teleported="false"
-            popper-class="popper-class_ai-copilot"
-            placement="left-start"
-            :width="224"
-            trigger="click"
-            ><template #default>
-              <div style="padding: 8px 0">
-                <LangSelector />
-              </div>
-            </template>
-            <template #reference>
-              <div class="item-select_info">
-                {{ $t('commons.language') }}
-                <el-icon style="font-size: 16px">
-                  <Icon><icon_right_outlined></icon_right_outlined></Icon>
-                </el-icon>
-              </div> </template
-          ></el-popover>
+        <div class="border-top language-block">
+          <div class="item-select_info item-select_info--plain">
+            {{ $t('commons.language') }}
+            <el-icon style="font-size: 16px">
+              <Icon><icon_right_outlined></icon_right_outlined></Icon>
+            </el-icon>
+          </div>
+          <div class="language-inner">
+            <LangSelector />
+          </div>
         </div>
       </div>
     </template>
@@ -194,6 +184,12 @@ onMounted(() => {
     padding-top: 4px;
     padding-bottom: 8px;
   }
+  .language-block {
+    padding-bottom: 0;
+  }
+  .language-inner {
+    padding: 0 0 8px;
+  }
   .item-select_info {
     cursor: pointer;
     height: 40px;
@@ -208,6 +204,13 @@ onMounted(() => {
 
     &:hover {
       background: #1f23291a;
+    }
+  }
+  .item-select_info--plain {
+    cursor: default;
+
+    &:hover {
+      background: transparent;
     }
   }
 }

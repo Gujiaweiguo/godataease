@@ -135,10 +135,27 @@ const getParentName = (parentId: number | null) => {
 const loadOrgList = async () => {
   try {
     const res = await orgListApi()
+    console.log('API Response:', res)
+    console.log('res.data:', res.data)
+    console.log('res.data type:', typeof res.data)
+    console.log('Is array:', Array.isArray(res.data))
+    console.log('orgList before:', orgList.value.length)
+
     if (res.code === '000000') {
-      orgList.value = res.data?.list || []
+      // API 直接返回数组
+      if (Array.isArray(res.data)) {
+        orgList.value = res.data
+        console.log('orgList after assignment:', orgList.value.length)
+      } else if (res.data?.list && Array.isArray(res.data.list)) {
+        orgList.value = res.data.list
+        console.log('orgList after assignment from list:', orgList.value.length)
+      } else {
+        orgList.value = []
+        console.log('orgList is empty, setting to empty array')
+      }
     }
   } catch (error) {
+    console.error('Error loading org list:', error)
     ElMessage.error('加载组织列表失败')
   }
 }

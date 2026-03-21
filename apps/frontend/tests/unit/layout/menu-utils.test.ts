@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/router/establish', () => ({
-  formatRoute: (routes: AppCustomRouteRecordRaw[]) => routes
+  formatRoute: (routes: any[]) => routes
 }))
 import {
   buildMenuSelectPath,
   resolveActiveTopPath,
+  resolveTopMenus,
   resolveSideMenus
-} from '@/layout/components/menu-utils'
+} from '../../../src/layout/components/menu-utils'
 
 const topMenus = [
   {
@@ -34,6 +35,27 @@ const topMenus = [
 ] as any
 
 describe('menu-utils', () => {
+  it('resolveTopMenus should exclude mine entry while keeping other top menus', () => {
+    const routes = [
+      { path: '/workbranch', hidden: false, meta: { hidden: false } },
+      { path: '/panel', hidden: false, meta: { hidden: false } },
+      { path: '/screen', hidden: false, meta: { hidden: false } },
+      { path: '/data', hidden: false, meta: { hidden: false } },
+      { path: '/system', hidden: false, meta: { hidden: false } },
+      { path: '/mine', hidden: false, meta: { hidden: false } },
+      { path: '/help', hidden: false, meta: { hidden: false } }
+    ] as any
+
+    expect(resolveTopMenus(routes).map(item => item.path)).toEqual([
+      '/workbranch',
+      '/panel',
+      '/screen',
+      '/data',
+      '/system',
+      '/help'
+    ])
+  })
+
   it('resolveActiveTopPath should match top menu by current route', () => {
     expect(resolveActiveTopPath('/system/user', topMenus)).toBe('/system')
     expect(resolveActiveTopPath('/workbranch/index', topMenus)).toBe('/workbranch/index')

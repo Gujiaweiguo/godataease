@@ -1,30 +1,38 @@
 <template>
   <div class="user-management">
-    <div class="header">
-      <h2>用户管理</h2>
-      <el-button type="primary" @click="handleCreate">新建用户</el-button>
-    </div>
+    <el-tabs v-model="activeTab" class="user-tabs">
+      <el-tab-pane label="用户" name="user">
+        <div class="tab-content">
+          <div class="toolbar">
+            <el-button type="primary" @click="handleCreate">新建用户</el-button>
+          </div>
 
-    <el-table :data="userList" border>
-      <el-table-column prop="username" label="用户名" />
-      <el-table-column prop="realName" label="姓名" />
-      <el-table-column prop="email" label="邮箱" />
-      <el-table-column prop="phone" label="手机号" />
-      <el-table-column prop="status" label="状态">
-        <template #default="{ row }">
-          <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-            {{ row.status === 1 ? '启用' : '禁用' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="280">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
-          <el-button link type="primary" @click="handleViewAudit(row)">审计日志</el-button>
-          <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+          <el-table :data="userList" border v-loading="loading">
+            <el-table-column prop="username" label="用户名" />
+            <el-table-column prop="realName" label="姓名" />
+            <el-table-column prop="email" label="邮箱" />
+            <el-table-column prop="phone" label="手机号" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 1 ? 'success' : 'danger'">
+                  {{ row.status === 1 ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+                <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="角色" name="role">
+        <RoleTab />
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
       <el-form :model="form" :rules="rules" label-width="100px">
@@ -64,13 +72,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { queryUserApi, userCreateApi, userUpdateApi, userDeleteApi } from '@/api/auth'
 import { queryUserOptionsApi } from '@/api/org'
+import RoleTab from './RoleTab.vue'
 
-const router = useRouter()
-
+const activeTab = ref('user')
+const loading = ref(false)
 const userList = ref([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -85,6 +93,15 @@ const form = ref({
 })
 const organizationList = ref([])
 
+const normalizeUsers = (items: any[] = []) => {
+  return items.map((item: any) => ({
+    ...item,
+    id: Number(item.id || item.userId),
+    userId: Number(item.userId || item.id),
+    realName: item.realName || item.nickName || ''
+  }))
+}
+
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   realName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
@@ -97,13 +114,16 @@ const rules = {
 }
 
 const loadUserList = async () => {
+  loading.value = true
   try {
     const res = await queryUserApi({ current: 1, size: 100 })
     if (res.code === '000000') {
-      userList.value = res.data?.list || []
+      userList.value = normalizeUsers(res.data?.list || [])
     }
   } catch (error) {
     ElMessage.error('加载用户列表失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -152,15 +172,10 @@ const handleDelete = async (id: number) => {
       loadUserList()
     }
   } catch (error) {
-    ElMessage.error('删除失败')
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
   }
-}
-
-const handleViewAudit = (row: any) => {
-  router.push({
-    path: '/system/audit',
-    query: { userId: row.userId, username: row.username }
-  })
 }
 
 const handleSubmit = async () => {
@@ -193,14 +208,19 @@ onMounted(() => {
   padding: 20px;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.user-tabs {
+  background: #fff;
+  padding: 16px;
+  border-radius: 4px;
 }
 
-.header h2 {
-  margin: 0;
+.tab-content {
+  padding-top: 16px;
+}
+
+.toolbar {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

@@ -165,6 +165,38 @@ export const routes: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/mine',
+    name: 'mine',
+    hidden: true,
+    meta: {},
+    component: () => import('@/layout/index.vue'),
+    children: [
+      {
+        path: 'about',
+        name: 'mine-about',
+        hidden: true,
+        component: () => import('@/views/about/page.vue'),
+        meta: { hidden: true }
+      }
+    ]
+  },
+  {
+    path: '/help',
+    name: 'help',
+    hidden: true,
+    meta: {},
+    component: () => import('@/layout/index.vue'),
+    children: [
+      {
+        path: 'doc',
+        name: 'help-doc',
+        hidden: true,
+        component: () => import('@/views/help/doc/index.vue'),
+        meta: { hidden: true }
+      }
+    ]
+  },
+  {
     path: '/chart-view',
     name: 'chart-view',
     hidden: true,

@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { ElHeader } from 'element-plus-secondary'
 import { useRouter } from 'vue-router_2'
 import AccountOperator from '@/layout/components/AccountOperator.vue'
+import DesktopSetting from './DesktopSetting.vue'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { useI18n } from '@/hooks/web/useI18n'
 import { isDesktop } from '@/utils/ModelUtil'
@@ -45,6 +46,7 @@ const navigate = computed(() => appearanceStore.getNavigate)
       </span>
 
       <AccountOperator v-if="!desktop" />
+      <DesktopSetting v-else />
     </div>
   </el-header>
 </template>

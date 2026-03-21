@@ -2,12 +2,15 @@ import { useUserStoreWithOut } from '@/store/modules/user'
 import router from '@/router'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
+import { useLocaleStoreWithOut } from '@/store/modules/locale'
 import { useCache } from '@/hooks/web/useCache'
+import { logoutApi } from '@/api/login'
 
 const { wsCache } = useCache()
 const permissionStore = usePermissionStoreWithOut()
 const userStore = useUserStoreWithOut()
 const interactiveStore = interactiveStoreWithOut()
+const localeStore = useLocaleStoreWithOut()
 
 export const logoutHandler = (justClean?: boolean, save_platform_status = false) => {
   userStore.clear()
@@ -16,12 +19,10 @@ export const logoutHandler = (justClean?: boolean, save_platform_status = false)
   permissionStore.$reset()
   interactiveStore.clear()
   interactiveStore.$reset()
+  localeStore.$reset()
   removeCache()
-  let queryRedirectPath = '/workbranch'
-  // 如果redirect参数中有值
-  if (router.currentRoute.value.fullPath) {
-    queryRedirectPath = router.currentRoute.value.fullPath as string
-  }
+  const currentFullPath = (router.currentRoute.value.fullPath || '/workbranch') as string
+  let queryRedirectPath = resolveLogoutRedirectTarget(currentFullPath)
   let pathname = window.location.pathname
   if (pathname) {
     if (pathname.includes('oidcbi/')) {
@@ -54,6 +55,26 @@ export const logoutHandler = (justClean?: boolean, save_platform_status = false)
     window.location.href = wsCache.get('custom_auth_logout_url')
   }
   router.push(justClean ? queryRedirectPath : `/login?redirect=${queryRedirectPath}`)
+}
+
+export const performLogout = async (justClean?: boolean, save_platform_status = false) => {
+  try {
+    if (!justClean) {
+      await logoutApi()
+    }
+  } catch {
+  } finally {
+    logoutHandler(justClean, save_platform_status)
+  }
+}
+
+const resolveLogoutRedirectTarget = (currentFullPath: string) => {
+  const path = (currentFullPath || '/workbranch').split('?')[0]
+  const disallowedPrefixes = ['/mine', '/help', '/401', '/404', '/login']
+  if (disallowedPrefixes.some(prefix => path === prefix || path.startsWith(prefix + '/'))) {
+    return '/workbranch'
+  }
+  return currentFullPath || '/workbranch'
 }
 
 const removeCache = () => {

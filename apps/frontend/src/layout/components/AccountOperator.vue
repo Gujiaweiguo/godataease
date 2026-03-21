@@ -4,8 +4,7 @@ import icon_expandDown_filled from '@/assets/svg/icon_expand-down_filled.svg'
 import { computed, ref, unref } from 'vue'
 import { Icon } from '@/components/icon-custom'
 import { useUserStoreWithOut } from '@/store/modules/user'
-import { logoutApi } from '@/api/login'
-import { logoutHandler } from '@/utils/logout'
+import { performLogout } from '@/utils/logout'
 import { XpackComponent } from '@/components/plugin'
 import { useI18n } from '@/hooks/web/useI18n'
 import { useEmitt } from '@/hooks/web/useEmitt'
@@ -34,12 +33,13 @@ if (!appearanceStore.getShowAbout) {
 const inPlatformClient = computed(() => !!wsCache.get('de-platform-client'))
 
 const logout = async () => {
-  await logoutApi()
-  logoutHandler()
+  await performLogout()
 }
 
 const linkLoaded = items => {
-  items.forEach(item => linkList.value.push(item))
+  items.forEach(item => {
+    linkList.value.push(item)
+  })
   linkList.value.sort(compare('id'))
 }
 const xpackLinkLoaded = items => {
@@ -49,7 +49,9 @@ const xpackLinkLoaded = items => {
       linkList.value.splice(len, 1)
     }
   }
-  items.forEach(item => linkList.value.push(item))
+  items.forEach(item => {
+    linkList.value.push(item)
+  })
   if (inPlatformClient.value) {
     len = linkList.value.length
     while (len--) {
@@ -84,13 +86,6 @@ const uid = computed(() => userStore.getUid)
 
 const buttonRef = ref()
 const popoverRef = ref()
-
-const divLanguageRef = ref()
-const popoverLanguageRef = ref()
-
-const openLanguage = () => {
-  unref(popoverLanguageRef).popperRef?.delayHide?.()
-}
 
 const openPopover = () => {
   unref(popoverRef).popperRef?.delayHide?.()
@@ -146,25 +141,16 @@ if (uid.value === '1') {
           <span>{{ link.label }}</span>
         </div>
 
-        <div class="uinfo-main-item de-container">
-          <div class="about-parent" ref="divLanguageRef" v-click-outside="openLanguage">
+        <div class="uinfo-main-item de-container uinfo-language-block">
+          <div class="about-parent about-parent--plain">
             <span>{{ $t('commons.language') }}</span>
             <el-icon class="el-icon-animate">
               <ArrowRight />
             </el-icon>
           </div>
-          <el-popover
-            ref="popoverLanguageRef"
-            :virtual-ref="divLanguageRef"
-            trigger="hover"
-            title=""
-            virtual-triggering
-            placement="left"
-            width="224"
-            popper-class="language-popover"
-          >
+          <div class="uinfo-language-inner">
             <LangSelector />
-          </el-popover>
+          </div>
         </div>
       </div>
       <el-divider />
@@ -264,6 +250,22 @@ if (uid.value === '1') {
         justify-content: space-between;
       }
     }
+    .uinfo-language-block {
+      height: auto;
+      line-height: normal;
+      cursor: default;
+      padding-bottom: 6px;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
+    .uinfo-language-inner {
+      padding-top: 4px;
+    }
+    .about-parent--plain {
+      cursor: default;
+    }
   }
 }
 .uinfo-popover {
@@ -277,12 +279,5 @@ if (uid.value === '1') {
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: 0 !important;
-}
-.language-popover {
-  // max-height: 112px;
-  .ed-popper__arrow {
-    display: none;
-  }
-  padding: var(--ed-popover-padding) 0 !important;
 }
 </style>

@@ -36,11 +36,13 @@ export const useLocale = () => {
       langModule = await import(`../../locales/${locale}.ts`)
     } else {
       const localeStore = useLocaleStoreWithOut()
-      const currentLocale = localeStore.getCurrentLocale
       const localeMap = await localeStore.getLocaleMap
       const cMap: any = localeMap.find(item => {
-        return item.lang === currentLocale.lang
+        return item.lang === locale
       })
+      if (!cMap) {
+        throw new Error(`missing locale option: ${locale}`)
+      }
       langModule = await loadRemoteI18n(cMap)
     }
     // const langModule = await import(`../../locales/${locale}.ts`)
