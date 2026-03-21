@@ -130,6 +130,7 @@ type Router struct {
 	syncHandler             *handler.SyncHandler
 	frontendCompatHandler   *handler.FrontendCompatHandler
 	permissionCompatHandler *handler.PermissionCompatHandler
+	dataPermissionHandler   *handler.DataPermissionHandler
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -237,6 +238,8 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	chartRepo := repository.NewChartRepository(db)
 	chartService := service.NewChartService(chartRepo)
 	chartHandler := handler.NewChartHandler(chartService)
+	dataPermissionService := service.NewDataPermissionAdminService(rowPermRepo, columnPermRepo, chartService)
+	dataPermissionHandler := handler.NewDataPermissionHandler(dataPermissionService)
 
 	visualRepo := repository.NewVisualizationRepository(db)
 	visualService := service.NewVisualizationService(visualRepo)
@@ -345,6 +348,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		syncHandler:             syncHandler,
 		frontendCompatHandler:   frontendCompatHandler,
 		permissionCompatHandler: permissionCompatHandler,
+		dataPermissionHandler:   dataPermissionHandler,
 	}
 }
 
@@ -410,17 +414,59 @@ func (r *Router) registerRootRoutes() {
 
 	r.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	handler.RegisterAuthRoutes(r.engine, r.authHandler)
+	if r.userHandler != nil {
+		protected.POST("/api/user/switchLanguage", r.userHandler.SwitchLanguage)
+	}
 	handler.RegisterSystemParamRoutes(r.engine, r.systemParamHandler)
 	handler.RegisterLicenseRoutes(r.engine, r.licenseHandler)
 	handler.RegisterMsgCenterRoutes(r.engine, r.msgCenterHandler)
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
 	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler)
-	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
+	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler, nil)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
 }
 
 func (r *Router) registerAPIRoutes() {
 	api := r.engine.Group("/api")
+	datasourceAPI := api
+	datasourceDe2API := r.engine.Group("/de2api")
+	datasetAPI := api
+	datasetDe2API := r.engine.Group("/de2api")
+	visualizationDe2API := r.engine.Group("/de2api")
+	auditAPI := api
+	exportAPI := api
+	if r.app != nil && r.app.Config != nil {
+		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
+			Secret: r.app.Config.JWT.Secret,
+			Expire: r.app.Config.JWT.Expire,
+		})
+		protectedDatasourceAPI := r.engine.Group("/api")
+		protectedDatasourceAPI.Use(middleware.Auth(jwtInstance))
+		datasourceAPI = protectedDatasourceAPI
+		protectedDatasourceDe2API := r.engine.Group("/de2api")
+		protectedDatasourceDe2API.Use(middleware.Auth(jwtInstance))
+		datasourceDe2API = protectedDatasourceDe2API
+
+		protectedDatasetAPI := r.engine.Group("/api")
+		protectedDatasetAPI.Use(middleware.Auth(jwtInstance))
+		datasetAPI = protectedDatasetAPI
+
+		protectedDatasetDe2API := r.engine.Group("/de2api")
+		protectedDatasetDe2API.Use(middleware.Auth(jwtInstance))
+		datasetDe2API = protectedDatasetDe2API
+
+		protectedVisualizationDe2API := r.engine.Group("/de2api")
+		protectedVisualizationDe2API.Use(middleware.Auth(jwtInstance))
+		visualizationDe2API = protectedVisualizationDe2API
+
+		protectedAuditAPI := r.engine.Group("/api")
+		protectedAuditAPI.Use(middleware.Auth(jwtInstance))
+		auditAPI = protectedAuditAPI
+
+		protectedExportAPI := r.engine.Group("/api")
+		protectedExportAPI.Use(middleware.Auth(jwtInstance))
+		exportAPI = protectedExportAPI
+	}
 	{
 		api.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
@@ -428,7 +474,7 @@ func (r *Router) registerAPIRoutes() {
 			})
 		})
 
-		handler.RegisterAuditRoutes(api, r.auditHandler)
+		handler.RegisterAuditRoutes(auditAPI, r.auditHandler)
 		handler.RegisterUserRoutes(api, r.userHandler)
 		handler.RegisterOrgRoutes(api, r.orgHandler)
 		handler.RegisterPermRoutes(api, r.permHandler)
@@ -437,12 +483,17 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterRoleMenuRoutes(api, r.roleMenuHandler)
 		handler.RegisterMenuRoutes(api, r.menuHandler)
 		handler.RegisterPermissionCompatRoutes(api, r.permissionCompatHandler)
+		handler.RegisterDataPermissionRoutes(api, r.dataPermissionHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
-		handler.RegisterDatasourceRoutes(api, r.datasourceHandler)
+		handler.RegisterDatasourceRoutes(datasourceAPI, r.datasourceHandler)
+		handler.RegisterCompatibilityBridgeRoutes(datasourceDe2API, nil, nil, r.datasourceHandler, nil, nil, nil)
 		handler.RegisterSyncRoutes(api, r.syncHandler)
-		r.registerDatasetRoutes(api)
+		r.registerDatasetRoutes(datasetAPI)
+		handler.RegisterCompatibilityBridgeRoutes(datasetAPI, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
+		handler.RegisterCompatibilityBridgeRoutes(datasetDe2API, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
 		handler.RegisterChartRoutes(api, r.chartHandler)
 		r.registerVisualizationRoutes(api)
+		r.registerVisualizationDe2DetailRoute(visualizationDe2API)
 		handler.RegisterWatermarkRoutes(api, r.watermarkHandler)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)
 		handler.RegisterSystemVariableRoutes(api, r.systemVariableHandler)
@@ -452,11 +503,12 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterTicketRoutes(api, r.ticketHandler)
 		handler.RegisterGeoRoutes(api, r.geoHandler)
 		handler.RegisterStaticRoutes(api, r.staticHandler)
-		handler.RegisterExportRoutes(api, r.exportHandler)
+		handler.RegisterExportRoutes(exportAPI, r.exportHandler)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
-		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler)
+		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
+		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, r.chartHandler, nil)
 	}
 }
 
@@ -545,6 +597,15 @@ func serveFrontendAsset(c *gin.Context, path, frontendDir string) {
 
 	c.Header("Cache-Control", "no-store")
 	c.File(filepath.Join(frontendDir, "index.html"))
+}
+
+func (r *Router) registerVisualizationDe2DetailRoute(api *gin.RouterGroup) {
+	visualGroup := api.Group("/dataVisualization")
+	if r.permMiddleware != nil {
+		visualGroup.POST("/findById", r.permMiddleware.CheckDashboardView(), r.visualHandler.FindByID)
+		return
+	}
+	visualGroup.POST("/findById", r.visualHandler.FindByID)
 }
 
 func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {

@@ -93,7 +93,18 @@ func getEnv(key, defaultValue string) string {
 }
 
 func cleanupTables(tables ...string) {
+	if err := testDB.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+		panic(fmt.Sprintf("disable foreign key checks failed: %v", err))
+	}
+	defer func() {
+		if err := testDB.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
+			panic(fmt.Sprintf("enable foreign key checks failed: %v", err))
+		}
+	}()
+
 	for _, table := range tables {
-		testDB.Exec(fmt.Sprintf("TRUNCATE TABLE %s", table))
+		if err := testDB.Exec(fmt.Sprintf("TRUNCATE TABLE %s", table)).Error; err != nil {
+			panic(fmt.Sprintf("truncate table %s failed: %v", table, err))
+		}
 	}
 }

@@ -13,7 +13,9 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 	calcitev1 "dataease/backend/proto/calcite/v1"
 	seatunnelv1 "dataease/backend/proto/seatunnel/v1"
 
@@ -41,6 +43,62 @@ type bridgeFieldListResp struct {
 		DimensionList []map[string]interface{} `json:"dimensionList"`
 		QuotaList     []map[string]interface{} `json:"quotaList"`
 	} `json:"data"`
+}
+
+type mockBridgeResourcePermRepo struct {
+	hasPermission bool
+}
+
+func (m *mockBridgeResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, error) {
+	return &permission.SysPerm{PermID: permID, PermKey: "view"}, nil
+}
+
+func (m *mockBridgeResourcePermRepo) GetPermByKey(permKey string) (*permission.SysPerm, error) {
+	return &permission.SysPerm{PermID: 1, PermKey: permKey}, nil
+}
+
+func (m *mockBridgeResourcePermRepo) ListPerms(permType string, page, size int) ([]*permission.SysPerm, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockBridgeResourcePermRepo) CreatePerm(perm *permission.SysPerm) error { return nil }
+func (m *mockBridgeResourcePermRepo) UpdatePerm(perm *permission.SysPerm) error { return nil }
+func (m *mockBridgeResourcePermRepo) DeletePerm(permID int64) error             { return nil }
+func (m *mockBridgeResourcePermRepo) GetUserPerms(userID int64) ([]int64, error) {
+	return nil, nil
+}
+func (m *mockBridgeResourcePermRepo) GetRolePerms(roleID int64) ([]int64, error) {
+	return nil, nil
+}
+func (m *mockBridgeResourcePermRepo) GetUserRoleIDs(userID int64) ([]int64, error) {
+	if m.hasPermission {
+		return []int64{1}, nil
+	}
+	return nil, nil
+}
+func (m *mockBridgeResourcePermRepo) CheckUserPermission(userID, permID int64) (bool, error) {
+	return m.hasPermission, nil
+}
+func (m *mockBridgeResourcePermRepo) CheckRolePermission(roleID, permID int64) (bool, error) {
+	return m.hasPermission, nil
+}
+func (m *mockBridgeResourcePermRepo) GrantPermToUser(userID, permID int64, createBy string) error {
+	return nil
+}
+func (m *mockBridgeResourcePermRepo) RevokePermFromUser(userID, permID int64) error { return nil }
+func (m *mockBridgeResourcePermRepo) GrantPermToRole(roleID, permID int64) error    { return nil }
+func (m *mockBridgeResourcePermRepo) RevokePermFromRole(roleID, permID int64) error { return nil }
+func (m *mockBridgeResourcePermRepo) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return []*permission.UserResourcePermVO{}, nil
+}
+func (m *mockBridgeResourcePermRepo) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return []*permission.ResourceUserPermVO{}, nil
+}
+func (m *mockBridgeResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
+	return nil
+}
+func (m *mockBridgeResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }
 
 type mockSeatunnelSyncService struct {
@@ -283,7 +341,7 @@ func (r *fakeBridgeChartRepo) DeleteDatasetFieldsByChart(chartID int64) error {
 func TestChartDataGetFieldDataInvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, &ChartHandler{})
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, &ChartHandler{}, nil)
 
 	req := httptest.NewRequest("POST", "/chartData/getFieldData/not-number/xAxis", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -306,7 +364,7 @@ func TestChartDataGetFieldDataInvalidID(t *testing.T) {
 func TestChartDataGetFieldDataFallbackEmptyWhenDatasetHandlerNil(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, &ChartHandler{})
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, &ChartHandler{}, nil)
 
 	req := httptest.NewRequest("POST", "/chartData/getFieldData/100/xAxis", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -332,7 +390,7 @@ func TestChartDataGetFieldDataFallbackEmptyWhenDatasetHandlerNil(t *testing.T) {
 func TestChartDataGetDrillFieldDataFallbackEmptyWhenDatasetHandlerNil(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, &ChartHandler{})
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, &ChartHandler{}, nil)
 
 	req := httptest.NewRequest("POST", "/chartData/getDrillFieldData/100", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -363,7 +421,7 @@ func TestChartSaveRouteUpdatesCoreFields(t *testing.T) {
 	chartHandler := NewChartHandler(service.NewChartService(repo))
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
 
 	reqBody := `{"id":101,"title":"new-title","resultMode":"all"}`
 	req := httptest.NewRequest("POST", "/chart/save", strings.NewReader(reqBody))
@@ -414,7 +472,7 @@ func TestChartListByDQRouteReturnsDimensionAndQuota(t *testing.T) {
 	chartHandler := NewChartHandler(service.NewChartService(repo))
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
 
 	req := httptest.NewRequest("POST", "/chart/listByDQ/11/9", strings.NewReader(`{"type":"bar"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -468,7 +526,7 @@ func TestApiAliasChartSaveAndListByDQ(t *testing.T) {
 
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, nil)
 
 	saveReq := httptest.NewRequest("POST", "/api/chart/save", strings.NewReader(`{"id":201,"title":"alias-title"}`))
 	saveReq.Header.Set("Content-Type", "application/json")
@@ -537,7 +595,7 @@ func TestChartCopyAndDeleteFieldRoutes(t *testing.T) {
 	chartHandler := NewChartHandler(service.NewChartService(repo))
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
 
 	copyReq := httptest.NewRequest("POST", "/chart/copyField/10/300", strings.NewReader("{}"))
 	copyReq.Header.Set("Content-Type", "application/json")
@@ -608,7 +666,7 @@ func TestApiAliasChartCopyAndDeleteFieldByChart(t *testing.T) {
 
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, nil)
 
 	copyReq := httptest.NewRequest("POST", "/api/chart/copyField/11/400", strings.NewReader("{}"))
 	copyReq.Header.Set("Content-Type", "application/json")
@@ -680,7 +738,7 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 	chartHandler := NewChartHandler(service.NewChartService(repo))
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
 
 	listReq := httptest.NewRequest("POST", "/datasetField/listByDatasetGroup/41", strings.NewReader("{}"))
 	listReq.Header.Set("Content-Type", "application/json")
@@ -722,7 +780,7 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 func TestOldPathDatasourceList(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasource/list", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -737,7 +795,7 @@ func TestOldPathDatasourceList(t *testing.T) {
 func TestOldPathDatasetTree(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasetTree/tree", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -753,7 +811,7 @@ func TestApiAliasDatasourceList(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/api/datasource/list", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -769,7 +827,7 @@ func TestApiAliasDatasetTree(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/api/datasetTree/tree", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -784,7 +842,7 @@ func TestApiAliasDatasetTree(t *testing.T) {
 func TestPaginationResponseFormat(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/chart/listByDQ/1/1", strings.NewReader(`{"type":"bar"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -809,7 +867,7 @@ func TestErrorResponseFormat(t *testing.T) {
 	chartHandler := NewChartHandler(service.NewChartService(repo))
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
 
 	req := httptest.NewRequest("POST", "/chartData/getFieldData/invalid/xAxis", strings.NewReader("{}"))
 	req.Header.Set("Content-Type", "application/json")
@@ -833,7 +891,7 @@ func TestErrorResponseFormat(t *testing.T) {
 func TestOldPathChartSaveWithNilHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/chart/save", strings.NewReader(`{"id":1}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -849,7 +907,7 @@ func TestApiAliasChartDataGetData(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, nil)
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/api/chartData/getData", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -866,7 +924,7 @@ func TestDatasourceSyncRouteReturnsErrorWhenSeatunnelUnavailable(t *testing.T) {
 	r := gin.New()
 
 	dsHandler := NewDatasourceHandler(service.NewDatasourceService(nil))
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasource/syncApiDs", strings.NewReader(`{"datasourceId":"1"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -895,7 +953,7 @@ func TestDatasourceSyncRouteReturnsSuccessWhenSeatunnelAvailable(t *testing.T) {
 	dsService := service.NewDatasourceService(nil)
 	dsService.SetSeatunnelConfig(addr, 2*time.Second, 0)
 	dsHandler := NewDatasourceHandler(dsService)
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasource/syncApiDs", strings.NewReader(`{"datasourceId":"1","name":"sync-job"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -936,7 +994,7 @@ func TestDatasourceSyncTableRouteReturnsSuccessWhenSeatunnelAvailable(t *testing
 	dsService := service.NewDatasourceService(nil)
 	dsService.SetSeatunnelConfig(addr, 2*time.Second, 0)
 	dsHandler := NewDatasourceHandler(dsService)
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasource/syncApiTable", strings.NewReader(`{"datasourceId":"2","name":"sync-table-job","tableName":"orders"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -973,7 +1031,7 @@ func TestDatasourceListSyncRecordReturnsErrorWithoutRepository(t *testing.T) {
 	r := gin.New()
 
 	dsHandler := NewDatasourceHandler(service.NewDatasourceService(nil))
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasource/listSyncRecord/1/1/10", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -1004,7 +1062,7 @@ func TestDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 	datasetHandler := NewDatasetHandler(datasetService)
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
 
 	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"SELECT 1"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -1039,7 +1097,7 @@ func TestApiAliasDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, datasetHandler, nil)
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, datasetHandler, nil, nil)
 
 	req := httptest.NewRequest("POST", "/api/datasetData/previewSql", strings.NewReader(`{"sql":"SELECT 1"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -1059,5 +1117,56 @@ func TestApiAliasDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 	}
 	if atomic.LoadInt32(&calciteMock.validateCalls) == 0 {
 		t.Fatal("expected calcite validate to be called")
+	}
+}
+
+func TestCompatibilityBridge_DatasetDetailWithPerm_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, &DatasetHandler{}, nil, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/datasetTree/detailWithPerm", strings.NewReader(`{"datasetGroupId":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated detailWithPerm, got %d", w.Code)
+	}
+}
+
+func TestCompatibilityBridge_DatasetDetailWithPerm_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: false}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, &DatasetHandler{}, nil, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/datasetTree/detailWithPerm", strings.NewReader(`{"datasetGroupId":123}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden detailWithPerm, got %d", w.Code)
 	}
 }

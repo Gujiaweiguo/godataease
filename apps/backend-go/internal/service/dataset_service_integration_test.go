@@ -29,7 +29,7 @@ func TestDatasetServiceIntegration_Tree(t *testing.T) {
 		NodeType: strPtr("folder"),
 	}
 	err := repo.CreateGroup(folder)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create dataset under folder
 	ds := &dataset.CoreDatasetGroup{
@@ -38,26 +38,26 @@ func TestDatasetServiceIntegration_Tree(t *testing.T) {
 		NodeType: strPtr("dataset"),
 	}
 	err = repo.CreateGroup(ds)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get tree
 	tree, err := svc.Tree(&dataset.TreeRequest{})
-	assert.NoError(t, err)
-	assert.NotEmpty(t, tree)
+	require.NoError(t, err)
+	require.NotEmpty(t, tree)
 
 	// Find folder in tree
 	var foundFolder *dataset.TreeNode
 	for _, node := range tree {
-		if node.ID == folder.ID {
+		if node.Name == folder.Name && node.NodeType == dataset.NodeTypeFolder {
 			foundFolder = &node
 			break
 		}
 	}
-	assert.NotNil(t, foundFolder)
-	assert.Equal(t, "folder", foundFolder.NodeType)
-	assert.NotEmpty(t, foundFolder.Children)
-	assert.Equal(t, ds.ID, foundFolder.Children[0].ID)
-	assert.Equal(t, "dataset", foundFolder.Children[0].NodeType)
+	require.NotNil(t, foundFolder)
+	assert.Equal(t, dataset.NodeTypeFolder, foundFolder.NodeType)
+	require.NotEmpty(t, foundFolder.Children)
+	assert.Equal(t, ds.Name, foundFolder.Children[0].Name)
+	assert.Equal(t, dataset.NodeTypeDataset, foundFolder.Children[0].NodeType)
 }
 
 func TestDatasetServiceIntegration_Tree_Empty(t *testing.T) {

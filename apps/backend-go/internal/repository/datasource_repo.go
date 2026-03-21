@@ -36,6 +36,10 @@ func NewDatasourceRepository(db *gorm.DB) *DatasourceRepository {
 }
 
 func (r *DatasourceRepository) Query(req *datasource.ListRequest) ([]*datasource.CoreDatasource, int64, error) {
+	if r == nil || r.db == nil {
+		return nil, 0, fmt.Errorf("datasource repository is unavailable")
+	}
+
 	var list []*datasource.CoreDatasource
 	var total int64
 

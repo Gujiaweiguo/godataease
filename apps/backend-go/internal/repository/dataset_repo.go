@@ -21,6 +21,10 @@ func NewDatasetRepository(db *gorm.DB) *DatasetRepository {
 }
 
 func (r *DatasetRepository) ListGroups(keyword *string) ([]*dataset.CoreDatasetGroup, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("dataset repository is unavailable")
+	}
+
 	var groups []*dataset.CoreDatasetGroup
 	q := r.db.Model(&dataset.CoreDatasetGroup{}).Where("COALESCE(del_flag, 0) = 0")
 	if keyword != nil && *keyword != "" {

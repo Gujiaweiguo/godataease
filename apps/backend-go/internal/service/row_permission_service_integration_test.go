@@ -45,6 +45,7 @@ func TestRowPermissionServiceIntegration_BuildWhereClause_MergeUserAndRole(t *te
 
 	err := testDB.Create(&permission.DataPermRow{
 		DatasetID:      1001,
+		DatasetGroupID: 1001,
 		AuthTargetType: permission.AuthTargetTypeUser,
 		AuthTargetID:   2001,
 		Status:         1,
@@ -54,6 +55,7 @@ func TestRowPermissionServiceIntegration_BuildWhereClause_MergeUserAndRole(t *te
 
 	err = testDB.Create(&permission.DataPermRow{
 		DatasetID:      1001,
+		DatasetGroupID: 1001,
 		AuthTargetType: permission.AuthTargetTypeRole,
 		AuthTargetID:   3001,
 		Status:         1,
@@ -81,6 +83,7 @@ func TestRowPermissionServiceIntegration_BuildWhereClause_InvalidRulesIgnored(t 
 
 	err := testDB.Create(&permission.DataPermRow{
 		DatasetID:      1002,
+		DatasetGroupID: 1002,
 		AuthTargetType: permission.AuthTargetTypeUser,
 		AuthTargetID:   2002,
 		Status:         1,
@@ -90,6 +93,7 @@ func TestRowPermissionServiceIntegration_BuildWhereClause_InvalidRulesIgnored(t 
 
 	err = testDB.Create(&permission.DataPermRow{
 		DatasetID:      1002,
+		DatasetGroupID: 1002,
 		AuthTargetType: permission.AuthTargetTypeUser,
 		AuthTargetID:   2002,
 		Status:         1,
@@ -124,11 +128,11 @@ func TestRowPermissionServiceIntegration_BuildSelectColumns_ExcludeDisabled(t *t
 	colRepo := repository.NewColumnPermissionRepository(testDB)
 	svc := NewRowPermissionService(rowRepo, colRepo, nil, &rowPermAdminCheckerStub{})
 
-	err := testDB.Create(&permission.DataPermColumn{DatasetID: 1004, FieldName: "region", PermType: "mask", Status: 1}).Error
+	err := testDB.Create(&permission.DataPermColumn{DatasetID: 1004, DatasetGroupID: 1004, FieldName: "region", PermType: "mask", Status: 1}).Error
 	assert.NoError(t, err)
-	err = testDB.Create(&permission.DataPermColumn{DatasetID: 1004, FieldName: "amount", PermType: "disable", Status: 1}).Error
+	err = testDB.Create(&permission.DataPermColumn{DatasetID: 1004, DatasetGroupID: 1004, FieldName: "amount", PermType: "disable", Status: 1}).Error
 	assert.NoError(t, err)
-	err = testDB.Create(&permission.DataPermColumn{DatasetID: 1004, FieldName: "city", PermType: "mask", Status: 1}).Error
+	err = testDB.Create(&permission.DataPermColumn{DatasetID: 1004, DatasetGroupID: 1004, FieldName: "city", PermType: "mask", Status: 1}).Error
 	assert.NoError(t, err)
 
 	columns, err := svc.BuildSelectColumns(1004, 2004)
@@ -146,7 +150,7 @@ func TestRowPermissionServiceIntegration_BuildSelectColumns_AllDisabledFallbackW
 	colRepo := repository.NewColumnPermissionRepository(testDB)
 	svc := NewRowPermissionService(rowRepo, colRepo, nil, &rowPermAdminCheckerStub{})
 
-	err := testDB.Create(&permission.DataPermColumn{DatasetID: 1005, FieldName: "secret", PermType: "disable", Status: 1}).Error
+	err := testDB.Create(&permission.DataPermColumn{DatasetID: 1005, DatasetGroupID: 1005, FieldName: "secret", PermType: "disable", Status: 1}).Error
 	assert.NoError(t, err)
 
 	columns, err := svc.BuildSelectColumns(1005, 2005)
@@ -168,6 +172,7 @@ func TestRowPermissionServiceIntegration_GetRowPermissionsTree_RoleLookupErrorIg
 
 	err := testDB.Create(&permission.DataPermRow{
 		DatasetID:      1006,
+		DatasetGroupID: 1006,
 		AuthTargetType: permission.AuthTargetTypeUser,
 		AuthTargetID:   2006,
 		Status:         1,
