@@ -403,7 +403,7 @@ func toRoleRouter(m *menu.MenuVO, isRoot bool, locale string) map[string]interfa
 	if m.MenuType != "" {
 		result["menuType"] = m.MenuType
 	}
-	if m.ActionConfig != nil && len(m.ActionConfig) > 0 {
+	if len(m.ActionConfig) > 0 {
 		result["actionConfig"] = m.ActionConfig
 	}
 
