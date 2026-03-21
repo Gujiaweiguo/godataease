@@ -168,7 +168,7 @@ func TestDataPermissionAdminService_SaveColumnPermission(t *testing.T) {
 		DatasetID: 9,
 		FieldName: "mobile",
 		RuleType:  permission.PermTypeMask,
-		MaskRule:  "custom",
+		MaskRule:  maskRuleCustom,
 		MaskStart: 2,
 		MaskEnd:   3,
 	})
@@ -247,7 +247,7 @@ func TestDataPermissionAdminService_SaveColumnPermission_UpdateExisting(t *testi
 		DatasetID: 9,
 		FieldName: "mobile",
 		RuleType:  permission.PermTypeMask,
-		MaskRule:  "keep_ends",
+		MaskRule:  maskRuleKeepEnds,
 	})
 	if err != nil {
 		t.Fatalf("SaveColumnPermission update failed: %v", err)
@@ -347,10 +347,10 @@ func TestDataPermissionAdminService_ColumnPermissionPage(t *testing.T) {
 	if page.Current != 1 || page.Size != 10 {
 		t.Fatalf("expected normalized paging (1,10), got (%d,%d)", page.Current, page.Size)
 	}
-	if list[0].MaskRule != "custom" || list[0].MaskStart != 2 || list[0].MaskEnd != 4 {
+	if list[0].MaskRule != maskRuleCustom || list[0].MaskStart != 2 || list[0].MaskEnd != 4 {
 		t.Fatalf("unexpected custom mask mapping: %#v", list[0])
 	}
-	if list[1].MaskRule != "all" {
+	if list[1].MaskRule != maskRuleAll {
 		t.Fatalf("expected empty mask rule to map to all, got %#v", list[1])
 	}
 }
@@ -363,7 +363,7 @@ func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 		t.Fatalf("expected empty decode result, got fieldID=%d value=%q err=%v", fieldID, value, err)
 	}
 
-	maskAll, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: "all"})
+	maskAll, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: maskRuleAll})
 	if err != nil {
 		t.Fatalf("encodeMaskRule all failed: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 		t.Fatalf("expected full mask rule, got %s", maskAll)
 	}
 
-	maskKeepEnds, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: "keep_ends"})
+	maskKeepEnds, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: maskRuleKeepEnds})
 	if err != nil {
 		t.Fatalf("encodeMaskRule keep_ends failed: %v", err)
 	}
@@ -381,13 +381,13 @@ func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 
 	keepEndsForm := &ColumnPermissionForm{}
 	applyMaskRuleToForm(keepEndsForm, maskKeepEnds)
-	if keepEndsForm.MaskRule != "keep_ends" {
+	if keepEndsForm.MaskRule != maskRuleKeepEnds {
 		t.Fatalf("expected keep_ends mapping, got %#v", keepEndsForm)
 	}
 
 	invalidForm := &ColumnPermissionForm{}
 	applyMaskRuleToForm(invalidForm, "not-json")
-	if invalidForm.MaskRule != "all" {
+	if invalidForm.MaskRule != maskRuleAll {
 		t.Fatalf("expected invalid mask rule to fall back to all, got %#v", invalidForm)
 	}
 

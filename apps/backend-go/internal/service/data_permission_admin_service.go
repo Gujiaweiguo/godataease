@@ -35,6 +35,12 @@ type DataPermissionAdminService struct {
 	fieldSource DatasetFieldProvider
 }
 
+const (
+	maskRuleAll      = "all"
+	maskRuleCustom   = "custom"
+	maskRuleKeepEnds = "keep_ends"
+)
+
 type DataPermissionPage struct {
 	List    interface{} `json:"list"`
 	Total   int64       `json:"total"`
@@ -325,7 +331,7 @@ func encodeMaskRule(req *ColumnPermissionForm) (string, error) {
 	switch req.MaskRule {
 	case "keep_ends":
 		rule.BuiltInRule = permission.BuiltInRuleKeepFirstAndLastThree
-	case "custom":
+	case maskRuleCustom:
 		rule.BuiltInRule = permission.BuiltInRuleCustom
 		rule.CustomBuiltInRule = permission.CustomRuleRetainBeforeMAndAfterN
 		rule.M = req.MaskStart
@@ -343,7 +349,7 @@ func encodeMaskRule(req *ColumnPermissionForm) (string, error) {
 
 func applyMaskRuleToForm(item *ColumnPermissionForm, raw string) {
 	if strings.TrimSpace(raw) == "" {
-		item.MaskRule = "all"
+		item.MaskRule = maskRuleAll
 		return
 	}
 
@@ -355,13 +361,13 @@ func applyMaskRuleToForm(item *ColumnPermissionForm, raw string) {
 
 	switch rule.BuiltInRule {
 	case permission.BuiltInRuleKeepFirstAndLastThree:
-		item.MaskRule = "keep_ends"
+		item.MaskRule = maskRuleKeepEnds
 	case permission.BuiltInRuleCustom:
-		item.MaskRule = "custom"
+		item.MaskRule = maskRuleCustom
 		item.MaskStart = rule.M
 		item.MaskEnd = rule.N
 	default:
-		item.MaskRule = "all"
+		item.MaskRule = maskRuleAll
 	}
 }
 
