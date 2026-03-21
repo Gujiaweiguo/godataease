@@ -59,3 +59,29 @@ The system SHALL provide datasource tree data for the frontend interactive aggre
 #### Scenario: Datasource interactive nodes remain structurally valid
 - **WHEN** datasource tree data is consumed through the interactive aggregate flow
 - **THEN** returned nodes MUST preserve valid identifiers, parent relationships, `leaf` semantics, and required children structure
+
+### Requirement: Datasource Entry and Initialization Recovery
+The system SHALL keep datasource entry paths and initialization flows recoverable as a governed broken-feature surface.
+
+#### Scenario: Datasource page remains reachable from governed entry paths
+- **WHEN** a user enters datasource management through an in-scope menu, route, or governed compatibility path
+- **THEN** the datasource page MUST initialize without route-loss or bootstrap-loss behavior
+- **AND** any failure MUST be reported as an explicit non-success outcome instead of a silent empty state
+
+#### Scenario: Datasource recovery work distinguishes real gaps from access-path regressions
+- **WHEN** datasource functionality appears broken during stabilization
+- **THEN** the recovery record MUST classify the symptom as route/access, API contract, page-init, or real implementation gap
+- **AND** the classification MUST be testable or otherwise verifiable before the issue is considered closed
+
+### Requirement: Datasource List Permission Model Must Be Explicitly Defined
+The system SHALL explicitly define the runtime permission semantics for datasource list endpoints and their compatibility aliases.
+
+#### Scenario: Datasource list runtime semantics are chosen deliberately
+- **WHEN** datasource list endpoints are hardened after recovery
+- **THEN** the system MUST choose and document whether list behavior is filtered, scope-bound with explicit forbidden outcomes, or intentionally auth-only
+- **AND** the chosen behavior MUST be justified against existing callers and compatibility paths
+
+#### Scenario: Datasource list permission behavior remains consistent with caller expectations
+- **WHEN** a client calls a datasource list route through a governed canonical or compatibility alias
+- **THEN** the runtime permission behavior MUST remain consistent across those aliases
+- **AND** regression coverage MUST exist for the selected permission model

@@ -83,3 +83,23 @@
 - **WHEN** 使用复杂过滤条件查询审计日志
 - **THEN** 查询性能 SHALL 不低于 Java 实现
 
+### Requirement: Audit Page Reachability and Query Recovery
+The system SHALL treat audit page reachability, filter queries, and detail-read flows as a governed broken-feature recovery surface.
+
+#### Scenario: Audit page initializes for governed query workflows
+- **WHEN** a user enters the audit page through an in-scope route or menu path
+- **THEN** the page MUST initialize its required query state and return explicit results or explicit failure
+- **AND** initialization failure MUST NOT collapse into a misleading blank-success state
+
+#### Scenario: Audit recovery preserves diagnosable query outcomes
+- **WHEN** audit list, filter, or detail-read flows fail during stabilization
+- **THEN** the recovery result MUST preserve diagnosable semantics for authorization, route, and business-query failure
+- **AND** the recovered path MUST be covered by targeted verification
+
+### Requirement: Audit Route-Level Hardening
+The system SHALL preserve explicit route-level audit semantics after the operational recovery batch is complete.
+
+#### Scenario: Audit page entry and detail routes remain explicit beyond unit coverage
+- **WHEN** a user enters the audit page or reads audit detail through a governed route path
+- **THEN** the route-level behavior MUST remain explicit for authorization, not-found, and query failure outcomes
+- **AND** route-level or smoke verification MUST exist in addition to unit/handler coverage
