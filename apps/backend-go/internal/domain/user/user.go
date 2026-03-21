@@ -108,3 +108,7 @@ type UserListResponse struct {
 	Current int         `json:"current"`
 	Size    int         `json:"size"`
 }
+
+type LangSwitchRequest struct {
+	Lang string `json:"lang" binding:"required"`
+}

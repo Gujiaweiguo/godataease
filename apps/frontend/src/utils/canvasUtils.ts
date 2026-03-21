@@ -88,11 +88,11 @@ export function findDragComponent(componentInfo) {
 }
 
 export function findNewComponent(componentName, innerType, staticMap?) {
-  let newComponent
+  let newComponent: Record<string, any> | null = null
   componentList.forEach(comp => {
     if (comp.component === componentName || comp.component === innerType) {
       newComponent = cloneDeep(comp)
-      if (['DeTabs', 'DeScreen'].includes(newComponent.component)) {
+      if (newComponent && ['DeTabs', 'DeScreen'].includes(String(newComponent.component))) {
         newComponent.propValue[0].name = guid()
         newComponent['titleBackground'] = deepCopy(COMMON_TAB_TITLE_BACKGROUND)
       }
@@ -111,16 +111,20 @@ export function findNewComponent(componentName, innerType, staticMap?) {
   })
   if (componentName === 'UserView') {
     const viewConfig = getViewConfig(innerType)
-    newComponent.name = viewConfig?.title
-    newComponent.label = viewConfig?.title
-    newComponent.render = viewConfig?.render
-    newComponent.isPlugin = !!staticMap
-    if (newComponent.isPlugin) {
-      newComponent.staticMap = staticMap
+    if (newComponent) {
+      newComponent.name = viewConfig?.title
+      newComponent.label = viewConfig?.title
+      newComponent.render = viewConfig?.render
+      newComponent.isPlugin = !!staticMap
+      if (newComponent.isPlugin) {
+        newComponent.staticMap = staticMap
+      }
     }
   } else if (['DeDecoration', 'DynamicBackground'].includes(componentName)) {
-    newComponent.style.borderWidth = 0
-    newComponent.style.innerPadding = getNewInnerPadding()
+    if (newComponent?.style) {
+      newComponent.style.borderWidth = 0
+      newComponent.style.innerPadding = getNewInnerPadding()
+    }
   }
   return newComponent
 }
@@ -681,7 +685,7 @@ export async function canvasSaveWithParams(params, callBack) {
   if (method === updateCanvas) {
     await dvNameCheck({
       opt: 'edit',
-      nodeType: 'leaf',
+      nodeType: 'panel',
       name: curDvInfo.value.name,
       type: curDvInfo.value.type,
       id: curDvInfo.value.id
@@ -878,7 +882,7 @@ export function canvasChangeAdaptor(component, matrixBase, usePointShadow = fals
 
 export function findAllViewsId(componentData, idArray) {
   componentData.forEach(item => {
-    if (item.component === 'UserView' && item.innerType != 'VQuery') {
+    if (item.component === 'UserView' && item.innerType !== 'VQuery') {
       idArray.push(item.id)
     } else if (item.component === 'Group') {
       item.propValue?.forEach(groupItem => {
@@ -951,7 +955,13 @@ export function findParentIdByChildIdRecursive(tree, targetChildId) {
 }
 
 export async function decompressionPre(params, callBack) {
-  let deTemplateData
+  let deTemplateData: {
+    canvasStyleData: Record<string, unknown>
+    componentData: { id?: string; inMobile?: boolean }[]
+    canvasViewInfo: unknown
+    appData: unknown
+    baseInfo: { preName: string }
+  } | null = null
   await decompression(params)
     .then(response => {
       const deTemplateDataTemp = response.data
@@ -971,7 +981,7 @@ export async function decompressionPre(params, callBack) {
       sourceCanvasStyle.component['seniorStyleSetting'] =
         sourceCanvasStyle.component['seniorStyleSetting'] || deepCopy(SENIOR_STYLE_SETTING_LIGHT)
       sourceCanvasStyle['scaleWidth'] = sourceCanvasStyle['scale']
-      sourceCanvasStyle['scaleHeight'] = sourceCanvasStyle['scaleHeight']
+      sourceCanvasStyle['scaleHeight'] = sourceCanvasStyle['scaleHeight'] ?? sourceCanvasStyle['scale']
       deTemplateData = {
         canvasStyleData: sourceCanvasStyle,
         componentData: sourceComponentData,
@@ -985,14 +995,16 @@ export async function decompressionPre(params, callBack) {
     .catch(e => {
       console.error(e)
     })
-  historyAdaptor(
-    deTemplateData.canvasStyleData,
-    deTemplateData.componentData,
-    null,
-    { resourceTable: 'snapshot' },
-    null
-  )
-  callBack(deTemplateData)
+  if (deTemplateData) {
+    historyAdaptor(
+      deTemplateData.canvasStyleData,
+      deTemplateData.componentData,
+      null,
+      { resourceTable: 'snapshot' },
+      null
+    )
+    callBack(deTemplateData)
+  }
 }
 
 export function isDashboard() {
@@ -1055,7 +1067,7 @@ export function componentSwitch(componentData, changeComponent) {
 }
 
 export function findComponentById(componentId) {
-  let result
+  let result: Record<string, any> | null = null
   componentData.value.forEach(item => {
     if (item.id === componentId) {
       result = item

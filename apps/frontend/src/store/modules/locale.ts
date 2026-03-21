@@ -11,6 +11,10 @@ const elLocaleMap = {
   en: en,
   tw: tw
 }
+
+const resolveElLocale = (language: string) => {
+  return elLocaleMap[language] || elLocaleMap['zh-CN']
+}
 interface LocaleState {
   customLoaded: boolean
   currentLocale: LocaleDropdownType
@@ -23,7 +27,7 @@ export const useLocaleStore = defineStore('locales', {
       customLoaded: false,
       currentLocale: {
         lang: getLocale(),
-        elLocale: elLocaleMap[getLocale()]
+        elLocale: resolveElLocale(getLocale())
       },
       // 多语言
       localeMap: [
@@ -85,12 +89,12 @@ export const useLocaleStore = defineStore('locales', {
     setCurrentLocale(localeMap: LocaleDropdownType) {
       // this.locale = Object.assign(this.locale, localeMap)
       this.currentLocale.lang = localeMap?.lang
-      this.currentLocale.elLocale = elLocaleMap[localeMap?.lang]
+      this.currentLocale.elLocale = resolveElLocale(localeMap?.lang)
       // wsCache.set('lang', localeMap?.lang)
     },
     setLang(language: string) {
       this.currentLocale.lang = language
-      this.currentLocale.elLocale = elLocaleMap[language]
+      this.currentLocale.elLocale = resolveElLocale(language)
     }
   }
 })

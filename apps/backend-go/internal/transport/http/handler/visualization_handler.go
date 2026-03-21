@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type VisualizationHandler struct {
@@ -29,6 +31,10 @@ func (h *VisualizationHandler) FindByID(c *gin.Context) {
 
 	result, err := h.service.Detail(&req)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.NotFound(c, "Visualization not found")
+			return
+		}
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
@@ -69,6 +75,7 @@ type treeNode struct {
 const (
 	visualizationNodeTypeFolder = "folder"
 	visualizationNodeTypePanel  = "panel"
+	visualizationNodeTypeLeaf   = "leaf"
 )
 
 func (h *VisualizationHandler) Tree(c *gin.Context) {
@@ -153,6 +160,9 @@ func buildVisualizationTree(items []*visualization.DataVisualizationInfo, leafFi
 		nodeType := ""
 		if item.NodeType != nil {
 			nodeType = *item.NodeType
+		}
+		if nodeType == visualizationNodeTypeLeaf {
+			nodeType = visualizationNodeTypePanel
 		}
 		if nodeType != visualizationNodeTypeFolder && nodeType != visualizationNodeTypePanel {
 			return nil, fmt.Errorf("invalid nodeType: %s", nodeType)

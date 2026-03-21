@@ -8,11 +8,25 @@ import NotFoundPage from '@/views/404/index.vue'
 
 export const DYNAMIC_NOT_FOUND_ROUTE_NAME = 'dynamic-not-found'
 
+export interface UserMenuItem {
+  id: number
+  name: string
+  path: string
+  icon?: string
+  menuType?: string
+  actionConfig?: Record<string, unknown>
+  menuSort?: number
+  hidden?: boolean
+  children?: UserMenuItem[]
+}
+
 export interface PermissionState {
   routers: AppRouteRecordRaw[]
   addRouters: AppRouteRecordRaw[]
   isAddRouters: boolean
   currentPath: string
+  userMenus: UserMenuItem[]
+  helpMenus: UserMenuItem[]
 }
 
 export const usePermissionStore = defineStore('permission', {
@@ -20,7 +34,9 @@ export const usePermissionStore = defineStore('permission', {
     routers: [],
     addRouters: [],
     isAddRouters: false,
-    currentPath: ''
+    currentPath: '',
+    userMenus: [],
+    helpMenus: []
   }),
   getters: {
     getRouters(): AppRouteRecordRaw[] {
@@ -37,6 +53,12 @@ export const usePermissionStore = defineStore('permission', {
     },
     getCurrentPath(): boolean {
       return this.currentPath
+    },
+    getUserMenus(): UserMenuItem[] {
+      return this.userMenus
+    },
+    getHelpMenus(): UserMenuItem[] {
+      return this.helpMenus
     }
   },
   actions: {
@@ -71,6 +93,12 @@ export const usePermissionStore = defineStore('permission', {
     },
     setIsAddRouters(state: boolean): void {
       this.isAddRouters = state
+    },
+    setUserMenus(menus: UserMenuItem[]): void {
+      this.userMenus = menus
+    },
+    setHelpMenus(menus: UserMenuItem[]): void {
+      this.helpMenus = menus
     }
   }
 })

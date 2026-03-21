@@ -10,7 +10,7 @@ export const modelApi = () => request.get({ url: 'model' })
 
 export const platformLoginApi = origin => request.post({ url: '/login/platformLogin/' + origin })
 
-export const logoutApi = () => request.get({ url: '/logout' })
+export const logoutApi = () => request.get({ url: '/api/logout' })
 
 export const refreshApi = (time?: any) => request.get({ url: '/login/refresh', params: { time } })
 

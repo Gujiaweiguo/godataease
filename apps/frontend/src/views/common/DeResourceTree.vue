@@ -406,7 +406,7 @@ const operation = (cmd: string, data: BusiTreeNode, nodeType: string) => {
   } else if (cmd === 'cancelPublish') {
     const params = {
       id: data.id,
-      nodeType: 'leaf',
+                nodeType: 'panel',
       name: data.name,
       type: curCanvasType.value,
       mobileLayout: data?.extraFlag,
@@ -424,7 +424,7 @@ const operation = (cmd: string, data: BusiTreeNode, nodeType: string) => {
   } else if (cmd === 'copy') {
     const targetPid = findParentIdByChildIdRecursive(state.resourceTree, data.id)
     const params: ResourceOrFolder = {
-      nodeType: nodeType as 'folder' | 'leaf',
+              nodeType: nodeType === 'leaf' ? 'panel' : 'folder',
       name: data.name + '-copy',
       type: curCanvasType.value,
       id: data.id,

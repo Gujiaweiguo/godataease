@@ -383,24 +383,28 @@ func buildInteractiveTreeResponse(busiFlag string, authorized bool) []interactiv
 func toRoleRouter(m *menu.MenuVO, isRoot bool, locale string) map[string]interface{} {
 	path := normalizePath(m.Path, isRoot)
 	result := map[string]interface{}{
-		"path":     path,
-		"name":     safeName(m.Name, path),
-		"hidden":   m.Hidden,
-		"inLayout": m.InLayout,
+		"path":      path,
+		"name":      safeName(m.Name, path),
+		"hidden":    m.Hidden,
+		"inLayout":  m.InLayout,
+		"component": m.Component,
 		"meta": map[string]interface{}{
 			"title": displayTitle(m, locale),
 			"icon":  m.Meta.Icon,
 		},
 	}
 
-	if m.Component != "" {
-		result["component"] = m.Component
-	}
 	if m.Redirect != "" {
 		result["redirect"] = m.Redirect
 	}
 	if m.IsPlugin {
 		result["plugin"] = true
+	}
+	if m.MenuType != "" {
+		result["menuType"] = m.MenuType
+	}
+	if len(m.ActionConfig) > 0 {
+		result["actionConfig"] = m.ActionConfig
 	}
 
 	if len(m.Children) > 0 {

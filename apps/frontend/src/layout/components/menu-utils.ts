@@ -12,16 +12,21 @@ export type LayoutMenuRoute = AppCustomRouteRecordRaw & {
 
 const isVisible = (route: LayoutMenuRoute) => !route.hidden && !route.meta?.hidden
 
-export const resolveTopMenus = (routes: AppCustomRouteRecordRaw[]): LayoutMenuRoute[] => {
-  const normalized = formatRoute(routes)
-  return normalized.filter(route => isVisible(route as LayoutMenuRoute)) as LayoutMenuRoute[]
-}
-
 const toAbsolutePath = (path: string) => {
   if (!path) {
     return '/'
   }
   return path.startsWith('/') ? path : `/${path}`
+}
+
+const isAccountTopMenu = (path: string) => {
+  const absolutePath = toAbsolutePath(path)
+  return absolutePath === '/mine' || absolutePath.startsWith('/mine/')
+}
+
+export const resolveTopMenus = (routes: AppCustomRouteRecordRaw[]): LayoutMenuRoute[] => {
+  const normalized = formatRoute(routes)
+  return normalized.filter(route => !isAccountTopMenu(route.path) && isVisible(route as LayoutMenuRoute)) as LayoutMenuRoute[]
 }
 
 export const resolveActiveTopPath = (currentPath: string, topMenus: LayoutMenuRoute[]): string | null => {

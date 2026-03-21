@@ -28,16 +28,19 @@ func (h *MenuHandler) Query(c *gin.Context) {
 }
 
 type CreateMenuRequest struct {
-	Pid       int64  `json:"pid"`
-	Type      int    `json:"type"`
-	Name      string `json:"name" binding:"required"`
-	Component string `json:"component"`
-	MenuSort  int    `json:"menuSort"`
-	Icon      string `json:"icon"`
-	Path      string `json:"path" binding:"required"`
-	Hidden    bool   `json:"hidden"`
-	InLayout  bool   `json:"inLayout"`
-	Auth      bool   `json:"auth"`
+	Pid          int64                  `json:"pid"`
+	Type         int                    `json:"type"`
+	Name         string                 `json:"name" binding:"required"`
+	Component    string                 `json:"component"`
+	MenuSort     int                    `json:"menuSort"`
+	Icon         string                 `json:"icon"`
+	Path         string                 `json:"path" binding:"required"`
+	Hidden       bool                   `json:"hidden"`
+	InLayout     bool                   `json:"inLayout"`
+	Auth         bool                   `json:"auth"`
+	MenuLocation string                 `json:"menuLocation"`
+	MenuType     string                 `json:"menuType"`
+	ActionConfig map[string]interface{} `json:"actionConfig"`
 }
 
 func (h *MenuHandler) Create(c *gin.Context) {
@@ -47,17 +50,25 @@ func (h *MenuHandler) Create(c *gin.Context) {
 		return
 	}
 
+	var actionConfig menu.JSON
+	if req.ActionConfig != nil {
+		actionConfig = menu.JSON(req.ActionConfig)
+	}
+
 	m := &menu.CoreMenu{
-		Pid:       req.Pid,
-		Type:      req.Type,
-		Name:      req.Name,
-		Component: req.Component,
-		MenuSort:  req.MenuSort,
-		Icon:      req.Icon,
-		Path:      req.Path,
-		Hidden:    req.Hidden,
-		InLayout:  req.InLayout,
-		Auth:      req.Auth,
+		Pid:          req.Pid,
+		Type:         req.Type,
+		Name:         req.Name,
+		Component:    req.Component,
+		MenuSort:     req.MenuSort,
+		Icon:         req.Icon,
+		Path:         req.Path,
+		Hidden:       req.Hidden,
+		InLayout:     req.InLayout,
+		Auth:         req.Auth,
+		MenuLocation: req.MenuLocation,
+		MenuType:     req.MenuType,
+		ActionConfig: actionConfig,
 	}
 
 	if err := h.service.Create(m); err != nil {
@@ -69,17 +80,20 @@ func (h *MenuHandler) Create(c *gin.Context) {
 }
 
 type UpdateMenuRequest struct {
-	ID        int64  `json:"id" binding:"required"`
-	Pid       int64  `json:"pid"`
-	Type      int    `json:"type"`
-	Name      string `json:"name" binding:"required"`
-	Component string `json:"component"`
-	MenuSort  int    `json:"menuSort"`
-	Icon      string `json:"icon"`
-	Path      string `json:"path" binding:"required"`
-	Hidden    bool   `json:"hidden"`
-	InLayout  bool   `json:"inLayout"`
-	Auth      bool   `json:"auth"`
+	ID           int64                  `json:"id" binding:"required"`
+	Pid          int64                  `json:"pid"`
+	Type         int                    `json:"type"`
+	Name         string                 `json:"name" binding:"required"`
+	Component    string                 `json:"component"`
+	MenuSort     int                    `json:"menuSort"`
+	Icon         string                 `json:"icon"`
+	Path         string                 `json:"path" binding:"required"`
+	Hidden       bool                   `json:"hidden"`
+	InLayout     bool                   `json:"inLayout"`
+	Auth         bool                   `json:"auth"`
+	MenuLocation string                 `json:"menuLocation"`
+	MenuType     string                 `json:"menuType"`
+	ActionConfig map[string]interface{} `json:"actionConfig"`
 }
 
 func (h *MenuHandler) Update(c *gin.Context) {
@@ -89,18 +103,26 @@ func (h *MenuHandler) Update(c *gin.Context) {
 		return
 	}
 
+	var actionConfig menu.JSON
+	if req.ActionConfig != nil {
+		actionConfig = menu.JSON(req.ActionConfig)
+	}
+
 	m := &menu.CoreMenu{
-		ID:        req.ID,
-		Pid:       req.Pid,
-		Type:      req.Type,
-		Name:      req.Name,
-		Component: req.Component,
-		MenuSort:  req.MenuSort,
-		Icon:      req.Icon,
-		Path:      req.Path,
-		Hidden:    req.Hidden,
-		InLayout:  req.InLayout,
-		Auth:      req.Auth,
+		ID:           req.ID,
+		Pid:          req.Pid,
+		Type:         req.Type,
+		Name:         req.Name,
+		Component:    req.Component,
+		MenuSort:     req.MenuSort,
+		Icon:         req.Icon,
+		Path:         req.Path,
+		Hidden:       req.Hidden,
+		InLayout:     req.InLayout,
+		Auth:         req.Auth,
+		MenuLocation: req.MenuLocation,
+		MenuType:     req.MenuType,
+		ActionConfig: actionConfig,
 	}
 
 	if err := h.service.Update(m); err != nil {

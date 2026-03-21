@@ -82,3 +82,29 @@ Interactive visualization trees SHALL filter unauthorized visualization resource
 - **WHEN** a user lacks access to part of the dashboard or big-screen resource tree
 - **THEN** unauthorized nodes MUST be excluded from the response
 - **AND** remaining nodes MUST keep valid identifiers, parent relationships, and leaf semantics
+
+### Requirement: Visualization Entry-Chain Recovery
+The system SHALL keep dashboard and big-screen entry chains recoverable as a governed stabilization surface.
+
+#### Scenario: Visualization entry path reaches usable page state
+- **WHEN** a user enters dashboard or big-screen flows from a governed menu or route entry
+- **THEN** the page MUST reach a usable initialized state for in-scope list, tree, or detail workflows
+- **AND** broken route or discovery behavior MUST be classified explicitly instead of appearing as generic feature absence
+
+#### Scenario: Visualization recovery preserves discovery-path integrity
+- **WHEN** a recovery fix is applied to dashboard or big-screen discovery flows
+- **THEN** tree/detail/resource-discovery payloads MUST remain consumable by the frontend path that triggered the flow
+- **AND** the recovered flow MUST have targeted regression or smoke coverage
+
+### Requirement: Visualization Detail Hardening After Recovery
+The system SHALL preserve explicit detail-path semantics for dashboard and big-screen flows after the primary recovery batch is complete.
+
+#### Scenario: Dashboard detail missing-resource behavior stays explicit at the boundary
+- **WHEN** a dashboard detail request targets a missing resource
+- **THEN** the frontend-facing boundary MUST preserve an explicit missing-resource response
+- **AND** the response MUST remain distinguishable from permission denial
+
+#### Scenario: Big-screen deeper detail paths remain consumable after hardening
+- **WHEN** a big-screen detail or edit path is exercised beyond preview-only coverage
+- **THEN** the route and detail payload MUST remain consumable by the intended frontend path
+- **AND** failures MUST remain explicit instead of degrading into generic feature absence

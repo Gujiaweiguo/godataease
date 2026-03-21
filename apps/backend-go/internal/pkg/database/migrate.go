@@ -24,6 +24,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&permission.SysRolePerm{},
 		&permission.SysResource{},
 		&permission.SysResourcePerm{},
+		&permission.DataPermRow{},
+		&permission.DataPermColumn{},
 		&static.StaticResource{},
 		&static.Store{},
 		&static.Typeface{},

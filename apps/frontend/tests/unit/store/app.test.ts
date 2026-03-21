@@ -122,8 +122,8 @@ describe('App Store', () => {
   describe('setAppModel', () => {
     it('should fetch and set app model', async () => {
       const { modelApi } = await import('@/api/login')
-      modelApi.mockResolvedValueOnce({ data: true })
-      
+      vi.mocked(modelApi).mockResolvedValueOnce({ data: true })
+
       const store = useAppStore()
       await store.setAppModel()
       

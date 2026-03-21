@@ -110,19 +110,27 @@ func (s *MenuService) convertToVO(m *menu.CoreMenu, childMap map[int64][]*menu.C
 		path = path[1:]
 	}
 
+	var actionConfig map[string]interface{}
+	if m.ActionConfig != nil {
+		actionConfig = map[string]interface{}(m.ActionConfig)
+	}
+
 	vo := &menu.MenuVO{
-		ID:        m.ID,
-		Pid:       m.Pid,
-		Type:      m.Type,
-		MenuSort:  m.MenuSort,
-		Icon:      m.Icon,
-		Auth:      m.Auth,
-		Path:      path,
-		Component: m.Component,
-		Hidden:    m.Hidden,
-		IsPlugin:  false,
-		Name:      m.Name,
-		InLayout:  m.InLayout,
+		ID:           m.ID,
+		Pid:          m.Pid,
+		Type:         m.Type,
+		MenuSort:     m.MenuSort,
+		Icon:         m.Icon,
+		Auth:         m.Auth,
+		Path:         path,
+		Component:    m.Component,
+		Hidden:       m.Hidden,
+		IsPlugin:     false,
+		Name:         m.Name,
+		InLayout:     m.InLayout,
+		MenuLocation: m.MenuLocation,
+		MenuType:     m.MenuType,
+		ActionConfig: actionConfig,
 		Meta: &menu.MenuMeta{
 			Title: m.Name,
 			Icon:  m.Icon,

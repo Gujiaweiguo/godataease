@@ -27,10 +27,11 @@ func TestColumnPermissionService_GetColumnPermissions(t *testing.T) {
 	t.Run("get column permissions with data", func(t *testing.T) {
 		// Create test data
 		perm := &permission.DataPermColumn{
-			DatasetID: 1,
-			FieldName: "email",
-			PermType:  permission.PermTypeMask,
-			Status:    1,
+			DatasetID:      1,
+			DatasetGroupID: 1,
+			FieldName:      "email",
+			PermType:       permission.PermTypeMask,
+			Status:         1,
 		}
 		require.NoError(t, testDB.Create(perm).Error)
 
@@ -55,19 +56,21 @@ func TestColumnPermissionService_GetDisabledColumns(t *testing.T) {
 	t.Run("get disabled columns with data", func(t *testing.T) {
 		// Create disabled column
 		perm := &permission.DataPermColumn{
-			DatasetID: 1,
-			FieldName: "secret_field",
-			PermType:  permission.PermTypeDisable,
-			Status:    1,
+			DatasetID:      1,
+			DatasetGroupID: 1,
+			FieldName:      "secret_field",
+			PermType:       permission.PermTypeDisable,
+			Status:         1,
 		}
 		require.NoError(t, testDB.Create(perm).Error)
 
 		// Create masked column (not disabled)
 		perm2 := &permission.DataPermColumn{
-			DatasetID: 1,
-			FieldName: "email",
-			PermType:  permission.PermTypeMask,
-			Status:    1,
+			DatasetID:      1,
+			DatasetGroupID: 1,
+			FieldName:      "email",
+			PermType:       permission.PermTypeMask,
+			Status:         1,
 		}
 		require.NoError(t, testDB.Create(perm2).Error)
 
@@ -94,11 +97,12 @@ func TestColumnPermissionService_GetMaskRules(t *testing.T) {
 		// Create masked column with rule
 		maskRule := `{"builtInRule":"` + permission.BuiltInRuleCompleteDesensitization + `"}`
 		perm := &permission.DataPermColumn{
-			DatasetID: 1,
-			FieldName: "phone",
-			PermType:  permission.PermTypeMask,
-			MaskRule:  maskRule,
-			Status:    1,
+			DatasetID:      1,
+			DatasetGroupID: 1,
+			FieldName:      "phone",
+			PermType:       permission.PermTypeMask,
+			MaskRule:       maskRule,
+			Status:         1,
 		}
 		require.NoError(t, testDB.Create(perm).Error)
 

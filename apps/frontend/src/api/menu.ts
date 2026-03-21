@@ -13,6 +13,16 @@ export const MENU_VALIDATION_MESSAGES = {
   hiddenInvalid: '隐藏标记格式错误'
 } as const
 
+export type MenuLocation = 'sidebar' | 'user_menu' | 'help_menu'
+export type MenuType = 'link' | 'action' | 'separator'
+
+export interface MenuActionConfig {
+  event?: string
+  url?: string
+  target?: '_blank' | '_self'
+  [key: string]: unknown
+}
+
 export interface MenuSavePayload {
   id?: number
   pid: number
@@ -25,6 +35,9 @@ export interface MenuSavePayload {
   hidden: boolean
   inLayout: boolean
   auth: boolean
+  menuLocation?: MenuLocation
+  menuType?: MenuType
+  actionConfig?: MenuActionConfig
 }
 
 export interface MenuValidationResult {

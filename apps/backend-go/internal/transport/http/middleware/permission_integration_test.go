@@ -626,6 +626,45 @@ func TestDatasourceView_403_Forbidden(t *testing.T) {
 	}
 }
 
+func TestDatasourceListAliases_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	for _, path := range []string{"/api/ds/list", "/api/datasource/list", "/de2api/datasource/list"} {
+		r.POST(path, func(c *gin.Context) {
+			c.Set("user_id", uint64(300))
+			c.Next()
+		}, permMiddleware.CheckDatasourceView(), func(c *gin.Context) {
+			c.JSON(200, gin.H{"success": true})
+		})
+	}
+
+	for _, path := range []string{"/api/ds/list", "/api/datasource/list", "/de2api/datasource/list"} {
+		req := httptest.NewRequest("POST", path, strings.NewReader(`{"id":123}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != 403 {
+			t.Fatalf("expected 403 for forbidden datasource list alias %s, got %d", path, w.Code)
+		}
+
+		var resp map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed for %s: %v", path, err)
+		}
+		if resp["code"] != "70001" {
+			t.Fatalf("expected code 70001 for %s, got %#v", path, resp["code"])
+		}
+	}
+}
+
 func TestDashboardDelete_401_Unauthenticated(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

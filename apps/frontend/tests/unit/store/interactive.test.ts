@@ -219,7 +219,7 @@ describe('Interactive Store', () => {
       const store = interactiveStore()
       vi.mocked(queryBusiTreeApi).mockResolvedValueOnce({
         dashboard: [{ id: '1', pid: '0', name: 'Dashboard', weight: 7, leaf: true, extraFlag: 0, extraFlag1: 0 }]
-      })
+      } as unknown as Awaited<ReturnType<typeof queryBusiTreeApi>>)
 
       await store.loadBusiInteractive()
 
@@ -247,7 +247,7 @@ describe('Interactive Store', () => {
           }
         ],
         dataV: [{ id: '21', pid: '0', name: 'Executive Screen', weight: 9, leaf: true, extraFlag: 0, extraFlag1: 1 }]
-      })
+      } as unknown as Awaited<ReturnType<typeof queryBusiTreeApi>>)
 
       await store.loadBusiInteractive()
 
@@ -274,7 +274,7 @@ describe('Interactive Store', () => {
           }
         ],
         datasource: [{ id: '41', pid: '0', name: 'MySQL DS', weight: 9, leaf: true, extraFlag: 1, extraFlag1: 0 }]
-      })
+      } as unknown as Awaited<ReturnType<typeof queryBusiTreeApi>>)
 
       await store.loadBusiInteractive()
 
@@ -290,7 +290,7 @@ describe('Interactive Store', () => {
         dataV: [],
         dataset: [{ id: '51', pid: '0', name: 'Dataset A', weight: 9, leaf: true, extraFlag: 0, extraFlag1: 0 }],
         datasource: [{ id: '61', pid: '0', name: 'Datasource A', weight: 9, leaf: true, extraFlag: 1, extraFlag1: 0 }]
-      })
+      } as unknown as Awaited<ReturnType<typeof queryBusiTreeApi>>)
 
       await store.initInteractive()
 
@@ -299,6 +299,24 @@ describe('Interactive Store', () => {
       expect(listDatasources).not.toHaveBeenCalled()
       expect(store.getDataset.treeNodes[0].id).toBe('51')
       expect(store.getDatasource.treeNodes[0].id).toBe('61')
+    })
+
+    it('should keep create permission when batched interactive scopes are authorized but empty', async () => {
+      const store = interactiveStore()
+      vi.mocked(queryBusiTreeApi).mockResolvedValueOnce({
+        dashboard: [],
+        dataV: [],
+        dataset: [],
+        datasource: []
+      } as unknown as Awaited<ReturnType<typeof queryBusiTreeApi>>)
+
+      await store.loadBusiInteractive()
+
+      expect(store.getPanel.menuAuth).toBe(true)
+      expect(store.getPanel.anyManage).toBe(true)
+      expect(store.getScreen.anyManage).toBe(true)
+      expect(store.getDataset.anyManage).toBe(true)
+      expect(store.getDatasource.anyManage).toBe(true)
     })
   })
 })

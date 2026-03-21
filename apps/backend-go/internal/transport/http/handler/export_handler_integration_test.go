@@ -536,6 +536,125 @@ func TestGenerateDownloadURI_TaskToResourceMapping(t *testing.T) {
 	}
 }
 
+func TestGenerateDownloadURI_UnauthenticatedUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := newMockExportRepo()
+	mockRepo.AddTask(&export.ExportTask{
+		ID:             "task-uri-unauth",
+		UserID:         100,
+		FileName:       "dataset_export.xlsx",
+		ExportFrom:     555,
+		ExportFromType: permission.ResourceTypeDataset,
+		ExportStatus:   "SUCCESS",
+	})
+
+	permRepo := &mockResourcePermRepoForExport{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(permRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+
+	exportSvc := service.NewExportService(mockRepo)
+	handler := NewExportHandler(exportSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.GET("/exportTasks/generateDownloadUri/:id", handler.GenerateDownloadURI)
+
+	req := httptest.NewRequest("GET", "/exportTasks/generateDownloadUri/task-uri-unauth", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", w.Code)
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "403001" {
+		t.Fatalf("expected code 403001 for unauthenticated generateDownloadUri, got %#v", resp["code"])
+	}
+}
+
+func TestGenerateDownloadURI_TaskNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := newMockExportRepo()
+	permRepo := &mockResourcePermRepoForExport{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(permRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+
+	exportSvc := service.NewExportService(mockRepo)
+	handler := NewExportHandler(exportSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.GET("/exportTasks/generateDownloadUri/:id", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Set("role", "user")
+		c.Next()
+	}, handler.GenerateDownloadURI)
+
+	req := httptest.NewRequest("GET", "/exportTasks/generateDownloadUri/nonexistent", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", w.Code)
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "404001" {
+		t.Fatalf("expected code 404001 for missing download URI task, got %#v", resp["code"])
+	}
+}
+
+func TestGenerateDownloadURI_Dataset_NoPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := newMockExportRepo()
+	mockRepo.AddTask(&export.ExportTask{
+		ID:             "task-uri-denied",
+		UserID:         100,
+		FileName:       "dataset_export.xlsx",
+		ExportFrom:     888,
+		ExportFromType: permission.ResourceTypeDataset,
+		ExportStatus:   "SUCCESS",
+	})
+
+	permRepo := &mockResourcePermRepoForExport{hasPermission: false}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(permRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+
+	exportSvc := service.NewExportService(mockRepo)
+	handler := NewExportHandler(exportSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.GET("/exportTasks/generateDownloadUri/:id", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Set("role", "user")
+		c.Next()
+	}, handler.GenerateDownloadURI)
+
+	req := httptest.NewRequest("GET", "/exportTasks/generateDownloadUri/task-uri-denied", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", w.Code)
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "403001" {
+		t.Fatalf("expected code 403001 for denied generateDownloadUri, got %#v", resp["code"])
+	}
+}
+
 func TestExportDownload_TaskWithNoResource(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

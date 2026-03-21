@@ -135,6 +135,27 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 	})
 }
 
+func (h *UserHandler) SwitchLanguage(c *gin.Context) {
+	var req user.LangSwitchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	userID := int64(middleware.GetUserID(c))
+	if userID == 0 {
+		response.Error(c, "500000", "Invalid user ID")
+		return
+	}
+
+	if err := h.userService.SwitchLanguage(userID, req.Lang); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func (h *UserHandler) DownloadExcelTemplate(c *gin.Context) {
 	if h.userImportService == nil {
 		response.Error(c, "500000", "user import service is not configured")

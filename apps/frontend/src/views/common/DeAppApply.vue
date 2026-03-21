@@ -441,7 +441,7 @@ const saveApp = () => {
       dvInfo.value['dataState'] = 'ready'
       await dvNameCheck({
         opt: 'newLeaf',
-        nodeType: 'leaf',
+        nodeType: 'panel',
         name: dvInfo.value['name'],
         type: curCanvasType.value,
         pid: dvInfo.value['pid']

@@ -33,7 +33,7 @@ test-integration:
 	TEST_DB_USER=$(or $(TEST_DB_USER),root) \
 	TEST_DB_PASSWORD=$(or $(TEST_DB_PASSWORD),Admin168) \
 	TEST_DB_NAME=$(or $(TEST_DB_NAME),dataease_test) \
-	$(GOTEST) -tags=integration -v -count=1 ./internal/repository/... ./internal/service/...
+	$(GOTEST) -p 1 -tags=integration -v -count=1 ./internal/repository/... ./internal/service/...
 
 # Lint
 lint:

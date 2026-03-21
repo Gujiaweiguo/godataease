@@ -188,7 +188,7 @@ func TestDatasetRepository_ListTablesByDatasetGroupID(t *testing.T) {
 	}
 
 	repo := NewDatasetRepository(testDB)
-	cleanupTables("core_dataset_table")
+	cleanupTables("core_dataset_table_field", "core_dataset_table")
 
 	groupID := int64(100)
 	for i := 1; i <= 3; i++ {

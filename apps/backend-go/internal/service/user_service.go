@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"dataease/backend/internal/domain/audit"
@@ -277,4 +278,37 @@ func (s *UserService) UpdateUserStatus(userID int64, status int) error {
 
 	logger.Info("User status updated", zap.Int64("userId", userID), zap.Int("status", status))
 	return nil
+}
+
+func (s *UserService) SwitchLanguage(userID int64, lang string) error {
+	existing, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+
+	normalized := normalizeLanguage(lang)
+	existing.Language = &normalized
+	now := time.Now()
+	existing.UpdateTime = &now
+
+	if err := s.userRepo.Update(existing); err != nil {
+		logger.Error("Failed to switch user language", zap.Error(err))
+		return fmt.Errorf("failed to switch user language: %w", err)
+	}
+
+	logger.Info("User language updated", zap.Int64("userId", userID), zap.String("language", normalized))
+	return nil
+}
+
+func normalizeLanguage(lang string) string {
+	switch strings.TrimSpace(strings.ToLower(strings.ReplaceAll(lang, "_", "-"))) {
+	case "zh-cn", "zh":
+		return "zh-CN"
+	case "zh-tw", "tw":
+		return "tw"
+	case "en", "en-us":
+		return "en"
+	default:
+		return "zh-CN"
+	}
 }

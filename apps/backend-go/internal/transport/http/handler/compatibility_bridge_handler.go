@@ -19,7 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler) { //nolint:gocyclo // large route registration for API compatibility
+func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler, permMiddleware *middleware.PermissionMiddleware) { //nolint:gocyclo // large route registration for API compatibility
 	_ = user
 	_ = org
 	getCurrentUserID := func(c *gin.Context) int64 {
@@ -485,7 +485,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				response.Success(c, result)
 			})
-			datasetTreeGroup.POST("/detailWithPerm", func(c *gin.Context) {
+			detailWithPermHandler := func(c *gin.Context) {
 				ids, ok := parseDatasetIDs(c)
 				if !ok {
 					return
@@ -499,7 +499,12 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					result = append(result, detail)
 				}
 				response.Success(c, result)
-			})
+			}
+			if permMiddleware != nil {
+				datasetTreeGroup.POST("/detailWithPerm", permMiddleware.CheckDatasetView(), detailWithPermHandler)
+			} else {
+				datasetTreeGroup.POST("/detailWithPerm", detailWithPermHandler)
+			}
 			datasetTreeGroup.POST("/getSqlParams", func(c *gin.Context) {
 				ids, ok := parseDatasetIDs(c)
 				if !ok {
@@ -1008,7 +1013,11 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			userGroup.POST("/update", user.UpdateUser)
 			userGroup.POST("/delete/:id", user.DeleteUser)
 			userGroup.GET("/options", user.GetUserOptions)
-			userGroup.GET("/org/option", user.GetUserOptions)
+			if org != nil {
+				userGroup.GET("/org/option", org.ListOrgs)
+			} else {
+				userGroup.GET("/org/option", user.GetUserOptions)
+			}
 			userGroup.POST("/byCurOrg", user.ListUsers)
 			userGroup.POST("/excelTemplate", user.DownloadExcelTemplate)
 			userGroup.POST("/batchImport", user.BatchImportUsers)

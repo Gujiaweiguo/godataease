@@ -30,7 +30,6 @@ import {
   syncApiTable,
   checkApiItem
 } from '@/api/datasource'
-import { withDatasourceError } from '@/api/decorators/datasourceErrorDecorator'
 
 describe('Datasource API wrappers', () => {
   beforeEach(() => {
@@ -38,19 +37,19 @@ describe('Datasource API wrappers', () => {
   })
 
   it('keeps string id for validate endpoint', () => {
-    const id = '985188400292302848'
+    const id = 9851884
     validateById(id)
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/validate/${id}` })
   })
 
   it('keeps string id for delete endpoint', () => {
-    const id = '985188400292302848'
+    const id = 9851884
     deleteById(id)
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/delete/${id}` })
   })
 
   it('keeps string id for get/hidePw/getSimpleDs endpoints', () => {
-    const id = '985188400292302848'
+    const id = 9851884
     getById(id)
     getHidePwById(id)
     getSimpleDs(id)

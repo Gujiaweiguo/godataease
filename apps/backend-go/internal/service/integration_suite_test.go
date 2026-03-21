@@ -204,33 +204,61 @@ func getEnv(key, defaultValue string) string {
 }
 
 func cleanupTables(tables ...interface{}) {
+	if err := testDB.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+		panic(fmt.Sprintf("disable foreign key checks failed: %v", err))
+	}
+	defer func() {
+		if err := testDB.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
+			panic(fmt.Sprintf("enable foreign key checks failed: %v", err))
+		}
+	}()
+
 	for _, table := range tables {
 		switch table.(type) {
 		case *share.Share, share.Share:
-			testDB.Exec("DELETE FROM core_share")
+			mustExecCleanup("DELETE FROM core_share")
 		case *share.ShareTicket, share.ShareTicket:
-			testDB.Exec("DELETE FROM core_share_ticket")
+			mustExecCleanup("DELETE FROM core_share_ticket")
 		case *template.Template, template.Template:
-			testDB.Exec("DELETE FROM core_visualization_template")
+			mustExecCleanup("DELETE FROM core_visualization_template")
 		case *visualization.DataVisualizationInfo, visualization.DataVisualizationInfo:
-			testDB.Exec("DELETE FROM data_visualization_info")
+			mustExecCleanup("DELETE FROM data_visualization_info")
 		case *visualization.Watermark, visualization.Watermark:
-			testDB.Exec("DELETE FROM visualization_watermark")
+			mustExecCleanup("DELETE FROM visualization_watermark")
 		case *datasource.CoreDatasource, datasource.CoreDatasource:
-			testDB.Exec("DELETE FROM core_datasource")
-			testDB.Exec("DELETE FROM core_datasource_task_log")
+			mustExecCleanup("DELETE FROM core_datasource")
+			mustExecCleanup("DELETE FROM core_datasource_task_log")
 		case *auto.CoreDatasourceTaskLog, auto.CoreDatasourceTaskLog:
-			testDB.Exec("DELETE FROM core_datasource_task_log")
+			mustExecCleanup("DELETE FROM core_datasource_task_log")
 		case *dataset.CoreDatasetGroup, dataset.CoreDatasetGroup:
-			testDB.Exec("DELETE FROM core_dataset_group")
+			mustExecCleanup("DELETE FROM core_dataset_table_field")
+			mustExecCleanup("DELETE FROM core_dataset_table")
+			mustExecCleanup("DELETE FROM core_dataset_group")
+		case *dataset.CoreDatasetTable, dataset.CoreDatasetTable:
+			mustExecCleanup("DELETE FROM core_dataset_table_field")
+			mustExecCleanup("DELETE FROM core_dataset_table")
+		case *dataset.CoreDatasetTableField, dataset.CoreDatasetTableField:
+			mustExecCleanup("DELETE FROM core_dataset_table_field")
+		case *permission.DataPermRow, permission.DataPermRow:
+			mustExecCleanup("DELETE FROM data_perm_row")
+		case *permission.DataPermColumn, permission.DataPermColumn:
+			mustExecCleanup("DELETE FROM data_perm_column")
 		case *system.SysVariable, system.SysVariable:
-			testDB.Exec("DELETE FROM sys_variable_value")
-			testDB.Exec("DELETE FROM sys_variable")
+			mustExecCleanup("DELETE FROM sys_variable_value")
+			mustExecCleanup("DELETE FROM sys_variable")
 		case *system.SysVariableValue, system.SysVariableValue:
-			testDB.Exec("DELETE FROM sys_variable_value")
+			mustExecCleanup("DELETE FROM sys_variable_value")
 		default:
 			// Use GORM's Unscoped delete for other types with soft delete support
-			testDB.Unscoped().Where("1 = 1").Delete(table)
+			if err := testDB.Unscoped().Where("1 = 1").Delete(table).Error; err != nil {
+				panic(fmt.Sprintf("cleanup delete failed for %T: %v", table, err))
+			}
 		}
+	}
+}
+
+func mustExecCleanup(sql string) {
+	if err := testDB.Exec(sql).Error; err != nil {
+		panic(fmt.Sprintf("cleanup exec failed for %q: %v", sql, err))
 	}
 }

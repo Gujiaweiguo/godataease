@@ -15,10 +15,18 @@ export const resolveViewComponent = (
 
 // 后端控制路由生成
 export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRecordRaw[] => {
+  return generateRoutesFnWithParent(routes)
+}
+
+const generateRoutesFnWithParent = (
+  routes: AppCustomRouteRecordRaw[],
+  parentPath = ''
+): AppRouteRecordRaw[] => {
   const res: AppRouteRecordRaw[] = []
 
   for (const router of routes) {
     let route = { ...router }
+    route.path = normalizeChildRoutePath(route.path, parentPath)
 
     if (route.top && route.inLayout) {
       route = decorate(route)
@@ -61,7 +69,7 @@ export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRe
     }
 
     if (route.children) {
-      data.children = generateRoutesFn2(route.children)
+      data.children = generateRoutesFnWithParent(route.children, route.path)
     }
 
     const hasResolvedChildren = !!data.children?.length
@@ -76,6 +84,24 @@ export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRe
   }
 
   return res
+}
+
+const normalizeChildRoutePath = (path: string, parentPath: string) => {
+  if (!path || !parentPath || path.startsWith('/')) {
+    return path
+  }
+
+  const trimmedParent = parentPath.replace(/^\//, '').replace(/\/$/, '')
+  if (!trimmedParent) {
+    return path
+  }
+
+  const prefixed = `${trimmedParent}/`
+  if (path.startsWith(prefixed)) {
+    return path.slice(prefixed.length)
+  }
+
+  return path
 }
 
 export const formatRoute = (arr: AppCustomRouteRecordRaw[]): AppCustomRouteRecordRaw[] => {

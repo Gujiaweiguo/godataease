@@ -80,7 +80,7 @@ const treeDraggbleChart = (state, key, type) => {
     const params = {
       id: draggingNode.data?.id,
       name: draggingNode.data?.name,
-      nodeType: draggingNode.data?.leaf ? 'leaf' : 'folder',
+      nodeType: draggingNode.data?.leaf ? 'panel' : 'folder',
       pid: '0',
       opt: 'move',
       type

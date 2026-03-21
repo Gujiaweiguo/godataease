@@ -45,6 +45,18 @@
           <el-switch :model-value="row.hidden" @change="value => handleHiddenChange(row, value)" />
         </template>
       </el-table-column>
+      <el-table-column prop="menuLocation" label="菜单位置" width="120">
+        <template #default="{ row }">
+          <el-tag v-if="row.menuLocation" size="small" type="info">{{ getMenuLocationLabel(row.menuLocation) }}</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="menuType" label="菜单类型" width="100">
+        <template #default="{ row }">
+          <el-tag v-if="row.menuType" size="small">{{ getMenuTypeLabel(row.menuType) }}</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="320" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleCreateChild(row)">新增子菜单</el-button>
@@ -97,6 +109,32 @@
         <el-form-item label="鉴权" prop="auth">
           <el-switch v-model="form.auth" />
         </el-form-item>
+        <el-form-item label="菜单位置" prop="menuLocation">
+          <el-select v-model="form.menuLocation" placeholder="请选择菜单位置" clearable>
+            <el-option value="sidebar" label="侧边栏" />
+            <el-option value="user_menu" label="用户菜单" />
+            <el-option value="help_menu" label="帮助菜单" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="菜单类型" prop="menuType">
+          <el-select v-model="form.menuType" placeholder="请选择菜单类型" clearable>
+            <el-option value="link" label="链接" />
+            <el-option value="action" label="动作" />
+            <el-option value="separator" label="分隔符" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="form.menuType === 'link'" label="链接地址" prop="actionConfigUrl">
+          <el-input v-model="form.actionConfigUrl" placeholder="请输入链接地址，如 https://example.com" />
+        </el-form-item>
+        <el-form-item v-if="form.menuType === 'link'" label="打开方式" prop="actionConfigTarget">
+          <el-select v-model="form.actionConfigTarget" placeholder="请选择打开方式">
+            <el-option value="_blank" label="新窗口" />
+            <el-option value="_self" label="当前窗口" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="form.menuType === 'action'" label="动作事件" prop="actionConfigEvent">
+          <el-input v-model="form.actionConfigEvent" placeholder="请输入动作事件名，如 open-about-dialog" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -120,7 +158,9 @@ import {
   menuUpdateSortApi,
   validateMenuPayload,
   MENU_VALIDATION_MESSAGES,
-  type MenuSavePayload
+  type MenuSavePayload,
+  type MenuLocation,
+  type MenuType
 } from '@/api/menu'
 
 type MenuItem = {
@@ -135,6 +175,9 @@ type MenuItem = {
   hidden: boolean
   inLayout: boolean
   auth: boolean
+  menuLocation?: MenuLocation
+  menuType?: MenuType
+  actionConfig?: { event?: string; url?: string; target?: string }
   children?: MenuItem[]
 }
 
@@ -145,7 +188,7 @@ const dialogTitle = ref('')
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 
-const form = ref<MenuSavePayload>({
+const form = ref<MenuSavePayload & { actionConfigUrl?: string; actionConfigTarget?: string; actionConfigEvent?: string }>({
   pid: 0,
   type: 0,
   name: '',
@@ -155,7 +198,13 @@ const form = ref<MenuSavePayload>({
   path: '',
   hidden: false,
   inLayout: true,
-  auth: true
+  auth: true,
+  menuLocation: undefined,
+  menuType: undefined,
+  actionConfig: undefined,
+  actionConfigUrl: '',
+  actionConfigTarget: '_blank',
+  actionConfigEvent: ''
 })
 
 const rules = {
@@ -185,6 +234,9 @@ const menuTreeOptions = computed(() => {
       hidden: false,
       inLayout: true,
       auth: true,
+      menuLocation: undefined,
+      menuType: undefined,
+      actionConfig: undefined,
       children: toOption(menuList.value)
     }
   ]
@@ -197,6 +249,24 @@ const getTypeLabel = (type: number) => {
     2: '按钮'
   }
   return map[type] || `类型${type}`
+}
+
+const getMenuLocationLabel = (location: MenuLocation) => {
+  const map: Record<MenuLocation, string> = {
+    sidebar: '侧边栏',
+    user_menu: '用户菜单',
+    help_menu: '帮助菜单'
+  }
+  return map[location] || location
+}
+
+const getMenuTypeLabel = (menuType: MenuType) => {
+  const map: Record<MenuType, string> = {
+    link: '链接',
+    action: '动作',
+    separator: '分隔符'
+  }
+  return map[menuType] || menuType
 }
 
 const normalizeMenus = (items: any[]): MenuItem[] => {
@@ -212,6 +282,9 @@ const normalizeMenus = (items: any[]): MenuItem[] => {
     hidden: !!item.hidden,
     inLayout: item.inLayout !== false,
     auth: item.auth !== false,
+    menuLocation: item.menuLocation || item.menu_location || undefined,
+    menuType: item.menuType || item.menu_type || undefined,
+    actionConfig: item.actionConfig || item.action_config || undefined,
     children: normalizeMenus(item.children || [])
   }))
 }
@@ -227,7 +300,13 @@ const resetForm = () => {
     path: '',
     hidden: false,
     inLayout: true,
-    auth: true
+    auth: true,
+    menuLocation: undefined,
+    menuType: undefined,
+    actionConfig: undefined,
+    actionConfigUrl: '',
+    actionConfigTarget: '_blank',
+    actionConfigEvent: ''
   }
 }
 
@@ -282,7 +361,13 @@ const handleEdit = async (row: MenuItem) => {
       path: detail.path || '',
       hidden: !!detail.hidden,
       inLayout: detail.inLayout !== false,
-      auth: detail.auth !== false
+      auth: detail.auth !== false,
+      menuLocation: detail.menuLocation || detail.menu_location || undefined,
+      menuType: detail.menuType || detail.menu_type || undefined,
+      actionConfig: detail.actionConfig || detail.action_config || undefined,
+      actionConfigUrl: detail.actionConfig?.url || detail.action_config?.url || '',
+      actionConfigTarget: detail.actionConfig?.target || detail.action_config?.target || '_blank',
+      actionConfigEvent: detail.actionConfig?.event || detail.action_config?.event || ''
     }
     dialogVisible.value = true
   } catch (_error) {
@@ -314,6 +399,19 @@ const handleSubmit = async () => {
     return
   }
   try {
+    // Build actionConfig based on menuType
+    let actionConfig: { event?: string; url?: string; target?: '_blank' | '_self' } | undefined
+    if (form.value.menuType === 'link' && form.value.actionConfigUrl) {
+      actionConfig = {
+        url: form.value.actionConfigUrl.trim(),
+        target: (form.value.actionConfigTarget as '_blank' | '_self') || '_blank'
+      }
+    } else if (form.value.menuType === 'action' && form.value.actionConfigEvent) {
+      actionConfig = {
+        event: form.value.actionConfigEvent.trim()
+      }
+    }
+
     const payload: MenuSavePayload = {
       ...(editingId.value ? { id: editingId.value } : {}),
       pid: Number(form.value.pid || 0),
@@ -325,7 +423,10 @@ const handleSubmit = async () => {
       path: form.value.path.trim(),
       hidden: !!form.value.hidden,
       inLayout: !!form.value.inLayout,
-      auth: !!form.value.auth
+      auth: !!form.value.auth,
+      menuLocation: form.value.menuLocation || undefined,
+      menuType: form.value.menuType || undefined,
+      actionConfig
     }
     const res = editingId.value ? await menuUpdateApi(payload) : await menuCreateApi(payload)
     if (res.code === '000000') {

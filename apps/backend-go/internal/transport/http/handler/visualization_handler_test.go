@@ -88,6 +88,15 @@ func TestBuildVisualizationTreeValidation(t *testing.T) {
 			}},
 			wantErr: false,
 		},
+		{
+			name: "legacy leaf nodeType is accepted as panel",
+			items: []*visualization.DataVisualizationInfo{{
+				ID:       1,
+				Name:     "legacy-leaf",
+				NodeType: func() *string { s := visualizationNodeTypeLeaf; return &s }(),
+			}},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

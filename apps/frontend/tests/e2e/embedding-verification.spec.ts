@@ -1,30 +1,29 @@
-import { test, expect, describe, beforeAll, afterAll } from 'vitest'
-import { chromium } from 'playwright'
+import { test, expect, chromium } from '@playwright/test'
 import path from 'path'
 
-describe('Embedding Verification - Automated Browser Tests', () => {
+test.describe('Embedding Verification - Automated Browser Tests', () => {
   let browser: any
   let page: any
 
-  beforeAll(async () => {
+  test.beforeAll(async () => {
     browser = await chromium.launch({
       headless: process.env.CI === 'true',
       args: ['--disable-web-security']
     })
   })
 
-  afterAll(async () => {
+  test.afterAll(async () => {
     if (browser) {
       await browser.close()
     }
   })
 
-  describe('Dashboard Embedding', () => {
-    beforeEach(async () => {
+  test.describe('Dashboard Embedding', () => {
+    test.beforeEach(async () => {
       page = await browser.newPage()
     })
 
-    afterEach(async () => {
+    test.afterEach(async () => {
       if (page) {
         await page.close()
       }
@@ -95,12 +94,12 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Screen Embedding', () => {
-    beforeEach(async () => {
+  test.describe('Screen Embedding', () => {
+    test.beforeEach(async () => {
       page = await browser.newPage()
     })
 
-    afterEach(async () => {
+    test.afterEach(async () => {
       if (page) {
         await page.close()
       }
@@ -131,7 +130,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Parameter Initialization', () => {
+  test.describe('Parameter Initialization', () => {
     test('should update iframe src with token parameter', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
       await page.goto(`file://${demoPath}`)
@@ -169,7 +168,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Event Communication', () => {
+  test.describe('Event Communication', () => {
     test('should log param_update events', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
       await page.goto(`file://${demoPath}`)
@@ -255,7 +254,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Iframe Functionality', () => {
+  test.describe('Iframe Functionality', () => {
     test('should render iframe element', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
       await page.goto(`file://${demoPath}`)
@@ -281,7 +280,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Console Error Detection', () => {
+  test.describe('Console Error Detection', () => {
     test('should detect console errors', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
 
@@ -297,14 +296,14 @@ describe('Embedding Verification - Automated Browser Tests', () => {
       await page.waitForTimeout(1000)
 
       await page.evaluate(() => {
-        return window.consoleErrors || []
+        return (window as Window & { consoleErrors?: string[] }).consoleErrors || []
       })
 
       expect(errors.length).toBe(0)
     })
   })
 
-  describe('Cross-Origin Communication', () => {
+  test.describe('Cross-Origin Communication', () => {
     test('should handle cross-origin messages', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
       await page.goto(`file://${demoPath}`)
@@ -331,7 +330,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Responsive Design', () => {
+  test.describe('Responsive Design', () => {
     test('should adapt to different viewport sizes', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
       await page.goto(`file://${demoPath}`)
@@ -347,7 +346,7 @@ describe('Embedding Verification - Automated Browser Tests', () => {
     })
   })
 
-  describe('Accessibility', () => {
+  test.describe('Accessibility', () => {
     test('should have proper labels', async () => {
       const demoPath = path.join(__dirname, '../../public/embedding-demo/dashboard-embed.html')
       await page.goto(`file://${demoPath}`)

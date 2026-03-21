@@ -77,7 +77,7 @@ class ShortcutOption {
         return res
       })
       .catch(error => {
-        if (this.busiFlag === 'store' && error?.response?.status === 404) {
+        if (['store', 'recent'].includes(this.busiFlag) && error?.response?.status === 404) {
           const result = {
             code: 200,
             data: [],
