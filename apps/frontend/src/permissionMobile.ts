@@ -8,6 +8,7 @@ import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { useLinkStoreWithOut } from '@/store/modules/link'
+import { isBootstrapSessionValid } from '@/utils/authBootstrap'
 
 const appearanceStore = useAppearanceStoreWithOut()
 const permissionStore = usePermissionStoreWithOut()
@@ -21,13 +22,25 @@ const interactiveStore = interactiveStoreWithOut()
 const { loadStart, loadDone } = usePageLoading()
 const whiteList = ['/login', '/panel', '/DashboardEmpty', '/preview'] // 不重定向白名单
 
+const hasValidBootstrapSession = () => {
+  return isBootstrapSessionValid({
+    token: wsCache.get('user.token'),
+    exp: wsCache.get('user.exp'),
+    time: wsCache.get('user.time')
+  })
+}
+
 router.beforeEach(async (to, _, next) => {
   start()
   loadStart()
   await appearanceStore.setAppearance()
+  if (wsCache.get('user.token') && !hasValidBootstrapSession()) {
+    userStore.clear()
+    permissionStore.clear()
+  }
   if (to.name === 'link') {
     next()
-  } else if (wsCache.get('user.token')) {
+  } else if (hasValidBootstrapSession()) {
     linkStore.setLinkToken('')
     if (!userStore.getUid) {
       await userStore.setUser()
@@ -37,7 +50,9 @@ router.beforeEach(async (to, _, next) => {
     } else {
       const roleRouters = (await getRoleRouters()) || []
       const routers: any[] = roleRouters as AppCustomRouteRecordRaw[]
-      routers.forEach(item => (item['top'] = true))
+      routers.forEach(item => {
+        item['top'] = true
+      })
       await permissionStore.generateRoutes(routers as AppCustomRouteRecordRaw[])
       permissionStore.setIsAddRouters(true)
       await interactiveStore.initInteractive(true)
