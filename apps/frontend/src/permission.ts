@@ -18,6 +18,7 @@ import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { useEmbedded } from '@/store/modules/embedded'
 import { useLoading } from '@/hooks/web/useLoading'
 import { isDynamicNavigationEnabled } from '@/utils/featureFlags'
+import { isBootstrapSessionValid } from '@/utils/authBootstrap'
 const appearanceStore = useAppearanceStoreWithOut()
 const { wsCache } = useCache()
 const permissionStore = usePermissionStoreWithOut()
@@ -47,6 +48,48 @@ const resolveUnauthorizedTarget = (path: string) => {
     return '/404'
   }
   return '/401'
+}
+
+type BootstrapErrorResponse = {
+  status?: number
+  headers?: {
+    has?: (key: string) => boolean
+    [key: string]: unknown
+  }
+}
+
+const hasResponseHeader = (headers: BootstrapErrorResponse['headers'], key: string) => {
+  if (!headers) {
+    return false
+  }
+  if (typeof headers.has === 'function') {
+    return headers.has(key)
+  }
+  const targetKey = key.toLowerCase()
+  return Object.keys(headers).some(headerKey => headerKey.toLowerCase() === targetKey)
+}
+
+const isAuthBootstrapError = (error: unknown) => {
+  const response = (error as { response?: BootstrapErrorResponse } | undefined)?.response
+  if (!response) {
+    return false
+  }
+  return response.status === 401 || hasResponseHeader(response.headers, 'DE-GATEWAY-FLAG')
+}
+
+const resetBootstrapAuthState = () => {
+  userStore.clear()
+  permissionStore.clear()
+  interactiveStore.clear()
+}
+
+const hasValidBootstrapSession = (isDesktop: boolean) => {
+  return isBootstrapSessionValid({
+    token: wsCache.get('user.token'),
+    exp: wsCache.get('user.exp'),
+    time: wsCache.get('user.time'),
+    isDesktop
+  })
 }
 
 const removeDynamicRoutes = () => {
@@ -83,8 +126,16 @@ const loadAuthorizedRoutes = async () => {
 }
 
 const refreshPermissionRoutes = async (force = false) => {
-  const hasSession = !!(wsCache.get('user.token') || wsCache.get('app.desktop'))
+  const isDesktop = !!wsCache.get('app.desktop')
+  const hasSession = hasValidBootstrapSession(isDesktop)
   if (!hasSession || (!force && !permissionStore.getIsAddRouters)) {
+    if (!hasSession && (wsCache.get('user.token') || isDesktop)) {
+      resetBootstrapAuthState()
+      const redirectPath = router.currentRoute.value.fullPath || router.currentRoute.value.path || '/workbranch'
+      if (router.currentRoute.value.path !== '/login') {
+        await router.replace(`/login?redirect=${redirectPath}`)
+      }
+    }
     return
   }
 
@@ -98,17 +149,29 @@ const refreshPermissionRoutes = async (force = false) => {
   }
 
   permissionRefreshPromise = (async () => {
-    await loadAuthorizedRoutes()
-    lastPermissionRefreshAt = Date.now()
+    try {
+      await loadAuthorizedRoutes()
+      lastPermissionRefreshAt = Date.now()
 
-    const currentPath = router.currentRoute.value.path
-    if (
-      currentPath &&
-      !whiteList.includes(currentPath) &&
-      !currentPath.startsWith('/de-link') &&
-      !pathValid(currentPath)
-    ) {
-	    await router.replace(resolveUnauthorizedTarget(currentPath))
+      const currentPath = router.currentRoute.value.path
+      if (
+        currentPath &&
+        !whiteList.includes(currentPath) &&
+        !currentPath.startsWith('/de-link') &&
+        !pathValid(currentPath)
+      ) {
+	      await router.replace(resolveUnauthorizedTarget(currentPath))
+      }
+    } catch (error) {
+      if (isAuthBootstrapError(error)) {
+        resetBootstrapAuthState()
+        const redirectPath = router.currentRoute.value.fullPath || router.currentRoute.value.path || '/workbranch'
+        if (router.currentRoute.value.path !== '/login') {
+          await router.replace(`/login?redirect=${redirectPath}`)
+        }
+        return
+      }
+      throw error
     }
   })().finally(() => {
     permissionRefreshPromise = null
@@ -137,6 +200,11 @@ router.beforeEach(async (to, from, next) => {
   if (isDesktop === null) {
     await appStore.setAppModel()
     isDesktop = appStore.getDesktop
+  }
+  const hasCachedSession = !!(wsCache.get('user.token') || isDesktop)
+  const hasValidSession = hasValidBootstrapSession(!!isDesktop)
+  if (hasCachedSession && !hasValidSession) {
+    resetBootstrapAuthState()
   }
   if (isMobile() && !['/chart-view'].includes(to.path)) {
     done()
@@ -183,53 +251,66 @@ router.beforeEach(async (to, from, next) => {
   const defaultSort = await getDefaultSettings()
   wsCache.set('TreeSort-backend', defaultSort['basic.defaultSort'] ?? '1')
   wsCache.set('open-backend', defaultSort['basic.defaultOpen'] ?? '0')
-  if ((wsCache.get('user.token') || isDesktop) && !to.path.startsWith('/de-link/')) {
-    if (!userStore.getUid) {
-      await userStore.setUser()
-    }
-    if (to.path === '/login') {
-      next({ path: '/workbranch' })
-    } else {
-      permissionStore.setCurrentPath(to.path)
-      if (permissionStore.getIsAddRouters) {
-        let str = ''
-        if (((from.query.redirect as string) || '?').split('?')[0] === to.path) {
-          str = ((window.location.hash as string) || '?').split('?').reverse()[0]
-          if (str.includes('redirect=')) {
-            str = ''
+  if (hasValidSession && !to.path.startsWith('/de-link/')) {
+    try {
+      if (!userStore.getUid) {
+        await userStore.setUser()
+      }
+      if (to.path === '/login') {
+        next({ path: '/workbranch' })
+      } else {
+        permissionStore.setCurrentPath(to.path)
+        if (permissionStore.getIsAddRouters) {
+          let str = ''
+          if (((from.query.redirect as string) || '?').split('?')[0] === to.path) {
+            str = ((window.location.hash as string) || '?').split('?').reverse()[0]
+            if (str.includes('redirect=')) {
+              str = ''
+            }
           }
+          if (str) {
+            to.fullPath += '?' + str
+            to.query = str.split('&').reduce((pre, itx) => {
+              const [key, val] = itx.split('=')
+              pre[key] = val
+              return pre
+            }, {})
+          }
+          if (!pathValid(to.path) && to.path !== '/404' && !to.path.startsWith('/de-link')) {
+	            next({ path: resolveUnauthorizedTarget(to.path), replace: true })
+            return
+          }
+          next()
+          return
         }
-        if (str) {
-          to.fullPath += '?' + str
-          to.query = str.split('&').reduce((pre, itx) => {
-            const [key, val] = itx.split('=')
-            pre[key] = val
-            return pre
-          }, {})
-        }
+
+        await loadAuthorizedRoutes()
+
+        const redirectPath = (from.query.redirect as string) || to.fullPath || to.path
+        const redirect = decodeURIComponent(redirectPath)
+        const resolvedRedirect = router.resolve(redirect)
+
         if (!pathValid(to.path) && to.path !== '/404' && !to.path.startsWith('/de-link')) {
 	          next({ path: resolveUnauthorizedTarget(to.path), replace: true })
           return
         }
-        next()
+        if (to.path === redirect && resolvedRedirect.matched.length > 0) {
+          next()
+          return
+        }
+        next({ path: redirect, replace: true })
+      }
+    } catch (error) {
+      if (isAuthBootstrapError(error)) {
+        resetBootstrapAuthState()
+        if (to.path === '/login') {
+          next()
+          return
+        }
+        next(`/login?redirect=${to.fullPath || to.path}`)
         return
       }
-
-      await loadAuthorizedRoutes()
-
-      const redirectPath = (from.query.redirect as string) || to.fullPath || to.path
-      const redirect = decodeURIComponent(redirectPath)
-      const resolvedRedirect = router.resolve(redirect)
-
-      if (!pathValid(to.path) && to.path !== '/404' && !to.path.startsWith('/de-link')) {
-	        next({ path: resolveUnauthorizedTarget(to.path), replace: true })
-        return
-      }
-      if (to.path === redirect && resolvedRedirect.matched.length > 0) {
-        next()
-        return
-      }
-      next({ path: redirect, replace: true })
+      throw error
     }
   } else {
     const embeddedStore = useEmbedded()

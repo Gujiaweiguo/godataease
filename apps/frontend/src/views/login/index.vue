@@ -144,6 +144,10 @@ const showLoginErrorMsg = () => {
   if (!loginErrorMsg.value) {
     return
   }
+  if (/^\d+$/.test(loginErrorMsg.value)) {
+    ElMessage.error('登录状态已失效，请重新登录！')
+    return
+  }
   if (loginErrorMsg.value.includes('token is empty')) {
     ElMessage.error('token为空！')
     return
