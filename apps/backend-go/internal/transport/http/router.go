@@ -131,6 +131,7 @@ type Router struct {
 	frontendCompatHandler   *handler.FrontendCompatHandler
 	permissionCompatHandler *handler.PermissionCompatHandler
 	dataPermissionHandler   *handler.DataPermissionHandler
+	resourceGovernanceHandler *handler.ResourceGovernanceHandler
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -286,10 +287,14 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
 	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
+	datasourceService.SetResourcePermissionService(resourcePermService)
 	datasetService.SetResourcePermissionService(resourcePermService)
+	visualService.SetResourcePermissionService(resourcePermService)
+	resourceGovernanceAdminService := service.NewResourceGovernanceAdminService(datasourceService, datasetService, visualService)
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
+	resourceGovernanceHandler := handler.NewResourceGovernanceHandler(resourceGovernanceAdminService, adminChecker)
 
 	// Export module initialization
 	exportRepo := repository.NewExportRepository(db)
@@ -349,6 +354,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		frontendCompatHandler:   frontendCompatHandler,
 		permissionCompatHandler: permissionCompatHandler,
 		dataPermissionHandler:   dataPermissionHandler,
+		resourceGovernanceHandler: resourceGovernanceHandler,
 	}
 }
 
@@ -483,6 +489,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterRoleMenuRoutes(api, r.roleMenuHandler)
 		handler.RegisterMenuRoutes(api, r.menuHandler)
 		handler.RegisterPermissionCompatRoutes(api, r.permissionCompatHandler)
+		handler.RegisterResourceGovernanceRoutes(auditAPI, r.resourceGovernanceHandler)
 		handler.RegisterDataPermissionRoutes(api, r.dataPermissionHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
 		handler.RegisterDatasourceRoutes(datasourceAPI, r.datasourceHandler)
