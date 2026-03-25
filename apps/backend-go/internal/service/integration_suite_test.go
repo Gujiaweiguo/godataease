@@ -3,12 +3,6 @@
 package service
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"testing"
-	"time"
-
 	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
@@ -79,114 +73,40 @@ func TestMain(m *testing.M) {
 		&visualization.Watermark{},
 		&datasource.CoreDatasource{}, &auto.CoreDatasourceTaskLog{},
 		&dataset.CoreDatasetGroup{},
+		&auto.CoreExportTask{},
+		&driver.Driver{}, &driver.DriverJar{},
+		&engine.Engine{},
+		&geo.GeometryArea{},
+		&areamap.Area{}, &areamap.CoreAreaCustom{},
+		&embedded.CoreEmbedded{},
+		&static.StaticResource{}, &static.Store{}, &static.Typeface{},
+		&system.SysVariable{}, &system.SysVariableValue{},
 	); err != nil {
-		log.Fatalf("Failed to auto migrate: %v", err)
+		log.Fatalf("Failed to migrate: %v\n", err)
 	}
 
 	// Create core_share table manually (repository uses internal coreShare type with gorm tags)
 	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_share (
-	id BIGINT AUTO_INCREMENT PRIMARY KEY,
-	creator BIGINT,
-	resource_id BIGINT,
-	resource_type VARCHAR(50),
-	time DATETIME,
-	exp BIGINT,
-	uuid VARCHAR(64),
-	pwd VARCHAR(255),
-	auto_pwd TINYINT(1) DEFAULT 1,
-	ticket_require TINYINT(1) DEFAULT 0,
-	INDEX idx_creator (creator),
-	INDEX idx_resource_id (resource_id),
-	UNIQUE INDEX idx_uuid (uuid)
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_share table: %v\n", err)
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    creator BIGINT,
+    resource_id BIGINT,
+    resource_type VARCHAR(50),
+    time DATETIME,
+    exp BIGINT,
+    pwd VARCHAR(255),
+    uuid VARCHAR(36),
+    CONSTRAINT fk_share_ticket FOREIGN KEY (ticket)
+    )`); err != nil {
+		log.Fatalf("Failed to create core_share table: %v", err)
 	}
 
-	// Create core_share_ticket table manually
-	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_share_ticket (
-	id BIGINT AUTO_INCREMENT PRIMARY KEY,
-	uuid VARCHAR(64),
-	ticket VARCHAR(64),
-	exp BIGINT,
-	args TEXT,
-	access_time DATETIME,
-	INDEX idx_uuid (uuid),
-	UNIQUE INDEX idx_ticket (ticket)
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_share_ticket table: %v\n", err)
+	// Create visualization_watermark table manually
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_watermark (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    setting_content LONGTEXT
+    )`); err != nil {
+		log.Fatalf("Failed to create visualization_watermark table: %v", err)
 	}
-
-	// Create core_visualization_template table manually
-	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_visualization_template (
-	id BIGINT AUTO_INCREMENT PRIMARY KEY,
-	name VARCHAR(255),
-	pid BIGINT,
-	level INT,
-	dv_type VARCHAR(50),
-	node_type VARCHAR(50),
-	create_by VARCHAR(255),
-	create_time DATETIME,
-	snapshot LONGTEXT,
-	template_type VARCHAR(50),
-	template_style LONGTEXT,
-	template_data LONGTEXT,
-	dynamic_data LONGTEXT,
-	app_data LONGTEXT,
-	use_count INT DEFAULT 0,
-	version INT DEFAULT 3,
-	INDEX idx_pid (pid)
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_visualization_template table: %v\n", err)
-	}
-
-	// Create additional tables that don't have GORM models in the test suite
-	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_ds_finish_page (
-	id BIGINT PRIMARY KEY
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_ds_finish_page table: %v\n", err)
-	}
-
-	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_msg_setting (
-	id BIGINT AUTO_INCREMENT PRIMARY KEY,
-	msg_id VARCHAR(100),
-	user_id BIGINT,
-	status VARCHAR(20),
-	read_at DATETIME,
-	UNIQUE INDEX idx_msg_user (msg_id, user_id),
-	INDEX idx_user_id (user_id)
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_msg_setting table: %v\n", err)
-	}
-
-	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_ticket (
-	id BIGINT AUTO_INCREMENT PRIMARY KEY,
-	uuid VARCHAR(255),
-	ticket VARCHAR(255) UNIQUE,
-	exp BIGINT,
-	args TEXT,
-	access_time BIGINT,
-	create_time DATETIME,
-	INDEX idx_uuid (uuid)
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_ticket table: %v\n", err)
-	}
-
-	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_sys_setting (
-	id BIGINT AUTO_INCREMENT PRIMARY KEY,
-	pkey VARCHAR(255) NOT NULL,
-	pval LONGTEXT,
-	type VARCHAR(50),
-	sort INT DEFAULT 0,
-	UNIQUE INDEX idx_pkey (pkey)
-)`).Error; err != nil {
-		log.Fatalf("Failed to create core_sys_setting table: %v\n", err)
-	}
-
-	code := m.Run()
-
-	sqlDB, _ = testDB.DB()
-	sqlDB.Close()
-	os.Exit(code)
 }
 
 func getEnv(key, defaultValue string) string {
@@ -211,7 +131,7 @@ func cleanupTables(tables ...interface{}) {
 		case *share.Share, share.Share:
 			mustExecCleanup("DELETE FROM core_share")
 		case *share.ShareTicket, share.ShareTicket:
-			mustExecCleanup("DELETE FROM core_share_ticket")
+			thenExecCleanup("DELETE FROM core_share_ticket")
 		case *template.Template, template.Template:
 			mustExecCleanup("DELETE FROM core_visualization_template")
 		case *visualization.DataVisualizationInfo, visualization.DataVisualizationInfo:
@@ -220,16 +140,16 @@ func cleanupTables(tables ...interface{}) {
 			mustExecCleanup("DELETE FROM visualization_watermark")
 		case *datasource.CoreDatasource, datasource.CoreDatasource:
 			mustExecCleanup("DELETE FROM core_datasource")
-			mustExecCleanup("DELETE FROM core_datasource_task_log")
+			thenExecCleanup("DELETE FROM core_datasource_task_log")
 		case *auto.CoreDatasourceTaskLog, auto.CoreDatasourceTaskLog:
 			mustExecCleanup("DELETE FROM core_datasource_task_log")
 		case *dataset.CoreDatasetGroup, dataset.CoreDatasetGroup:
 			mustExecCleanup("DELETE FROM core_dataset_table_field")
-			mustExecCleanup("DELETE FROM core_dataset_table")
+			thenExecCleanup("DELETE FROM core_dataset_table")
 			mustExecCleanup("DELETE FROM core_dataset_group")
 		case *dataset.CoreDatasetTable, dataset.CoreDatasetTable:
 			mustExecCleanup("DELETE FROM core_dataset_table_field")
-			mustExecCleanup("DELETE FROM core_dataset_table")
+			thenExecCleanup("DELETE FROM core_dataset_table")
 		case *dataset.CoreDatasetTableField, dataset.CoreDatasetTableField:
 			mustExecCleanup("DELETE FROM core_dataset_table_field")
 		case *permission.DataPermRow, permission.DataPermRow:
@@ -241,7 +161,9 @@ func cleanupTables(tables ...interface{}) {
 			mustExecCleanup("DELETE FROM sys_variable")
 		case *system.SysVariableValue, system.SysVariableValue:
 			mustExecCleanup("DELETE FROM sys_variable_value")
-	mustExecCleanup("DELETE FROM sys_role_perm")
+		case *permission.SysRolePerm, permission.SysRolePerm:
+			mustExecCleanup("DELETE FROM sys_role_perm")
+		}
 	}
 }
 
