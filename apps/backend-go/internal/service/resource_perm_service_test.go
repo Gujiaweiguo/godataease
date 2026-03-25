@@ -1,6 +1,9 @@
 package service
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 
 	"dataease/backend/internal/domain/permission"
@@ -15,22 +18,24 @@ func (m *mockResourcePermAdminChecker) IsAdmin(userID int64) bool {
 }
 
 type mockResourcePermRepo struct {
-	userPerms  map[int64][]int64
-	rolePerms  map[int64][]int64
-	userRoles  map[int64][]int64
-	permKeys   map[string]*permission.SysPerm
-	userPermOk map[int64]map[int64]bool
-	rolePermOk map[int64]map[int64]bool
+	userPerms     map[int64][]int64
+	rolePerms     map[int64][]int64
+	userRoles     map[int64][]int64
+	permKeys      map[string]*permission.SysPerm
+	userPermOk    map[int64]map[int64]bool
+	rolePermOk    map[int64]map[int64]bool
+	resourcePerms map[string][]int64
 }
 
 func newMockResourcePermRepo() *mockResourcePermRepo {
 	return &mockResourcePermRepo{
-		userPerms:  make(map[int64][]int64),
-		rolePerms:  make(map[int64][]int64),
-		userRoles:  make(map[int64][]int64),
-		permKeys:   make(map[string]*permission.SysPerm),
-		userPermOk: make(map[int64]map[int64]bool),
-		rolePermOk: make(map[int64]map[int64]bool),
+		userPerms:     make(map[int64][]int64),
+		rolePerms:     make(map[int64][]int64),
+		userRoles:     make(map[int64][]int64),
+		permKeys:      make(map[string]*permission.SysPerm),
+		userPermOk:    make(map[int64]map[int64]bool),
+		rolePermOk:    make(map[int64]map[int64]bool),
+		resourcePerms: make(map[string][]int64),
 	}
 }
 
@@ -41,6 +46,14 @@ func (m *mockResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, e
 func (m *mockResourcePermRepo) GetPermByKey(permKey string) (*permission.SysPerm, error) {
 	if perm, ok := m.permKeys[permKey]; ok {
 		return perm, nil
+	}
+	if idx := strings.Index(permKey, ":"); idx >= 0 {
+		if perm, ok := m.permKeys[permKey[idx+1:]]; ok {
+			return perm, nil
+		}
+	}
+	if strings.Contains(permKey, ":") {
+		return nil, fmt.Errorf("permission not found")
 	}
 	return &permission.SysPerm{PermID: 1, PermKey: permKey}, nil
 }
@@ -116,8 +129,33 @@ func (m *mockResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, 
 	return nil
 }
 
+func (m *mockResourcePermRepo) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
+	return nil
+}
+
+func (m *mockResourcePermRepo) InheritParentResourcePermissions(parentID, resourceID int64, resourceName, resourceType string) error {
+	return nil
+}
+
+func (m *mockResourcePermRepo) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
+	m.resourcePerms[resourceTypeKey(resourceType, resourceID)] = append([]int64{}, permIDs...)
+	return nil
+}
+
+func (m *mockResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
+	permIDs, ok := m.resourcePerms[resourceTypeKey(resourceType, resourceID)]
+	if !ok {
+		return nil, false, nil
+	}
+	return append([]int64{}, permIDs...), true, nil
+}
+
 func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
+func resourceTypeKey(resourceType string, resourceID int64) string {
+	return resourceType + ":" + strconv.FormatInt(resourceID, 10)
 }
 
 func TestCheckPermission_AdminBypass(t *testing.T) {
@@ -178,6 +216,40 @@ func TestCheckPermission_NoPermission(t *testing.T) {
 	}
 	if result.Reason != "no_roles" {
 		t.Errorf("Expected reason 'no_roles', got %s", result.Reason)
+	}
+}
+
+func TestCheckPermission_ResourceScopedPermissionDenied(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	mockRepo.userPermOk[9] = map[int64]bool{1: true}
+	mockRepo.permKeys[permission.ResourceTypeDashboard+":"+permission.PermKeyView] = &permission.SysPerm{PermID: 1, PermKey: permission.ResourceTypeDashboard + ":" + permission.PermKeyView}
+	mockRepo.resourcePerms[resourceTypeKey(permission.ResourceTypeDashboard, 700)] = []int64{2}
+	mockChecker := &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}}
+	svc := NewResourcePermissionService(mockRepo, mockChecker)
+
+	result := svc.CheckPermission(9, permission.ResourceTypeDashboard, 700, permission.PermKeyView)
+	if result.HasPermission {
+		t.Fatalf("expected governed resource permission denial, got allowed")
+	}
+	if result.Reason != "resource_permission_denied" {
+		t.Fatalf("expected resource_permission_denied, got %s", result.Reason)
+	}
+}
+
+func TestCheckPermission_ResourceScopedPermissionAllowed(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	mockRepo.userPermOk[10] = map[int64]bool{1: true}
+	mockRepo.permKeys[permission.ResourceTypeDashboard+":"+permission.PermKeyView] = &permission.SysPerm{PermID: 1, PermKey: permission.ResourceTypeDashboard + ":" + permission.PermKeyView}
+	mockRepo.resourcePerms[resourceTypeKey(permission.ResourceTypeDashboard, 701)] = []int64{1}
+	mockChecker := &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}}
+	svc := NewResourcePermissionService(mockRepo, mockChecker)
+
+	result := svc.CheckPermission(10, permission.ResourceTypeDashboard, 701, permission.PermKeyView)
+	if !result.HasPermission {
+		t.Fatalf("expected governed resource permission allowed, got denied: %s", result.Reason)
+	}
+	if result.Reason != "user_permission" {
+		t.Fatalf("expected user_permission, got %s", result.Reason)
 	}
 }
 
@@ -262,5 +334,49 @@ func TestResourcePermissionService_DelegateMethods(t *testing.T) {
 	}
 	if err = svc.RevokePermissionFromRole(3, 4); err != nil {
 		t.Fatalf("RevokePermissionFromRole failed: %v", err)
+	}
+}
+
+func TestTryInheritParentResourcePermissions_ParentGoverned(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	mockRepo.resourcePerms[resourceTypeKey(permission.ResourceTypeDatasource, 10)] = []int64{11, 12}
+	svc := NewResourcePermissionService(mockRepo, nil)
+
+	inherited, err := svc.TryInheritParentResourcePermissions(10, 20, "Child Datasource", permission.ResourceTypeDatasource)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !inherited {
+		t.Fatalf("expected governed inheritance to be applied")
+	}
+	permIDs, exists, err := mockRepo.GetResourcePermissionIDs(20, permission.ResourceTypeDatasource)
+	if err != nil {
+		t.Fatalf("expected no lookup error, got %v", err)
+	}
+	if !exists {
+		t.Fatalf("expected child resource permissions to exist after inheritance")
+	}
+	if len(permIDs) != 2 || permIDs[0] != 11 || permIDs[1] != 12 {
+		t.Fatalf("expected inherited perm ids [11 12], got %v", permIDs)
+	}
+}
+
+func TestTryInheritParentResourcePermissions_ParentNotGoverned(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	svc := NewResourcePermissionService(mockRepo, nil)
+
+	inherited, err := svc.TryInheritParentResourcePermissions(10, 20, "Child Datasource", permission.ResourceTypeDatasource)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if inherited {
+		t.Fatalf("expected ungoverned parent to skip inheritance")
+	}
+	permIDs, exists, err := mockRepo.GetResourcePermissionIDs(20, permission.ResourceTypeDatasource)
+	if err != nil {
+		t.Fatalf("expected no lookup error, got %v", err)
+	}
+	if exists || len(permIDs) != 0 {
+		t.Fatalf("expected no child resource permissions for ungoverned parent, got exists=%v permIDs=%v", exists, permIDs)
 	}
 }
