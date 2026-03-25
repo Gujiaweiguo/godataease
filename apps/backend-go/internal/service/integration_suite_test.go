@@ -3,6 +3,12 @@
 package service
 
 import (
+	"fmt"
+	"log"
+	"os"
+	"testing"
+	"time"
+
 	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
@@ -96,7 +102,7 @@ func TestMain(m *testing.M) {
     pwd VARCHAR(255),
     uuid VARCHAR(36),
     CONSTRAINT fk_share_ticket FOREIGN KEY (ticket)
-    )`); err != nil {
+    )`).Error; err != nil {
 		log.Fatalf("Failed to create core_share table: %v", err)
 	}
 
@@ -104,7 +110,7 @@ func TestMain(m *testing.M) {
 	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_watermark (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     setting_content LONGTEXT
-    )`); err != nil {
+    )`).Error; err != nil {
 		log.Fatalf("Failed to create visualization_watermark table: %v", err)
 	}
 }

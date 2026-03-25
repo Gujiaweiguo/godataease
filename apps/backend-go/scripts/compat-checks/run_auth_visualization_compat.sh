@@ -19,7 +19,13 @@ TOTAL=0
 FAILED=0
 
 # Try login with default admin credentials
-status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login" \
+login_admin() {
+  local tmp
+  tmp=$(mktemp)
+  local curl_rc=0
+  local status
+
+  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login" \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"DataEase1234"}') || curl_rc=$?
 
