@@ -1,0 +1,12 @@
+schema: spec-driven
+created: 2026-03-25
+status: active
+
+test_gate:
+  ci:
+    - Unit tests (make test)
+    - Integration tests (make test-integration)
+    - Lint (golangci-lint)
+  archive:
+    - All CI tests must pass
+    - E2E tests must pass
