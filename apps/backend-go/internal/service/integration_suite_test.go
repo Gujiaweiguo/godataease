@@ -112,6 +112,8 @@ func TestMain(m *testing.M) {
     )`).Error; err != nil {
 		log.Fatalf("Failed to create visualization_watermark table: %v", err)
 	}
+
+	os.Exit(m.Run())
 }
 
 func getEnv(key, defaultValue string) string {
