@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"dataease/backend/internal/domain/role"
@@ -23,6 +24,12 @@ func NewRoleService(repo *repository.RoleRepository, userRepo *repository.UserRe
 }
 
 func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string) (int64, error) {
+	if req.ParentID != nil && *req.ParentID > 0 {
+		if err := s.validateInheritance(*req.ParentID); err != nil {
+			return 0, err
+		}
+	}
+
 	roleName := req.RoleName
 	if roleName == "" {
 		roleName = req.Name
@@ -48,6 +55,11 @@ func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string) (int64,
 		Status:    role.StatusEnabled,
 		CreateBy:  &createBy,
 		DataScope: strPtr(role.DataScopeSelf),
+		ParentID:  req.ParentID,
+	}
+	if req.ParentID != nil && *req.ParentID > 0 {
+		roleType := role.RoleTypeCustom
+		rle.RoleType = &roleType
 	}
 
 	if req.Status != nil {
@@ -92,6 +104,18 @@ func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string) error {
 	}
 	if req.Status != nil {
 		rle.Status = *req.Status
+	}
+	if req.ParentID != nil {
+		if *req.ParentID > 0 {
+			if err := s.validateInheritance(*req.ParentID); err != nil {
+				return err
+			}
+			rle.ParentID = req.ParentID
+			roleType := role.RoleTypeCustom
+			rle.RoleType = &roleType
+		} else {
+			rle.ParentID = req.ParentID
+		}
 	}
 
 	now := time.Now()
@@ -222,7 +246,7 @@ func (s *RoleService) MountUsers(req *role.MountUserRequest) error {
 			RoleID: req.Rid,
 			OrgID:  req.OrgId,
 		}
-		if err := s.userRoleRepo.Create(userRole); err != nil {
+		if _, err := s.userRoleRepo.CreateIfMissing(userRole); err != nil {
 			logger.Error("Failed to bind user to role", zap.Int64("uid", uid), zap.Int64("rid", req.Rid), zap.Error(err))
 			return fmt.Errorf("failed to bind user %d to role: %w", uid, err)
 		}
@@ -237,13 +261,24 @@ func (s *RoleService) MountExternalUser(req *role.MountExternalUserRequest, orgI
 	if s.userRoleRepo == nil {
 		return fmt.Errorf("userRoleRepo not initialized")
 	}
+	if orgID <= 0 {
+		return fmt.Errorf("org id is required")
+	}
+
+	inOrg, err := s.userRoleRepo.IsUserInOrg(req.Uid, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to validate external user organization: %w", err)
+	}
+	if inOrg {
+		return fmt.Errorf("user already belongs to target organization")
+	}
 
 	userRole := &user.SysUserRole{
 		UserID: req.Uid,
 		RoleID: req.Rid,
 		OrgID:  orgID,
 	}
-	if err := s.userRoleRepo.Create(userRole); err != nil {
+	if _, err := s.userRoleRepo.CreateIfMissing(userRole); err != nil {
 		logger.Error("Failed to bind external user to role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Error(err))
 		return fmt.Errorf("failed to bind external user to role: %w", err)
 	}
@@ -288,6 +323,17 @@ func (s *RoleService) BeforeUnmountInfo(req *role.UnmountUserRequest) (int, erro
 
 // SearchExternalUser 搜索组织外用户
 func (s *RoleService) SearchExternalUser(keyword string, excludeOrgID int64) ([]*role.ExternalUserVO, error) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return []*role.ExternalUserVO{}, nil
+	}
+	if excludeOrgID <= 0 {
+		return nil, fmt.Errorf("org id is required")
+	}
+	if s.userRepo == nil {
+		return nil, fmt.Errorf("userRepo not initialized")
+	}
+
 	users, err := s.userRepo.SearchExternalUser(keyword, excludeOrgID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search external users: %w", err)
@@ -433,13 +479,12 @@ func (s *RoleService) validateInheritance(parentRoleID int64) error {
 		return fmt.Errorf("parent role is disabled")
 	}
 
-	// 内置角色（root 角色）才能作为父角色
-	// parent_id 为 null 或 0 表示根角色/内置角色
 	if parent.ParentID != nil && *parent.ParentID != 0 {
-		// 父角色本身也是自定义角色，需要递归验证
-		if err := s.validateInheritance(*parent.ParentID); err != nil {
-			return fmt.Errorf("grandparent role inheritance invalid: %w", err)
-		}
+		return fmt.Errorf("parent role must be a built-in root role")
+	}
+
+	if parent.RoleType != nil && *parent.RoleType == role.RoleTypeCustom {
+		return fmt.Errorf("custom role cannot be used as parent role")
 	}
 
 	return nil

@@ -15,6 +15,17 @@ const (
 	DataScopeSelf         = "self"
 )
 
+const (
+	RoleTypeSystem       = "system"
+	RoleTypeCustom       = "custom"
+	RoleTypeOrganization = "organization"
+)
+
+const (
+	BuiltInOrgUserRoleCode = "ROLE_ORG_DEFAULT_USER"
+	BuiltInOrgUserRoleName = "普通用户"
+)
+
 type SysRole struct {
 	RoleID     int64      `gorm:"column:role_id;primaryKey;autoIncrement" json:"roleId"`
 	RoleName   string     `gorm:"column:role_name;size:100;not null" json:"roleName"`
@@ -43,6 +54,7 @@ type RoleCreator struct {
 	RoleDesc *string `json:"roleDesc"`
 	Desc     *string `json:"desc"`
 	Status   *int    `json:"status"`
+	ParentID *int64  `json:"parentId"`
 }
 
 type RoleEditor struct {
@@ -53,6 +65,7 @@ type RoleEditor struct {
 	RoleDesc *string `json:"roleDesc"`
 	Desc     *string `json:"desc"`
 	Status   *int    `json:"status"`
+	ParentID *int64  `json:"parentId"`
 }
 
 type RoleVO struct {
@@ -84,7 +97,7 @@ type RoleQueryRequest struct {
 type MountUserRequest struct {
 	Rid   int64   `json:"rid" binding:"required"`
 	Uids  []int64 `json:"uids" binding:"required"`
-	OrgId int64   `json:"orgId" binding:"required"`
+	OrgId int64   `json:"orgId"`
 	Over  bool    `json:"over"`
 }
 

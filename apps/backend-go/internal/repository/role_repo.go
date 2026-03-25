@@ -35,6 +35,15 @@ func (r *RoleRepository) GetByID(roleID int64) (*role.SysRole, error) {
 	return &rle, nil
 }
 
+func (r *RoleRepository) GetByRoleCode(roleCode string) (*role.SysRole, error) {
+	var rle role.SysRole
+	err := r.db.Where("role_code = ?", roleCode).First(&rle).Error
+	if err != nil {
+		return nil, err
+	}
+	return &rle, nil
+}
+
 func (r *RoleRepository) Query(keyword string) ([]*role.SysRole, error) {
 	var roles []*role.SysRole
 	db := r.db.Model(&role.SysRole{})
@@ -99,11 +108,14 @@ func (r *RoleRepository) GetRolesByIDs(roleIDs []int64) ([]*role.SysRole, error)
 // QueryByOrgID 查询组织下的角色
 func (r *RoleRepository) QueryByOrgID(orgID int64, keyword string) ([]*role.SysRole, error) {
 	var roles []*role.SysRole
-	db := r.db.Model(&role.SysRole{}).Where("status = ?", role.StatusEnabled)
+	assignedRoles := r.db.Table("sys_user_role").Select("role_id").Where("org_id = ?", orgID)
+	db := r.db.Model(&role.SysRole{}).
+		Where("status = ?", role.StatusEnabled).
+		Where("role_type = ? OR role_id IN (?)", role.RoleTypeOrganization, assignedRoles)
 	if keyword != "" {
 		db = db.Where("role_name LIKE ?", "%"+keyword+"%")
 	}
-	err := db.Order("create_time DESC").Find(&roles).Error
+	err := db.Distinct().Order("create_time DESC").Find(&roles).Error
 	return roles, err
 }
 
