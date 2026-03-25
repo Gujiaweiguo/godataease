@@ -1,6 +1,13 @@
 name: E2E Tests
 
 on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        default: ''
+        type: string
   push:
     branches: [main, dev]
     paths:
@@ -16,10 +23,15 @@ on:
         required: false
         default: ''
         type: string
+      ref:
+        description: 'Git ref to checkout (branch/tag/sha)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   e2e:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,6 +39,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

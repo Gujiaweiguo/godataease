@@ -48,24 +48,65 @@ Archive a completed change in the experimental workflow.
    - Use **AskUserQuestion tool** to confirm user wants to proceed
    - Proceed if user confirms
 
-   **If no tasks file exists:** Proceed without task-related warning.
+    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Assess delta spec sync state**
+4. **Run test gate (unit + integration + E2E)**
 
-   Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
+    Before archiving, ensure all tests pass. This is a HARD REQUIREMENT.
 
-   **If delta specs exist:**
-   - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
-   - Determine what changes would be applied (adds, modifications, removals, renames)
-   - Show a combined summary before prompting
+    **4a. Check CI status for current branch**
 
-   **Prompt options:**
-   - If changes needed: "Sync now (recommended)", "Archive without syncing"
-   - If already synced: "Archive now", "Sync anyway", "Cancel"
+    Run `gh pr list --head <current-branch> --json number,statusCheckRollup` to find the PR for this change.
+    If no PR exists, warn the user and ask to create one first.
 
-   If user chooses sync, execute /opsx-sync logic (use the openspec-sync-specs skill). Proceed to archive regardless of choice.
+    Check if all CI checks passed:
+    - If all passed: Note "CI checks passed"
+    - If any failed: Block archive, tell user to fix CI failures first
+    - If pending: Offer to wait or cancel
 
-5. **Perform the archive**
+    **4b. Trigger and verify E2E tests**
+
+    E2E tests are required before archive but not run on every PR.
+
+    ```bash
+    gh workflow run test-gate.yml \
+      -f run_unit=false \
+      -f run_integration=false \
+      -f run_e2e=true \
+      --ref <current-branch>
+    ```
+
+    Wait for the workflow to complete:
+    ```bash
+    gh run watch <run-id> --exit-status
+    ```
+
+    **If E2E tests fail:**
+    - Block archive with clear error message
+    - Show failure details from the workflow run
+    - Tell user to fix issues and retry
+
+    **If user wants to skip E2E:**
+    - Use **AskUserQuestion tool** to confirm
+    - Only allow skip with explicit acknowledgment of risk
+    - Add warning to archive summary
+
+5. **Assess delta spec sync state**
+
+    Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
+
+    **If delta specs exist:**
+    - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
+    - Determine what changes would be applied (adds, modifications, removals, renames)
+    - Show a combined summary before prompting
+
+    **Prompt options:**
+    - If changes needed: "Sync now (recommended)", "Archive without syncing"
+    - If already synced: "Archive now", "Sync anyway", "Cancel"
+
+    If user chooses sync, execute /opsx-sync logic (use the openspec-sync-specs skill). Proceed to archive regardless of choice.
+
+6. **Perform the archive**
 
    Create the archive directory if it doesn't exist:
    ```bash
@@ -82,7 +123,7 @@ Archive a completed change in the experimental workflow.
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **Display summary**
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
@@ -100,6 +141,7 @@ Archive a completed change in the experimental workflow.
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
+**Tests:** ✓ CI passed, E2E passed (or "E2E skipped with acknowledgment")
 
 All artifacts complete. All tasks complete.
 ```
@@ -112,3 +154,5 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- **Test Gate (HARD REQUIREMENT)**: CI must pass and E2E tests must pass before archive
+- Only allow E2E skip with explicit user acknowledgment
