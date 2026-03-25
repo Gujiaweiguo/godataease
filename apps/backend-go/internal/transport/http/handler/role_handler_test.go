@@ -3,12 +3,15 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"dataease/backend/internal/domain/role"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 
@@ -20,20 +23,38 @@ import (
 )
 
 func setupRoleHandlerTestRouter(t *testing.T) *gin.Engine {
+	return setupRoleHandlerTestRouterWithOrg(t, 0)
+}
+
+func setupRoleHandlerTestRouterWithOrg(t *testing.T, orgID uint64) *gin.Engine {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}))
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}))
 
 	repo := repository.NewRoleRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	userRoleRepo := repository.NewUserRoleRepository(db)
 	systemType := "system"
 	now := time.Unix(300, 0)
-	require.NoError(t, repo.Create(&role.SysRole{RoleName: "Admin", RoleCode: "admin", RoleType: &systemType, Status: role.StatusEnabled, CreateTime: &now}))
+	adminRole := &role.SysRole{RoleName: "Admin", RoleCode: "admin", RoleType: &systemType, Status: role.StatusEnabled, CreateTime: &now}
+	require.NoError(t, repo.Create(adminRole))
+	require.NoError(t, db.Create(&user.SysUserRole{UserID: 1, RoleID: adminRole.RoleID, OrgID: 1}).Error)
 
-	svc := service.NewRoleService(repo, nil, nil)
+	svc := service.NewRoleService(repo, userRepo, userRoleRepo)
 	r := gin.New()
+	if orgID > 0 {
+		r.Use(func(c *gin.Context) {
+			c.Set("org_id", orgID)
+			c.Next()
+		})
+	}
 	RegisterRoleRoutes(r.Group("/api"), NewRoleHandler(svc))
 	return r
 }
@@ -114,4 +135,41 @@ func TestRoleHandler_QueryWithOrgID_InvalidOID(t *testing.T) {
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "500000", resp["code"])
+}
+
+func TestRoleHandler_QueryByCurrentOrg_UsesContextOrg(t *testing.T) {
+	r := setupRoleHandlerTestRouterWithOrg(t, 1)
+	body := []byte(`{"keyword":"Admin"}`)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/role/byCurOrg", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string `json:"code"`
+		Data struct {
+			List []struct {
+				Name string `json:"roleName"`
+			} `json:"list"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Len(t, resp.Data.List, 1)
+	assert.Equal(t, "Admin", resp.Data.List[0].Name)
+}
+
+func TestRoleHandler_MountUser_UsesContextOrgWhenMissingInRequest(t *testing.T) {
+	r := setupRoleHandlerTestRouterWithOrg(t, 3)
+	body := []byte(`{"rid":1,"uids":[99]}`)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/role/mountUser", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
 }
