@@ -68,6 +68,7 @@ func TestMain(m *testing.M) {
 	if err = testDB.AutoMigrate(
 		&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{},
 		&role.SysRole{}, &role.RoleMenu{},
+		&permission.SysRolePerm{},
 		&org.SysOrg{},
 		&menu.CoreMenu{},
 		&permission.SysPerm{}, &permission.SysResource{}, &permission.SysResourcePerm{}, &permission.DataPermRow{}, &permission.DataPermColumn{},
@@ -78,16 +79,8 @@ func TestMain(m *testing.M) {
 		&visualization.Watermark{},
 		&datasource.CoreDatasource{}, &auto.CoreDatasourceTaskLog{},
 		&dataset.CoreDatasetGroup{},
-		&auto.CoreExportTask{},
-		&driver.Driver{}, &driver.DriverJar{},
-		&engine.Engine{},
-		&geo.GeometryArea{},
-		&areamap.Area{}, &areamap.CoreAreaCustom{},
-		&embedded.CoreEmbedded{},
-		&static.StaticResource{}, &static.Store{}, &static.Typeface{},
-		&system.SysVariable{}, &system.SysVariableValue{},
 	); err != nil {
-		log.Fatalf("Failed to migrate: %v\n", err)
+		log.Fatalf("Failed to auto migrate: %v", err)
 	}
 
 	// Create core_share table manually (repository uses internal coreShare type with gorm tags)
@@ -248,12 +241,7 @@ func cleanupTables(tables ...interface{}) {
 			mustExecCleanup("DELETE FROM sys_variable")
 		case *system.SysVariableValue, system.SysVariableValue:
 			mustExecCleanup("DELETE FROM sys_variable_value")
-		default:
-			// Use GORM's Unscoped delete for other types with soft delete support
-			if err := testDB.Unscoped().Where("1 = 1").Delete(table).Error; err != nil {
-				panic(fmt.Sprintf("cleanup delete failed for %T: %v", table, err))
-			}
-		}
+	mustExecCleanup("DELETE FROM sys_role_perm")
 	}
 }
 
