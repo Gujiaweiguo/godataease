@@ -218,7 +218,7 @@ func TestResourcePermissionService_GovernedResourcePerspectiveMatchesRuntimeChec
 			repo := repository.NewResourcePermissionRepository(testDB)
 			svc := NewResourcePermissionService(repo, nil)
 
-			roleType := role.RoleTypeOrganization
+			roleType := "organization"
 			testRole := &role.SysRole{RoleName: tc.name + " governed role", RoleCode: tc.name + "_governed_role", RoleType: &roleType, Status: 1}
 			require.NoError(t, testDB.Create(testRole).Error)
 

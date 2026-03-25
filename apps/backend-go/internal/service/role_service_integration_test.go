@@ -14,7 +14,7 @@ import (
 
 // Helper function to create RoleService with all dependencies
 func newTestRoleService(t *testing.T) *RoleService {
-	cleanupTables(&role.SysRole{})
+	cleanupTables(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{})
 
 	repo := repository.NewRoleRepository(testDB)
 	userRepo := repository.NewUserRepository(testDB)
@@ -83,6 +83,65 @@ func TestRoleServiceIntegration_EditNotFound(t *testing.T) {
 	err := svc.EditRole(&role.RoleEditor{ID: 9999, Name: "NotFound"}, "editor")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "role not found")
+}
+
+func TestRoleServiceIntegration_CreateRole_WithParent(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "RootParentRole"}, "tester")
+	require.NoError(t, err)
+
+	childID, err := svc.CreateRole(&role.RoleCreator{Name: "ChildCustomRole", ParentID: &parentID}, "tester")
+	require.NoError(t, err)
+
+	child, err := repo.GetByID(childID)
+	require.NoError(t, err)
+	require.NotNil(t, child.ParentID)
+	assert.Equal(t, parentID, *child.ParentID)
+	if child.RoleType != nil {
+		assert.Equal(t, role.RoleTypeCustom, *child.RoleType)
+	}
+}
+
+func TestRoleServiceIntegration_EditRole_WithParent(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "EditParentRole"}, "tester")
+	require.NoError(t, err)
+	childID, err := svc.CreateRole(&role.RoleCreator{Name: "EditChildRole"}, "tester")
+	require.NoError(t, err)
+
+	err = svc.EditRole(&role.RoleEditor{ID: childID, Name: "EditChildRole", ParentID: &parentID}, "tester")
+	require.NoError(t, err)
+
+	child, err := repo.GetByID(childID)
+	require.NoError(t, err)
+	require.NotNil(t, child.ParentID)
+	assert.Equal(t, parentID, *child.ParentID)
+	if child.RoleType != nil {
+		assert.Equal(t, role.RoleTypeCustom, *child.RoleType)
+	}
+}
+
+func TestRoleServiceIntegration_EditRole_ClearParent(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "ClearParentRoot"}, "tester")
+	require.NoError(t, err)
+	childID, err := svc.CreateRole(&role.RoleCreator{Name: "ClearParentChild", ParentID: &parentID}, "tester")
+	require.NoError(t, err)
+
+	zeroParent := int64(0)
+	err = svc.EditRole(&role.RoleEditor{ID: childID, Name: "ClearParentChild", ParentID: &zeroParent}, "tester")
+	require.NoError(t, err)
+
+	child, err := repo.GetByID(childID)
+	require.NoError(t, err)
+	require.NotNil(t, child.ParentID)
+	assert.Equal(t, int64(0), *child.ParentID)
 }
 
 func TestRoleServiceIntegration_Delete(t *testing.T) {
@@ -225,6 +284,26 @@ func TestRoleServiceIntegration_MountUsers(t *testing.T) {
 	assert.Contains(t, roleIDs, roleID)
 }
 
+func TestRoleServiceIntegration_MountUsers_Idempotent(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+
+	testUser := &user.SysUser{Username: "mount_idempotent_user", NickName: "Mount Idempotent User", Status: 1}
+	require.NoError(t, userRepo.Create(testUser))
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MountIdempotentRole"}, "tester")
+	require.NoError(t, err)
+
+	req := &role.MountUserRequest{Rid: roleID, OrgId: 7, Uids: []int64{testUser.UserID}}
+	require.NoError(t, svc.MountUsers(req))
+	require.NoError(t, svc.MountUsers(req))
+
+	bindings, err := userRoleRepo.GetByUserID(testUser.UserID)
+	require.NoError(t, err)
+	require.Len(t, bindings, 1)
+	assert.Equal(t, int64(7), bindings[0].OrgID)
+}
+
 // Test MountExternalUser
 func TestRoleServiceIntegration_MountExternalUser(t *testing.T) {
 	svc := newTestRoleService(t)
@@ -257,6 +336,36 @@ func TestRoleServiceIntegration_MountExternalUser(t *testing.T) {
 	roleIDs, err := roleRepo.GetUserRoleIDs(testUser.UserID)
 	assert.NoError(t, err)
 	assert.Contains(t, roleIDs, roleID)
+}
+
+func TestRoleServiceIntegration_MountExternalUser_RejectsUserAlreadyInTargetOrg(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+
+	testUser := &user.SysUser{Username: "external_existing_org_user", NickName: "External Existing Org User", Status: 1}
+	require.NoError(t, userRepo.Create(testUser))
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "ExistingOrgRole"}, "tester")
+	require.NoError(t, err)
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: testUser.UserID, RoleID: roleID, OrgID: 2}))
+
+	err = svc.MountExternalUser(&role.MountExternalUserRequest{Rid: roleID, Uid: testUser.UserID}, 2)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user already belongs to target organization")
+}
+
+func TestRoleServiceIntegration_MountExternalUser_RequiresOrgID(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+
+	testUser := &user.SysUser{Username: "external_missing_org_user", NickName: "External Missing Org User", Status: 1}
+	require.NoError(t, userRepo.Create(testUser))
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MissingOrgRole"}, "tester")
+	require.NoError(t, err)
+
+	err = svc.MountExternalUser(&role.MountExternalUserRequest{Rid: roleID, Uid: testUser.UserID}, 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "org id is required")
 }
 
 // Test UnmountUser
@@ -365,6 +474,47 @@ func TestRoleServiceIntegration_BeforeUnmountInfo(t *testing.T) {
 	assert.Equal(t, 2, count)
 }
 
+func TestRoleServiceIntegration_SearchExternalUser_UsesExactKeyword(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	roleRepo := repository.NewRoleRepository(testDB)
+
+	insideUser := &user.SysUser{Username: "inside-user", NickName: "Inside User", Email: pStr("inside@example.com"), Status: 1}
+	outsideUser := &user.SysUser{Username: "outside-user", NickName: "Outside User", Email: pStr("outside@example.com"), Status: 1}
+	require.NoError(t, userRepo.Create(insideUser))
+	require.NoError(t, userRepo.Create(outsideUser))
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "SearchRole"}, "tester")
+	require.NoError(t, err)
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: insideUser.UserID, RoleID: roleID, OrgID: 4}))
+	require.NoError(t, roleRepo.Delete(roleID))
+
+	result, err := svc.SearchExternalUser("outside-user", 4)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, outsideUser.UserID, result[0].Uid)
+
+	result, err = svc.SearchExternalUser("outside", 4)
+	require.NoError(t, err)
+	assert.Len(t, result, 0)
+}
+
+func TestRoleServiceIntegration_SearchExternalUser_BlankKeywordReturnsEmpty(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	result, err := svc.SearchExternalUser("   ", 4)
+	require.NoError(t, err)
+	assert.Len(t, result, 0)
+}
+
+func TestRoleServiceIntegration_SearchExternalUser_RequiresOrgID(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	_, err := svc.SearchExternalUser("outside-user", 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "org id is required")
+}
+
 // Test SearchExternalUser
 func TestRoleServiceIntegration_SearchExternalUser(t *testing.T) {
 	svc := newTestRoleService(t)
@@ -386,19 +536,30 @@ func TestRoleServiceIntegration_SearchExternalUser(t *testing.T) {
 	userRepo.Create(testUser1)
 	userRepo.Create(testUser2)
 
-	// Search with keyword
-	result, err := svc.SearchExternalUser("search_ext", 999)
+	result, err := svc.SearchExternalUser("search_ext_user1", 999)
 	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, len(result), 1)
+	assert.Len(t, result, 1)
+	assert.Equal(t, testUser1.UserID, result[0].Uid)
 }
 
 // Test OptionForUser
 func TestRoleServiceIntegration_OptionForUser(t *testing.T) {
 	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
 
 	// Create some roles
-	svc.CreateRole(&role.RoleCreator{Name: "OptionRole1"}, "tester")
-	svc.CreateRole(&role.RoleCreator{Name: "OptionRole2"}, "tester")
+	roleID1, err := svc.CreateRole(&role.RoleCreator{Name: "OptionRole1"}, "tester")
+	require.NoError(t, err)
+	_, err = svc.CreateRole(&role.RoleCreator{Name: "OptionRole2"}, "tester")
+	require.NoError(t, err)
+
+	testUser := &user.SysUser{
+		Username: "option_user",
+		NickName: "Option User",
+		Status:   1,
+	}
+	require.NoError(t, userRepo.Create(testUser))
+	require.NoError(t, svc.MountUsers(&role.MountUserRequest{Rid: roleID1, OrgId: 1, Uids: []int64{testUser.UserID}}))
 
 	// Get option for user
 	req := &role.RoleRequest{
@@ -482,4 +643,113 @@ func TestRoleServiceIntegration_SelectedForUserNoRoles(t *testing.T) {
 	result, err := svc.SelectedForUser(req)
 	assert.NoError(t, err)
 	assert.Len(t, result, 0)
+}
+
+func TestRoleServiceIntegration_CreateRoleWithInheritance(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "ParentRole"}, "tester")
+	require.NoError(t, err)
+
+	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildRole"}, &parentID, "tester")
+	require.NoError(t, err)
+
+	child, err := repo.GetByID(childID)
+	require.NoError(t, err)
+	require.NotNil(t, child.ParentID)
+	assert.Equal(t, parentID, *child.ParentID)
+	assert.Equal(t, "ChildRole", child.RoleName)
+}
+
+func TestRoleServiceIntegration_CreateRoleWithInheritance_UsesRoleKeyAndDesc(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	desc := "Inherited role description"
+	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{RoleName: "InheritedRole", RoleKey: "inherited_role_key", RoleDesc: &desc}, nil, "tester")
+	require.NoError(t, err)
+
+	child, err := repo.GetByID(childID)
+	require.NoError(t, err)
+	assert.Equal(t, "InheritedRole", child.RoleName)
+	assert.Equal(t, "inherited_role_key", child.RoleCode)
+	if assert.NotNil(t, child.RoleDesc) {
+		assert.Equal(t, desc, *child.RoleDesc)
+	}
+}
+
+func TestRoleServiceIntegration_ValidatePermissionInheritance_WithParent(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParent"}, "tester")
+	require.NoError(t, err)
+
+	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "InheritanceChild"}, &parentID, "tester")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.ValidatePermissionInheritance(childID, []int64{1, 2, 3}))
+}
+
+func TestRoleServiceIntegration_CreateRoleWithInheritance_ParentNotFound(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	missingParentID := int64(999999)
+	_, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "BrokenChild"}, &missingParentID, "tester")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parent role not found")
+}
+
+func TestRoleServiceIntegration_CreateRoleWithInheritance_NameRequired(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	_, err := svc.CreateRoleWithInheritance(&role.RoleCreator{}, nil, "tester")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "role name is required")
+}
+
+func TestRoleServiceIntegration_CreateRoleWithInheritance_ParentDisabled(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "DisabledParent"}, "tester")
+	require.NoError(t, err)
+	parent, err := repo.GetByID(parentID)
+	require.NoError(t, err)
+	parent.Status = role.StatusDisabled
+	require.NoError(t, repo.Update(parent))
+
+	_, err = svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildFromDisabledParent"}, &parent.RoleID, "tester")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parent role is disabled")
+}
+
+func TestRoleServiceIntegration_CreateRoleWithInheritance_CustomParentRejected(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	rootParentID, err := svc.CreateRole(&role.RoleCreator{Name: "RootParentForCustom"}, "tester")
+	require.NoError(t, err)
+	customParentID, err := svc.CreateRole(&role.RoleCreator{Name: "CustomParent", ParentID: &rootParentID}, "tester")
+	require.NoError(t, err)
+
+	_, err = svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildFromCustomParent"}, &customParentID, "tester")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parent role must be a built-in root role")
+}
+
+func TestRoleServiceIntegration_ValidatePermissionInheritance_NoParent(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "NoParentRole"}, "tester")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.ValidatePermissionInheritance(roleID, []int64{1}))
+}
+
+func TestRoleServiceIntegration_ValidatePermissionInheritance_RoleNotFound(t *testing.T) {
+	svc := newTestRoleService(t)
+
+	err := svc.ValidatePermissionInheritance(999999, []int64{1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "role not found")
 }
