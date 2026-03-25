@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"strconv"
+	"strings"
+
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 
@@ -141,9 +144,15 @@ func (r *UserRepository) SearchExternalUser(keyword string, excludeOrgID int64) 
 		Where("del_flag = ?", user.DelFlagNormal).
 		Where("user_id NOT IN (SELECT user_id FROM sys_user_role WHERE org_id = ?)", excludeOrgID)
 
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		db = db.Where("username LIKE ? OR nick_name LIKE ? OR email LIKE ?", kw, kw, kw)
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return []*user.SysUser{}, nil
+	}
+
+	if userID, err := strconv.ParseInt(keyword, 10, 64); err == nil && userID > 0 {
+		db = db.Where("user_id = ? OR username = ? OR email = ?", userID, keyword, keyword)
+	} else {
+		db = db.Where("username = ? OR email = ?", keyword, keyword)
 	}
 
 	err := db.Limit(20).Find(&users).Error
@@ -161,6 +170,36 @@ func NewUserRoleRepository(db *gorm.DB) *UserRoleRepository {
 
 func (r *UserRoleRepository) Create(role *user.SysUserRole) error {
 	return r.db.Create(role).Error
+}
+
+func (r *UserRoleRepository) CreateIfMissing(role *user.SysUserRole) (bool, error) {
+	var count int64
+	err := r.db.Model(&user.SysUserRole{}).
+		Where("user_id = ? AND role_id = ? AND org_id = ?", role.UserID, role.RoleID, role.OrgID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return false, nil
+	}
+	return true, r.db.Create(role).Error
+}
+
+func (r *UserRoleRepository) Exists(userID, roleID, orgID int64) (bool, error) {
+	var count int64
+	err := r.db.Model(&user.SysUserRole{}).
+		Where("user_id = ? AND role_id = ? AND org_id = ?", userID, roleID, orgID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *UserRoleRepository) IsUserInOrg(userID, orgID int64) (bool, error) {
+	var count int64
+	err := r.db.Model(&user.SysUserRole{}).
+		Where("user_id = ? AND org_id = ?", userID, orgID).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func (r *UserRoleRepository) DeleteByUserID(userID int64) error {
