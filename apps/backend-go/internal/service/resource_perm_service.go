@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"dataease/backend/internal/domain/permission"
 )
@@ -26,6 +27,9 @@ type ResourcePermRepo interface {
 	GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error)
 	GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error)
 	ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error
+	RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error
+	ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error
+	GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error)
 	CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error)
 }
 
@@ -46,9 +50,24 @@ func (s *ResourcePermissionService) CheckPermission(userID int64, resourceType s
 		return &permission.PermissionCheckResult{HasPermission: true, Reason: "admin"}
 	}
 
-	perm, err := s.repo.GetPermByKey(permKey)
+	perm, err := s.lookupPermission(resourceType, permKey)
 	if err != nil {
 		return &permission.PermissionCheckResult{HasPermission: false, Reason: "permission_not_found"}
+	}
+
+	if resourceID > 0 {
+		resourcePermIDs, exists, resourceErr := s.repo.GetResourcePermissionIDs(resourceID, resourceType)
+		if resourceErr != nil {
+			return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_lookup_failed"}
+		}
+		if exists {
+			if len(resourcePermIDs) == 0 {
+				return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_denied"}
+			}
+			if !containsInt64(resourcePermIDs, perm.PermID) {
+				return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_denied"}
+			}
+		}
 	}
 
 	hasUserPerm, err := s.repo.CheckUserPermission(userID, perm.PermID)
@@ -97,6 +116,10 @@ func (s *ResourcePermissionService) GetUserPermissionIDs(userID int64) ([]int64,
 
 func (s *ResourcePermissionService) GetRolePermissionIDs(roleID int64) ([]int64, error) {
 	return s.repo.GetRolePerms(roleID)
+}
+
+func (s *ResourcePermissionService) GetPermissionByID(permID int64) (*permission.SysPerm, error) {
+	return s.repo.GetPermByID(permID)
 }
 
 func (s *ResourcePermissionService) GrantPermissionToUser(userID, permID int64, createBy string) error {
@@ -151,6 +174,54 @@ func (s *ResourcePermissionService) ApplyGroupPermissionsToResource(groupID, res
 	return s.repo.ApplyGroupPermissions(groupID, resourceID, resourceType)
 }
 
+func (s *ResourcePermissionService) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
+	if s.repo == nil {
+		return fmt.Errorf("repository not initialized")
+	}
+
+	return s.repo.RegisterResource(resourceID, resourceName, resourceType, parentID)
+}
+
+func (s *ResourcePermissionService) InheritParentResourcePermissions(parentID, resourceID int64, resourceName, resourceType string) error {
+	_, err := s.TryInheritParentResourcePermissions(parentID, resourceID, resourceName, resourceType)
+	return err
+}
+
+func (s *ResourcePermissionService) TryInheritParentResourcePermissions(parentID, resourceID int64, resourceName, resourceType string) (bool, error) {
+	if s.repo == nil {
+		return false, fmt.Errorf("repository not initialized")
+	}
+	if parentID <= 0 || resourceID <= 0 || strings.TrimSpace(resourceType) == "" {
+		return false, nil
+	}
+	permIDs, exists, err := s.repo.GetResourcePermissionIDs(parentID, resourceType)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	if err := s.repo.RegisterResource(resourceID, resourceName, resourceType, &parentID); err != nil {
+		return false, err
+	}
+	if err := s.repo.ReplaceResourcePermissions(resourceID, resourceType, permIDs); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *ResourcePermissionService) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
+	if s.repo == nil {
+		return fmt.Errorf("repository not initialized")
+	}
+
+	return s.repo.ReplaceResourcePermissions(resourceID, resourceType, permIDs)
+}
+
+func (s *ResourcePermissionService) ResolvePermission(resourceType, permKey string) (*permission.SysPerm, error) {
+	return s.lookupPermission(resourceType, permKey)
+}
+
 // CheckPermissionConsistency 校验双视角权限一致性
 func (s *ResourcePermissionService) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	if s.repo == nil {
@@ -158,4 +229,35 @@ func (s *ResourcePermissionService) CheckPermissionConsistency() (*permission.Pe
 	}
 
 	return s.repo.CheckPermissionConsistency()
+}
+
+func (s *ResourcePermissionService) lookupPermission(resourceType, permKey string) (*permission.SysPerm, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository not initialized")
+	}
+
+	lookupKeys := make([]string, 0, 2)
+	if strings.Contains(permKey, ":") {
+		lookupKeys = append(lookupKeys, permKey)
+	} else {
+		lookupKeys = append(lookupKeys, fmt.Sprintf("%s:%s", resourceType, permKey), permKey)
+	}
+
+	for _, key := range lookupKeys {
+		perm, err := s.repo.GetPermByKey(key)
+		if err == nil && perm != nil {
+			return perm, nil
+		}
+	}
+
+	return nil, fmt.Errorf("permission %s not found", permKey)
+}
+
+func containsInt64(items []int64, target int64) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }
