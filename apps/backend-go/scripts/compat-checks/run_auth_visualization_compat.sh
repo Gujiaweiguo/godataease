@@ -26,7 +26,7 @@ login_admin() {
   local curl_rc=0
   
   # Try login with default admin credentials
-  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/api/login" \
+  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login" \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"DataEase1234"}') || curl_rc=$?
 
