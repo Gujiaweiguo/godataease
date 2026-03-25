@@ -5,6 +5,7 @@ package service
 import (
 	"testing"
 
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
 
@@ -108,6 +109,268 @@ func TestVisualizationServiceIntegration_Copy(t *testing.T) {
 	assert.Equal(t, "content-1", *copied.ContentID)
 	assert.Equal(t, "ver-1", *copied.CheckVersion)
 	assert.Equal(t, "copier", *copied.CreateBy)
+}
+
+func TestVisualizationServiceIntegration_Save_ScreenInheritsParentResourcePermissions(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	svc := NewVisualizationService(repo)
+	svc.SetResourcePermissionService(resourcePermSvc)
+
+	folderNodeType := "folder"
+	screenType := "dataV"
+	parentID, err := svc.Save(&visualization.SaveRequest{
+		Name:     "Governed Screen Folder",
+		NodeType: &folderNodeType,
+		Type:     &screenType,
+	}, "tester")
+	require.NoError(t, err)
+	require.NoError(t, resourcePermSvc.RegisterResource(parentID, "Governed Screen Folder", permission.ResourceTypeScreen, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(parentID, permission.ResourceTypeScreen, []int64{31, 32}))
+
+	panelNodeType := "panel"
+	childID, err := svc.Save(&visualization.SaveRequest{
+		Name:     "Inherited Screen",
+		NodeType: &panelNodeType,
+		Type:     &screenType,
+		PID:      &parentID,
+	}, "tester")
+	require.NoError(t, err)
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(childID, permission.ResourceTypeScreen)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{31, 32}, permIDs)
+}
+
+func TestVisualizationServiceIntegration_BackfillGovernedResources(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewVisualizationService(repo)
+	backfillSvc := NewVisualizationService(repo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	folderNodeType := "folder"
+	panelNodeType := "panel"
+	dashboardType := "dashboard"
+	screenType := "dataV"
+
+	dashboardParentID, err := seedSvc.Save(&visualization.SaveRequest{
+		Name:     "Governed Dashboard Folder",
+		NodeType: &folderNodeType,
+		Type:     &dashboardType,
+	}, "tester")
+	require.NoError(t, err)
+	screenParentID, err := seedSvc.Save(&visualization.SaveRequest{
+		Name:     "Governed Screen Folder",
+		NodeType: &folderNodeType,
+		Type:     &screenType,
+	}, "tester")
+	require.NoError(t, err)
+	plainParentID, err := seedSvc.Save(&visualization.SaveRequest{
+		Name:     "Ungoverned Dashboard Folder",
+		NodeType: &folderNodeType,
+		Type:     &dashboardType,
+	}, "tester")
+	require.NoError(t, err)
+
+	dashboardChildID, err := seedSvc.Save(&visualization.SaveRequest{
+		Name:     "Legacy Dashboard",
+		NodeType: &panelNodeType,
+		Type:     &dashboardType,
+		PID:      &dashboardParentID,
+	}, "tester")
+	require.NoError(t, err)
+	screenChildID, err := seedSvc.Save(&visualization.SaveRequest{
+		Name:     "Legacy Screen",
+		NodeType: &panelNodeType,
+		Type:     &screenType,
+		PID:      &screenParentID,
+	}, "tester")
+	require.NoError(t, err)
+	plainChildID, err := seedSvc.Save(&visualization.SaveRequest{
+		Name:     "Legacy Plain Dashboard",
+		NodeType: &panelNodeType,
+		Type:     &dashboardType,
+		PID:      &plainParentID,
+	}, "tester")
+	require.NoError(t, err)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(dashboardParentID, "Governed Dashboard Folder", permission.ResourceTypeDashboard, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(dashboardParentID, permission.ResourceTypeDashboard, []int64{41, 42}))
+	require.NoError(t, resourcePermSvc.RegisterResource(screenParentID, "Governed Screen Folder", permission.ResourceTypeScreen, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(screenParentID, permission.ResourceTypeScreen, []int64{51, 52}))
+
+	report, err := backfillSvc.BackfillGovernedResources()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, report.Scanned, 6)
+	assert.Equal(t, 2, report.Governed)
+	assert.Contains(t, report.ResourceIDs, dashboardChildID)
+	assert.Contains(t, report.ResourceIDs, screenChildID)
+
+	dashboardPermIDs, dashboardExists, err := resourcePermRepo.GetResourcePermissionIDs(dashboardChildID, permission.ResourceTypeDashboard)
+	require.NoError(t, err)
+	assert.True(t, dashboardExists)
+	assert.ElementsMatch(t, []int64{41, 42}, dashboardPermIDs)
+
+	screenPermIDs, screenExists, err := resourcePermRepo.GetResourcePermissionIDs(screenChildID, permission.ResourceTypeScreen)
+	require.NoError(t, err)
+	assert.True(t, screenExists)
+	assert.ElementsMatch(t, []int64{51, 52}, screenPermIDs)
+
+	plainPermIDs, plainExists, err := resourcePermRepo.GetResourcePermissionIDs(plainChildID, permission.ResourceTypeDashboard)
+	require.NoError(t, err)
+	assert.False(t, plainExists)
+	assert.Empty(t, plainPermIDs)
+
+	report, err = backfillSvc.BackfillGovernedResources()
+	require.NoError(t, err)
+	assert.Equal(t, 2, report.Governed)
+
+	var dashboardResourceCount int64
+	require.NoError(t, testDB.Model(&permission.SysResource{}).
+		Where("resource_type = ? AND resource_name = ?", permission.ResourceTypeDashboard, "Legacy Dashboard").
+		Count(&dashboardResourceCount).Error)
+	assert.Equal(t, int64(1), dashboardResourceCount)
+
+	var screenResourceCount int64
+	require.NoError(t, testDB.Model(&permission.SysResource{}).
+		Where("resource_type = ? AND resource_name = ?", permission.ResourceTypeScreen, "Legacy Screen").
+		Count(&screenResourceCount).Error)
+	assert.Equal(t, int64(1), screenResourceCount)
+}
+
+func TestVisualizationServiceIntegration_BackfillGovernedResourcesWithOptions(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewVisualizationService(repo)
+	backfillSvc := NewVisualizationService(repo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	folderNodeType := "folder"
+	panelNodeType := "panel"
+	dashboardType := "dashboard"
+	screenType := "dataV"
+
+	dashboardParentID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Batch Governed Dashboard Folder", NodeType: &folderNodeType, Type: &dashboardType}, "tester")
+	require.NoError(t, err)
+	plainParentID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Batch Plain Dashboard Folder", NodeType: &folderNodeType, Type: &dashboardType}, "tester")
+	require.NoError(t, err)
+	screenParentID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Batch Governed Screen Folder", NodeType: &folderNodeType, Type: &screenType}, "tester")
+	require.NoError(t, err)
+	dashboardChildID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Batch Legacy Dashboard", NodeType: &panelNodeType, Type: &dashboardType, PID: &dashboardParentID}, "tester")
+	require.NoError(t, err)
+	plainChildID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Batch Legacy Plain Dashboard", NodeType: &panelNodeType, Type: &dashboardType, PID: &plainParentID}, "tester")
+	require.NoError(t, err)
+	screenChildID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Batch Legacy Screen", NodeType: &panelNodeType, Type: &screenType, PID: &screenParentID}, "tester")
+	require.NoError(t, err)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(dashboardParentID, "Batch Governed Dashboard Folder", permission.ResourceTypeDashboard, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(dashboardParentID, permission.ResourceTypeDashboard, []int64{81, 82}))
+	require.NoError(t, resourcePermSvc.RegisterResource(screenParentID, "Batch Governed Screen Folder", permission.ResourceTypeScreen, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(screenParentID, permission.ResourceTypeScreen, []int64{91, 92}))
+
+	batch1, err := backfillSvc.BackfillGovernedVisualizationResourcesWithOptions(&GovernanceBackfillOptions{Limit: 3})
+	require.NoError(t, err)
+	assert.Equal(t, 3, batch1.Scanned)
+	assert.Equal(t, 0, batch1.Governed)
+	assert.Equal(t, 3, batch1.Skipped)
+	assert.Equal(t, screenParentID, batch1.NextAfterID)
+	if assert.Len(t, batch1.SkippedItems, 3) {
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[1].Reason)
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[2].Reason)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[0].Remediation)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[1].Remediation)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[2].Remediation)
+	}
+
+	batch2, err := backfillSvc.BackfillGovernedVisualizationResourcesWithOptions(&GovernanceBackfillOptions{AfterID: batch1.NextAfterID, Limit: 3})
+	require.NoError(t, err)
+	assert.Equal(t, 3, batch2.Scanned)
+	assert.Equal(t, 2, batch2.Governed)
+	assert.Equal(t, 1, batch2.Skipped)
+	assert.Contains(t, batch2.ResourceIDs, dashboardChildID)
+	assert.Contains(t, batch2.ResourceIDs, screenChildID)
+	if assert.Len(t, batch2.SkippedItems, 1) {
+		assert.Equal(t, plainChildID, batch2.SkippedItems[0].ResourceID)
+		assert.Equal(t, permission.ResourceTypeDashboard, batch2.SkippedItems[0].ResourceType)
+		assert.Equal(t, GovernanceBackfillSkipReasonParentNotGoverned, batch2.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillRemediationGovernParent, batch2.SkippedItems[0].Remediation)
+	}
+
+	dashboardPermIDs, dashboardExists, err := resourcePermRepo.GetResourcePermissionIDs(dashboardChildID, permission.ResourceTypeDashboard)
+	require.NoError(t, err)
+	assert.True(t, dashboardExists)
+	assert.ElementsMatch(t, []int64{81, 82}, dashboardPermIDs)
+
+	screenPermIDs, screenExists, err := resourcePermRepo.GetResourcePermissionIDs(screenChildID, permission.ResourceTypeScreen)
+	require.NoError(t, err)
+	assert.True(t, screenExists)
+	assert.ElementsMatch(t, []int64{91, 92}, screenPermIDs)
+}
+
+func TestVisualizationServiceIntegration_BackfillGovernedResourcesWithOptions_FiltersByOrg(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &visualization.DataVisualizationInfo{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewVisualizationService(repo)
+	backfillSvc := NewVisualizationService(repo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	folderNodeType := "folder"
+	panelNodeType := "panel"
+	dashboardType := "dashboard"
+	orgA := int64(101)
+	orgB := int64(202)
+
+	governedParentAID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Org A Governed Folder", NodeType: &folderNodeType, Type: &dashboardType}, "tester")
+	require.NoError(t, err)
+	governedParentBID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Org B Governed Folder", NodeType: &folderNodeType, Type: &dashboardType}, "tester")
+	require.NoError(t, err)
+	childAID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Org A Legacy Dashboard", NodeType: &panelNodeType, Type: &dashboardType, PID: &governedParentAID}, "tester")
+	require.NoError(t, err)
+	childBID, err := seedSvc.Save(&visualization.SaveRequest{Name: "Org B Legacy Dashboard", NodeType: &panelNodeType, Type: &dashboardType, PID: &governedParentBID}, "tester")
+	require.NoError(t, err)
+
+	require.NoError(t, testDB.Model(&visualization.DataVisualizationInfo{}).Where("id IN ?", []int64{governedParentAID, childAID}).Update("org_id", orgA).Error)
+	require.NoError(t, testDB.Model(&visualization.DataVisualizationInfo{}).Where("id IN ?", []int64{governedParentBID, childBID}).Update("org_id", orgB).Error)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(governedParentAID, "Org A Governed Folder", permission.ResourceTypeDashboard, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(governedParentAID, permission.ResourceTypeDashboard, []int64{111, 112}))
+	require.NoError(t, resourcePermSvc.RegisterResource(governedParentBID, "Org B Governed Folder", permission.ResourceTypeDashboard, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(governedParentBID, permission.ResourceTypeDashboard, []int64{211, 212}))
+
+	report, err := backfillSvc.BackfillGovernedVisualizationResourcesWithOptions(&GovernanceBackfillOptions{OrgID: &orgA, Limit: 10})
+	require.NoError(t, err)
+	assert.Equal(t, &orgA, report.OrgID)
+	assert.Equal(t, 2, report.Scanned)
+	assert.Equal(t, 1, report.Governed)
+	assert.Contains(t, report.ResourceIDs, childAID)
+	assert.NotContains(t, report.ResourceIDs, childBID)
+	assert.Equal(t, "current_request_batch", report.RollbackBoundary)
+	assert.Equal(t, "idempotent_recompute", report.RerunStrategy)
+
+	permA, existsA, err := resourcePermRepo.GetResourcePermissionIDs(childAID, permission.ResourceTypeDashboard)
+	require.NoError(t, err)
+	assert.True(t, existsA)
+	assert.ElementsMatch(t, []int64{111, 112}, permA)
+
+	permB, existsB, err := resourcePermRepo.GetResourcePermissionIDs(childBID, permission.ResourceTypeDashboard)
+	require.NoError(t, err)
+	assert.False(t, existsB)
+	assert.Empty(t, permB)
 }
 
 func TestVisualizationServiceIntegration_Update(t *testing.T) {

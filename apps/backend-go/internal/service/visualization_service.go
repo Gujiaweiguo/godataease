@@ -4,16 +4,22 @@ import (
 	"fmt"
 	"time"
 
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
 )
 
 type VisualizationService struct {
-	repo *repository.VisualizationRepository
+	repo                *repository.VisualizationRepository
+	resourcePermService *ResourcePermissionService
 }
 
 func NewVisualizationService(repo *repository.VisualizationRepository) *VisualizationService {
 	return &VisualizationService{repo: repo}
+}
+
+func (s *VisualizationService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
+	s.resourcePermService = resourcePermSvc
 }
 
 func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy string) (int64, error) {
@@ -47,7 +53,71 @@ func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy str
 	if err := s.repo.Create(v); err != nil {
 		return 0, err
 	}
+	if err := s.applyInheritedPermissionsOnCreate(v.ID, req.Name, req.PID, req.Type); err != nil {
+		_ = s.repo.DeleteLogic(v.ID, updateBy)
+		return 0, err
+	}
 	return v.ID, nil
+}
+
+func (s *VisualizationService) applyInheritedPermissionsOnCreate(resourceID int64, resourceName string, pid *int64, visualizationType *string) error {
+	if s.resourcePermService == nil || pid == nil || *pid <= 0 {
+		return nil
+	}
+	return s.resourcePermService.InheritParentResourcePermissions(*pid, resourceID, resourceName, normalizeVisualizationResourceType(visualizationType))
+}
+
+func (s *VisualizationService) BackfillGovernedResources() (*VisualizationGovernanceBackfillReport, error) {
+	return s.BackfillGovernedVisualizationResourcesWithOptions(nil)
+}
+
+func (s *VisualizationService) BackfillGovernedVisualizationResourcesWithOptions(options *GovernanceBackfillOptions) (*VisualizationGovernanceBackfillReport, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("visualization repository not initialized")
+	}
+	if s.resourcePermService == nil {
+		return nil, fmt.Errorf("resource permission service not initialized")
+	}
+
+	normalized := normalizeGovernanceBackfillOptions(options)
+	items, err := s.repo.ListAllByTypesBatch(nil, normalized.AfterID, normalized.Limit, normalized.OrgID)
+	if err != nil {
+		return nil, err
+	}
+
+	report := newGovernanceBackfillReport("visualization", normalized)
+	for _, item := range items {
+		if item == nil || item.ID <= 0 {
+			continue
+		}
+		resourceType := normalizeVisualizationResourceType(item.Type)
+		report.observe(item.ID)
+		if item.PID == nil || *item.PID <= 0 {
+			report.addSkipped(item.ID, resourceType, 0, GovernanceBackfillSkipReasonMissingParent)
+			continue
+		}
+		inherited, err := s.resourcePermService.TryInheritParentResourcePermissions(*item.PID, item.ID, item.Name, resourceType)
+		if err != nil {
+			return nil, err
+		}
+		if !inherited {
+			report.addSkipped(item.ID, resourceType, *item.PID, GovernanceBackfillSkipReasonParentNotGoverned)
+			continue
+		}
+		report.addGoverned(item.ID)
+	}
+
+	return report, nil
+}
+
+func normalizeVisualizationResourceType(visualizationType *string) string {
+	if visualizationType != nil {
+		switch *visualizationType {
+		case "dataV", permission.ResourceTypeScreen:
+			return permission.ResourceTypeScreen
+		}
+	}
+	return permission.ResourceTypeDashboard
 }
 
 func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy string) (int64, error) {
