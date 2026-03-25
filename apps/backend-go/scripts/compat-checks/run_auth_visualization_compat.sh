@@ -27,7 +27,7 @@ login_admin() {
 
   status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login/localLogin" \
     -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"DataEase1234"}') || curl_rc=$?
+    -d '{"name":"admin","pwd":"DataEase1234"}') || curl_rc=$?
 
   if [[ "$curl_rc" -ne 0 || "$status" == "000" ]]; then
     rm -f "$tmp"
@@ -41,8 +41,8 @@ login_admin() {
     return 1
   fi
 
-  # Extract token from response
-  ADMIN_TOKEN=$(jq -r '.data.accessToken // .data.token // empty' "$tmp" 2>/dev/null || echo "")
+  # Extract token from response (TokenVO uses "token" field)
+  ADMIN_TOKEN=$(jq -r '.data.token // empty' "$tmp" 2>/dev/null || echo "")
   rm -f "$tmp"
 
   if [[ -z "$ADMIN_TOKEN" ]]; then
