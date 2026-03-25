@@ -1,20 +1,53 @@
 schema: spec-driven
 
 # Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: Go 1.24+, Vue 3, TypeScript, Node.js 18+, MySQL 8.0+, Redis 7.0+
+  Backend: Gin framework with domain-driven architecture
+  Frontend: Vue 3 + Vite + Element Plus + Pinia
+  Testing: Vitest (frontend), go test (backend unit), integration tests with MySQL
+  We use conventional commits
+  Domain: BI platform (DataEase)
+
+# Test Gate Configuration (HARD REQUIREMENT)
+# All changes must pass tests before archive
+test_gate:
+  # CI tests (run on every PR)
+  ci:
+    - Unit tests (make test / npm test)
+    - Integration tests (make test-integration)
+    - Lint and type check (golangci-lint / npm run lint + ts:check)
+  
+  # Archive tests (run before archiving a change)
+  archive:
+    - All CI tests must pass
+    - E2E tests (Playwright) must pass
+    - Contract drift check must pass (make drift-check)
+  
+  # E2E can be skipped only with explicit acknowledgment
+  allow_e2e_skip: true
+  e2e_skip_requires_acknowledgment: true
 
 # Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Include problem statement and proposed solution
+    - List affected components/modules
+    - Identify potential breaking changes
+    - Include rollback strategy if applicable
+  
+  design:
+    - Follow existing architecture patterns (domain/repository/service)
+    - Document API contracts and data models
+    - Consider error handling and edge cases
+  
+  tasks:
+    - Break tasks into chunks of max 2 hours
+    - Each task should be verifiable
+    - Include test requirements for each task
+  
+  verification:
+    - Run relevant unit tests
+    - Run integration tests if touching DB
+    - Verify API compatibility with contract diff
+    - Manual smoke test for user-facing changes
