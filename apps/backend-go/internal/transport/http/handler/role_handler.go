@@ -6,6 +6,7 @@ import (
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,30 @@ func (h *RoleHandler) Query(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req)
 
 	result, err := h.service.QueryRoles(&req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{"list": result})
+}
+
+func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
+	var req role.RoleQueryRequest
+	_ = c.ShouldBindJSON(&req)
+
+	orgID := middleware.GetOrgID(c)
+	if orgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
+
+	keyword := ""
+	if req.Keyword != nil {
+		keyword = *req.Keyword
+	}
+
+	result, err := h.service.QueryRolesByOrgID(orgID, keyword)
 	if err != nil {
 		response.Error(c, "500000", err.Error())
 		return
@@ -152,6 +177,13 @@ func (h *RoleHandler) MountUser(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	if req.OrgId <= 0 {
+		req.OrgId = middleware.GetOrgID(c)
+	}
+	if req.OrgId <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 
 	if err := h.service.MountUsers(&req); err != nil {
 		response.Error(c, "500000", err.Error())
@@ -169,8 +201,11 @@ func (h *RoleHandler) MountExternalUser(c *gin.Context) {
 		return
 	}
 
-	// TODO: 从上下文获取组织ID，暂时使用1
-	orgID := int64(1)
+	orgID := middleware.GetOrgID(c)
+	if orgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 	if err := h.service.MountExternalUser(&req, orgID); err != nil {
 		response.Error(c, "500000", err.Error())
 		return
@@ -215,8 +250,11 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 // SearchExternalUser 搜索组织外用户
 func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
 	keyword := c.Param("keyword")
-	// TODO: 从上下文获取排除的组织ID，暂时使用1
-	excludeOrgID := int64(1)
+	excludeOrgID := middleware.GetOrgID(c)
+	if excludeOrgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 
 	result, err := h.service.SearchExternalUser(keyword, excludeOrgID)
 	if err != nil {
@@ -235,8 +273,11 @@ func (h *RoleHandler) OptionForUser(c *gin.Context) {
 		return
 	}
 
-	// TODO: 从上下文获取组织ID，暂时使用1
-	orgID := int64(1)
+	orgID := middleware.GetOrgID(c)
+	if orgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 	result, err := h.service.OptionForUser(&req, orgID)
 	if err != nil {
 		response.Error(c, "500000", err.Error())
@@ -268,7 +309,7 @@ func RegisterRoleRoutes(r *gin.RouterGroup, h *RoleHandler) {
 	{
 		roleGroup.POST("/query", h.Query)
 		roleGroup.POST("/page", h.Page)
-		roleGroup.POST("/byCurOrg", h.Query)
+		roleGroup.POST("/byCurOrg", h.QueryByCurrentOrg)
 		roleGroup.GET("/queryWithOid/:oid", h.QueryWithOrgID)
 		roleGroup.POST("/create", h.Create)
 		roleGroup.POST("/edit", h.Edit)

@@ -277,6 +277,57 @@ func TestRegisterRoutes_DatasourceListAliasesReturnExplicitErrorAfterAuthenticat
 	}
 }
 
+func TestRegisterRoutes_LoginRefreshCompatibilityRouteReturnsRefreshedToken(t *testing.T) {
+	router := newRouterWithJWTConfig()
+	router.RegisterRoutes()
+
+	jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{Secret: "test-secret", Expire: 3600})
+	token, err := jwtInstance.GenerateTokenWithOrgID(7, "refresh-user", "", 3)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	tests := []string{"/login/refresh", "/api/login/refresh"}
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest("GET", path+"?time=1", nil)
+			req.Header.Set("X-DE-TOKEN", token)
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Data struct {
+					Token string `json:"token"`
+					Exp   int64  `json:"exp"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v", path, err)
+			}
+			if resp.Code != "000000" {
+				t.Fatalf("expected code 000000 for %s, got %s", path, resp.Code)
+			}
+			if resp.Data.Token == "" || resp.Data.Exp == 0 {
+				t.Fatalf("expected refreshed token payload for %s, got %#v", path, resp.Data)
+			}
+
+			claims, err := jwtInstance.ParseToken(resp.Data.Token)
+			if err != nil {
+				t.Fatalf("parse refreshed token for %s failed: %v", path, err)
+			}
+			if claims.UserID != 7 || claims.OrgID != 3 {
+				t.Fatalf("expected refreshed token to preserve user/org for %s, got %#v", path, claims)
+			}
+		})
+	}
+}
+
 func TestRegisterRoutes_DatasetCanonicalAndCompatibilityContracts(t *testing.T) {
 	router := NewRouter(nil, nil)
 	router.RegisterRoutes()

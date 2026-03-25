@@ -41,36 +41,50 @@ Run in `/opt/code/godataease`:
 - Docker API docs: `http://localhost:8080/doc.html`
 - Legacy Java emergency operations: see `legacy/README-READONLY.md`
 
-### 开发模式（推荐）
+### 开发模式（推荐：本地前后端 + Docker Redis + 外部 MySQL）
 
 **快速入口脚本**：
 ```bash
-./scripts/dev.sh build     # 构建前后端产物
-./scripts/dev.sh start     # 启动开发容器
-./scripts/dev.sh stop      # 停止开发容器
-./scripts/dev.sh restart   # 重建并重启
+./scripts/dev.sh redis-start   # 启动本地开发所需 Redis 容器
+./scripts/dev.sh redis-stop    # 停止本地开发 Redis 容器
+./scripts/dev.sh local-help    # 查看本地混合开发命令
 ```
 
 **手动方式**：
 ```bash
-# 1. 构建产物（首次或代码变更后）
-cd apps/backend-go && make build-static && cd ../..
-cd apps/frontend && npm run build:base && cd ..
+# 1. 启动 Redis 容器（宿主机端口 16379）
+docker compose -f infra/compose/docker-compose.yml up -d godataease-redis
 
-# 2. 启动开发模式（挂载产物，无需重建镜像）
-docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d
+# 2. 启动本地 Go 后端（连接外部 MySQL + Docker Redis）
+cd apps/backend-go
+DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
 
-# 3. 验证
+# 3. 启动本地前端开发服务器
+cd ../frontend
+npm install
+npm run dev
+
+# 4. 验证
 curl http://localhost:8080/health
 ```
 
-**开发模式 vs 生产模式**：
-| 模式 | 命令 | 镜像重建 | 适用场景 |
-|------|------|----------|----------|
-| 开发 | `dev.sh start` | ❌ | 日常开发、快速迭代 |
-| 生产 | `docker compose up --build` | ✅ | 集成验证、部署 |
+**本地混合开发默认端口**：
+| 服务 | 地址 |
+|------|------|
+| 前端 Vite | `http://localhost:5173` |
+| Go 后端 | `http://localhost:8080` |
+| Redis (Docker) | `127.0.0.1:16379` |
 
-**注意**：开发模式需要静态编译后端（`make build-static`），因为 Alpine 容器使用 musl 而非 glibc。
+### 容器化开发（可选，用于集成验证）
+
+```bash
+./scripts/dev.sh build
+./scripts/dev.sh start
+./scripts/dev.sh stop
+./scripts/dev.sh restart
+```
+
+说明：容器化开发会将本地产物挂载进 `godataease-app`，适合验证镜像运行路径，不再作为日常首选开发循环。
 
 ### Go Backend (`apps/backend-go`)
 Run in `/opt/code/godataease/apps/backend-go`:
@@ -83,7 +97,7 @@ Run in `/opt/code/godataease/apps/backend-go`:
 ### Frontend (`apps/frontend`)
 Run in `/opt/code/godataease/apps/frontend`:
 - Install dependencies: `npm install`
-- Dev server: `npm run dev` (Vite, default `http://localhost:8080`)
+- Dev server: `npm run dev` (Vite, default `http://localhost:5173`, proxy API to `http://localhost:8080`)
 - Build (base): `npm run build:base`
 - Build (distributed): `npm run build:distributed`
 - Build (library): `npm run build:lib`

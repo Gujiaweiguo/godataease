@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,15 +11,25 @@ import (
 )
 
 type fakeRowPermissionStore struct {
-	items      []*permission.DataPermRow
-	created    *permission.DataPermRow
-	updated    *permission.DataPermRow
-	deletedID  int64
-	lookupByID map[int64]*permission.DataPermRow
+	items       []*permission.DataPermRow
+	targetItems map[string][]*permission.DataPermRow
+	created     *permission.DataPermRow
+	updated     *permission.DataPermRow
+	deletedID   int64
+	lookupByID  map[int64]*permission.DataPermRow
 }
 
 func (f *fakeRowPermissionStore) PagerByDatasetID(datasetID int64, page, size int) ([]*permission.DataPermRow, int64, error) {
 	return f.items, int64(len(f.items)), nil
+}
+
+func (f *fakeRowPermissionStore) PagerByDatasetIDAndTarget(datasetID int64, targetType string, targetID int64, page, size int) ([]*permission.DataPermRow, int64, error) {
+	if f.targetItems == nil {
+		return []*permission.DataPermRow{}, 0, nil
+	}
+	key := fmt.Sprintf("%d:%s:%d", datasetID, targetType, targetID)
+	items := f.targetItems[key]
+	return items, int64(len(items)), nil
 }
 
 func (f *fakeRowPermissionStore) GetByID(id int64) (*permission.DataPermRow, error) {
@@ -152,6 +163,52 @@ func TestDataPermissionAdminService_RowPermissionPage(t *testing.T) {
 	}
 	if list[0].FilterField != "region" || list[0].FilterValue != "east" {
 		t.Fatalf("unexpected row mapping: %#v", list[0])
+	}
+}
+
+func TestDataPermissionAdminService_RowPermissionPageByTarget(t *testing.T) {
+	expr, err := encodeSimpleExpression(11, "east")
+	if err != nil {
+		t.Fatalf("encodeSimpleExpression failed: %v", err)
+	}
+
+	rowStore := &fakeRowPermissionStore{targetItems: map[string][]*permission.DataPermRow{
+		"9:role:7": {{
+			ID:             5,
+			DatasetID:      9,
+			AuthTargetType: permission.AuthTargetTypeRole,
+			AuthTargetID:   7,
+			ExpressionTree: expr,
+			Status:         1,
+		}},
+	}}
+	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{
+		ID:         11,
+		OriginName: "region",
+	}}}}
+
+	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider)
+	page, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeRole, 7, 1, 10)
+	if err != nil {
+		t.Fatalf("RowPermissionPageByTarget failed: %v", err)
+	}
+
+	list, ok := page.List.([]RowPermissionForm)
+	if !ok {
+		t.Fatalf("unexpected list type: %T", page.List)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(list))
+	}
+	if list[0].FilterType != permission.AuthTargetTypeRole || list[0].TargetID != 7 {
+		t.Fatalf("unexpected target row mapping: %#v", list[0])
+	}
+}
+
+func TestDataPermissionAdminService_RowPermissionPageByTarget_RejectsUnsupportedType(t *testing.T) {
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+	if _, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeDept, 7, 1, 10); err == nil {
+		t.Fatal("expected unsupported targetType to fail")
 	}
 }
 

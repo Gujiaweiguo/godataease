@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"dataease/backend/internal/domain/user"
+	domainauth "dataease/backend/internal/domain/auth"
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -74,9 +74,18 @@ func TestUserHandler_GetUserInfo_UsesNormalizedLanguage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	h := &UserHandler{
-		loadUserByID: func(userID int64) (*user.SysUser, error) {
-			lang := "zh-TW"
-			return &user.SysUser{UserID: userID, Username: "alice", Language: &lang}, nil
+		buildBootstrap: func(userID int64, selectedOrgID int64, requestLanguage string) (*domainauth.IdentityBootstrap, error) {
+			assert.Equal(t, int64(9), userID)
+			assert.Equal(t, int64(0), selectedOrgID)
+			assert.Empty(t, requestLanguage)
+			return &domainauth.IdentityBootstrap{
+				ID:            userID,
+				Name:          "alice",
+				Oid:           2,
+				Language:      "tw",
+				CurrentOrg:    &domainauth.OrgSummary{OrgID: 2, OrgName: "Org B"},
+				AvailableOrgs: []domainauth.OrgSummary{{OrgID: 2, OrgName: "Org B"}},
+			}, nil
 		},
 	}
 	r := gin.New()
@@ -100,16 +109,21 @@ func TestUserHandler_GetUserInfo_UsesNormalizedLanguage(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(9), data["id"])
 	assert.Equal(t, "alice", data["name"])
+	assert.Equal(t, float64(2), data["oid"])
 	assert.Equal(t, "tw", data["language"])
+	currentOrg, ok := data["currentOrg"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, float64(2), currentOrg["orgId"])
 }
 
 func TestUserHandler_GetUserInfo_HeaderOverridesStoredLanguage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	h := &UserHandler{
-		loadUserByID: func(userID int64) (*user.SysUser, error) {
-			lang := "zh-CN"
-			return &user.SysUser{UserID: userID, Username: "bob", Language: &lang}, nil
+		buildBootstrap: func(userID int64, selectedOrgID int64, requestLanguage string) (*domainauth.IdentityBootstrap, error) {
+			assert.Equal(t, "en-US", requestLanguage)
+			assert.Equal(t, int64(0), selectedOrgID)
+			return &domainauth.IdentityBootstrap{ID: userID, Name: "bob", Oid: 0, Language: "en", AvailableOrgs: []domainauth.OrgSummary{}}, nil
 		},
 	}
 	r := gin.New()
@@ -133,9 +147,10 @@ func TestUserHandler_GetUserInfo_UsesFirstSupportedLocaleFromHeaderList(t *testi
 	gin.SetMode(gin.TestMode)
 
 	h := &UserHandler{
-		loadUserByID: func(userID int64) (*user.SysUser, error) {
-			lang := "zh-CN"
-			return &user.SysUser{UserID: userID, Username: "dora", Language: &lang}, nil
+		buildBootstrap: func(userID int64, selectedOrgID int64, requestLanguage string) (*domainauth.IdentityBootstrap, error) {
+			assert.Equal(t, "fr-FR,en-US;q=0.8", requestLanguage)
+			assert.Equal(t, int64(0), selectedOrgID)
+			return &domainauth.IdentityBootstrap{ID: userID, Name: "dora", Oid: 0, Language: "en", AvailableOrgs: []domainauth.OrgSummary{}}, nil
 		},
 	}
 	r := gin.New()
@@ -159,9 +174,10 @@ func TestUserHandler_GetUserInfo_UnsupportedInputFallsBackToDefault(t *testing.T
 	gin.SetMode(gin.TestMode)
 
 	h := &UserHandler{
-		loadUserByID: func(userID int64) (*user.SysUser, error) {
-			lang := "de-DE"
-			return &user.SysUser{UserID: userID, Username: "carl", Language: &lang}, nil
+		buildBootstrap: func(userID int64, selectedOrgID int64, requestLanguage string) (*domainauth.IdentityBootstrap, error) {
+			assert.Equal(t, "fr-FR", requestLanguage)
+			assert.Equal(t, int64(0), selectedOrgID)
+			return &domainauth.IdentityBootstrap{ID: userID, Name: "carl", Oid: 0, Language: "zh-CN", AvailableOrgs: []domainauth.OrgSummary{}}, nil
 		},
 	}
 	r := gin.New()
@@ -179,4 +195,46 @@ func TestUserHandler_GetUserInfo_UnsupportedInputFallsBackToDefault(t *testing.T
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	data := resp["data"].(map[string]interface{})
 	assert.Equal(t, "zh-CN", data["language"])
+}
+
+func TestUserHandler_GetUserInfo_RejectsMissingAuthenticatedUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	h := &UserHandler{}
+	r := gin.New()
+	r.GET("/user/info", h.GetUserInfo)
+
+	req := httptest.NewRequest("GET", "/user/info", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 401, w.Code)
+}
+
+func TestUserHandler_SwitchOrg_ReturnsTokenVO(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &UserHandler{
+		switchOrg: func(userID int64, targetOrgID int64, requestLanguage string) (*domainauth.TokenVO, error) {
+			assert.Equal(t, int64(15), userID)
+			assert.Equal(t, int64(3), targetOrgID)
+			assert.Equal(t, "en-US", requestLanguage)
+			return &domainauth.TokenVO{Token: "new-token", Exp: 123, Oid: 3, CurrentOrg: &domainauth.OrgSummary{OrgID: 3, OrgName: "Org Three"}}, nil
+		},
+	}
+	r := gin.New()
+	r.POST("/user/switch/:id", func(c *gin.Context) {
+		c.Set("user_id", uint64(15))
+		h.SwitchOrg(c)
+	})
+	req := httptest.NewRequest("POST", "/user/switch/3", nil)
+	req.Header.Set("Accept-Language", "en-US")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, 200, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+	data := resp["data"].(map[string]interface{})
+	assert.Equal(t, "new-token", data["token"])
+	assert.Equal(t, float64(3), data["oid"])
 }

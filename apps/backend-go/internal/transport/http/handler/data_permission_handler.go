@@ -31,6 +31,27 @@ func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
+	datasetID, page, size, ok := parseDatasetPagerParams(c)
+	if !ok {
+		return
+	}
+
+	targetType := c.Param("targetType")
+	targetID, err := strconv.ParseInt(c.Param("targetId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid target ID")
+		return
+	}
+
+	result, err := h.service.RowPermissionPageByTarget(datasetID, targetType, targetID, page, size)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *DataPermissionHandler) SaveRowPermission(c *gin.Context) {
 	var req service.RowPermissionForm
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -109,6 +130,7 @@ func RegisterDataPermissionRoutes(r *gin.RouterGroup, h *DataPermissionHandler) 
 	datasetGroup := r.Group("/dataset")
 	{
 		datasetGroup.GET("/rowPermissions/pager/:datasetId/:page/:limit", h.RowPermissionPager)
+		datasetGroup.GET("/rowPermissions/pagerByTarget/:datasetId/:targetType/:targetId/:page/:limit", h.RowPermissionPagerByTarget)
 		datasetGroup.POST("/rowPermissions/save", h.SaveRowPermission)
 		datasetGroup.POST("/rowPermissions/delete", h.DeleteRowPermission)
 		datasetGroup.GET("/columnPermissions/pager/:datasetId/:page/:limit", h.ColumnPermissionPager)

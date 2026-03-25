@@ -34,6 +34,16 @@ const appearanceStore = useAppearanceStoreWithOut()
 const username = ref('')
 const password = ref('')
 const duringLogin = ref(false)
+const persistLoginSession = (token?: string, exp?: number) => {
+  if (!token) {
+    return
+  }
+  userStore.setToken(token)
+  if (typeof exp === 'number') {
+    userStore.setExp(exp)
+  }
+  userStore.setTime(Date.now())
+}
 
 const xpackLoadFail = ref(false)
 const xpackInvalidPwd = ref()
@@ -132,6 +142,7 @@ const onSubmit = async () => {
   loginApi(param)
     .then(res => {
       const { token, exp, mfa } = res.data
+      persistLoginSession(token, exp)
       if (!isLdap && !xpackLoadFail.value && xpackInvalidPwd.value?.invokeMethod) {
         const param = {
           methodName: 'init',
@@ -144,9 +155,6 @@ const onSubmit = async () => {
       if (toMfa(mfa)) {
         return
       }
-      userStore.setToken(token)
-      userStore.setExp(exp)
-      userStore.setTime(Date.now())
       router.push({ path: '/index' })
     })
     .catch(() => {

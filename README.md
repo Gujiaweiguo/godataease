@@ -76,29 +76,36 @@ godataease/
 └── openspec/               # OpenSpec 规范
 ```
 
-### 本地开发
+### 本地开发（推荐：本地前后端 + Docker Redis + 外部 MySQL）
 
 ```bash
 # 克隆项目
 git clone https://github.com/Gujiaweiguo/godataease.git
 cd godataease
 
-# 编译 Go 后端
-cd apps/backend-go
-make build
-
-# 编译前端
-cd ../frontend
+# 安装前端依赖
+cd apps/frontend
 npm install
-npm run dev  # 访问 http://localhost:8080
 
-# 启动 Go 后端（需要配置数据库）
-cd ../backend-go
-make run  # API 端口由 apps/backend-go/configs/config.yaml 的 server.port 决定
+# 启动 Redis 容器（宿主机端口 16379）
+cd ../..
+docker compose -f infra/compose/docker-compose.yml up -d godataease-redis
 
-# 本机 MySQL/Redis（localhost）快速启动
-make run-local
+# 启动 Go 后端（连接外部 MySQL + Docker Redis）
+cd apps/backend-go
+DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
+
+# 启动前端开发服务器
+cd ../frontend
+npm run dev  # 访问 http://localhost:5173
 ```
+
+本地混合开发默认端口：
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8080`
+- Redis（Docker）：`127.0.0.1:16379`
+
+说明：当前推荐的本地开发方式是前后端都在宿主机运行；Redis 通过 Docker 提供；MySQL 继续使用已有外部实例。
 
 ### 打包构建
 

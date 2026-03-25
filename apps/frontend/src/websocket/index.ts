@@ -5,9 +5,7 @@ import { useEmitt } from '@/hooks/web/useEmitt'
 const { wsCache } = useCache()
 let stompClient: Stomp.Client
 let websocketSupported: boolean | null = null
-import dev from '../../config/dev'
 const env = import.meta.env
-const basePath = env.VITE_API_BASEPATH
 
 export default {
   install() {
@@ -35,7 +33,7 @@ export default {
       } else {
         prefix = location.origin + location.pathname
         if (env.MODE === 'dev') {
-          prefix = dev.server.proxy[basePath].target + '/'
+          prefix = location.origin + '/'
         }
       }
       if (!prefix.endsWith('/')) {

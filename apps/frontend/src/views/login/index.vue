@@ -73,6 +73,17 @@ const enterHandler = e => {
 }
 const formRef = ref<FormInstance | undefined>()
 const duringLogin = ref(true)
+const persistLoginSession = (token?: string, exp?: number) => {
+  if (!token) {
+    return
+  }
+  userStore.setToken(token)
+  if (typeof exp === 'number') {
+    userStore.setExp(exp)
+  }
+  userStore.setTime(Date.now())
+}
+
 const handleLogin = () => {
   if (!formRef.value) return
   formRef.value.validate(async (valid: boolean) => {
@@ -88,28 +99,26 @@ const handleLogin = () => {
       }
       duringLogin.value = true
       cleanPlatformFlag()
-      loginApi(param)
-        .then(res => {
-          const { token, exp, mfa } = res.data
-          if (!isLdap && !xpackLoadFail.value && xpackInvalidPwd.value?.invokeMethod) {
-            const param = {
-              methodName: 'init',
+        loginApi(param)
+          .then(res => {
+            const { token, exp, mfa } = res.data
+            persistLoginSession(token, exp)
+            if (!isLdap && !xpackLoadFail.value && xpackInvalidPwd.value?.invokeMethod) {
+              const param = {
+                methodName: 'init',
               args: res.data
             }
             xpackInvalidPwd?.value.invokeMethod(param)
             return
           }
-          if (!isLdap && mfa?.enabled) {
-            xpackLoginHandler.value?.invokeMethod({ methodName: 'toMfa', args: mfa })
-            duringLogin.value = false
-            return
-          }
-          userStore.setToken(token)
-          userStore.setExp(exp)
-          userStore.setTime(Date.now())
-          const queryRedirectPath = getCurLocation()
-          router.push({ path: queryRedirectPath })
-        })
+            if (!isLdap && mfa?.enabled) {
+              xpackLoginHandler.value?.invokeMethod({ methodName: 'toMfa', args: mfa })
+              duringLogin.value = false
+              return
+            }
+            const queryRedirectPath = getCurLocation()
+            router.push({ path: queryRedirectPath })
+          })
         .catch(() => {
           duringLogin.value = false
         })

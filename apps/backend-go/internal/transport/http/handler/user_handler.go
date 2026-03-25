@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strconv"
 
+	domainauth "dataease/backend/internal/domain/auth"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -16,7 +17,12 @@ type UserHandler struct {
 	userService       *service.UserService
 	userImportService *service.UserImportService
 	loadUserByID      userByIDLoader
+	buildBootstrap    identityBootstrapBuilder
+	switchOrg         orgSwitcher
 }
+
+type identityBootstrapBuilder func(userID int64, selectedOrgID int64, requestLanguage string) (*domainauth.IdentityBootstrap, error)
+type orgSwitcher func(userID int64, targetOrgID int64, requestLanguage string) (*domainauth.TokenVO, error)
 
 func NewUserHandler(userService *service.UserService, userImportService *service.UserImportService) *UserHandler {
 	var loadUserByID userByIDLoader
@@ -29,6 +35,16 @@ func NewUserHandler(userService *service.UserService, userImportService *service
 		userImportService: userImportService,
 		loadUserByID:      loadUserByID,
 	}
+}
+
+func (h *UserHandler) SetAuthService(authService *service.AuthService) {
+	if authService == nil {
+		h.buildBootstrap = nil
+		h.switchOrg = nil
+		return
+	}
+	h.buildBootstrap = authService.BuildIdentityBootstrapForOrg
+	h.switchOrg = authService.SwitchOrg
 }
 
 func (h *UserHandler) ListUsers(c *gin.Context) {
@@ -108,31 +124,49 @@ func (h *UserHandler) GetUserOptions(c *gin.Context) {
 
 func (h *UserHandler) GetUserInfo(c *gin.Context) {
 	userID := int64(middleware.GetUserID(c))
-	username := middleware.GetUsername(c)
-	locale := requestLocale(c, h.loadUserByID)
-	current := currentUser(c, h.loadUserByID)
-
-	if current != nil {
-		if current.UserID > 0 {
-			userID = current.UserID
-		}
-		if current.Username != "" {
-			username = current.Username
-		}
+	if userID <= 0 {
+		response.Unauthorized(c, "invalid user context")
+		return
 	}
-	if userID == 0 {
-		userID = 1
-	}
-	if username == "" {
-		username = "admin"
+	if h.buildBootstrap == nil {
+		response.Error(c, "500000", "identity bootstrap resolver is not configured")
+		return
 	}
 
-	response.Success(c, map[string]interface{}{
-		"id":       userID,
-		"name":     username,
-		"oid":      1,
-		"language": locale,
-	})
+	bootstrap, err := h.buildBootstrap(userID, middleware.GetOrgID(c), c.GetHeader("Accept-Language"))
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, bootstrap)
+}
+
+func (h *UserHandler) SwitchOrg(c *gin.Context) {
+	if h.switchOrg == nil {
+		response.Error(c, "500000", "org switcher is not configured")
+		return
+	}
+
+	targetOrgID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || targetOrgID <= 0 {
+		response.Error(c, "500000", "Invalid organization ID")
+		return
+	}
+
+	userID := int64(middleware.GetUserID(c))
+	if userID <= 0 {
+		response.Unauthorized(c, "invalid user context")
+		return
+	}
+
+	tokenVO, err := h.switchOrg(userID, targetOrgID, c.GetHeader("Accept-Language"))
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, tokenVO)
 }
 
 func (h *UserHandler) SwitchLanguage(c *gin.Context) {
@@ -303,4 +337,5 @@ func RegisterUserRoutes(r *gin.RouterGroup, h *UserHandler) {
 	}
 
 	r.GET("/user/info", h.GetUserInfo)
+	r.POST("/user/switch/:id", h.SwitchOrg)
 }

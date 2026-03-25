@@ -10,8 +10,13 @@ export default {
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: path => path
+      },
+      '/websocket': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: path => path
       }
     },
-    port: 8080
+    port: 5173
   }
 }

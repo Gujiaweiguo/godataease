@@ -70,7 +70,7 @@ func TestMain(m *testing.M) {
 		&role.SysRole{}, &role.RoleMenu{},
 		&org.SysOrg{},
 		&menu.CoreMenu{},
-		&permission.SysPerm{}, &permission.DataPermRow{}, &permission.DataPermColumn{},
+		&permission.SysPerm{}, &permission.SysResource{}, &permission.SysResourcePerm{}, &permission.DataPermRow{}, &permission.DataPermColumn{},
 		&share.Share{}, &share.ShareTicket{},
 		&template.Template{},
 		&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{},

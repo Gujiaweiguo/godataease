@@ -241,8 +241,8 @@ const handleSaveExportSettings = () => {
       .form-tip {
         margin-top: 8px;
         font-size: 12px;
-        color: #909399;
         line-height: 1.5;
+        color: #909399;
       }
 
       :deep(.el-form-item) {

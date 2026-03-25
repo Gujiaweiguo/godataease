@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 
@@ -48,6 +50,48 @@ func TestUserServiceIntegration_CreateUser(t *testing.T) {
 	// Verify password was hashed
 	err = bcrypt.CompareHashAndPassword([]byte(created.Password), []byte("password123"))
 	assert.NoError(t, err)
+}
+
+func TestUserServiceIntegration_CreateUser_WithOrganizationMembershipBaseline(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{}, &role.SysRole{}, &org.SysOrg{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	userPermRepo := repository.NewUserPermRepository(testDB)
+	roleRepo := repository.NewRoleRepository(testDB)
+	orgRepo := repository.NewOrgRepository(testDB)
+	svc := NewUserService(userRepo, userRoleRepo, userPermRepo)
+	svc.SetRoleRepository(roleRepo)
+	svc.SetOrgRepository(orgRepo)
+
+	require.NoError(t, orgRepo.Create(&org.SysOrg{OrgName: "Org A", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
+	createdOrg, err := orgRepo.GetByName("Org A")
+	require.NoError(t, err)
+
+	id, err := svc.CreateUser(&user.UserCreateRequest{
+		Username:       "scoped-user",
+		Password:       "password123",
+		RealName:       "Scoped User",
+		OrganizationID: &createdOrg.OrgID,
+	})
+	require.NoError(t, err)
+	assert.Greater(t, id, int64(0))
+
+	userRoles, err := userRoleRepo.GetByUserID(id)
+	require.NoError(t, err)
+	require.Len(t, userRoles, 1)
+	assert.Equal(t, createdOrg.OrgID, userRoles[0].OrgID)
+
+	defaultRole, err := roleRepo.GetByID(userRoles[0].RoleID)
+	require.NoError(t, err)
+	assert.Equal(t, role.BuiltInOrgUserRoleCode, defaultRole.RoleCode)
+	require.NotNil(t, defaultRole.RoleType)
+	assert.Equal(t, role.RoleTypeOrganization, *defaultRole.RoleType)
+
+	orgRoles, err := roleRepo.QueryByOrgID(createdOrg.OrgID, "")
+	require.NoError(t, err)
+	require.NotEmpty(t, orgRoles)
+	assert.Equal(t, role.BuiltInOrgUserRoleCode, orgRoles[0].RoleCode)
 }
 
 func TestUserServiceIntegration_CreateUser_DuplicateUsername(t *testing.T) {

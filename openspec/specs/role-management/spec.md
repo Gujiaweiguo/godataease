@@ -74,6 +74,14 @@ The system SHALL allow administrators to configure menu authorizations as part o
 - **THEN** the role starts with no business menu visibility by default
 - **AND** access remains denied until menu grants are explicitly assigned
 
+### Requirement: Role Authorization Carrier Boundary
+The system SHALL treat roles as authorization carriers inside the unified permission center without moving role lifecycle or member-management responsibilities into permission workflows.
+
+#### Scenario: Administrator grants menu or resource authorization to role
+- **WHEN** an administrator configures authorization for a role inside the permission center
+- **THEN** the system MUST use the role as the persisted authorization carrier
+- **AND** the workflow MUST NOT require redefining the role lifecycle or membership semantics
+
 ### Requirement: Legacy System Role Route Compatibility
 The system SHALL support legacy role administration routes under `/system/role/*` for frontend compatibility.
 
@@ -89,6 +97,19 @@ The system SHALL handle legacy action-name differences between frontend and cano
 - **WHEN** frontend calls legacy role update endpoint
 - **THEN** backend MUST execute canonical role edit logic
 - **AND** returned payload and status MUST remain compatible with frontend handling
+
+### Requirement: Built-in Role Model Baseline
+The system SHALL define a stable built-in role baseline that distinguishes global system roles from organization-scoped default roles before advanced role workflows are introduced.
+
+#### Scenario: Organization becomes available for IAM workflows
+- **WHEN** an organization is initialized for governed IAM administration
+- **THEN** the system MUST expose the built-in organizational role baseline required by downstream role workflows
+- **AND** those built-in roles MUST be discoverable through shared role queries under organization scope
+
+#### Scenario: System-level role is queried alongside organization roles
+- **WHEN** an administrator queries roles under a given runtime context
+- **THEN** the system MUST distinguish immutable global system roles from organization-scoped built-in roles
+- **AND** later role workflow and permission changes MUST consume the same role classification semantics
 
 ### Requirement: Role Member Lifecycle Management
 The system SHALL provide complete role member lifecycle APIs and UI workflows, including add organization user, add external user, and remove member from role.

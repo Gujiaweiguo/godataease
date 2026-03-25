@@ -9,6 +9,7 @@ import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { useLinkStoreWithOut } from '@/store/modules/link'
 import { isBootstrapSessionValid } from '@/utils/authBootstrap'
+import { bootstrapInteractiveInBackground } from '@/utils/interactiveBootstrap'
 
 const appearanceStore = useAppearanceStoreWithOut()
 const permissionStore = usePermissionStoreWithOut()
@@ -55,7 +56,7 @@ router.beforeEach(async (to, _, next) => {
       })
       await permissionStore.generateRoutes(routers as AppCustomRouteRecordRaw[])
       permissionStore.setIsAddRouters(true)
-      await interactiveStore.initInteractive(true)
+      bootstrapInteractiveInBackground(interactiveStore)
       next()
     }
   } else {

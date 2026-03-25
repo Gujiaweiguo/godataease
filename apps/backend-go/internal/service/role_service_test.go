@@ -97,3 +97,48 @@ func TestRoleService_QueryRolesPage_OutOfRangePage(t *testing.T) {
 	assert.Equal(t, 1, result.Size)
 	assert.Len(t, result.List, 0)
 }
+
+func TestRoleService_CreateRole_AllowsBuiltInRootParent(t *testing.T) {
+	svc, repo := setupRoleServiceTest(t)
+	roleType := role.RoleTypeSystem
+	rootParent := int64(0)
+	seed := &role.SysRole{RoleName: "System Root", RoleCode: "system-root", RoleType: &roleType, Status: role.StatusEnabled, ParentID: &rootParent}
+	require.NoError(t, repo.Create(seed))
+
+	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Child Custom", ParentID: &seed.RoleID}, "tester")
+	require.NoError(t, err)
+	created, err := repo.GetByID(createdID)
+	require.NoError(t, err)
+	require.NotNil(t, created.ParentID)
+	assert.Equal(t, seed.RoleID, *created.ParentID)
+	require.NotNil(t, created.RoleType)
+	assert.Equal(t, role.RoleTypeCustom, *created.RoleType)
+}
+
+func TestRoleService_CreateRole_RejectsCustomParent(t *testing.T) {
+	svc, repo := setupRoleServiceTest(t)
+	customType := role.RoleTypeCustom
+	rootParent := int64(0)
+	seed := &role.SysRole{RoleName: "Custom Parent", RoleCode: "custom-parent", RoleType: &customType, Status: role.StatusEnabled, ParentID: &rootParent}
+	require.NoError(t, repo.Create(seed))
+
+	_, err := svc.CreateRole(&role.RoleCreator{Name: "Invalid Child", ParentID: &seed.RoleID}, "tester")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "custom role cannot be used as parent role")
+}
+
+func TestRoleService_EditRole_RejectsNonRootParent(t *testing.T) {
+	svc, repo := setupRoleServiceTest(t)
+	rootParent := int64(0)
+	builtInType := role.RoleTypeOrganization
+	builtInParent := &role.SysRole{RoleName: "BuiltIn Parent", RoleCode: "builtin-parent", RoleType: &builtInType, Status: role.StatusEnabled, ParentID: &rootParent}
+	require.NoError(t, repo.Create(builtInParent))
+	childOfBuiltIn := &role.SysRole{RoleName: "Custom Child", RoleCode: "custom-child", Status: role.StatusEnabled, ParentID: &builtInParent.RoleID}
+	require.NoError(t, repo.Create(childOfBuiltIn))
+	targetID, err := svc.CreateRole(&role.RoleCreator{Name: "Editable Role"}, "tester")
+	require.NoError(t, err)
+
+	err = svc.EditRole(&role.RoleEditor{ID: targetID, ParentID: &childOfBuiltIn.RoleID}, "editor")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parent role must be a built-in root role")
+}

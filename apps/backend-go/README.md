@@ -21,16 +21,23 @@ make build
 make run
 ```
 
-For local MySQL/Redis on `localhost`, use:
+For local backend development with an external MySQL and Docker Redis, use:
 
 ```bash
+DATABASE_HOST=<external-mysql-host> \
+DATABASE_PORT=3306 \
+DATABASE_NAME=dataease_dev \
+DATABASE_USER=root \
+DATABASE_PASSWORD=<password> \
+REDIS_HOST=127.0.0.1 \
+REDIS_PORT=16379 \
 make run-local
 ```
 
 You can also override hosts/ports explicitly:
 
 ```bash
-DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 REDIS_HOST=127.0.0.1 REDIS_PORT=6379 make run-local
+DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
 ```
 
 ## Integration Config (Optional)

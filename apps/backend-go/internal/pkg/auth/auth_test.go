@@ -50,6 +50,24 @@ func TestGenerateAndParseToken(t *testing.T) {
 	if claims.Role != "admin" {
 		t.Errorf("Expected Role 'admin', got '%s'", claims.Role)
 	}
+	if claims.OrgID != 0 {
+		t.Errorf("Expected OrgID 0, got %d", claims.OrgID)
+	}
+}
+
+func TestGenerateAndParseToken_WithOrgID(t *testing.T) {
+	jwt := NewJWT(&JWTConfig{Secret: "org-secret", Expire: 3600})
+	token, err := jwt.GenerateTokenWithOrgID(8, "orguser", "user", 5)
+	if err != nil {
+		t.Fatalf("Failed to generate token with org: %v", err)
+	}
+	claims, err := jwt.ParseToken(token)
+	if err != nil {
+		t.Fatalf("Failed to parse token: %v", err)
+	}
+	if claims.OrgID != 5 {
+		t.Fatalf("Expected OrgID 5, got %d", claims.OrgID)
+	}
 }
 
 func TestParseToken_InvalidToken(t *testing.T) {
@@ -109,6 +127,22 @@ func TestRefreshToken(t *testing.T) {
 	}
 	if claims.Username != "refreshuser" {
 		t.Errorf("Expected Username 'refreshuser', got '%s'", claims.Username)
+	}
+	if claims.OrgID != 0 {
+		t.Errorf("Expected OrgID 0 after refresh, got %d", claims.OrgID)
+	}
+}
+
+func TestRefreshToken_PreservesOrgID(t *testing.T) {
+	jwt := NewJWT(&JWTConfig{Secret: "refresh-org-secret", Expire: 3600})
+	originalToken, _ := jwt.GenerateTokenWithOrgID(42, "refreshuser", "user", 9)
+	newToken, err := jwt.RefreshToken(originalToken)
+	if err != nil {
+		t.Fatalf("Failed to refresh token: %v", err)
+	}
+	claims, _ := jwt.ParseToken(newToken)
+	if claims.OrgID != 9 {
+		t.Fatalf("Expected OrgID 9 after refresh, got %d", claims.OrgID)
 	}
 }
 
@@ -178,6 +212,9 @@ func TestClaimsStructure(t *testing.T) {
 	}
 	if claims.Role != "superadmin" {
 		t.Errorf("Role mismatch: expected 'superadmin', got '%s'", claims.Role)
+	}
+	if claims.OrgID != 0 {
+		t.Errorf("OrgID mismatch: expected 0, got %d", claims.OrgID)
 	}
 
 	if claims.IssuedAt == nil {

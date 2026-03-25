@@ -5,7 +5,7 @@ import { ElMenuItem, ElSubMenu } from 'element-plus-secondary'
 
 const title = props => {
   const { title } = props?.menu?.meta || {}
-  return [h('span', null, { default: () => title })]
+  return [h('span', null, title)]
 }
 
 const HeaderMenuItem = props => {
@@ -36,7 +36,7 @@ const HeaderMenuItem = props => {
     ElMenuItem,
     { index: props.index ? `${props.index}/${path}` : path },
     {
-      title: () => title(props)
+      default: () => title(props)
     }
   )
 }

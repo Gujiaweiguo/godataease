@@ -1,12 +1,29 @@
 <template>
   <div class="data-permission">
     <div class="toolbar">
+      <el-radio-group v-if="activeTab === 'row'" v-model="rowViewMode">
+        <el-radio-button value="dataset">按数据集</el-radio-button>
+        <el-radio-button value="role">按角色</el-radio-button>
+      </el-radio-group>
       <el-select v-model="selectedDatasetId" placeholder="请选择数据集" @change="handleDatasetChange">
         <el-option
           v-for="dataset in datasetList"
           :key="dataset.id"
           :label="dataset.name"
           :value="dataset.id"
+        />
+      </el-select>
+      <el-select
+        v-if="activeTab === 'row' && rowViewMode === 'role'"
+        v-model="selectedRoleFilterId"
+        placeholder="请选择角色"
+        @change="loadRowRules"
+      >
+        <el-option
+          v-for="role in roleList"
+          :key="role.roleId"
+          :label="role.roleName"
+          :value="role.roleId"
         />
       </el-select>
       <el-button type="primary" @click="handleAddRule" :disabled="!selectedDatasetId">添加规则</el-button>
@@ -40,6 +57,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="列权限" name="column">
+        <div class="column-scope-desc">列权限当前按数据集统一治理，不区分角色单独视角。</div>
         <el-table :data="columnRules" border v-loading="loading">
           <el-table-column prop="fieldName" label="字段名称" />
           <el-table-column prop="fieldType" label="字段类型" width="120" />
@@ -67,14 +85,13 @@
           <el-input v-model="rowRuleForm.name" placeholder="请输入规则名称" />
         </el-form-item>
         <el-form-item label="过滤类型" prop="filterType">
-          <el-select v-model="rowRuleForm.filterType" placeholder="请选择过滤类型">
+          <el-select v-model="rowRuleForm.filterType" placeholder="请选择过滤类型" :disabled="isRowRoleMode">
             <el-option label="按角色" value="role" />
             <el-option label="按用户" value="user" />
-            <el-option label="按系统变量" value="variable" />
           </el-select>
         </el-form-item>
         <el-form-item label="目标" prop="targetId">
-          <el-select v-model="rowRuleForm.targetId" placeholder="请选择目标">
+          <el-select v-model="rowRuleForm.targetId" placeholder="请选择目标" :disabled="isRowRoleMode">
             <el-option
               v-for="item in targetOptions"
               :key="item.id"
@@ -126,10 +143,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="规则类型" prop="ruleType">
-          <el-radio-group v-model="columnRuleForm.ruleType">
-            <el-radio label="disable">禁用</el-radio>
-            <el-radio label="mask">脱敏</el-radio>
-          </el-radio-group>
+            <el-radio-group v-model="columnRuleForm.ruleType">
+              <el-radio value="disable">禁用</el-radio>
+              <el-radio value="mask">脱敏</el-radio>
+            </el-radio-group>
         </el-form-item>
         <el-form-item label="脱敏规则" v-if="columnRuleForm.ruleType === 'mask'">
           <el-select v-model="columnRuleForm.maskRule" placeholder="请选择脱敏规则">
@@ -154,13 +171,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { queryUserApi, queryRoleApi } from '@/api/auth'
 import {
   getDatasetTree,
   listFieldByDatasetGroup,
   rowPermissionList,
+  rowPermissionListByTarget,
   columnPermissionList,
   saveRowPermission,
   saveColumnPermission,
@@ -169,8 +187,10 @@ import {
 } from '@/api/dataset'
 
 const activeTab = ref('row')
+const rowViewMode = ref<'dataset' | 'role'>('dataset')
 const loading = ref(false)
 const selectedDatasetId = ref(null)
+const selectedRoleFilterId = ref<number | null>(null)
 const datasetList = ref([])
 const datasetFields = ref([])
 const userList = ref([])
@@ -219,17 +239,15 @@ const columnRuleRules = {
   ruleType: [{ required: true, message: '请选择规则类型', trigger: 'change' }]
 }
 
+const isRowRoleMode = computed(() => activeTab.value === 'row' && rowViewMode.value === 'role')
+
 const targetOptions = computed(() => {
   if (rowRuleForm.value.filterType === 'role') {
     return roleList.value
   } else if (rowRuleForm.value.filterType === 'user') {
     return userList.value
   }
-  return [
-    { id: 'account', name: '账号' },
-    { id: 'name', name: '姓名' },
-    { id: 'email', name: '邮箱' }
-  ]
+  return []
 })
 
 const getFilterTypeName = (type: string) => {
@@ -275,9 +293,16 @@ const loadDatasetFields = async () => {
 
 const loadRowRules = async () => {
   if (!selectedDatasetId.value) return
+  if (rowViewMode.value === 'role' && !selectedRoleFilterId.value) {
+    rowRules.value = []
+    return
+  }
   loading.value = true
   try {
-    const res = await rowPermissionList(1, 100, selectedDatasetId.value)
+    const res =
+      rowViewMode.value === 'role'
+        ? await rowPermissionListByTarget(1, 100, selectedDatasetId.value, 'role', selectedRoleFilterId.value)
+        : await rowPermissionList(1, 100, selectedDatasetId.value)
     if (res.code === '000000') {
       rowRules.value = res.data?.list || []
     }
@@ -305,13 +330,17 @@ const loadColumnRules = async () => {
 
 const handleAddRule = () => {
   if (activeTab.value === 'row') {
+    if (isRowRoleMode.value && !selectedRoleFilterId.value) {
+      ElMessage.warning('请先选择角色')
+      return
+    }
     rowRuleDialogTitle.value = '添加行权限规则'
     rowRuleForm.value = {
       id: null,
       datasetId: selectedDatasetId.value,
       name: '',
-      filterType: 'role',
-      targetId: null,
+      filterType: isRowRoleMode.value ? 'role' : 'role',
+      targetId: isRowRoleMode.value ? selectedRoleFilterId.value : null,
       filterField: '',
       filterValue: '',
       whiteList: []
@@ -334,8 +363,16 @@ const handleAddRule = () => {
 }
 
 const handleEditRowRule = (row: any) => {
+  if (isRowRoleMode.value && row.filterType !== 'role') {
+    ElMessage.warning('当前角色视角仅支持编辑角色行权限规则')
+    return
+  }
   rowRuleDialogTitle.value = '编辑行权限规则'
-  rowRuleForm.value = { ...row }
+  rowRuleForm.value = {
+    ...row,
+    filterType: isRowRoleMode.value ? 'role' : row.filterType,
+    targetId: isRowRoleMode.value ? selectedRoleFilterId.value : row.targetId
+  }
   rowRuleDialogVisible.value = true
 }
 
@@ -385,7 +422,16 @@ const handleDeleteColumnRule = async (id: number) => {
 
 const handleRowRuleSubmit = async () => {
   try {
-    const res = await saveRowPermission(rowRuleForm.value)
+    if (isRowRoleMode.value && !selectedRoleFilterId.value) {
+      ElMessage.warning('请先选择角色')
+      return
+    }
+    const payload = {
+      ...rowRuleForm.value,
+      filterType: isRowRoleMode.value ? 'role' : rowRuleForm.value.filterType,
+      targetId: isRowRoleMode.value ? selectedRoleFilterId.value : rowRuleForm.value.targetId
+    }
+    const res = await saveRowPermission(payload)
     if (res.code === '000000') {
       ElMessage.success('保存成功')
       rowRuleDialogVisible.value = false
@@ -460,6 +506,26 @@ onMounted(() => {
   loadUserList()
   loadRoleList()
 })
+
+watch(rowViewMode, mode => {
+  if (mode === 'dataset') {
+    selectedRoleFilterId.value = null
+    if (rowRuleDialogVisible.value) {
+      rowRuleForm.value.filterType = 'role'
+      rowRuleForm.value.targetId = null
+    }
+  } else if (rowRuleDialogVisible.value) {
+    rowRuleForm.value.filterType = 'role'
+    rowRuleForm.value.targetId = selectedRoleFilterId.value
+  }
+  loadRowRules()
+})
+
+watch(activeTab, tab => {
+  if (tab === 'row') {
+    loadRowRules()
+  }
+})
 </script>
 
 <style scoped>
@@ -468,14 +534,21 @@ onMounted(() => {
 }
 
 .toolbar {
-  margin-bottom: 16px;
   display: flex;
+  margin-bottom: 16px;
   gap: 16px;
 }
 
 .permission-tabs {
-  background: #fff;
   padding: 16px;
+  background: #fff;
   border-radius: 4px;
+}
+
+.column-scope-desc {
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ed-text-color-secondary);
 }
 </style>

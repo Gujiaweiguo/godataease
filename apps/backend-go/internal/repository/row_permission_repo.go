@@ -24,12 +24,21 @@ func (r *RowPermissionRepository) ListByDatasetID(datasetID int64) ([]*permissio
 }
 
 func (r *RowPermissionRepository) PagerByDatasetID(datasetID int64, page, size int) ([]*permission.DataPermRow, int64, error) {
+	query := r.db.Model(&permission.DataPermRow{}).Where("dataset_id = ? AND status = 1", datasetID)
+	return r.pageRows(query, page, size)
+}
+
+func (r *RowPermissionRepository) PagerByDatasetIDAndTarget(datasetID int64, targetType string, targetID int64, page, size int) ([]*permission.DataPermRow, int64, error) {
+	query := r.db.Model(&permission.DataPermRow{}).
+		Where("dataset_id = ? AND auth_target_type = ? AND auth_target_id = ? AND status = 1", datasetID, targetType, targetID)
+	return r.pageRows(query, page, size)
+}
+
+func (r *RowPermissionRepository) pageRows(query *gorm.DB, page, size int) ([]*permission.DataPermRow, int64, error) {
 	var (
 		perms []*permission.DataPermRow
 		total int64
 	)
-
-	query := r.db.Model(&permission.DataPermRow{}).Where("dataset_id = ? AND status = 1", datasetID)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

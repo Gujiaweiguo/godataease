@@ -431,41 +431,41 @@ const formatDateTime = (dateStr: string) => {
     margin-bottom: 24px;
 
     .stat-card {
+      display: flex;
+      padding: 20px;
       background: #fff;
       border-radius: 8px;
-      padding: 20px;
-      display: flex;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
       align-items: center;
       gap: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
       .stat-icon {
+        display: flex;
         width: 60px;
         height: 60px;
+        font-size: 28px;
         border-radius: 50%;
-        display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
 
         &.total {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: #fff;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         &.today {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
           color: #fff;
+          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
         &.failed {
-          background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
           color: #fff;
+          background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         }
 
         &.alert {
-          background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
           color: #fff;
+          background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
         }
       }
 
@@ -473,9 +473,9 @@ const formatDateTime = (dateStr: string) => {
         flex: 1;
 
         .stat-label {
+          margin-bottom: 8px;
           font-size: 14px;
           color: #909399;
-          margin-bottom: 8px;
         }
 
         .stat-value {
@@ -497,19 +497,19 @@ const formatDateTime = (dateStr: string) => {
       margin-bottom: 20px;
 
       .chart-box {
+        padding: 20px;
         background: #fff;
         border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
 
         &.full-width {
           grid-column: span 2;
         }
 
         .chart-title {
+          margin-bottom: 16px;
           font-size: 16px;
           font-weight: bold;
-          margin-bottom: 16px;
           color: #303133;
         }
 
@@ -521,10 +521,10 @@ const formatDateTime = (dateStr: string) => {
   }
 
   .recent-operations {
+    padding: 20px;
     background: #fff;
     border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
 
     .section-title {
       display: flex;

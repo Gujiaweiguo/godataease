@@ -197,6 +197,22 @@ export const routes: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/system',
+    name: 'system',
+    hidden: true,
+    meta: {},
+    component: () => import('@/layout/index.vue'),
+    children: [
+      {
+        path: 'permission',
+        name: 'system-permission',
+        hidden: true,
+        component: () => import('@/views/system/permission/index.vue'),
+        meta: { hidden: true }
+      }
+    ]
+  },
+  {
     path: '/chart-view',
     name: 'chart-view',
     hidden: true,

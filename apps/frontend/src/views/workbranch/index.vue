@@ -351,14 +351,23 @@ loadShareBase()
               :content="t('work_branch.permission_to_create')"
               placement="top"
             >
-              <div class="empty-tooltip-container" />
+              <div class="quick-create-content">
+                <el-icon class="main-color" :style="{ backgroundColor: ele.color }">
+                  <Icon><component class="svg-icon" :is="ele.icon"></component></Icon>
+                </el-icon>
+                <span class="name">
+                  {{ t(`auth.${ele.name}`) }}
+                </span>
+              </div>
             </el-tooltip>
-            <el-icon class="main-color" :style="{ backgroundColor: ele.color }">
-              <Icon><component class="svg-icon" :is="ele.icon"></component></Icon>
-            </el-icon>
-            <span class="name">
-              {{ t(`auth.${ele.name}`) }}
-            </span>
+            <div v-else class="quick-create-content">
+              <el-icon class="main-color" :style="{ backgroundColor: ele.color }">
+                <Icon><component class="svg-icon" :is="ele.icon"></component></Icon>
+              </el-icon>
+              <span class="name">
+                {{ t(`auth.${ele.name}`) }}
+              </span>
+            </div>
           </div>
           <div
             class="item item-quick"
@@ -374,12 +383,19 @@ loadShareBase()
               :content="t('work_branch.permission_to_create')"
               placement="top"
             >
-              <div class="empty-tooltip-container-template" />
+              <div class="quick-create-content">
+                <el-icon class="main-color-quick template-create">
+                  <Icon name="icon_template_colorful"><icon_template_colorful class="svg-icon" /></Icon>
+                </el-icon>
+                <span class="name">{{ t('work_branch.new_using_template') }}</span>
+              </div>
             </el-tooltip>
-            <el-icon class="main-color-quick template-create">
-              <Icon name="icon_template_colorful"><icon_template_colorful class="svg-icon" /></Icon>
-            </el-icon>
-            <span class="name">{{ t('work_branch.new_using_template') }}</span>
+            <div v-else class="quick-create-content">
+              <el-icon class="main-color-quick template-create">
+                <Icon name="icon_template_colorful"><icon_template_colorful class="svg-icon" /></Icon>
+              </el-icon>
+              <span class="name">{{ t('work_branch.new_using_template') }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -425,7 +441,7 @@ loadShareBase()
           </div>
           <el-row v-show="state.networkStatus && !state.hasResult" class="template-empty">
             <div style="text-align: center">
-              <Icon name="no_result" class="no-result"
+              <Icon name="no_result" className="no-result"
                 ><no_result class="svg-icon no-result"
               /></Icon>
               <br />
@@ -601,6 +617,12 @@ loadShareBase()
             font-weight: 400;
             line-height: 22px;
           }
+
+          .quick-create-content {
+            display: flex;
+            align-items: center;
+            width: 100%;
+          }
         }
 
         .item-quick {
@@ -621,18 +643,6 @@ loadShareBase()
           .main-color {
             background-color: var(--ed-color-primary-light-8) !important;
             border-color: var(--ed-color-info-light-8) !important;
-          }
-          .empty-tooltip-container {
-            width: 146px;
-            position: absolute;
-            height: 52px;
-            margin-left: -16px;
-          }
-          .empty-tooltip-container-template {
-            width: 300px;
-            position: absolute;
-            height: 52px;
-            margin-left: -16px;
           }
           .template-create {
             opacity: 0.3;
