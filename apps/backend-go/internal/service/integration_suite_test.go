@@ -178,3 +178,9 @@ func mustExecCleanup(sql string) {
 		panic(fmt.Sprintf("cleanup exec failed for %q: %v", sql, err))
 	}
 }
+
+func thenExecCleanup(sql string) {
+	if err := testDB.Exec(sql).Error; err != nil {
+		log.Printf("cleanup exec warning for %q: %v", sql, err)
+	}
+}
