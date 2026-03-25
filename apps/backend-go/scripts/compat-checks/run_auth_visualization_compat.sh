@@ -18,15 +18,8 @@ echo "[INFO] Strict success code: $SUCCESS_CODE" | tee -a "$REPORT_FILE"
 TOTAL=0
 FAILED=0
 
-# Login to get admin token
-login_admin() {
-  local tmp
-  tmp=$(mktemp)
-  local status
-  local curl_rc=0
-  
-  # Try login with default admin credentials
-  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login" \
+# Try login with default admin credentials
+status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login" \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"DataEase1234"}') || curl_rc=$?
 
@@ -65,21 +58,14 @@ post_json() {
   local curl_rc=0
 
   # Build auth header if token is available
-  local auth_header=""
+  local auth_args=()
   if [[ -n "$ADMIN_TOKEN" ]]; then
-    auth_header="-H \"Authorization: Bearer $ADMIN_TOKEN\""
+    auth_args=(-H "Authorization: Bearer $ADMIN_TOKEN")
   fi
 
-  if [[ -n "$ADMIN_TOKEN" ]]; then
-    status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL$path" \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer $ADMIN_TOKEN" \
-      -d "$body") || curl_rc=$?
-  else
-    status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL$path" \
-      -H "Content-Type: application/json" \
-      -d "$body") || curl_rc=$?
-  fi
+  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL$path" \
+    -H "Content-Type: application/json" "${auth_args[@]}" \
+    -d "$body") || curl_rc=$?
 
   if [[ "$curl_rc" -ne 0 || "$status" == "000" ]]; then
     rm -f "$tmp"
