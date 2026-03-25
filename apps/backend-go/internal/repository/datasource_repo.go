@@ -163,6 +163,25 @@ func (r *DatasourceRepository) ListAll(keyword *string) ([]*datasource.CoreDatas
 	return list, nil
 }
 
+func (r *DatasourceRepository) ListBatch(keyword *string, afterID int64, limit int) ([]*datasource.CoreDatasource, error) {
+	var list []*datasource.CoreDatasource
+	query := r.db.Model(&datasource.CoreDatasource{}).Where("COALESCE(del_flag, 0) = 0")
+	if keyword != nil && *keyword != "" {
+		kw := "%" + *keyword + "%"
+		query = query.Where("name LIKE ?", kw)
+	}
+	if afterID > 0 {
+		query = query.Where("id > ?", afterID)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Order("id ASC").Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func (r *DatasourceRepository) ListByType(dsType string, excludeID *int64) ([]*datasource.CoreDatasource, error) {
 	var list []*datasource.CoreDatasource
 	query := r.db.Model(&datasource.CoreDatasource{}).
