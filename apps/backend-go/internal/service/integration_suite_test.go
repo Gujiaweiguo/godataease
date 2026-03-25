@@ -100,8 +100,7 @@ func TestMain(m *testing.M) {
     time DATETIME,
     exp BIGINT,
     pwd VARCHAR(255),
-    uuid VARCHAR(36),
-    CONSTRAINT fk_share_ticket FOREIGN KEY (ticket)
+    uuid VARCHAR(36)
     )`).Error; err != nil {
 		log.Fatalf("Failed to create core_share table: %v", err)
 	}
