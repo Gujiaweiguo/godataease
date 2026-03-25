@@ -216,6 +216,18 @@ func (m *mockResourcePermRepoForExport) ApplyGroupPermissions(groupID, resourceI
 	return nil
 }
 
+func (m *mockResourcePermRepoForExport) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
+	return nil
+}
+
+func (m *mockResourcePermRepoForExport) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
+	return nil
+}
+
+func (m *mockResourcePermRepoForExport) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
+	return nil, false, nil
+}
+
 func (m *mockResourcePermRepoForExport) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }

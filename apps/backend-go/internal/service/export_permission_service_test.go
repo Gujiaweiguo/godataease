@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"dataease/backend/internal/domain/permission"
@@ -30,6 +32,14 @@ func (m *mockExportResourcePermRepo) GetPermByID(permID int64) (*permission.SysP
 func (m *mockExportResourcePermRepo) GetPermByKey(permKey string) (*permission.SysPerm, error) {
 	if perm, ok := m.permKeys[permKey]; ok {
 		return perm, nil
+	}
+	if idx := strings.Index(permKey, ":"); idx >= 0 {
+		if perm, ok := m.permKeys[permKey[idx+1:]]; ok {
+			return perm, nil
+		}
+	}
+	if strings.Contains(permKey, ":") {
+		return nil, fmt.Errorf("permission not found")
 	}
 	return &permission.SysPerm{PermID: 1, PermKey: permKey}, nil
 }
@@ -104,6 +114,18 @@ func (m *mockExportResourcePermRepo) GetResourceUsers(resourceID int64, resource
 
 func (m *mockExportResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
 	return nil
+}
+
+func (m *mockExportResourcePermRepo) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
+	return nil
+}
+
+func (m *mockExportResourcePermRepo) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
+	return nil
+}
+
+func (m *mockExportResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
+	return nil, false, nil
 }
 
 func (m *mockExportResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {

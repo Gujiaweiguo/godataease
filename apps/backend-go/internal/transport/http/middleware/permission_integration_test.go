@@ -93,6 +93,18 @@ func (m *mockResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, 
 	return nil
 }
 
+func (m *mockResourcePermRepo) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
+	return nil
+}
+
+func (m *mockResourcePermRepo) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
+	return nil
+}
+
+func (m *mockResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
+	return nil, false, nil
+}
+
 func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }
