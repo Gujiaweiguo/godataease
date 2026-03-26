@@ -139,6 +139,37 @@ func TestMain(m *testing.M) {
     )`).Error; err != nil {
 		log.Fatalf("Failed to create core_msg_setting table: %v", err)
 	}
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_sys_setting (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    pkey VARCHAR(255),
+    pval LONGTEXT,
+    type VARCHAR(50),
+    sort INT,
+    UNIQUE INDEX idx_core_sys_setting_pkey (pkey)
+    )`).Error; err != nil {
+		log.Fatalf("Failed to create core_sys_setting table: %v", err)
+	}
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_visualization_template (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    pid BIGINT,
+    level INT,
+    dv_type VARCHAR(50),
+    node_type VARCHAR(50),
+    create_by VARCHAR(255),
+    create_time DATETIME,
+    snapshot LONGTEXT,
+    template_type VARCHAR(50),
+    template_style LONGTEXT,
+    template_data LONGTEXT,
+    dynamic_data LONGTEXT,
+    app_data LONGTEXT,
+    use_count INT DEFAULT 0,
+    version INT DEFAULT 3,
+    INDEX idx_core_visualization_template_pid (pid)
+    )`).Error; err != nil {
+		log.Fatalf("Failed to create core_visualization_template table: %v", err)
+	}
 
 	os.Exit(m.Run())
 }
