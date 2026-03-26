@@ -100,6 +100,8 @@ func TestMain(m *testing.M) {
     time DATETIME,
     exp BIGINT,
     pwd VARCHAR(255),
+    auto_pwd TINYINT(1) DEFAULT 1,
+    ticket_require TINYINT(1) DEFAULT 0,
     uuid VARCHAR(36)
     )`).Error; err != nil {
 		log.Fatalf("Failed to create core_share table: %v", err)

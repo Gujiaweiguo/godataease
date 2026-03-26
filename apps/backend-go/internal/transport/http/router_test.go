@@ -36,6 +36,16 @@ func TestRegisterRoutes_RegistersVisualizationCompatibilityRoutes(t *testing.T) 
 		"POST /dataVisualization/updateCanvas":              true,
 		"POST /dataVisualization/deleteLogic/:id":           true,
 		"POST /dataVisualization/deleteLogic/:id/:busiFlag": true,
+		"GET /de2api/auth/menuPermission":                   true,
+		"POST /de2api/auth/menuPermission":                  true,
+		"GET /de2api/auth/busiPermission":                   true,
+		"POST /de2api/auth/busiPermission":                  true,
+		"POST /de2api/auth/saveMenuPer":                     true,
+		"POST /de2api/auth/saveBusiPer":                     true,
+		"POST /de2api/system/role/permission/save":          true,
+		"POST /de2api/system/role/create":                   true,
+		"POST /de2api/system/role/update":                   true,
+		"POST /de2api/system/role/delete/:id":               true,
 	}
 
 	for _, route := range router.Engine().Routes() {

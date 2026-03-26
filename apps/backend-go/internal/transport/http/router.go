@@ -439,8 +439,10 @@ func (r *Router) registerAPIRoutes() {
 	api := r.engine.Group("/api")
 	userAPI := api
 	roleAPI := api
+	roleDe2API := r.engine.Group("/de2api")
 	roleMenuAPI := api
 	permissionCompatAPI := api
+	permissionCompatDe2API := r.engine.Group("/de2api")
 	dataPermissionAPI := api
 	datasourceAPI := api
 	datasourceDe2API := r.engine.Group("/de2api")
@@ -463,8 +465,12 @@ func (r *Router) registerAPIRoutes() {
 		protectedRoleAPI := r.engine.Group("/api")
 		protectedRoleAPI.Use(middleware.Auth(jwtInstance))
 		roleAPI = protectedRoleAPI
+		protectedRoleDe2API := r.engine.Group("/de2api")
+		protectedRoleDe2API.Use(middleware.Auth(jwtInstance))
+		roleDe2API = protectedRoleDe2API
 		roleMenuAPI = protectedRoleAPI
 		permissionCompatAPI = protectedRoleAPI
+		permissionCompatDe2API = protectedRoleDe2API
 		dataPermissionAPI = protectedRoleAPI
 		protectedDatasourceDe2API := r.engine.Group("/de2api")
 		protectedDatasourceDe2API.Use(middleware.Auth(jwtInstance))
@@ -503,9 +509,11 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterPermRoutes(api, r.permHandler)
 		handler.RegisterEmbeddedRoutes(api, r.embeddedHandler)
 		handler.RegisterRoleRoutes(roleAPI, r.roleHandler)
+		handler.RegisterRoleRoutes(roleDe2API, r.roleHandler)
 		handler.RegisterRoleMenuRoutes(roleMenuAPI, r.roleMenuHandler)
 		handler.RegisterMenuRoutes(api, r.menuHandler)
 		handler.RegisterPermissionCompatRoutes(permissionCompatAPI, r.permissionCompatHandler)
+		handler.RegisterPermissionCompatRoutes(permissionCompatDe2API, r.permissionCompatHandler)
 		handler.RegisterResourceGovernanceRoutes(roleAPI, r.resourceGovernanceHandler)
 		handler.RegisterDataPermissionRoutes(dataPermissionAPI, r.dataPermissionHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
