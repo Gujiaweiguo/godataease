@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +79,7 @@ func TestMain(m *testing.M) {
 		&visualization.DataVisualizationInfo{},
 		&visualization.Watermark{},
 		&datasource.CoreDatasource{}, &auto.CoreDatasourceTaskLog{},
+		&auto.CoreDsFinishPage{},
 		&dataset.CoreDatasetGroup{},
 		&auto.CoreExportTask{},
 		&driver.Driver{}, &driver.DriverJar{},
@@ -115,6 +117,17 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Failed to create visualization_watermark table: %v", err)
 	}
 
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_msg_setting (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    msg_id VARCHAR(100),
+    user_id BIGINT,
+    status VARCHAR(20),
+    read_at DATETIME,
+    UNIQUE INDEX idx_msg_user (msg_id, user_id)
+    )`).Error; err != nil {
+		log.Fatalf("Failed to create core_msg_setting table: %v", err)
+	}
+
 	os.Exit(m.Run())
 }
 
@@ -126,6 +139,7 @@ func getEnv(key, defaultValue string) string {
 }
 
 func cleanupTables(tables ...interface{}) {
+	_ = tables
 	if err := testDB.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
 		panic(fmt.Sprintf("disable foreign key checks failed: %v", err))
 	}
@@ -135,45 +149,28 @@ func cleanupTables(tables ...interface{}) {
 		}
 	}()
 
-	for _, table := range tables {
-		switch table.(type) {
-		case *share.Share, share.Share:
-			mustExecCleanup("DELETE FROM core_share")
-		case *share.ShareTicket, share.ShareTicket:
-			thenExecCleanup("DELETE FROM core_share_ticket")
-		case *template.Template, template.Template:
-			mustExecCleanup("DELETE FROM core_visualization_template")
-		case *visualization.DataVisualizationInfo, visualization.DataVisualizationInfo:
-			mustExecCleanup("DELETE FROM data_visualization_info")
-		case *visualization.Watermark, visualization.Watermark:
-			mustExecCleanup("DELETE FROM visualization_watermark")
-		case *datasource.CoreDatasource, datasource.CoreDatasource:
-			mustExecCleanup("DELETE FROM core_datasource")
-			thenExecCleanup("DELETE FROM core_datasource_task_log")
-		case *auto.CoreDatasourceTaskLog, auto.CoreDatasourceTaskLog:
-			mustExecCleanup("DELETE FROM core_datasource_task_log")
-		case *dataset.CoreDatasetGroup, dataset.CoreDatasetGroup:
-			mustExecCleanup("DELETE FROM core_dataset_table_field")
-			thenExecCleanup("DELETE FROM core_dataset_table")
-			mustExecCleanup("DELETE FROM core_dataset_group")
-		case *dataset.CoreDatasetTable, dataset.CoreDatasetTable:
-			mustExecCleanup("DELETE FROM core_dataset_table_field")
-			thenExecCleanup("DELETE FROM core_dataset_table")
-		case *dataset.CoreDatasetTableField, dataset.CoreDatasetTableField:
-			mustExecCleanup("DELETE FROM core_dataset_table_field")
-		case *permission.DataPermRow, permission.DataPermRow:
-			mustExecCleanup("DELETE FROM data_perm_row")
-		case *permission.DataPermColumn, permission.DataPermColumn:
-			mustExecCleanup("DELETE FROM data_perm_column")
-		case *system.SysVariable, system.SysVariable:
-			mustExecCleanup("DELETE FROM sys_variable_value")
-			mustExecCleanup("DELETE FROM sys_variable")
-		case *system.SysVariableValue, system.SysVariableValue:
-			mustExecCleanup("DELETE FROM sys_variable_value")
-		case *permission.SysRolePerm, permission.SysRolePerm:
-			mustExecCleanup("DELETE FROM sys_role_perm")
-		}
+	tableNames, err := integrationTableNames()
+	if err != nil {
+		panic(fmt.Sprintf("list integration tables failed: %v", err))
 	}
+
+	for _, tableName := range tableNames {
+		mustExecCleanup(fmt.Sprintf("DELETE FROM `%s`", strings.ReplaceAll(tableName, "`", "``")))
+	}
+}
+
+func integrationTableNames() ([]string, error) {
+	var tableNames []string
+	err := testDB.Raw(`
+SELECT TABLE_NAME
+FROM information_schema.tables
+WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+ORDER BY TABLE_NAME DESC
+`).Scan(&tableNames).Error
+	if err != nil {
+		return nil, err
+	}
+	return tableNames, nil
 }
 
 func mustExecCleanup(sql string) {
