@@ -108,6 +108,18 @@ func TestMain(m *testing.M) {
     )`).Error; err != nil {
 		log.Fatalf("Failed to create core_share table: %v", err)
 	}
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_share_ticket (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    uuid VARCHAR(64),
+    ticket VARCHAR(64),
+    exp BIGINT,
+    args TEXT,
+    access_time DATETIME,
+    UNIQUE INDEX idx_core_share_ticket_ticket (ticket),
+    INDEX idx_core_share_ticket_uuid (uuid)
+    )`).Error; err != nil {
+		log.Fatalf("Failed to create core_share_ticket table: %v", err)
+	}
 
 	// Create visualization_watermark table manually
 	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_watermark (
