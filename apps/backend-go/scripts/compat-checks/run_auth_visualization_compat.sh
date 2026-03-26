@@ -41,6 +41,11 @@ login_admin() {
     return 1
   fi
 
+  # Debug: print response
+  echo "[DEBUG] Login response:" | tee -a "$REPORT_FILE"
+  cat "$tmp" | tee -a "$REPORT_FILE"
+  echo "" | tee -a "$REPORT_FILE"
+
   # Extract token from response (TokenVO uses "token" field)
   ADMIN_TOKEN=$(jq -r '.data.token // empty' "$tmp" 2>/dev/null || echo "")
   rm -f "$tmp"
