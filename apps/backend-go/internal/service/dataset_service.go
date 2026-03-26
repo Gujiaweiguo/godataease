@@ -835,35 +835,13 @@ func (s *DatasetService) BackfillGovernedResourcesWithOptions(options *Governanc
 	if s.resourcePermService == nil {
 		return nil, fmt.Errorf("resource permission service not initialized")
 	}
-
-	normalized := normalizeGovernanceBackfillOptions(options)
-	items, err := s.repo.ListGroupsBatch(nil, normalized.AfterID, normalized.Limit)
-	if err != nil {
-		return nil, err
-	}
-
-	report := newGovernanceBackfillReport(permission.ResourceTypeDataset, normalized)
-	for _, item := range items {
-		if item == nil || item.ID <= 0 {
-			continue
-		}
-		report.observe(item.ID)
-		if item.PID == nil || *item.PID <= 0 {
-			report.addSkipped(item.ID, permission.ResourceTypeDataset, 0, GovernanceBackfillSkipReasonMissingParent)
-			continue
-		}
-		inherited, err := s.resourcePermService.TryInheritParentResourcePermissions(*item.PID, item.ID, item.Name, permission.ResourceTypeDataset)
-		if err != nil {
-			return nil, err
-		}
-		if !inherited {
-			report.addSkipped(item.ID, permission.ResourceTypeDataset, *item.PID, GovernanceBackfillSkipReasonParentNotGoverned)
-			continue
-		}
-		report.addGoverned(item.ID)
-	}
-
-	return report, nil
+	return runGovernanceBackfillWithOptions(options, permission.ResourceTypeDataset, func(normalized GovernanceBackfillOptions) ([]*dataset.CoreDatasetGroup, error) {
+		return s.repo.ListGroupsBatch(nil, normalized.AfterID, normalized.Limit)
+	}, func(item *dataset.CoreDatasetGroup) governanceBackfillItem {
+		return governanceBackfillItem{resourceID: item.ID, parentID: item.PID, resourceName: item.Name}
+	}, func(parentID, resourceID int64, resourceName string) (bool, error) {
+		return s.resourcePermService.TryInheritParentResourcePermissions(parentID, resourceID, resourceName, permission.ResourceTypeDataset)
+	})
 }
 
 func (s *DatasetService) Rename(id int64, name string) (*dataset.CoreDatasetGroup, error) {

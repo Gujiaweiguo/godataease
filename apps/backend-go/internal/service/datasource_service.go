@@ -424,35 +424,13 @@ func (s *DatasourceService) BackfillGovernedResourcesWithOptions(options *Govern
 	if s.resourcePermService == nil {
 		return nil, fmt.Errorf("resource permission service not initialized")
 	}
-
-	normalized := normalizeGovernanceBackfillOptions(options)
-	items, err := s.repo.ListBatch(nil, normalized.AfterID, normalized.Limit)
-	if err != nil {
-		return nil, err
-	}
-
-	report := newGovernanceBackfillReport(permission.ResourceTypeDatasource, normalized)
-	for _, item := range items {
-		if item == nil || item.ID <= 0 {
-			continue
-		}
-		report.observe(item.ID)
-		if item.PID == nil || *item.PID <= 0 {
-			report.addSkipped(item.ID, permission.ResourceTypeDatasource, 0, GovernanceBackfillSkipReasonMissingParent)
-			continue
-		}
-		inherited, err := s.resourcePermService.TryInheritParentResourcePermissions(*item.PID, item.ID, item.Name, permission.ResourceTypeDatasource)
-		if err != nil {
-			return nil, err
-		}
-		if !inherited {
-			report.addSkipped(item.ID, permission.ResourceTypeDatasource, *item.PID, GovernanceBackfillSkipReasonParentNotGoverned)
-			continue
-		}
-		report.addGoverned(item.ID)
-	}
-
-	return report, nil
+	return runGovernanceBackfillWithOptions(options, permission.ResourceTypeDatasource, func(normalized GovernanceBackfillOptions) ([]*datasource.CoreDatasource, error) {
+		return s.repo.ListBatch(nil, normalized.AfterID, normalized.Limit)
+	}, func(item *datasource.CoreDatasource) governanceBackfillItem {
+		return governanceBackfillItem{resourceID: item.ID, parentID: item.PID, resourceName: item.Name}
+	}, func(parentID, resourceID int64, resourceName string) (bool, error) {
+		return s.resourcePermService.TryInheritParentResourcePermissions(parentID, resourceID, resourceName, permission.ResourceTypeDatasource)
+	})
 }
 
 func (s *DatasourceService) Rename(id int64, name string) (*datasource.CoreDatasource, error) {

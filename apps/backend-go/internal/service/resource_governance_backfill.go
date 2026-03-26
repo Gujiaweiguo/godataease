@@ -2,7 +2,11 @@ package service
 
 import "dataease/backend/internal/domain/permission"
 
-const DefaultGovernanceBackfillLimit = 100
+const (
+	DefaultGovernanceBackfillLimit = 100
+	defaultLanguageZhCN            = "zh-CN"
+	systemActor                    = "system"
+)
 
 type GovernanceBackfillOptions struct {
 	AfterID int64  `json:"afterId"`
@@ -52,6 +56,32 @@ type GovernanceBackfillReport struct {
 type DatasourceGovernanceBackfillReport = GovernanceBackfillReport
 type DatasetGovernanceBackfillReport = GovernanceBackfillReport
 type VisualizationGovernanceBackfillReport = GovernanceBackfillReport
+
+type governanceBackfillItem struct {
+	resourceID   int64
+	parentID     *int64
+	resourceName string
+}
+
+func buildGovernanceBackfillItems[T any](items []*T, toItem func(*T) governanceBackfillItem) []governanceBackfillItem {
+	backfillItems := make([]governanceBackfillItem, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		backfillItems = append(backfillItems, toItem(item))
+	}
+	return backfillItems
+}
+
+func runGovernanceBackfillWithOptions[T any](options *GovernanceBackfillOptions, resourceType string, fetch func(GovernanceBackfillOptions) ([]*T, error), toItem func(*T) governanceBackfillItem, inherit func(parentID, resourceID int64, resourceName string) (bool, error)) (*GovernanceBackfillReport, error) {
+	normalized := normalizeGovernanceBackfillOptions(options)
+	items, err := fetch(normalized)
+	if err != nil {
+		return nil, err
+	}
+	return executeGovernanceBackfill(resourceType, normalized, buildGovernanceBackfillItems(items, toItem), inherit)
+}
 
 func normalizeGovernanceBackfillOptions(options *GovernanceBackfillOptions) GovernanceBackfillOptions {
 	if options == nil {
@@ -122,4 +152,28 @@ func remediationForGovernanceBackfillReason(reason GovernanceBackfillSkipReason)
 	default:
 		return GovernanceBackfillRemediationNeedsChange
 	}
+}
+
+func executeGovernanceBackfill(resourceType string, options GovernanceBackfillOptions, items []governanceBackfillItem, inherit func(parentID, resourceID int64, resourceName string) (bool, error)) (*GovernanceBackfillReport, error) {
+	report := newGovernanceBackfillReport(resourceType, options)
+	for _, item := range items {
+		if item.resourceID <= 0 {
+			continue
+		}
+		report.observe(item.resourceID)
+		if item.parentID == nil || *item.parentID <= 0 {
+			report.addSkipped(item.resourceID, resourceType, 0, GovernanceBackfillSkipReasonMissingParent)
+			continue
+		}
+		inherited, err := inherit(*item.parentID, item.resourceID, item.resourceName)
+		if err != nil {
+			return nil, err
+		}
+		if !inherited {
+			report.addSkipped(item.resourceID, resourceType, *item.parentID, GovernanceBackfillSkipReasonParentNotGoverned)
+			continue
+		}
+		report.addGoverned(item.resourceID)
+	}
+	return report, nil
 }

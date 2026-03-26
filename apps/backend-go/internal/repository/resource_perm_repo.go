@@ -442,33 +442,6 @@ func dedupeInt64(values []int64) []int64 {
 	return result
 }
 
-func (r *ResourcePermissionRepository) listLegacyPermIDsForResourceType(resourceType string) ([]int64, error) {
-	permKeyPrefix := resourcePermKeyPrefix(resourceType)
-	if permKeyPrefix == "" {
-		return []int64{}, nil
-	}
-
-	var userPermIDs []int64
-	if err := r.db.Table("sys_user_perm sup").
-		Select("DISTINCT sup.perm_id").
-		Joins("JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0").
-		Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_key LIKE ?", permKeyPrefix+"%").
-		Pluck("sup.perm_id", &userPermIDs).Error; err != nil {
-		return nil, err
-	}
-
-	var rolePermIDs []int64
-	if err := r.db.Table("sys_role_perm srp").
-		Select("DISTINCT srp.perm_id").
-		Joins("JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0").
-		Where("p.perm_key LIKE ?", permKeyPrefix+"%").
-		Pluck("srp.perm_id", &rolePermIDs).Error; err != nil {
-		return nil, err
-	}
-
-	return dedupeInt64(append(userPermIDs, rolePermIDs...)), nil
-}
-
 func scopedResourceID(resourceType string, resourceID int64) int64 {
 	const resourceNamespaceStride int64 = 1_000_000_000_000
 	var namespace int64

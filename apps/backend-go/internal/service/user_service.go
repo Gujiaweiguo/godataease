@@ -201,7 +201,7 @@ func (s *UserService) SearchUsers(req *user.UserQueryRequest) (*user.UserListRes
 
 // ResetPassword 重置密码
 func (s *UserService) ResetPassword(userID int64, newPassword string) error {
-	return s.ResetPasswordWithAudit(userID, newPassword, 0, "system", "127.0.0.1")
+	return s.ResetPasswordWithAudit(userID, newPassword, 0, systemActor, "127.0.0.1")
 }
 
 // ResetPasswordWithAudit 重置密码（含审计日志）
@@ -324,13 +324,13 @@ func (s *UserService) SwitchLanguage(userID int64, lang string) error {
 func normalizeLanguage(lang string) string {
 	switch strings.TrimSpace(strings.ToLower(strings.ReplaceAll(lang, "_", "-"))) {
 	case "zh-cn", "zh":
-		return "zh-CN"
+		return defaultLanguageZhCN
 	case "zh-tw", "tw":
 		return "tw"
 	case "en", "en-us":
 		return "en"
 	default:
-		return "zh-CN"
+		return defaultLanguageZhCN
 	}
 }
 
@@ -393,7 +393,7 @@ func (s *UserService) ensureDefaultOrgUserRole() (int64, error) {
 
 	roleType := domainrole.RoleTypeOrganization
 	dataScope := domainrole.DataScopeSelf
-	createBy := "system"
+	createBy := systemActor
 	defaultRole := &domainrole.SysRole{
 		RoleName:  domainrole.BuiltInOrgUserRoleName,
 		RoleCode:  domainrole.BuiltInOrgUserRoleCode,

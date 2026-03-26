@@ -286,7 +286,7 @@ func resolveBootstrapLanguage(requestLanguage string, storedLanguage string) str
 	if locale := normalizeBootstrapLanguage(storedLanguage); locale != "" {
 		return locale
 	}
-	return "zh-CN"
+	return defaultLanguageZhCN
 }
 
 func normalizeBootstrapLanguage(input string) string {
@@ -306,7 +306,7 @@ func normalizeBootstrapLanguage(input string) string {
 		case normalized == "en", strings.HasPrefix(normalized, "en"):
 			return "en"
 		case normalized == "zh-cn", normalized == "zh", strings.HasPrefix(normalized, "zh"):
-			return "zh-CN"
+			return defaultLanguageZhCN
 		}
 	}
 
