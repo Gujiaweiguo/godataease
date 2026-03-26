@@ -170,6 +170,19 @@ func TestMain(m *testing.M) {
     )`).Error; err != nil {
 		log.Fatalf("Failed to create core_visualization_template table: %v", err)
 	}
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_ticket (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    uuid VARCHAR(255),
+    ticket VARCHAR(255),
+    exp BIGINT,
+    args TEXT,
+    access_time BIGINT,
+    create_time DATETIME,
+    UNIQUE INDEX idx_core_ticket_ticket (ticket),
+    INDEX idx_core_ticket_uuid (uuid)
+    )`).Error; err != nil {
+		log.Fatalf("Failed to create core_ticket table: %v", err)
+	}
 
 	os.Exit(m.Run())
 }
