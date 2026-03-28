@@ -8,14 +8,6 @@ on:
         required: false
         default: ''
         type: string
-  push:
-    branches: [main, dev]
-    paths:
-      - 'apps/frontend/**'
-  pull_request:
-    branches: [main, dev]
-    paths:
-      - 'apps/frontend/**'
   workflow_dispatch:
     inputs:
       baseline-url:

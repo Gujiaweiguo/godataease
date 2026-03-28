@@ -3,8 +3,14 @@ name: Go Backend CI
 on:
   push:
     branches: [ main, dev ]
+    paths:
+      - 'apps/backend-go/**'
+      - '.github/workflows/go-backend.yml'
   pull_request:
     branches: [ main, dev ]
+    paths:
+      - 'apps/backend-go/**'
+      - '.github/workflows/go-backend.yml'
 
 jobs:
   build:
