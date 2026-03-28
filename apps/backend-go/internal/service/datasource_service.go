@@ -45,6 +45,8 @@ type DatasourceService struct {
 	seatunnelMu         sync.Mutex
 }
 
+const datasourceTypeFolder = "folder"
+
 func NewDatasourceService(repo *repository.DatasourceRepository) *DatasourceService {
 	return &DatasourceService{
 		repo:             repo,
@@ -596,7 +598,7 @@ func normalizedPID(pid *int64) int64 {
 
 func shouldSkipRepeatCheck(dsType string) bool {
 	lowerType := strings.ToLower(strings.TrimSpace(dsType))
-	if lowerType == "folder" || lowerType == "es" {
+	if lowerType == datasourceTypeFolder || lowerType == "es" {
 		return true
 	}
 	if strings.Contains(lowerType, "api") || strings.Contains(lowerType, "excel") {

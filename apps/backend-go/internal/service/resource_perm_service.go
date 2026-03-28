@@ -55,24 +55,12 @@ func (s *ResourcePermissionService) CheckPermission(userID int64, resourceType s
 		return &permission.PermissionCheckResult{HasPermission: false, Reason: "permission_not_found"}
 	}
 
-	if resourceID > 0 {
-		resourcePermIDs, exists, resourceErr := s.repo.GetResourcePermissionIDs(resourceID, resourceType)
-		if resourceErr != nil {
-			return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_lookup_failed"}
-		}
-		if exists {
-			if len(resourcePermIDs) == 0 {
-				return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_denied"}
-			}
-			if !containsInt64(resourcePermIDs, perm.PermID) {
-				return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_denied"}
-			}
-		}
+	if result := s.checkResourcePermission(resourceID, resourceType, perm.PermID); result != nil {
+		return result
 	}
 
-	hasUserPerm, err := s.repo.CheckUserPermission(userID, perm.PermID)
-	if err == nil && hasUserPerm {
-		return &permission.PermissionCheckResult{HasPermission: true, Reason: "user_permission"}
+	if result := s.checkDirectUserPermission(userID, perm.PermID); result != nil {
+		return result
 	}
 
 	roleIDs, err := s.repo.GetUserRoleIDs(userID)
@@ -88,6 +76,31 @@ func (s *ResourcePermissionService) CheckPermission(userID int64, resourceType s
 	}
 
 	return &permission.PermissionCheckResult{HasPermission: false, Reason: "permission_denied"}
+}
+
+func (s *ResourcePermissionService) checkResourcePermission(resourceID int64, resourceType string, permID int64) *permission.PermissionCheckResult {
+	if resourceID <= 0 {
+		return nil
+	}
+	resourcePermIDs, exists, err := s.repo.GetResourcePermissionIDs(resourceID, resourceType)
+	if err != nil {
+		return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_lookup_failed"}
+	}
+	if !exists {
+		return nil
+	}
+	if len(resourcePermIDs) == 0 || !containsInt64(resourcePermIDs, permID) {
+		return &permission.PermissionCheckResult{HasPermission: false, Reason: "resource_permission_denied"}
+	}
+	return nil
+}
+
+func (s *ResourcePermissionService) checkDirectUserPermission(userID int64, permID int64) *permission.PermissionCheckResult {
+	hasUserPerm, err := s.repo.CheckUserPermission(userID, permID)
+	if err == nil && hasUserPerm {
+		return &permission.PermissionCheckResult{HasPermission: true, Reason: "user_permission"}
+	}
+	return nil
 }
 
 func (s *ResourcePermissionService) CheckViewPermission(userID int64, resourceType string, resourceID int64) bool {

@@ -108,6 +108,11 @@ func TestExecuteGovernanceBackfill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	assertGovernanceBackfillReport(t, report, inheritCalls)
+}
+
+func assertGovernanceBackfillReport(t *testing.T, report *GovernanceBackfillReport, inheritCalls int) {
+	t.Helper()
 	if inheritCalls != 2 {
 		t.Fatalf("expected 2 inherit calls, got %d", inheritCalls)
 	}

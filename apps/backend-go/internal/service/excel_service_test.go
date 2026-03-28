@@ -76,7 +76,9 @@ func createTestWorkbook(t *testing.T, sheets map[string][][]string) []byte {
 		var sheet string
 		if first {
 			sheet = f.GetSheetName(0)
-			f.SetSheetName(sheet, name)
+			if err := f.SetSheetName(sheet, name); err != nil {
+				t.Fatalf("rename sheet failed: %v", err)
+			}
 			sheet = name
 			first = false
 		} else {
@@ -592,25 +594,7 @@ func TestExcelService_UploadFile_AssignsSheetMetadataAndPersistsSavedPath(t *tes
 	if result == nil || len(result.Sheets) != 1 {
 		t.Fatalf("expected single sheet result, got %#v", result)
 	}
-	sheet := result.Sheets[0]
-	if result.ExcelLabel != "upload" || sheet.ExcelLabel != "upload" {
-		t.Fatalf("unexpected excel labels: result=%q sheet=%q", result.ExcelLabel, sheet.ExcelLabel)
-	}
-	if sheet.TableName != "upload" || sheet.FileName != "upload.csv" {
-		t.Fatalf("unexpected table/file name metadata: %#v", sheet)
-	}
-	if sheet.SheetExcelID != result.ID || sheet.Path != result.Path {
-		t.Fatalf("expected sheet to reference saved file metadata, got %#v", sheet)
-	}
-	if sheet.Size != "30 B" {
-		t.Fatalf("expected formatted file size, got %q", sheet.Size)
-	}
-	if sheet.SheetID == "" || sheet.DeTableName == "" || sheet.LastUpdateTime == 0 {
-		t.Fatalf("expected generated metadata fields, got %#v", sheet)
-	}
-	if len(sheet.Fields) != 2 || sheet.Fields[0].DeType != 0 || sheet.Fields[0].DeExtractType != 0 {
-		t.Fatalf("expected field metadata defaults, got %#v", sheet.Fields)
-	}
+	assertUploadedSheetMetadata(t, result)
 	if _, err = os.Stat(result.Path); err != nil {
 		t.Fatalf("expected saved upload path to exist: %v", err)
 	}
@@ -632,6 +616,34 @@ func TestExcelService_LoadRemoteFile_AssignsRemoteSheetMetadataAndNASize(t *test
 	if result == nil || len(result.Sheets) != 1 {
 		t.Fatalf("expected single remote sheet, got %#v", result)
 	}
+	assertRemoteSheetMetadata(t, result)
+}
+
+func assertUploadedSheetMetadata(t *testing.T, result *datasource.ExcelFileData) {
+	t.Helper()
+	sheet := result.Sheets[0]
+	if result.ExcelLabel != "upload" || sheet.ExcelLabel != "upload" {
+		t.Fatalf("unexpected excel labels: result=%q sheet=%q", result.ExcelLabel, sheet.ExcelLabel)
+	}
+	if sheet.TableName != "upload" || sheet.FileName != "upload.csv" {
+		t.Fatalf("unexpected table/file name metadata: %#v", sheet)
+	}
+	if sheet.SheetExcelID != result.ID || sheet.Path != result.Path {
+		t.Fatalf("expected sheet to reference saved file metadata, got %#v", sheet)
+	}
+	if sheet.Size != "30 B" {
+		t.Fatalf("expected formatted file size, got %q", sheet.Size)
+	}
+	if sheet.SheetID == "" || sheet.DeTableName == "" || sheet.LastUpdateTime == 0 {
+		t.Fatalf("expected generated metadata fields, got %#v", sheet)
+	}
+	if len(sheet.Fields) != 2 || sheet.Fields[0].DeType != 0 || sheet.Fields[0].DeExtractType != 0 {
+		t.Fatalf("expected field metadata defaults, got %#v", sheet.Fields)
+	}
+}
+
+func assertRemoteSheetMetadata(t *testing.T, result *datasource.ExcelFileData) {
+	t.Helper()
 	sheet := result.Sheets[0]
 	if result.ExcelLabel != "remote" || sheet.ExcelLabel != "remote" {
 		t.Fatalf("unexpected remote labels: result=%q sheet=%q", result.ExcelLabel, sheet.ExcelLabel)

@@ -310,6 +310,11 @@ func TestDataPermissionAdminService_SaveRowPermission_Validation(t *testing.T) {
 }
 
 func TestDataPermissionAdminService_SaveColumnPermission_Validation(t *testing.T) {
+	t.Run("validation errors", testSaveColumnPermissionValidationErrors)
+	t.Run("persists mask and disable rules", testSaveColumnPermissionValidationPersistsRules)
+}
+
+func testSaveColumnPermissionValidationErrors(t *testing.T) {
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
 	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider)
 
@@ -325,9 +330,12 @@ func TestDataPermissionAdminService_SaveColumnPermission_Validation(t *testing.T
 	if err := svc.SaveColumnPermission(&ColumnPermissionForm{DatasetID: 9, FieldName: "missing", RuleType: permission.PermTypeMask}); err == nil || err.Error() != "dataset field missing not found" {
 		t.Fatalf("unexpected dataset field error: %v", err)
 	}
+}
 
+func testSaveColumnPermissionValidationPersistsRules(t *testing.T) {
+	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
 	columnStore := &fakeColumnPermissionStore{}
-	svc = NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
 	err := svc.SaveColumnPermission(&ColumnPermissionForm{DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeMask, MaskRule: maskRuleCustom, MaskStart: 1, MaskEnd: 5})
 	if err != nil {
 		t.Fatalf("expected custom mask permission to succeed: %v", err)
@@ -572,6 +580,11 @@ func TestDataPermissionAdminService_ColumnPermissionStoreErrorPaths(t *testing.T
 }
 
 func TestDataPermissionAdminService_ColumnPermissionPage(t *testing.T) {
+	t.Run("maps custom and disable rules", testColumnPermissionPageBase)
+	t.Run("maps keep ends mask rule", testColumnPermissionPageKeepEnds)
+}
+
+func testColumnPermissionPageBase(t *testing.T) {
 	customRuleBytes, err := json.Marshal(permission.DesensitizationRule{
 		BuiltInRule:       permission.BuiltInRuleCustom,
 		CustomBuiltInRule: permission.CustomRuleRetainBeforeMAndAfterN,
@@ -625,32 +638,38 @@ func TestDataPermissionAdminService_ColumnPermissionPage(t *testing.T) {
 	if list[1].MaskRule != maskRuleAll {
 		t.Fatalf("expected empty mask rule to map to all, got %#v", list[1])
 	}
+}
 
-	t.Run("maps keep ends mask rule", func(t *testing.T) {
-		keepEndsBytes, err := json.Marshal(permission.DesensitizationRule{BuiltInRule: permission.BuiltInRuleKeepFirstAndLastThree})
-		if err != nil {
-			t.Fatalf("marshal keep ends rule failed: %v", err)
-		}
+func testColumnPermissionPageKeepEnds(t *testing.T) {
+	keepEndsBytes, err := json.Marshal(permission.DesensitizationRule{BuiltInRule: permission.BuiltInRuleKeepFirstAndLastThree})
+	if err != nil {
+		t.Fatalf("marshal keep ends rule failed: %v", err)
+	}
 
-		columnStore := &fakeColumnPermissionStore{items: []*permission.DataPermColumn{{ID: 3, DatasetID: 10, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: string(keepEndsBytes)}}}
-		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 21, OriginName: "mobile", Type: "string"}}}}
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	columnStore := &fakeColumnPermissionStore{items: []*permission.DataPermColumn{{ID: 3, DatasetID: 10, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: string(keepEndsBytes)}}}
+	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 21, OriginName: "mobile", Type: "string"}}}}
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
 
-		page, err := svc.ColumnPermissionPage(10, 1, 10)
-		if err != nil {
-			t.Fatalf("ColumnPermissionPage failed: %v", err)
-		}
-		list, ok := page.List.([]ColumnPermissionForm)
-		if !ok || len(list) != 1 {
-			t.Fatalf("unexpected column list: %#v", page.List)
-		}
-		if list[0].MaskRule != maskRuleKeepEnds {
-			t.Fatalf("expected keep_ends mask mapping, got %#v", list[0])
-		}
-	})
+	page, err := svc.ColumnPermissionPage(10, 1, 10)
+	if err != nil {
+		t.Fatalf("ColumnPermissionPage failed: %v", err)
+	}
+	list, ok := page.List.([]ColumnPermissionForm)
+	if !ok || len(list) != 1 {
+		t.Fatalf("unexpected column list: %#v", page.List)
+	}
+	if list[0].MaskRule != maskRuleKeepEnds {
+		t.Fatalf("expected keep_ends mask mapping, got %#v", list[0])
+	}
 }
 
 func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
+	t.Run("decode and encode mask helpers", testDataPermissionMaskHelpers)
+	t.Run("apply mask helpers", testDataPermissionApplyMaskHelpers)
+	t.Run("rule name helpers", testDataPermissionRuleNameHelpers)
+}
+
+func testDataPermissionMaskHelpers(t *testing.T) {
 	if _, _, err := decodeSimpleExpression("not-json"); err == nil {
 		t.Fatal("expected decodeSimpleExpression to fail for invalid json")
 	}
@@ -681,6 +700,13 @@ func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 	if maskEmpty != "" {
 		t.Fatalf("expected non-mask rule to encode empty string, got %q", maskEmpty)
 	}
+}
+
+func testDataPermissionApplyMaskHelpers(t *testing.T) {
+	maskKeepEnds, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: maskRuleKeepEnds})
+	if err != nil {
+		t.Fatalf("encodeMaskRule keep_ends failed: %v", err)
+	}
 
 	keepEndsForm := &ColumnPermissionForm{}
 	applyMaskRuleToForm(keepEndsForm, maskKeepEnds)
@@ -708,7 +734,9 @@ func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 	if err != nil || fieldID != 0 || value != "" {
 		t.Fatalf("expected empty items decode result, got fieldID=%d value=%q err=%v", fieldID, value, err)
 	}
+}
 
+func testDataPermissionRuleNameHelpers(t *testing.T) {
 	if buildRuleName("field", "value", 1) != "field = value" {
 		t.Fatal("expected buildRuleName to use field/value pair")
 	}
@@ -721,6 +749,12 @@ func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 }
 
 func TestDataPermissionAdminService_FieldProviderErrorsAndMaps(t *testing.T) {
+	t.Run("field provider errors", testDataPermissionFieldProviderErrors)
+	t.Run("dataset field maps", testDataPermissionDatasetFieldMaps)
+	t.Run("display field helpers", testDataPermissionDisplayFieldHelpers)
+}
+
+func testDataPermissionFieldProviderErrors(t *testing.T) {
 	fieldErr := errors.New("field provider failed")
 	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{err: fieldErr})
 
@@ -733,9 +767,11 @@ func TestDataPermissionAdminService_FieldProviderErrorsAndMaps(t *testing.T) {
 	if _, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeUser, 1, 1, 10); !errors.Is(err, fieldErr) {
 		t.Fatalf("expected target row page field provider error, got %v", err)
 	}
+}
 
+func testDataPermissionDatasetFieldMaps(t *testing.T) {
 	provider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 31, Name: "raw_name", OriginName: "origin_name", DataeaseName: "dataease_name", FieldShortName: "short_name"}}}}
-	svc = NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, provider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, provider)
 	byID, byName, err := svc.datasetFieldMaps(9)
 	if err != nil {
 		t.Fatalf("datasetFieldMaps failed: %v", err)
@@ -760,7 +796,9 @@ func TestDataPermissionAdminService_FieldProviderErrorsAndMaps(t *testing.T) {
 			t.Fatalf("expected quota alias %s to be indexed", key)
 		}
 	}
+}
 
+func testDataPermissionDisplayFieldHelpers(t *testing.T) {
 	if displayFieldName(chart.ChartField{ID: 1, OriginName: "", Name: "", DataeaseName: "dataease", FieldShortName: "short"}) != "dataease" {
 		t.Fatal("expected displayFieldName to fall back to dataease name")
 	}

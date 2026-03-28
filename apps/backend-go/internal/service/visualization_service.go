@@ -14,6 +14,14 @@ type VisualizationService struct {
 	resourcePermService *ResourcePermissionService
 }
 
+const (
+	visualizationNodeTypePanel      = "panel"
+	visualizationNodeTypeFolder     = "folder"
+	visualizationTypeDashboard      = "dashboard"
+	visualizationTypeDataV          = "dataV"
+	visualizationBusiFlagDashboardV = "dashboard-dataV"
+)
+
 func NewVisualizationService(repo *repository.VisualizationRepository) *VisualizationService {
 	return &VisualizationService{repo: repo}
 }
@@ -24,12 +32,12 @@ func (s *VisualizationService) SetResourcePermissionService(resourcePermSvc *Res
 
 func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy string) (int64, error) {
 	now := time.Now().UnixMilli()
-	nodeType := "panel"
+	nodeType := visualizationNodeTypePanel
 	if req.NodeType != nil && *req.NodeType != "" {
 		nodeType = *req.NodeType
 	}
 	status := 0
-	if nodeType == "folder" {
+	if nodeType == visualizationNodeTypeFolder {
 		status = 1
 	}
 
@@ -113,7 +121,7 @@ func (s *VisualizationService) BackfillGovernedVisualizationResourcesWithOptions
 func normalizeVisualizationResourceType(visualizationType *string) string {
 	if visualizationType != nil {
 		switch *visualizationType {
-		case "dataV", permission.ResourceTypeScreen:
+		case visualizationTypeDataV, permission.ResourceTypeScreen:
 			return permission.ResourceTypeScreen
 		}
 	}
@@ -255,12 +263,12 @@ func (s *VisualizationService) FindDvType(id int64) (string, error) {
 func resolveInteractiveVisualizationTypes(busiFlag string) ([]string, error) {
 	flag := busiFlag
 	switch flag {
-	case "", "dashboard-dataV":
-		return []string{"dashboard", "dataV"}, nil
-	case "panel", "dashboard":
-		return []string{"dashboard"}, nil
-	case "screen", "dataV":
-		return []string{"dataV"}, nil
+	case "", visualizationBusiFlagDashboardV:
+		return []string{visualizationTypeDashboard, visualizationTypeDataV}, nil
+	case visualizationNodeTypePanel, visualizationTypeDashboard:
+		return []string{visualizationTypeDashboard}, nil
+	case "screen", visualizationTypeDataV:
+		return []string{visualizationTypeDataV}, nil
 	default:
 		return nil, fmt.Errorf("unsupported busiFlag: %s", flag)
 	}

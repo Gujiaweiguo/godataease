@@ -41,8 +41,6 @@ func closeVisualizationDB(t *testing.T, db *gorm.DB) {
 	require.NoError(t, sqlDB.Close())
 }
 
-func boolPtr(v bool) *bool { return &v }
-
 func int64Ptr(v int64) *int64 { return &v }
 
 func intPtrVisualization(v int) *int { return &v }

@@ -279,7 +279,7 @@ func TestSystemParam_QueryOnlineMapByType(t *testing.T) {
 		t.Fatalf("QueryOnlineMapByType failed: %v", err)
 	}
 	if result == nil {
-		t.Error("Expected non-nil result")
+		t.Fatal("Expected non-nil result")
 	}
 	if result.Key != "typed-key" {
 		t.Fatalf("expected typed lookup result, got %#v", result)
