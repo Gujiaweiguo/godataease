@@ -47,6 +47,7 @@ func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
+		c.Set("org_id", claims.OrgID)
 
 		c.Next()
 	}
@@ -71,6 +72,18 @@ func GetRole(c *gin.Context) string {
 		return role.(string)
 	}
 	return ""
+}
+
+func GetOrgID(c *gin.Context) int64 {
+	if orgID, exists := c.Get("org_id"); exists {
+		switch value := orgID.(type) {
+		case uint64:
+			return int64(value)
+		case int64:
+			return value
+		}
+	}
+	return 0
 }
 
 type AuditConfig struct {

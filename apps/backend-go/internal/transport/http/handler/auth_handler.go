@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"strings"
 	"sync"
 
 	"dataease/backend/internal/domain/auth"
@@ -52,7 +53,7 @@ func (h *AuthHandler) LocalLogin(c *gin.Context) {
 	dto.Name = decryptCredentialIfNeeded(dto.Name)
 	dto.Pwd = decryptCredentialIfNeeded(dto.Pwd)
 
-	tokenVO, err := h.authService.LocalLogin(&dto)
+	tokenVO, err := h.authService.LocalLogin(&dto, c.GetHeader("Accept-Language"))
 	if err != nil {
 		response.Error(c, "500000", err.Error())
 		return
@@ -64,6 +65,30 @@ func (h *AuthHandler) LocalLogin(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	h.authService.Logout()
 	response.Success(c, nil)
+}
+
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	if h.authService == nil {
+		response.Error(c, "500000", "auth service is not configured")
+		return
+	}
+
+	token := strings.TrimPrefix(currentAuthToken(c), "Bearer ")
+	if token == "" {
+		response.Unauthorized(c, "missing authorization header")
+		return
+	}
+
+	refreshedToken, exp, err := h.authService.RefreshToken(token)
+	if err != nil {
+		response.Unauthorized(c, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"token": refreshedToken,
+		"exp":   exp,
+	})
 }
 
 func (h *AuthHandler) Dekey(c *gin.Context) {
@@ -80,15 +105,25 @@ func (h *AuthHandler) Model(c *gin.Context) {
 
 func RegisterAuthRoutes(engine *gin.Engine, h *AuthHandler) {
 	engine.POST("/login/localLogin", h.LocalLogin)
+	engine.GET("/login/refresh", h.Refresh)
 	engine.GET("/logout", h.Logout)
 	engine.GET("/dekey", h.Dekey)
 	engine.GET("/symmetricKey", h.SymmetricKey)
 	engine.GET("/model", h.Model)
 	engine.POST("/api/login/localLogin", h.LocalLogin)
+	engine.GET("/api/login/refresh", h.Refresh)
 	engine.GET("/api/logout", h.Logout)
 	engine.GET("/api/dekey", h.Dekey)
 	engine.GET("/api/symmetricKey", h.SymmetricKey)
 	engine.GET("/api/model", h.Model)
+}
+
+func currentAuthToken(c *gin.Context) string {
+	token := c.GetHeader("Authorization")
+	if token != "" {
+		return token
+	}
+	return c.GetHeader("X-DE-TOKEN")
 }
 
 func initCryptoMaterials() {

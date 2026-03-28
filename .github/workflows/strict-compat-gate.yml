@@ -15,7 +15,7 @@ on:
 
 jobs:
   strict-compat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     defaults:
       run:
@@ -160,15 +160,51 @@ jobs:
 
       - name: Wait for backend
         run: |
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+              echo "Backend is ready"
               exit 0
             fi
-            sleep 2
+            echo "Waiting for backend to start... (attempt $i)"
+            sleep 5
           done
-          echo "backend failed to start"
+          echo "Backend failed to start after 5 minutes"
           cat /tmp/backend.log || true
           exit 1
+
+      - name: Seed strict compatibility admin identity
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot -pAdmin168 dataease_test <<'SQL'
+          INSERT INTO sys_org (org_id, org_name, parent_id, level, status, del_flag, create_time)
+          VALUES (1, 'Default Org', 0, 1, 1, 0, NOW())
+          ON DUPLICATE KEY UPDATE
+            org_name = VALUES(org_name),
+            status = VALUES(status),
+            del_flag = VALUES(del_flag);
+
+          INSERT INTO sys_role (role_id, role_name, role_code, role_type, status, create_time)
+          VALUES (1, 'Admin', 'admin', 'system', 1, NOW())
+          ON DUPLICATE KEY UPDATE
+            role_name = VALUES(role_name),
+            role_code = VALUES(role_code),
+            role_type = VALUES(role_type),
+            status = VALUES(status);
+
+          INSERT INTO sys_user (user_id, username, password, nick_name, status, del_flag, `from`, create_time)
+          VALUES (1, 'admin', '$2b$10$tjXRoXceWaFAGgQZOQgpzuY2OrV1F2zsdFifcvhY0ms8inlxomiGi', 'Admin', 1, 0, 0, NOW())
+          ON DUPLICATE KEY UPDATE
+            username = VALUES(username),
+            password = VALUES(password),
+            nick_name = VALUES(nick_name),
+            status = VALUES(status),
+            del_flag = VALUES(del_flag);
+
+          INSERT INTO sys_user_role (user_id, role_id, org_id)
+          VALUES (1, 1, 1)
+          ON DUPLICATE KEY UPDATE
+            role_id = VALUES(role_id),
+            org_id = VALUES(org_id);
+          SQL
 
       - name: Run strict compatibility gate
         env:

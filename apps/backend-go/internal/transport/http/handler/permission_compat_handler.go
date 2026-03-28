@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/pkg/response"
@@ -45,9 +47,38 @@ type targetPermissionRequest struct {
 	RoleID int64 `json:"roleId" binding:"required"`
 }
 
+type businessTargetPermissionRequest struct {
+	ID     int64  `json:"id"`
+	Type   int    `json:"type"`
+	Flag   string `json:"flag"`
+	RoleID int64  `json:"roleId"`
+}
+
+type userPerspectiveCompatRequest struct {
+	UserID       int64  `json:"userId" binding:"required"`
+	ResourceID   int64  `json:"resourceId"`
+	ResourceType string `json:"resourceType"`
+}
+
 type targetPermissionSaveRequest struct {
-	RoleID      int64                    `json:"roleId" binding:"required"`
-	TargetPerms []map[string]interface{} `json:"targetPerms"`
+	ID          int64                    `json:"id"`
+	Type        int                      `json:"type"`
+	Flag        string                   `json:"flag"`
+	RoleID      int64                    `json:"roleId"`
+	TargetPerms []targetPermissionTarget `json:"targetPerms"`
+}
+
+type targetPermissionTarget struct {
+	TargetType  string                  `json:"targetType"`
+	SourceType  string                  `json:"sourceType"`
+	TargetID    int64                   `json:"targetId"`
+	SourceID    int64                   `json:"sourceId"`
+	PermIDs     []int64                 `json:"permIds"`
+	Permissions []targetPermissionEntry `json:"permissions"`
+}
+
+type targetPermissionEntry struct {
+	ID int64 `json:"id"`
 }
 
 type roleIDQuery struct {
@@ -173,13 +204,71 @@ func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
-	var req targetPermissionRequest
+	var req businessTargetPermissionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
 
-	response.Error(c, "501000", "Not Implemented: business target permission compatibility is unavailable")
+	resourceID := req.ID
+	if resourceID == 0 {
+		resourceID = req.RoleID
+	}
+	if resourceID <= 0 || req.Flag == "" {
+		response.Error(c, "500000", "Invalid request: id and flag are required")
+		return
+	}
+
+	targetPermissions, err := h.resourcePermService.GetResourcePerspective(resourceID, req.Flag)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, targetPermissions)
+}
+
+func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
+	var req userPerspectiveCompatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	var (
+		userPermissions []*permission.UserResourcePermVO
+		err             error
+	)
+	if req.ResourceID > 0 {
+		resourcePermissions, resourceErr := h.resourcePermService.GetResourcePerspective(req.ResourceID, req.ResourceType)
+		if resourceErr != nil {
+			response.Error(c, "500000", "Failed: "+resourceErr.Error())
+			return
+		}
+		userPermissions = make([]*permission.UserResourcePermVO, 0)
+		for _, item := range resourcePermissions {
+			if item == nil || item.UserID != req.UserID {
+				continue
+			}
+			userPermissions = append(userPermissions, &permission.UserResourcePermVO{
+				ResourceID:   req.ResourceID,
+				ResourceType: req.ResourceType,
+				PermKey:      item.PermKey,
+				PermName:     item.PermName,
+				SourceType:   item.SourceType,
+				SourceID:     item.SourceID,
+				SourceName:   item.SourceName,
+			})
+		}
+	} else {
+		userPermissions, err = h.resourcePermService.GetUserPerspective(req.UserID, req.ResourceType)
+	}
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, userPermissions)
 }
 
 func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
@@ -199,7 +288,117 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 		return
 	}
 
-	response.Error(c, "501000", "Not Implemented: save business target permission compatibility is unavailable")
+	resourceID := req.ID
+	if resourceID == 0 {
+		resourceID = req.RoleID
+	}
+	if resourceID <= 0 || req.Flag == "" {
+		response.Error(c, "500000", "Invalid request: id and flag are required")
+		return
+	}
+
+	resourcePermIDs := make([]int64, 0)
+	preservedDirectPermIDs, err := h.collectDirectResourcePermIDs(resourceID, req.Flag)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	resourcePermIDs = append(resourcePermIDs, preservedDirectPermIDs...)
+	for _, target := range req.TargetPerms {
+		matchedPermIDs, err := h.collectMatchedTargetPermIDs(target, req.Flag)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+		resourcePermIDs = append(resourcePermIDs, matchedPermIDs...)
+
+		if err := h.saveRolePermsForResourceType(normalizeTargetID(target.TargetID, target.SourceID), extractTargetPermIDs(target), req.Flag); err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+	}
+
+	if err := h.resourcePermService.ReplaceResourcePermissions(resourceID, req.Flag, uniqueInt64(resourcePermIDs)); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *PermissionCompatHandler) collectMatchedTargetPermIDs(target targetPermissionTarget, resourceType string) ([]int64, error) {
+	targetType := normalizeTargetType(target.TargetType, target.SourceType)
+	targetID := normalizeTargetID(target.TargetID, target.SourceID)
+	if targetType != "role" || targetID <= 0 {
+		return nil, fmt.Errorf("only role targets are supported in the current resource-perspective save slice")
+	}
+
+	permIDs := extractTargetPermIDs(target)
+	matchedPermIDs := make([]int64, 0, len(permIDs))
+	for _, permID := range permIDs {
+		matches, err := h.permissionMatchesResourceType(permID, resourceType)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			matchedPermIDs = append(matchedPermIDs, permID)
+		}
+	}
+	return matchedPermIDs, nil
+}
+
+func extractTargetPermIDs(target targetPermissionTarget) []int64 {
+	if len(target.PermIDs) > 0 || len(target.Permissions) == 0 {
+		return target.PermIDs
+	}
+
+	permIDs := make([]int64, 0, len(target.Permissions))
+	for _, item := range target.Permissions {
+		if item.ID > 0 {
+			permIDs = append(permIDs, item.ID)
+		}
+	}
+	return permIDs
+}
+
+func (h *PermissionCompatHandler) collectDirectResourcePermIDs(resourceID int64, resourceType string) ([]int64, error) {
+	items, err := h.resourcePermService.GetResourcePerspective(resourceID, resourceType)
+	if err != nil {
+		return nil, err
+	}
+	permIDs := make([]int64, 0)
+	seen := make(map[int64]struct{})
+	for _, item := range items {
+		if item == nil || item.SourceType != "direct" || strings.TrimSpace(item.PermKey) == "" {
+			continue
+		}
+		perm, resolveErr := h.resourcePermService.ResolvePermission(resourceType, item.PermKey)
+		if resolveErr != nil || perm == nil || perm.PermID <= 0 {
+			continue
+		}
+		if _, ok := seen[perm.PermID]; ok {
+			continue
+		}
+		seen[perm.PermID] = struct{}{}
+		permIDs = append(permIDs, perm.PermID)
+	}
+	return permIDs, nil
+}
+
+func uniqueInt64(values []int64) []int64 {
+	seen := make(map[int64]struct{}, len(values))
+	result := make([]int64, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []int64) error {
@@ -239,6 +438,87 @@ func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []in
 	return nil
 }
 
+func (h *PermissionCompatHandler) saveRolePermsForResourceType(roleID int64, targetPermIDs []int64, resourceType string) error {
+	target := make(map[int64]struct{}, len(targetPermIDs))
+	for _, id := range targetPermIDs {
+		if id <= 0 {
+			continue
+		}
+		matches, err := h.permissionMatchesResourceType(id, resourceType)
+		if err != nil {
+			return err
+		}
+		if !matches {
+			return fmt.Errorf("permission %d does not belong to resource type %s", id, resourceType)
+		}
+		target[id] = struct{}{}
+	}
+
+	currentPermIDs, err := h.resourcePermService.GetRolePermissionIDs(roleID)
+	if err != nil {
+		return err
+	}
+
+	current := make(map[int64]struct{}, len(currentPermIDs))
+	for _, id := range currentPermIDs {
+		matches, matchErr := h.permissionMatchesResourceType(id, resourceType)
+		if matchErr != nil {
+			return matchErr
+		}
+		if matches {
+			current[id] = struct{}{}
+		}
+	}
+
+	for id := range target {
+		if _, exists := current[id]; !exists {
+			if grantErr := h.resourcePermService.GrantPermissionToRole(roleID, id); grantErr != nil {
+				return grantErr
+			}
+		}
+	}
+
+	for id := range current {
+		if _, keep := target[id]; !keep {
+			if revokeErr := h.resourcePermService.RevokePermissionFromRole(roleID, id); revokeErr != nil {
+				return revokeErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func (h *PermissionCompatHandler) permissionMatchesResourceType(permID int64, resourceType string) (bool, error) {
+	if h.resourcePermService == nil {
+		return false, fmt.Errorf("resource permission service is unavailable")
+	}
+
+	perm, err := h.resourcePermService.GetPermissionByID(permID)
+	if err != nil {
+		return false, err
+	}
+	if perm == nil {
+		return false, fmt.Errorf("permission %d not found", permID)
+	}
+
+	return strings.HasPrefix(perm.PermKey, resourceType+":"), nil
+}
+
+func normalizeTargetType(targetType, sourceType string) string {
+	if targetType != "" {
+		return targetType
+	}
+	return sourceType
+}
+
+func normalizeTargetID(targetID, sourceID int64) int64 {
+	if targetID > 0 {
+		return targetID
+	}
+	return sourceID
+}
+
 func RegisterPermissionCompatRoutes(r *gin.RouterGroup, h *PermissionCompatHandler) {
 	if h == nil {
 		return
@@ -251,6 +531,7 @@ func RegisterPermissionCompatRoutes(r *gin.RouterGroup, h *PermissionCompatHandl
 		authGroup.GET("/busiPermission", h.BusiPermission)
 		authGroup.POST("/busiPermission", h.BusiPermission)
 		authGroup.GET("/busiResource/:flag", h.BusiResource)
+		authGroup.POST("/userPerspective", h.UserPerspective)
 		authGroup.POST("/menuTargetPermission", h.MenuTargetPermission)
 		authGroup.POST("/busiTargetPermission", h.BusiTargetPermission)
 		authGroup.POST("/saveMenuPer", h.SaveMenuPer)

@@ -273,10 +273,10 @@ const formatDateTime = (dateStr: string) => {
   }
 
   .filter-bar {
-    background: #f5f7fa;
-    padding: 20px;
-    border-radius: 4px;
     display: flex;
+    padding: 20px;
+    background: #f5f7fa;
+    border-radius: 4px;
     gap: 16px;
     align-items: center;
   }

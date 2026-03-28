@@ -7,6 +7,7 @@ REPORT_DIR="${REPORT_DIR:-./tmp/compat-checks}"
 REPORT_FILE="$REPORT_DIR/auth-visualization-compat-report.txt"
 SUCCESS_CODE="${SUCCESS_CODE:-000000}"
 ROLE_TYPE_CODE="${ROLE_TYPE_CODE:-1}"
+ADMIN_TOKEN=""
 
 mkdir -p "$REPORT_DIR"
 : > "$REPORT_FILE"
@@ -17,6 +18,47 @@ echo "[INFO] Strict success code: $SUCCESS_CODE" | tee -a "$REPORT_FILE"
 TOTAL=0
 FAILED=0
 
+# Try login with default admin credentials
+login_admin() {
+  local tmp
+  tmp=$(mktemp)
+  local curl_rc=0
+  local status
+
+  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL/login/localLogin" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"admin","pwd":"DataEase1234"}') || curl_rc=$?
+
+  if [[ "$curl_rc" -ne 0 || "$status" == "000" ]]; then
+    rm -f "$tmp"
+    echo "[WARN] Admin login request failed, will proceed without auth" | tee -a "$REPORT_FILE"
+    return 1
+  fi
+
+  if [[ "$status" != "200" ]]; then
+    rm -f "$tmp"
+    echo "[WARN] Admin login returned status $status, will proceed without auth" | tee -a "$REPORT_FILE"
+    return 1
+  fi
+
+  # Debug: print response
+  echo "[DEBUG] Login response:" | tee -a "$REPORT_FILE"
+  cat "$tmp" | tee -a "$REPORT_FILE"
+  echo "" | tee -a "$REPORT_FILE"
+
+  # Extract token from response (TokenVO uses "token" field)
+  ADMIN_TOKEN=$(jq -r '.data.token // empty' "$tmp" 2>/dev/null || echo "")
+  rm -f "$tmp"
+
+  if [[ -z "$ADMIN_TOKEN" ]]; then
+    echo "[WARN] Failed to extract token from login response, will proceed without auth" | tee -a "$REPORT_FILE"
+    return 1
+  fi
+
+  echo "[INFO] Admin login successful, token obtained" | tee -a "$REPORT_FILE"
+  return 0
+}
+
 post_json() {
   local path="$1"
   local body="$2"
@@ -25,7 +67,16 @@ post_json() {
   tmp=$(mktemp)
   local status
   local curl_rc=0
-  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL$path" -H "Content-Type: application/json" -d "$body") || curl_rc=$?
+
+  # Build auth header if token is available
+  local auth_args=()
+  if [[ -n "$ADMIN_TOKEN" ]]; then
+    auth_args=(-H "Authorization: Bearer $ADMIN_TOKEN")
+  fi
+
+  status=$(curl -sS -o "$tmp" -w "%{http_code}" -X POST "$BASE_URL$path" \
+    -H "Content-Type: application/json" "${auth_args[@]}" \
+    -d "$body") || curl_rc=$?
 
   if [[ "$curl_rc" -ne 0 || "$status" == "000" ]]; then
     rm -f "$tmp"
@@ -145,6 +196,9 @@ run_flow() {
   run_case_strict "$label visualization tree" "$prefix/dataVisualization/tree" '{"busiFlag":"dashboard-dataV","leaf":false}'
   run_case_strict "$label system role delete" "$prefix/system/role/delete/$role_id" '{}'
 }
+
+# Try to login first
+login_admin || true
 
 run_flow "/api" "api"
 run_flow "/de2api" "de2api"

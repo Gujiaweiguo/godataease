@@ -35,6 +35,27 @@ func (r *DatasetRepository) ListGroups(keyword *string) ([]*dataset.CoreDatasetG
 	return groups, err
 }
 
+func (r *DatasetRepository) ListGroupsBatch(keyword *string, afterID int64, limit int) ([]*dataset.CoreDatasetGroup, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("dataset repository is unavailable")
+	}
+
+	var groups []*dataset.CoreDatasetGroup
+	q := r.db.Model(&dataset.CoreDatasetGroup{}).Where("COALESCE(del_flag, 0) = 0")
+	if keyword != nil && *keyword != "" {
+		kw := "%" + *keyword + "%"
+		q = q.Where("name LIKE ?", kw)
+	}
+	if afterID > 0 {
+		q = q.Where("id > ?", afterID)
+	}
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	err := q.Order("id ASC").Find(&groups).Error
+	return groups, err
+}
+
 func (r *DatasetRepository) GetGroupByID(id int64) (*dataset.CoreDatasetGroup, error) {
 	var group dataset.CoreDatasetGroup
 	err := r.db.Model(&dataset.CoreDatasetGroup{}).

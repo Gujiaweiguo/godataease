@@ -97,6 +97,15 @@ func (m *mockBridgeResourcePermRepo) GetResourceUsers(resourceID int64, resource
 func (m *mockBridgeResourcePermRepo) ApplyGroupPermissions(groupID, resourceID int64, resourceType string) error {
 	return nil
 }
+func (m *mockBridgeResourcePermRepo) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
+	return nil
+}
+func (m *mockBridgeResourcePermRepo) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
+	return nil
+}
+func (m *mockBridgeResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
+	return nil, false, nil
+}
 func (m *mockBridgeResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }

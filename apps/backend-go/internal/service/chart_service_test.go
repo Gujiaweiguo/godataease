@@ -11,6 +11,9 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type chartRegressionSample struct {
@@ -33,9 +36,22 @@ type fakeChartRepo struct {
 	chartFieldsByChart map[int64][]*dataset.CoreDatasetTableField
 	fieldsByID         map[int64]*dataset.CoreDatasetTableField
 	nextID             int64
+	getByIDErr         error
+	updateErr          error
+	listGroupErr       error
+	listChartErr       error
+	getFieldErr        error
+	countNameErr       error
+	createFieldErr     error
+	updateNamesErr     error
+	deleteFieldErr     error
+	deleteByChartErr   error
 }
 
 func (r *fakeChartRepo) GetByID(id int64) (*chart.CoreChartView, error) {
+	if r.getByIDErr != nil {
+		return nil, r.getByIDErr
+	}
 	v, ok := r.byID[id]
 	if !ok {
 		return nil, errors.New("not found")
@@ -65,9 +81,14 @@ func (r *fakeChartRepo) QueryRows(chartID int64, limit int) ([]map[string]interf
 	return result, s.Total, nil
 }
 
-func (r *fakeChartRepo) Update(view *chart.CoreChartView) error { return nil }
+func (r *fakeChartRepo) Update(view *chart.CoreChartView) error {
+	return r.updateErr
+}
 
 func (r *fakeChartRepo) ListDatasetFieldsByGroup(datasetGroupID int64) ([]*dataset.CoreDatasetTableField, error) {
+	if r.listGroupErr != nil {
+		return nil, r.listGroupErr
+	}
 	if r.dsFieldsByGroup == nil {
 		return []*dataset.CoreDatasetTableField{}, nil
 	}
@@ -80,6 +101,9 @@ func (r *fakeChartRepo) ListDatasetFieldsByGroup(datasetGroupID int64) ([]*datas
 }
 
 func (r *fakeChartRepo) ListDatasetFieldsByChart(chartID int64) ([]*dataset.CoreDatasetTableField, error) {
+	if r.listChartErr != nil {
+		return nil, r.listChartErr
+	}
 	if r.chartFieldsByChart == nil {
 		return []*dataset.CoreDatasetTableField{}, nil
 	}
@@ -92,6 +116,9 @@ func (r *fakeChartRepo) ListDatasetFieldsByChart(chartID int64) ([]*dataset.Core
 }
 
 func (r *fakeChartRepo) GetDatasetFieldByID(id int64) (*dataset.CoreDatasetTableField, error) {
+	if r.getFieldErr != nil {
+		return nil, r.getFieldErr
+	}
 	if r.fieldsByID == nil {
 		return nil, errors.New("not found")
 	}
@@ -103,6 +130,9 @@ func (r *fakeChartRepo) GetDatasetFieldByID(id int64) (*dataset.CoreDatasetTable
 }
 
 func (r *fakeChartRepo) CountDatasetFieldName(datasetGroupID int64, name string) (int64, error) {
+	if r.countNameErr != nil {
+		return 0, r.countNameErr
+	}
 	if r.fieldsByID == nil {
 		return 0, nil
 	}
@@ -119,6 +149,9 @@ func (r *fakeChartRepo) CountDatasetFieldName(datasetGroupID int64, name string)
 }
 
 func (r *fakeChartRepo) CreateDatasetField(field *dataset.CoreDatasetTableField) error {
+	if r.createFieldErr != nil {
+		return r.createFieldErr
+	}
 	if r.fieldsByID == nil {
 		r.fieldsByID = make(map[int64]*dataset.CoreDatasetTableField)
 	}
@@ -141,6 +174,9 @@ func (r *fakeChartRepo) CreateDatasetField(field *dataset.CoreDatasetTableField)
 }
 
 func (r *fakeChartRepo) UpdateDatasetFieldNames(id int64, dataeaseName string, fieldShortName string) error {
+	if r.updateNamesErr != nil {
+		return r.updateNamesErr
+	}
 	if r.fieldsByID == nil {
 		return nil
 	}
@@ -164,6 +200,9 @@ func (r *fakeChartRepo) UpdateDatasetFieldNames(id int64, dataeaseName string, f
 }
 
 func (r *fakeChartRepo) DeleteDatasetField(id int64) error {
+	if r.deleteFieldErr != nil {
+		return r.deleteFieldErr
+	}
 	if r.fieldsByID != nil {
 		delete(r.fieldsByID, id)
 	}
@@ -183,6 +222,9 @@ func (r *fakeChartRepo) DeleteDatasetField(id int64) error {
 }
 
 func (r *fakeChartRepo) DeleteDatasetFieldsByChart(chartID int64) error {
+	if r.deleteByChartErr != nil {
+		return r.deleteByChartErr
+	}
 	if r.chartFieldsByChart == nil {
 		return nil
 	}
@@ -607,3 +649,238 @@ func TestChart_convertToChartField(t *testing.T) {
 }
 
 func intPtrForChart(i int) *int { return &i }
+
+func TestChartQueryAndSaveFromMap(t *testing.T) {
+	t.Run("query returns chart and propagates missing id error", func(t *testing.T) {
+		title := "Sales"
+		repo := &fakeChartRepo{
+			byID: map[int64]*chart.CoreChartView{
+				1: {ID: 1, Title: &title},
+			},
+		}
+		svc := NewChartService(repo)
+
+		view, err := svc.Query(&chart.ChartQueryRequest{ID: 1})
+		require.NoError(t, err)
+		require.NotNil(t, view)
+		require.NotNil(t, view.Title)
+		assert.Equal(t, "Sales", *view.Title)
+
+		view, err = svc.Query(&chart.ChartQueryRequest{ID: 999})
+		require.Error(t, err)
+		assert.Nil(t, view)
+	})
+
+	t.Run("save from map validates id updates fields and persists update time", func(t *testing.T) {
+		title := "Old Title"
+		tableID := int64(5)
+		sceneID := int64(6)
+		chartType := "bar"
+		render := "antv"
+		resultMode := "custom"
+		resultCount := 50
+		dataFrom := "dataset"
+		repo := &fakeChartRepo{
+			byID: map[int64]*chart.CoreChartView{
+				7: {
+					ID:          7,
+					Title:       &title,
+					TableID:     &tableID,
+					SceneID:     &sceneID,
+					Type:        &chartType,
+					Render:      &render,
+					ResultMode:  &resultMode,
+					ResultCount: &resultCount,
+					DataFrom:    &dataFrom,
+				},
+			},
+		}
+		svc := NewChartService(repo)
+
+		view, err := svc.SaveFromMap(map[string]interface{}{})
+		require.Error(t, err)
+		assert.Nil(t, view)
+		assert.Equal(t, "chart id is required", err.Error())
+
+		body := map[string]interface{}{
+			"id":          int64(7),
+			"title":       "New Title",
+			"tableId":     int64(15),
+			"sceneId":     float64(16),
+			"type":        "line",
+			"render":      "echarts",
+			"resultMode":  "all",
+			"resultCount": 25,
+			"dataFrom":    "api",
+			"xAxis":       []string{"month"},
+			"yAxis":       []string{"sales"},
+			"customAttr":  map[string]any{"stack": true},
+			"customStyle": map[string]any{"color": "blue"},
+			"customFilter": []map[string]any{{
+				"field": "region",
+				"op":    "eq",
+			}},
+		}
+
+		view, err = svc.SaveFromMap(body)
+		require.NoError(t, err)
+		require.NotNil(t, view)
+		require.NotNil(t, view.Title)
+		assert.Equal(t, "New Title", *view.Title)
+		require.NotNil(t, view.TableID)
+		assert.Equal(t, int64(15), *view.TableID)
+		require.NotNil(t, view.SceneID)
+		assert.Equal(t, int64(16), *view.SceneID)
+		require.NotNil(t, view.Type)
+		assert.Equal(t, "line", *view.Type)
+		require.NotNil(t, view.Render)
+		assert.Equal(t, "echarts", *view.Render)
+		require.NotNil(t, view.ResultMode)
+		assert.Equal(t, "all", *view.ResultMode)
+		require.NotNil(t, view.ResultCount)
+		assert.Equal(t, 25, *view.ResultCount)
+		require.NotNil(t, view.DataFrom)
+		assert.Equal(t, "api", *view.DataFrom)
+		require.NotNil(t, view.XAxis)
+		assert.JSONEq(t, `["month"]`, *view.XAxis)
+		require.NotNil(t, view.YAxis)
+		assert.JSONEq(t, `["sales"]`, *view.YAxis)
+		require.NotNil(t, view.CustomAttr)
+		assert.JSONEq(t, `{"stack":true}`, *view.CustomAttr)
+		require.NotNil(t, view.CustomStyle)
+		assert.JSONEq(t, `{"color":"blue"}`, *view.CustomStyle)
+		require.NotNil(t, view.CustomFilter)
+		assert.JSONEq(t, `[{"field":"region","op":"eq"}]`, *view.CustomFilter)
+		assert.NotNil(t, view.UpdateTime)
+	})
+
+	t.Run("save from map propagates get by id error", func(t *testing.T) {
+		svc := NewChartService(&fakeChartRepo{byID: map[int64]*chart.CoreChartView{}})
+		view, err := svc.SaveFromMap(map[string]interface{}{"id": int64(42)})
+		require.Error(t, err)
+		assert.Nil(t, view)
+	})
+}
+
+func TestChartDeleteFieldByChart(t *testing.T) {
+	chartID := int64(9)
+	repo := &fakeChartRepo{
+		fieldsByID: map[int64]*dataset.CoreDatasetTableField{
+			1: {ID: 1, ChartID: &chartID},
+			2: {ID: 2, ChartID: &chartID},
+		},
+		chartFieldsByChart: map[int64][]*dataset.CoreDatasetTableField{
+			9: {
+				{ID: 1, ChartID: &chartID},
+				{ID: 2, ChartID: &chartID},
+			},
+		},
+	}
+	svc := NewChartService(repo)
+
+	err := svc.DeleteFieldByChart(0)
+	require.Error(t, err)
+	assert.Equal(t, "chart id is required", err.Error())
+
+	require.NoError(t, svc.DeleteFieldByChart(9))
+	assert.Empty(t, repo.chartFieldsByChart[9])
+	_, exists := repo.fieldsByID[1]
+	assert.False(t, exists)
+	_, exists = repo.fieldsByID[2]
+	assert.False(t, exists)
+}
+
+func TestChartService_RemainingBranches(t *testing.T) {
+	t.Run("list by dq handles empty input and repo errors", func(t *testing.T) {
+		svc := NewChartService(&fakeChartRepo{})
+
+		resp, err := svc.ListByDQ(0, 0)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Empty(t, resp.DimensionList)
+		assert.Empty(t, resp.QuotaList)
+
+		svc = NewChartService(&fakeChartRepo{listGroupErr: errors.New("group failed")})
+		resp, err = svc.ListByDQ(10, 0)
+		require.Error(t, err)
+		assert.Nil(t, resp)
+
+		svc = NewChartService(&fakeChartRepo{
+			dsFieldsByGroup: map[int64][]*dataset.CoreDatasetTableField{10: {}},
+			listChartErr:    errors.New("chart fields failed"),
+		})
+		resp, err = svc.ListByDQ(10, 99)
+		require.Error(t, err)
+		assert.Nil(t, resp)
+	})
+
+	t.Run("copy field handles validation conflicts and repo errors", func(t *testing.T) {
+		svc := NewChartService(&fakeChartRepo{})
+		err := svc.CopyField(0, 1)
+		require.Error(t, err)
+		assert.Equal(t, "field id and chart id are required", err.Error())
+
+		err = svc.CopyField(1, 0)
+		require.Error(t, err)
+		assert.Equal(t, "field id and chart id are required", err.Error())
+
+		svc = NewChartService(&fakeChartRepo{getFieldErr: errors.New("load failed")})
+		err = svc.CopyField(1, 2)
+		require.Error(t, err)
+		assert.Equal(t, "load failed", err.Error())
+
+		name := "sales"
+		origin := "sales"
+		group := "q"
+		typeName := "DECIMAL"
+		deType := 3
+		repo := &fakeChartRepo{
+			fieldsByID: map[int64]*dataset.CoreDatasetTableField{
+				10: {ID: 10, DatasetGroupID: 11, Name: &name, OriginName: &origin, GroupType: &group, Type: &typeName, DeType: &deType},
+				20: {ID: 20, DatasetGroupID: 11, Name: strPtr("sales_copy")},
+			},
+			nextID:         3000,
+			updateNamesErr: errors.New("rename failed"),
+		}
+		svc = NewChartService(repo)
+		err = svc.CopyField(10, 99)
+		require.Error(t, err)
+		assert.Equal(t, "rename failed", err.Error())
+
+		copied := repo.fieldsByID[3000]
+		require.NotNil(t, copied)
+		require.NotNil(t, copied.Name)
+		assert.Equal(t, "sales_copy_copy", *copied.Name)
+	})
+
+	t.Run("delete field and delete by chart propagate repo errors", func(t *testing.T) {
+		svc := NewChartService(&fakeChartRepo{})
+		err := svc.DeleteField(0)
+		require.Error(t, err)
+		assert.Equal(t, "field id is required", err.Error())
+
+		svc = NewChartService(&fakeChartRepo{deleteFieldErr: errors.New("delete field failed")})
+		err = svc.DeleteField(10)
+		require.Error(t, err)
+		assert.Equal(t, "delete field failed", err.Error())
+
+		svc = NewChartService(&fakeChartRepo{deleteByChartErr: errors.New("delete by chart failed")})
+		err = svc.DeleteFieldByChart(9)
+		require.Error(t, err)
+		assert.Equal(t, "delete by chart failed", err.Error())
+	})
+
+	t.Run("save from map propagates update error", func(t *testing.T) {
+		title := "Old"
+		repo := &fakeChartRepo{
+			byID:      map[int64]*chart.CoreChartView{7: {ID: 7, Title: &title}},
+			updateErr: errors.New("update failed"),
+		}
+		svc := NewChartService(repo)
+
+		view, err := svc.SaveFromMap(map[string]interface{}{"id": int64(7), "title": "new"})
+		require.Error(t, err)
+		assert.Nil(t, view)
+		assert.Equal(t, "update failed", err.Error())
+	})
+}

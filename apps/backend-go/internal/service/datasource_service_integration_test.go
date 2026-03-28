@@ -14,6 +14,7 @@ import (
 
 	datasetdomain "dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/repository"
 	seatunnelv1 "dataease/backend/proto/seatunnel/v1"
 
@@ -345,6 +346,201 @@ func TestDatasourceService_CreateFolder(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, parent.ID, *child.PID)
 	})
+}
+
+func TestDatasourceService_Save_InheritsParentResourcePermissions(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &datasource.CoreDatasource{})
+
+	datasourceRepo := repository.NewDatasourceRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	svc := NewDatasourceService(datasourceRepo)
+	svc.SetResourcePermissionService(resourcePermSvc)
+
+	parent, err := svc.CreateFolder("Governed Parent", 0)
+	require.NoError(t, err)
+	require.NoError(t, resourcePermSvc.RegisterResource(parent.ID, parent.Name, permission.ResourceTypeDatasource, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(parent.ID, permission.ResourceTypeDatasource, []int64{11, 12}))
+
+	cfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "inherit_db"}
+	cfgJSON, _ := json.Marshal(cfg)
+	cfgStr := base64.StdEncoding.EncodeToString(cfgJSON)
+	child, err := svc.Save(&datasource.WriteRequest{
+		Name:          "Inherited Datasource",
+		PID:           &parent.ID,
+		Type:          "mysql",
+		Configuration: &cfgStr,
+	})
+	require.NoError(t, err)
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(child.ID, permission.ResourceTypeDatasource)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{11, 12}, permIDs)
+}
+
+func TestDatasourceService_Save_DoesNotRegisterUnderUngovernedParent(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &datasource.CoreDatasource{})
+
+	datasourceRepo := repository.NewDatasourceRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	svc := NewDatasourceService(datasourceRepo)
+	svc.SetResourcePermissionService(resourcePermSvc)
+
+	parent, err := svc.CreateFolder("Plain Parent", 0)
+	require.NoError(t, err)
+
+	cfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "plain_db"}
+	cfgJSON, _ := json.Marshal(cfg)
+	cfgStr := base64.StdEncoding.EncodeToString(cfgJSON)
+	child, err := svc.Save(&datasource.WriteRequest{
+		Name:          "Legacy Child Datasource",
+		PID:           &parent.ID,
+		Type:          "mysql",
+		Configuration: &cfgStr,
+	})
+	require.NoError(t, err)
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(child.ID, permission.ResourceTypeDatasource)
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.Empty(t, permIDs)
+}
+
+func TestDatasourceService_BackfillGovernedResources(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &datasource.CoreDatasource{})
+
+	datasourceRepo := repository.NewDatasourceRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewDatasourceService(datasourceRepo)
+	backfillSvc := NewDatasourceService(datasourceRepo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	governedParent, err := seedSvc.CreateFolder("Governed Legacy Parent", 0)
+	require.NoError(t, err)
+	plainParent, err := seedSvc.CreateFolder("Ungoverned Legacy Parent", 0)
+	require.NoError(t, err)
+
+	governedCfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "legacy_governed_db"}
+	governedCfgJSON, _ := json.Marshal(governedCfg)
+	governedCfgStr := base64.StdEncoding.EncodeToString(governedCfgJSON)
+	governedChild, err := seedSvc.Save(&datasource.WriteRequest{
+		Name:          "Legacy Governed Child",
+		PID:           &governedParent.ID,
+		Type:          "mysql",
+		Configuration: &governedCfgStr,
+	})
+	require.NoError(t, err)
+
+	plainCfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "legacy_plain_db"}
+	plainCfgJSON, _ := json.Marshal(plainCfg)
+	plainCfgStr := base64.StdEncoding.EncodeToString(plainCfgJSON)
+	plainChild, err := seedSvc.Save(&datasource.WriteRequest{
+		Name:          "Legacy Plain Child",
+		PID:           &plainParent.ID,
+		Type:          "mysql",
+		Configuration: &plainCfgStr,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(governedParent.ID, governedParent.Name, permission.ResourceTypeDatasource, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(governedParent.ID, permission.ResourceTypeDatasource, []int64{21, 22}))
+
+	report, err := backfillSvc.BackfillGovernedResources()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, report.Scanned, 4)
+	assert.Equal(t, 1, report.Governed)
+	assert.Contains(t, report.ResourceIDs, governedChild.ID)
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(governedChild.ID, permission.ResourceTypeDatasource)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{21, 22}, permIDs)
+
+	plainPermIDs, plainExists, err := resourcePermRepo.GetResourcePermissionIDs(plainChild.ID, permission.ResourceTypeDatasource)
+	require.NoError(t, err)
+	assert.False(t, plainExists)
+	assert.Empty(t, plainPermIDs)
+
+	report, err = backfillSvc.BackfillGovernedResources()
+	require.NoError(t, err)
+	assert.Equal(t, 1, report.Governed)
+
+	var resourceCount int64
+	require.NoError(t, testDB.Model(&permission.SysResource{}).
+		Where("resource_type = ? AND resource_name = ?", permission.ResourceTypeDatasource, governedChild.Name).
+		Count(&resourceCount).Error)
+	assert.Equal(t, int64(1), resourceCount)
+
+	var resourcePermCount int64
+	require.NoError(t, testDB.Model(&permission.SysResourcePerm{}).
+		Where("resource_id = ?", int64(1_000_000_000_000)+governedChild.ID).
+		Count(&resourcePermCount).Error)
+	assert.Equal(t, int64(2), resourcePermCount)
+}
+
+func TestDatasourceService_BackfillGovernedResourcesWithOptions(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &datasource.CoreDatasource{})
+
+	datasourceRepo := repository.NewDatasourceRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewDatasourceService(datasourceRepo)
+	backfillSvc := NewDatasourceService(datasourceRepo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	governedParent, err := seedSvc.CreateFolder("Batch Governed Parent", 0)
+	require.NoError(t, err)
+	plainParent, err := seedSvc.CreateFolder("Batch Plain Parent", 0)
+	require.NoError(t, err)
+
+	governedCfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "batch_governed_db"}
+	governedCfgJSON, _ := json.Marshal(governedCfg)
+	governedCfgStr := base64.StdEncoding.EncodeToString(governedCfgJSON)
+	governedChild, err := seedSvc.Save(&datasource.WriteRequest{Name: "Batch Governed Child", PID: &governedParent.ID, Type: "mysql", Configuration: &governedCfgStr})
+	require.NoError(t, err)
+
+	plainCfg := &datasource.ConnectionConfig{Host: "localhost", Port: 3306, Database: "batch_plain_db"}
+	plainCfgJSON, _ := json.Marshal(plainCfg)
+	plainCfgStr := base64.StdEncoding.EncodeToString(plainCfgJSON)
+	plainChild, err := seedSvc.Save(&datasource.WriteRequest{Name: "Batch Plain Child", PID: &plainParent.ID, Type: "mysql", Configuration: &plainCfgStr})
+	require.NoError(t, err)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(governedParent.ID, governedParent.Name, permission.ResourceTypeDatasource, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(governedParent.ID, permission.ResourceTypeDatasource, []int64{61, 62}))
+
+	batch1, err := backfillSvc.BackfillGovernedResourcesWithOptions(&GovernanceBackfillOptions{Limit: 2})
+	require.NoError(t, err)
+	assert.Equal(t, 2, batch1.Scanned)
+	assert.Equal(t, 0, batch1.Governed)
+	assert.Equal(t, 2, batch1.Skipped)
+	assert.Equal(t, plainParent.ID, batch1.NextAfterID)
+	if assert.Len(t, batch1.SkippedItems, 2) {
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[1].Reason)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[0].Remediation)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[1].Remediation)
+	}
+
+	batch2, err := backfillSvc.BackfillGovernedResourcesWithOptions(&GovernanceBackfillOptions{AfterID: batch1.NextAfterID, Limit: 2})
+	require.NoError(t, err)
+	assert.Equal(t, 2, batch2.Scanned)
+	assert.Equal(t, 1, batch2.Governed)
+	assert.Equal(t, 1, batch2.Skipped)
+	assert.Contains(t, batch2.ResourceIDs, governedChild.ID)
+	if assert.Len(t, batch2.SkippedItems, 1) {
+		assert.Equal(t, plainChild.ID, batch2.SkippedItems[0].ResourceID)
+		assert.Equal(t, plainParent.ID, batch2.SkippedItems[0].ParentID)
+		assert.Equal(t, GovernanceBackfillSkipReasonParentNotGoverned, batch2.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillRemediationGovernParent, batch2.SkippedItems[0].Remediation)
+	}
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(governedChild.ID, permission.ResourceTypeDatasource)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{61, 62}, permIDs)
 }
 
 func TestDatasourceService_Rename(t *testing.T) {

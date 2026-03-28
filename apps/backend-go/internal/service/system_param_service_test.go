@@ -4,18 +4,38 @@ import (
 	"errors"
 	"testing"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/system"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockSystemParamRepository implements SystemParamRepository for testing
 type MockSystemParamRepository struct {
-	basicSettings    []system.SettingItem
-	onlineMap        *system.OnlineMapEditor
-	sqlBotConfig     *system.SQLBotConfig
-	saveBasicErr     error
-	saveOnlineMapErr error
-	saveSQLBotErr    error
-	getOnlineMapErr  error
+	basicSettings         []system.SettingItem
+	onlineMap             *system.OnlineMapEditor
+	onlineMapByType       *system.OnlineMapEditor
+	sqlBotConfig          *system.SQLBotConfig
+	shareBase             *system.ShareBase
+	requestTimeOut        int
+	defaultSettings       map[string]interface{}
+	ui                    []interface{}
+	defaultLogin          int
+	i18nOptions           map[string]string
+	saveBasicErr          error
+	saveOnlineMapErr      error
+	saveSQLBotErr         error
+	getOnlineMapErr       error
+	getOnlineMapByTypeErr error
+	getSQLBotErr          error
+	getShareBaseErr       error
+	getRequestTimeOutErr  error
+	getDefaultSettingsErr error
+	getUIErr              error
+	getDefaultLoginErr    error
+	getI18nOptionsErr     error
+	lastMapType           string
 }
 
 func NewMockSystemParamRepository() *MockSystemParamRepository {
@@ -23,6 +43,12 @@ func NewMockSystemParamRepository() *MockSystemParamRepository {
 		basicSettings: []system.SettingItem{
 			{Pkey: "test.key", Pval: "test.value", Type: "basic", Sort: 1},
 		},
+		shareBase:       &system.ShareBase{Disable: false, PERequire: true},
+		requestTimeOut:  30,
+		defaultSettings: map[string]interface{}{"key": "value"},
+		ui:              []interface{}{},
+		defaultLogin:    0,
+		i18nOptions:     map[string]string{"en": "English", "zh": "中文"},
 	}
 }
 
@@ -49,6 +75,13 @@ func (m *MockSystemParamRepository) GetOnlineMap() (*system.OnlineMapEditor, err
 }
 
 func (m *MockSystemParamRepository) GetOnlineMapByType(mapType string) (*system.OnlineMapEditor, error) {
+	m.lastMapType = mapType
+	if m.getOnlineMapByTypeErr != nil {
+		return nil, m.getOnlineMapByTypeErr
+	}
+	if m.onlineMapByType != nil {
+		return m.onlineMapByType, nil
+	}
 	return m.GetOnlineMap()
 }
 
@@ -61,6 +94,9 @@ func (m *MockSystemParamRepository) SaveOnlineMap(editor *system.OnlineMapEditor
 }
 
 func (m *MockSystemParamRepository) GetSQLBotConfig() (*system.SQLBotConfig, error) {
+	if m.getSQLBotErr != nil {
+		return nil, m.getSQLBotErr
+	}
 	if m.sqlBotConfig == nil {
 		return &system.SQLBotConfig{Domain: "test.domain", Enabled: true}, nil
 	}
@@ -76,27 +112,48 @@ func (m *MockSystemParamRepository) SaveSQLBotConfig(cfg *system.SQLBotConfig) e
 }
 
 func (m *MockSystemParamRepository) GetShareBase() (*system.ShareBase, error) {
-	return &system.ShareBase{Disable: false, PERequire: true}, nil
+	if m.getShareBaseErr != nil {
+		return nil, m.getShareBaseErr
+	}
+	if m.shareBase == nil {
+		return &system.ShareBase{Disable: false, PERequire: true}, nil
+	}
+	return m.shareBase, nil
 }
 
 func (m *MockSystemParamRepository) GetRequestTimeOut() (int, error) {
-	return 30, nil
+	if m.getRequestTimeOutErr != nil {
+		return 0, m.getRequestTimeOutErr
+	}
+	return m.requestTimeOut, nil
 }
 
 func (m *MockSystemParamRepository) GetDefaultSettings() (map[string]interface{}, error) {
-	return map[string]interface{}{"key": "value"}, nil
+	if m.getDefaultSettingsErr != nil {
+		return nil, m.getDefaultSettingsErr
+	}
+	return m.defaultSettings, nil
 }
 
 func (m *MockSystemParamRepository) GetUI() ([]interface{}, error) {
-	return []interface{}{}, nil
+	if m.getUIErr != nil {
+		return nil, m.getUIErr
+	}
+	return m.ui, nil
 }
 
 func (m *MockSystemParamRepository) GetDefaultLogin() (int, error) {
-	return 0, nil
+	if m.getDefaultLoginErr != nil {
+		return 0, m.getDefaultLoginErr
+	}
+	return m.defaultLogin, nil
 }
 
 func (m *MockSystemParamRepository) GetI18nOptions() (map[string]string, error) {
-	return map[string]string{"en": "English", "zh": "中文"}, nil
+	if m.getI18nOptionsErr != nil {
+		return nil, m.getI18nOptionsErr
+	}
+	return m.i18nOptions, nil
 }
 
 func setupSystemParamService() *SystemParamService {
@@ -203,7 +260,9 @@ func TestSystemParam_SaveBasic_WithoutAudit(t *testing.T) {
 }
 
 func TestSystemParam_QueryOnlineMapByType(t *testing.T) {
-	svc := setupSystemParamService()
+	mockRepo := NewMockSystemParamRepository()
+	mockRepo.onlineMapByType = &system.OnlineMapEditor{MapType: "gaode", Key: "typed-key"}
+	svc := NewSystemParamService(mockRepo, nil)
 
 	// Test with empty type
 	result, err := svc.QueryOnlineMapByType("")
@@ -215,12 +274,18 @@ func TestSystemParam_QueryOnlineMapByType(t *testing.T) {
 	}
 
 	// Test with specific type
-	result, err = svc.QueryOnlineMapByType("gaode")
+	result, err = svc.QueryOnlineMapByType("  gaode  ")
 	if err != nil {
 		t.Fatalf("QueryOnlineMapByType failed: %v", err)
 	}
 	if result == nil {
-		t.Error("Expected non-nil result")
+		t.Fatal("Expected non-nil result")
+	}
+	if result.Key != "typed-key" {
+		t.Fatalf("expected typed lookup result, got %#v", result)
+	}
+	if mockRepo.lastMapType != "gaode" {
+		t.Fatalf("expected trimmed map type 'gaode', got %q", mockRepo.lastMapType)
 	}
 }
 
@@ -291,6 +356,106 @@ func TestSystemParam_I18nOptions(t *testing.T) {
 	}
 }
 
+func TestSystemParam_Getters_RepoErrors(t *testing.T) {
+	t.Run("query sql bot", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getSQLBotErr = errors.New("sqlbot error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		cfg, err := svc.QuerySQLBot()
+		if err == nil {
+			t.Fatal("expected QuerySQLBot error")
+		}
+		if cfg != nil {
+			t.Fatalf("expected nil config, got %#v", cfg)
+		}
+	})
+
+	t.Run("share base", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getShareBaseErr = errors.New("share base error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		cfg, err := svc.ShareBase()
+		if err == nil {
+			t.Fatal("expected ShareBase error")
+		}
+		if cfg != nil {
+			t.Fatalf("expected nil share base, got %#v", cfg)
+		}
+	})
+
+	t.Run("request timeout", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getRequestTimeOutErr = errors.New("timeout error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		timeout, err := svc.RequestTimeOut()
+		if err == nil {
+			t.Fatal("expected RequestTimeOut error")
+		}
+		if timeout != 0 {
+			t.Fatalf("expected zero timeout on error, got %d", timeout)
+		}
+	})
+
+	t.Run("default settings", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getDefaultSettingsErr = errors.New("default settings error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		settings, err := svc.DefaultSettings()
+		if err == nil {
+			t.Fatal("expected DefaultSettings error")
+		}
+		if settings != nil {
+			t.Fatalf("expected nil settings, got %#v", settings)
+		}
+	})
+
+	t.Run("ui", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getUIErr = errors.New("ui error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		ui, err := svc.UI()
+		if err == nil {
+			t.Fatal("expected UI error")
+		}
+		if ui != nil {
+			t.Fatalf("expected nil ui, got %#v", ui)
+		}
+	})
+
+	t.Run("default login", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getDefaultLoginErr = errors.New("default login error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		login, err := svc.DefaultLogin()
+		if err == nil {
+			t.Fatal("expected DefaultLogin error")
+		}
+		if login != 0 {
+			t.Fatalf("expected zero default login on error, got %d", login)
+		}
+	})
+
+	t.Run("i18n options", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		mockRepo.getI18nOptionsErr = errors.New("i18n error")
+		svc := NewSystemParamService(mockRepo, nil)
+
+		options, err := svc.I18nOptions()
+		if err == nil {
+			t.Fatal("expected I18nOptions error")
+		}
+		if options != nil {
+			t.Fatalf("expected nil options, got %#v", options)
+		}
+	})
+}
+
 func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
 	svc := setupSystemParamService()
 
@@ -321,7 +486,8 @@ func TestSystemParam_QuerySQLBotAndUIAndDefaultLogin(t *testing.T) {
 
 func TestSystemParam_SaveOnlineMap_WithAudit(t *testing.T) {
 	mockRepo := NewMockSystemParamRepository()
-	svc := NewSystemParamService(mockRepo, nil)
+	auditSvc, db := setupAuditServiceRepoTest(t)
+	svc := NewSystemParamService(mockRepo, auditSvc)
 
 	editor := &system.OnlineMapEditor{
 		MapType:      "gaode",
@@ -333,11 +499,15 @@ func TestSystemParam_SaveOnlineMap_WithAudit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveOnlineMap with audit failed: %v", err)
 	}
+	var count int64
+	require.NoError(t, db.Model(&audit.AuditLog{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
 }
 
 func TestSystemParam_SaveSQLBot_WithAudit(t *testing.T) {
 	mockRepo := NewMockSystemParamRepository()
-	svc := NewSystemParamService(mockRepo, nil)
+	auditSvc, db := setupAuditServiceRepoTest(t)
+	svc := NewSystemParamService(mockRepo, auditSvc)
 
 	cfg := &system.SQLBotConfig{
 		Domain:  "test.domain",
@@ -350,6 +520,60 @@ func TestSystemParam_SaveSQLBot_WithAudit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveSQLBot with audit failed: %v", err)
 	}
+	var count int64
+	require.NoError(t, db.Model(&audit.AuditLog{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestSystemParam_SaveBasic_WithAudit(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	auditSvc, db := setupAuditServiceRepoTest(t)
+	svc := NewSystemParamService(mockRepo, auditSvc)
+	items := []system.SettingItem{{Pkey: "audit.key", Pval: "audit.value", Type: "basic", Sort: 1}}
+
+	require.NoError(t, svc.SaveBasic(items))
+	assert.Equal(t, items, mockRepo.basicSettings)
+
+	var count int64
+	require.NoError(t, db.Model(&audit.AuditLog{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestSystemParam_SaveMethods_AuditFailureDoesNotBreakSave(t *testing.T) {
+	t.Run("save basic", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		auditSvc, db := setupAuditServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TRIGGER deny_audit_insert_basic BEFORE INSERT ON de_audit_log BEGIN SELECT RAISE(FAIL, 'deny audit insert'); END;").Error)
+		svc := NewSystemParamService(mockRepo, auditSvc)
+		items := []system.SettingItem{{Pkey: "after.key", Pval: "after.value", Type: "basic", Sort: 2}}
+
+		require.NoError(t, svc.SaveBasic(items))
+		assert.Equal(t, items, mockRepo.basicSettings)
+	})
+
+	t.Run("save online map", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		auditSvc, db := setupAuditServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TRIGGER deny_audit_insert_map BEFORE INSERT ON de_audit_log BEGIN SELECT RAISE(FAIL, 'deny audit insert'); END;").Error)
+		svc := NewSystemParamService(mockRepo, auditSvc)
+		editor := &system.OnlineMapEditor{MapType: "gaode", Key: "map-key", SecurityCode: "map-code"}
+
+		require.NoError(t, svc.SaveOnlineMap(editor))
+		require.NotNil(t, mockRepo.onlineMap)
+		assert.Equal(t, editor, mockRepo.onlineMap)
+	})
+
+	t.Run("save sql bot", func(t *testing.T) {
+		mockRepo := NewMockSystemParamRepository()
+		auditSvc, db := setupAuditServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TRIGGER deny_audit_insert_sqlbot BEFORE INSERT ON de_audit_log BEGIN SELECT RAISE(FAIL, 'deny audit insert'); END;").Error)
+		svc := NewSystemParamService(mockRepo, auditSvc)
+		cfg := &system.SQLBotConfig{Domain: "sqlbot.domain", ID: "sqlbot-id", Enabled: true, Valid: true}
+
+		require.NoError(t, svc.SaveSQLBot(cfg))
+		require.NotNil(t, mockRepo.sqlBotConfig)
+		assert.Equal(t, cfg, mockRepo.sqlBotConfig)
+	})
 }
 
 func TestSystemParam_SaveBasic_RepoError(t *testing.T) {

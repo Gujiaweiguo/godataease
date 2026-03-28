@@ -299,16 +299,14 @@ const getEmptyDesc = (): string => {
         :name="item.name"
       >
         <template #label>
-          <span class="custom-tabs-label">
-            <el-tooltip
-              placement="top"
-              v-if="item.disabled"
-              :content="t('work_branch.permission_denied')"
-            >
-              <span>{{ item.title }}</span>
-            </el-tooltip>
-            <span v-else>{{ item.title }}</span>
-          </span>
+          <el-tooltip
+            v-if="item.disabled"
+            placement="top"
+            :content="t('work_branch.permission_denied')"
+          >
+            <span class="custom-tabs-label">{{ item.title }}</span>
+          </el-tooltip>
+          <span v-else class="custom-tabs-label">{{ item.title }}</span>
         </template>
       </el-tab-pane>
     </el-tabs>

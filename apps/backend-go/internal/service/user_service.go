@@ -1,18 +1,22 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"dataease/backend/internal/domain/audit"
+	domainorg "dataease/backend/internal/domain/org"
+	domainrole "dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 const (
@@ -25,6 +29,8 @@ type UserService struct {
 	userRepo     *repository.UserRepository
 	userRoleRepo *repository.UserRoleRepository
 	userPermRepo *repository.UserPermRepository
+	roleRepo     *repository.RoleRepository
+	orgRepo      *repository.OrgRepository
 	auditSvc     *AuditService // 审计服务（可选）
 }
 
@@ -39,6 +45,14 @@ func NewUserService(
 		userPermRepo: userPermRepo,
 		auditSvc:     nil, // 默认为空，可通过 SetAuditService 注入
 	}
+}
+
+func (s *UserService) SetRoleRepository(repo *repository.RoleRepository) {
+	s.roleRepo = repo
+}
+
+func (s *UserService) SetOrgRepository(repo *repository.OrgRepository) {
+	s.orgRepo = repo
 }
 
 // SetAuditService 设置审计服务
@@ -81,6 +95,13 @@ func (s *UserService) CreateUser(req *user.UserCreateRequest) (int64, error) {
 	if err := s.userRepo.Create(u); err != nil {
 		logger.Error("Failed to create user", zap.Error(err))
 		return 0, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	if orgID, ok := requestedOrgID(req.OrgID, req.OrganizationID); ok {
+		if err := s.bindUserToOrgBaseline(u.UserID, orgID); err != nil {
+			_ = s.userRepo.Delete(u.UserID)
+			return 0, err
+		}
 	}
 
 	logger.Info("User created", zap.Int64("userId", u.UserID), zap.String("username", u.Username))
@@ -180,7 +201,7 @@ func (s *UserService) SearchUsers(req *user.UserQueryRequest) (*user.UserListRes
 
 // ResetPassword 重置密码
 func (s *UserService) ResetPassword(userID int64, newPassword string) error {
-	return s.ResetPasswordWithAudit(userID, newPassword, 0, "system", "127.0.0.1")
+	return s.ResetPasswordWithAudit(userID, newPassword, 0, systemActor, "127.0.0.1")
 }
 
 // ResetPasswordWithAudit 重置密码（含审计日志）
@@ -303,12 +324,88 @@ func (s *UserService) SwitchLanguage(userID int64, lang string) error {
 func normalizeLanguage(lang string) string {
 	switch strings.TrimSpace(strings.ToLower(strings.ReplaceAll(lang, "_", "-"))) {
 	case "zh-cn", "zh":
-		return "zh-CN"
+		return defaultLanguageZhCN
 	case "zh-tw", "tw":
 		return "tw"
 	case "en", "en-us":
 		return "en"
 	default:
-		return "zh-CN"
+		return defaultLanguageZhCN
 	}
+}
+
+func requestedOrgID(orgID *int64, organizationID *int64) (int64, bool) {
+	if organizationID != nil && *organizationID > 0 {
+		return *organizationID, true
+	}
+	if orgID != nil && *orgID > 0 {
+		return *orgID, true
+	}
+	return 0, false
+}
+
+func (s *UserService) bindUserToOrgBaseline(userID int64, orgID int64) error {
+	if s.orgRepo == nil {
+		return fmt.Errorf("org repository is not configured")
+	}
+	if s.userRoleRepo == nil {
+		return fmt.Errorf("user-role repository is not configured")
+	}
+
+	orgEntity, err := s.orgRepo.GetByID(orgID)
+	if err != nil {
+		return fmt.Errorf("organization not found: %w", err)
+	}
+	if orgEntity.Status != domainorg.StatusEnabled {
+		return fmt.Errorf("organization is disabled")
+	}
+
+	defaultRoleID, err := s.ensureDefaultOrgUserRole()
+	if err != nil {
+		return err
+	}
+
+	if err := s.userRoleRepo.Create(&user.SysUserRole{UserID: userID, RoleID: defaultRoleID, OrgID: orgID}); err != nil {
+		return fmt.Errorf("failed to persist organization membership baseline: %w", err)
+	}
+
+	return nil
+}
+
+func (s *UserService) ensureDefaultOrgUserRole() (int64, error) {
+	if s.roleRepo == nil {
+		return 0, fmt.Errorf("role repository is not configured")
+	}
+
+	existing, err := s.roleRepo.GetByRoleCode(domainrole.BuiltInOrgUserRoleCode)
+	if err == nil {
+		if existing.Status != domainrole.StatusEnabled {
+			existing.Status = domainrole.StatusEnabled
+			if updateErr := s.roleRepo.Update(existing); updateErr != nil {
+				return 0, fmt.Errorf("failed to enable default organization role: %w", updateErr)
+			}
+		}
+		return existing.RoleID, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to load default organization role: %w", err)
+	}
+
+	roleType := domainrole.RoleTypeOrganization
+	dataScope := domainrole.DataScopeSelf
+	createBy := systemActor
+	defaultRole := &domainrole.SysRole{
+		RoleName:  domainrole.BuiltInOrgUserRoleName,
+		RoleCode:  domainrole.BuiltInOrgUserRoleCode,
+		RoleType:  &roleType,
+		DataScope: &dataScope,
+		Status:    domainrole.StatusEnabled,
+		CreateBy:  &createBy,
+	}
+
+	if err := s.roleRepo.Create(defaultRole); err != nil {
+		return 0, fmt.Errorf("failed to create default organization role: %w", err)
+	}
+
+	return defaultRole.RoleID, nil
 }

@@ -96,41 +96,42 @@ func determineRouteSource(path string) string {
 }
 
 type Router struct {
-	engine                  *gin.Engine
-	app                     *app.Application
-	db                      *gorm.DB
-	permMiddleware          *middleware.PermissionMiddleware
-	auditHandler            *handler.AuditHandler
-	userHandler             *handler.UserHandler
-	orgHandler              *handler.OrgHandler
-	permHandler             *handler.PermHandler
-	embeddedHandler         *handler.EmbeddedHandler
-	roleHandler             *handler.RoleHandler
-	roleMenuHandler         *handler.RoleMenuHandler
-	menuHandler             *handler.MenuHandler
-	mapHandler              *handler.MapHandler
-	authHandler             *handler.AuthHandler
-	datasourceHandler       *handler.DatasourceHandler
-	datasetHandler          *handler.DatasetHandler
-	chartHandler            *handler.ChartHandler
-	visualHandler           *handler.VisualizationHandler
-	watermarkHandler        *handler.WatermarkHandler
-	systemParamHandler      *handler.SystemParamHandler
-	systemVariableHandler   *handler.SystemVariableHandler
-	licenseHandler          *handler.LicenseHandler
-	msgCenterHandler        *handler.MsgCenterHandler
-	shareHandler            *handler.ShareHandler
-	ticketHandler           *handler.TicketHandler
-	geoHandler              *handler.GeoHandler
-	staticHandler           *handler.StaticHandler
-	exportHandler           *handler.ExportHandler
-	engineHandler           *handler.EngineHandler
-	driverHandler           *handler.DriverHandler
-	templateHandler         *handler.TemplateHandler
-	syncHandler             *handler.SyncHandler
-	frontendCompatHandler   *handler.FrontendCompatHandler
-	permissionCompatHandler *handler.PermissionCompatHandler
-	dataPermissionHandler   *handler.DataPermissionHandler
+	engine                    *gin.Engine
+	app                       *app.Application
+	db                        *gorm.DB
+	permMiddleware            *middleware.PermissionMiddleware
+	auditHandler              *handler.AuditHandler
+	userHandler               *handler.UserHandler
+	orgHandler                *handler.OrgHandler
+	permHandler               *handler.PermHandler
+	embeddedHandler           *handler.EmbeddedHandler
+	roleHandler               *handler.RoleHandler
+	roleMenuHandler           *handler.RoleMenuHandler
+	menuHandler               *handler.MenuHandler
+	mapHandler                *handler.MapHandler
+	authHandler               *handler.AuthHandler
+	datasourceHandler         *handler.DatasourceHandler
+	datasetHandler            *handler.DatasetHandler
+	chartHandler              *handler.ChartHandler
+	visualHandler             *handler.VisualizationHandler
+	watermarkHandler          *handler.WatermarkHandler
+	systemParamHandler        *handler.SystemParamHandler
+	systemVariableHandler     *handler.SystemVariableHandler
+	licenseHandler            *handler.LicenseHandler
+	msgCenterHandler          *handler.MsgCenterHandler
+	shareHandler              *handler.ShareHandler
+	ticketHandler             *handler.TicketHandler
+	geoHandler                *handler.GeoHandler
+	staticHandler             *handler.StaticHandler
+	exportHandler             *handler.ExportHandler
+	engineHandler             *handler.EngineHandler
+	driverHandler             *handler.DriverHandler
+	templateHandler           *handler.TemplateHandler
+	syncHandler               *handler.SyncHandler
+	frontendCompatHandler     *handler.FrontendCompatHandler
+	permissionCompatHandler   *handler.PermissionCompatHandler
+	dataPermissionHandler     *handler.DataPermissionHandler
+	resourceGovernanceHandler *handler.ResourceGovernanceHandler
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -159,11 +160,13 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	userHandler := handler.NewUserHandler(userService, userImportService)
 	// Role module initialization (must be before OrgService as it depends on roleRepo)
 	roleRepo := repository.NewRoleRepository(db)
+	userService.SetRoleRepository(roleRepo)
 	roleService := service.NewRoleService(roleRepo, userRepo, userRoleRepo)
 	roleHandler := handler.NewRoleHandler(roleService)
 
 	// Organization module initialization
 	orgRepo := repository.NewOrgRepository(db)
+	userService.SetOrgRepository(orgRepo)
 	orgService := service.NewOrgService(orgRepo, auditService, userRepo, roleRepo)
 	orgHandler := handler.NewOrgHandler(orgService)
 
@@ -200,8 +203,9 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		})
 	}
 
-	authService := service.NewAuthService(userRepo, jwtInstance)
+	authService := service.NewAuthService(userRepo, userRoleRepo, orgRepo, jwtInstance)
 	authHandler := handler.NewAuthHandler(authService)
+	userHandler.SetAuthService(authService)
 
 	datasourceRepo := repository.NewDatasourceRepository(db)
 	syncRepo := repository.NewSyncRepository(db)
@@ -286,10 +290,14 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
 	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
+	datasourceService.SetResourcePermissionService(resourcePermService)
 	datasetService.SetResourcePermissionService(resourcePermService)
+	visualService.SetResourcePermissionService(resourcePermService)
+	resourceGovernanceAdminService := service.NewResourceGovernanceAdminService(datasourceService, datasetService, visualService)
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
+	resourceGovernanceHandler := handler.NewResourceGovernanceHandler(resourceGovernanceAdminService, adminChecker)
 
 	// Export module initialization
 	exportRepo := repository.NewExportRepository(db)
@@ -314,41 +322,42 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
 	return &Router{
-		engine:                  engine,
-		app:                     application,
-		db:                      db,
-		permMiddleware:          permMiddleware,
-		auditHandler:            auditHandler,
-		userHandler:             userHandler,
-		orgHandler:              orgHandler,
-		permHandler:             permHandler,
-		embeddedHandler:         embeddedHandler,
-		roleHandler:             roleHandler,
-		roleMenuHandler:         roleMenuHandler,
-		menuHandler:             menuHandler,
-		mapHandler:              mapHandler,
-		authHandler:             authHandler,
-		datasourceHandler:       datasourceHandler,
-		datasetHandler:          datasetHandler,
-		chartHandler:            chartHandler,
-		visualHandler:           visualHandler,
-		watermarkHandler:        watermarkHandler,
-		systemParamHandler:      systemParamHandler,
-		systemVariableHandler:   systemVariableHandler,
-		licenseHandler:          licenseHandler,
-		msgCenterHandler:        msgCenterHandler,
-		shareHandler:            shareHandler,
-		ticketHandler:           ticketHandler,
-		geoHandler:              geoHandler,
-		staticHandler:           staticHandler,
-		exportHandler:           exportHandler,
-		engineHandler:           engineHandler,
-		driverHandler:           driverHandler,
-		templateHandler:         templateHandler,
-		syncHandler:             syncHandler,
-		frontendCompatHandler:   frontendCompatHandler,
-		permissionCompatHandler: permissionCompatHandler,
-		dataPermissionHandler:   dataPermissionHandler,
+		engine:                    engine,
+		app:                       application,
+		db:                        db,
+		permMiddleware:            permMiddleware,
+		auditHandler:              auditHandler,
+		userHandler:               userHandler,
+		orgHandler:                orgHandler,
+		permHandler:               permHandler,
+		embeddedHandler:           embeddedHandler,
+		roleHandler:               roleHandler,
+		roleMenuHandler:           roleMenuHandler,
+		menuHandler:               menuHandler,
+		mapHandler:                mapHandler,
+		authHandler:               authHandler,
+		datasourceHandler:         datasourceHandler,
+		datasetHandler:            datasetHandler,
+		chartHandler:              chartHandler,
+		visualHandler:             visualHandler,
+		watermarkHandler:          watermarkHandler,
+		systemParamHandler:        systemParamHandler,
+		systemVariableHandler:     systemVariableHandler,
+		licenseHandler:            licenseHandler,
+		msgCenterHandler:          msgCenterHandler,
+		shareHandler:              shareHandler,
+		ticketHandler:             ticketHandler,
+		geoHandler:                geoHandler,
+		staticHandler:             staticHandler,
+		exportHandler:             exportHandler,
+		engineHandler:             engineHandler,
+		driverHandler:             driverHandler,
+		templateHandler:           templateHandler,
+		syncHandler:               syncHandler,
+		frontendCompatHandler:     frontendCompatHandler,
+		permissionCompatHandler:   permissionCompatHandler,
+		dataPermissionHandler:     dataPermissionHandler,
+		resourceGovernanceHandler: resourceGovernanceHandler,
 	}
 }
 
@@ -428,6 +437,13 @@ func (r *Router) registerRootRoutes() {
 
 func (r *Router) registerAPIRoutes() {
 	api := r.engine.Group("/api")
+	userAPI := api
+	roleAPI := api
+	roleDe2API := r.engine.Group("/de2api")
+	roleMenuAPI := api
+	permissionCompatAPI := api
+	permissionCompatDe2API := r.engine.Group("/de2api")
+	dataPermissionAPI := api
 	datasourceAPI := api
 	datasourceDe2API := r.engine.Group("/de2api")
 	datasetAPI := api
@@ -443,6 +459,19 @@ func (r *Router) registerAPIRoutes() {
 		protectedDatasourceAPI := r.engine.Group("/api")
 		protectedDatasourceAPI.Use(middleware.Auth(jwtInstance))
 		datasourceAPI = protectedDatasourceAPI
+		protectedUserAPI := r.engine.Group("/api")
+		protectedUserAPI.Use(middleware.Auth(jwtInstance))
+		userAPI = protectedUserAPI
+		protectedRoleAPI := r.engine.Group("/api")
+		protectedRoleAPI.Use(middleware.Auth(jwtInstance))
+		roleAPI = protectedRoleAPI
+		protectedRoleDe2API := r.engine.Group("/de2api")
+		protectedRoleDe2API.Use(middleware.Auth(jwtInstance))
+		roleDe2API = protectedRoleDe2API
+		roleMenuAPI = protectedRoleAPI
+		permissionCompatAPI = protectedRoleAPI
+		permissionCompatDe2API = protectedRoleDe2API
+		dataPermissionAPI = protectedRoleAPI
 		protectedDatasourceDe2API := r.engine.Group("/de2api")
 		protectedDatasourceDe2API.Use(middleware.Auth(jwtInstance))
 		datasourceDe2API = protectedDatasourceDe2API
@@ -475,15 +504,18 @@ func (r *Router) registerAPIRoutes() {
 		})
 
 		handler.RegisterAuditRoutes(auditAPI, r.auditHandler)
-		handler.RegisterUserRoutes(api, r.userHandler)
+		handler.RegisterUserRoutes(userAPI, r.userHandler)
 		handler.RegisterOrgRoutes(api, r.orgHandler)
 		handler.RegisterPermRoutes(api, r.permHandler)
 		handler.RegisterEmbeddedRoutes(api, r.embeddedHandler)
-		handler.RegisterRoleRoutes(api, r.roleHandler)
-		handler.RegisterRoleMenuRoutes(api, r.roleMenuHandler)
+		handler.RegisterRoleRoutes(roleAPI, r.roleHandler)
+		handler.RegisterRoleRoutes(roleDe2API, r.roleHandler)
+		handler.RegisterRoleMenuRoutes(roleMenuAPI, r.roleMenuHandler)
 		handler.RegisterMenuRoutes(api, r.menuHandler)
-		handler.RegisterPermissionCompatRoutes(api, r.permissionCompatHandler)
-		handler.RegisterDataPermissionRoutes(api, r.dataPermissionHandler)
+		handler.RegisterPermissionCompatRoutes(permissionCompatAPI, r.permissionCompatHandler)
+		handler.RegisterPermissionCompatRoutes(permissionCompatDe2API, r.permissionCompatHandler)
+		handler.RegisterResourceGovernanceRoutes(roleAPI, r.resourceGovernanceHandler)
+		handler.RegisterDataPermissionRoutes(dataPermissionAPI, r.dataPermissionHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
 		handler.RegisterDatasourceRoutes(datasourceAPI, r.datasourceHandler)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceDe2API, nil, nil, r.datasourceHandler, nil, nil, nil)

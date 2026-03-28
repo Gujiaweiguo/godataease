@@ -1,9 +1,16 @@
 package service
 
 import (
+	"errors"
 	"testing"
 
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/repository"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type mockAdminChecker struct {
@@ -12,6 +19,30 @@ type mockAdminChecker struct {
 
 func (m *mockAdminChecker) IsAdmin(userID int64) bool {
 	return m.adminUserIDs[userID]
+}
+
+type mockUserRoleRepo struct {
+	roleIDs []int64
+	err     error
+}
+
+func (m *mockUserRoleRepo) GetRoleIDsByUserID(_ int64) ([]int64, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.roleIDs, nil
+}
+
+func setupRowPermissionServiceRepoTest(t *testing.T, userRoleRepo UserRoleRepositoryInterface, adminChecker AdminCheckerInterface) (*RowPermissionService, *repository.RowPermissionRepository, *repository.ColumnPermissionRepository, *gorm.DB) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&permission.DataPermRow{}, &permission.DataPermColumn{}))
+
+	rowRepo := repository.NewRowPermissionRepository(db)
+	colRepo := repository.NewColumnPermissionRepository(db)
+	return NewRowPermissionService(rowRepo, colRepo, userRoleRepo, adminChecker), rowRepo, colRepo, db
 }
 
 func TestBuildLogicCondition(t *testing.T) {
@@ -369,4 +400,199 @@ func TestBuildSelectColumns_Admin(t *testing.T) {
 	if err != nil || cols != "*" {
 		t.Errorf("Expected * for admin, got %s, %v", cols, err)
 	}
+}
+
+func TestRowPermissionService_GetRowPermissionsTree(t *testing.T) {
+	t.Run("admin returns nil", func(t *testing.T) {
+		svc, _, _, _ := setupRowPermissionServiceRepoTest(t, nil, &mockAdminChecker{adminUserIDs: map[int64]bool{1: true}})
+
+		perms, err := svc.GetRowPermissionsTree(10, 1)
+		require.NoError(t, err)
+		assert.Nil(t, perms)
+	})
+
+	t.Run("user only permissions", func(t *testing.T) {
+		svc, rowRepo, _, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"a"}]}`}))
+
+		perms, err := svc.GetRowPermissionsTree(10, 7)
+		require.NoError(t, err)
+		assert.Len(t, perms, 1)
+		assert.Equal(t, int64(7), perms[0].AuthTargetID)
+	})
+
+	t.Run("appends role permissions and tolerates role repo error", func(t *testing.T) {
+		t.Run("appends role permissions", func(t *testing.T) {
+			svc, rowRepo, _, _ := setupRowPermissionServiceRepoTest(t, &mockUserRoleRepo{roleIDs: []int64{9}}, nil)
+			require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"a"}]}`}))
+			require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeRole, AuthTargetID: 9, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":2,"term":"eq","value":"b"}]}`}))
+
+			perms, err := svc.GetRowPermissionsTree(10, 7)
+			require.NoError(t, err)
+			assert.Len(t, perms, 2)
+		})
+
+		t.Run("role repo error does not fail", func(t *testing.T) {
+			svc, rowRepo, _, _ := setupRowPermissionServiceRepoTest(t, &mockUserRoleRepo{err: errors.New("role repo failed")}, nil)
+			require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"a"}]}`}))
+
+			perms, err := svc.GetRowPermissionsTree(10, 7)
+			require.NoError(t, err)
+			assert.Len(t, perms, 1)
+		})
+	})
+
+	t.Run("row repo error returns error", func(t *testing.T) {
+		svc, _, _, db := setupRowPermissionServiceRepoTest(t, nil, nil)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+
+		perms, treeErr := svc.GetRowPermissionsTree(10, 7)
+		require.Error(t, treeErr)
+		assert.Nil(t, perms)
+	})
+}
+
+func TestRowPermissionService_BuildWhereClause(t *testing.T) {
+	t.Run("admin returns nil", func(t *testing.T) {
+		svc, _, _, _ := setupRowPermissionServiceRepoTest(t, nil, &mockAdminChecker{adminUserIDs: map[int64]bool{1: true}})
+
+		result, err := svc.BuildWhereClause(10, 1)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("no permissions returns nil", func(t *testing.T) {
+		svc, _, _, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+
+		result, err := svc.BuildWhereClause(10, 7)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("skips disabled and empty expressions then combines valid with or", func(t *testing.T) {
+		svc, rowRepo, _, db := setupRowPermissionServiceRepoTest(t, nil, nil)
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, ExpressionTree: `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"ignored"}]}`}))
+		require.NoError(t, db.Model(&permission.DataPermRow{}).Where("dataset_id = ? AND auth_target_id = ? AND expression_tree = ?", 10, 7, `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"ignored"}]}`).Update("status", permission.StatusDisabled).Error)
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: ""}))
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"a"}]}`}))
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 10, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":2,"term":"eq","value":"b"}]}`}))
+
+		result, err := svc.BuildWhereClause(10, 7)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "((`1` = ?) OR (`2` = ?))", result.Clause)
+		assert.Equal(t, []interface{}{"a", "b"}, result.Args)
+	})
+
+	t.Run("invalid expression skipped when other perms valid", func(t *testing.T) {
+		svc, rowRepo, _, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 12, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `not-json`}))
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 12, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `{"logic":"OR","items":[{"fieldId":3,"term":"eq","value":"ok"}]}`}))
+
+		result, err := svc.BuildWhereClause(12, 7)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "((`3` = ?))", result.Clause)
+		assert.Equal(t, []interface{}{"ok"}, result.Args)
+	})
+
+	t.Run("all invalid or disabled returns nil", func(t *testing.T) {
+		svc, rowRepo, _, db := setupRowPermissionServiceRepoTest(t, nil, nil)
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 13, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: ""}))
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 13, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, Status: permission.StatusEnabled, ExpressionTree: `not-json`}))
+		require.NoError(t, rowRepo.Create(&permission.DataPermRow{DatasetID: 13, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 7, ExpressionTree: `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"x"}]}`}))
+		require.NoError(t, db.Model(&permission.DataPermRow{}).Where("dataset_id = ? AND auth_target_id = ? AND expression_tree = ?", 13, 7, `{"logic":"OR","items":[{"fieldId":1,"term":"eq","value":"x"}]}`).Update("status", permission.StatusDisabled).Error)
+
+		result, err := svc.BuildWhereClause(13, 7)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("get tree error returns error", func(t *testing.T) {
+		svc, _, _, db := setupRowPermissionServiceRepoTest(t, nil, nil)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+
+		result, whereErr := svc.BuildWhereClause(10, 7)
+		require.Error(t, whereErr)
+		assert.Nil(t, result)
+	})
+}
+
+func TestRowPermissionService_BuildSelectColumns(t *testing.T) {
+	t.Run("no column permissions returns wildcard", func(t *testing.T) {
+		svc, _, _, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+
+		cols, err := svc.BuildSelectColumns(10, 7)
+		require.NoError(t, err)
+		assert.Equal(t, "*", cols)
+	})
+
+	t.Run("no disabled columns returns wildcard", func(t *testing.T) {
+		svc, _, colRepo, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+		require.NoError(t, colRepo.Create(&permission.DataPermColumn{DatasetID: 10, FieldName: "name", PermType: "mask", Status: permission.StatusEnabled}))
+
+		cols, err := svc.BuildSelectColumns(10, 7)
+		require.NoError(t, err)
+		assert.Equal(t, "*", cols)
+	})
+
+	t.Run("excludes disabled columns and all excluded falls back to wildcard", func(t *testing.T) {
+		t.Run("excludes disabled columns", func(t *testing.T) {
+			svc, _, colRepo, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+			require.NoError(t, colRepo.Create(&permission.DataPermColumn{DatasetID: 10, FieldName: "name", PermType: "disable", Status: permission.StatusEnabled}))
+			require.NoError(t, colRepo.Create(&permission.DataPermColumn{DatasetID: 10, FieldName: "age", PermType: "disable", Status: permission.StatusEnabled}))
+			require.NoError(t, colRepo.Create(&permission.DataPermColumn{DatasetID: 10, FieldName: "city", PermType: "mask", Status: permission.StatusEnabled}))
+
+			cols, err := svc.BuildSelectColumns(10, 7)
+			require.NoError(t, err)
+			assert.Equal(t, "`city`", cols)
+		})
+
+		t.Run("all columns excluded falls back to wildcard", func(t *testing.T) {
+			svc, _, colRepo, _ := setupRowPermissionServiceRepoTest(t, nil, nil)
+			require.NoError(t, colRepo.Create(&permission.DataPermColumn{DatasetID: 11, FieldName: "only_col", PermType: "disable", Status: permission.StatusEnabled}))
+
+			cols, err := svc.BuildSelectColumns(11, 7)
+			require.NoError(t, err)
+			assert.Equal(t, "*", cols)
+		})
+	})
+
+	t.Run("list columns error returns wildcard", func(t *testing.T) {
+		svc, _, colRepo, db := setupRowPermissionServiceRepoTest(t, nil, nil)
+		require.NoError(t, colRepo.Create(&permission.DataPermColumn{DatasetID: 10, FieldName: "name", PermType: "disable", Status: permission.StatusEnabled}))
+		require.NoError(t, db.Migrator().DropTable(&permission.DataPermColumn{}))
+
+		cols, err := svc.BuildSelectColumns(10, 7)
+		require.NoError(t, err)
+		assert.Equal(t, "*", cols)
+	})
+}
+
+func TestRowPermissionService_GetUserRoleIDs_AdditionalBranches(t *testing.T) {
+	t.Run("nil repo returns nil", func(t *testing.T) {
+		svc := &RowPermissionService{userRoleRepo: nil}
+		ids, err := svc.GetUserRoleIDs(1)
+		require.NoError(t, err)
+		assert.Nil(t, ids)
+	})
+
+	t.Run("success delegates role ids", func(t *testing.T) {
+		svc := &RowPermissionService{userRoleRepo: &mockUserRoleRepo{roleIDs: []int64{3, 4}}}
+		ids, err := svc.GetUserRoleIDs(2)
+		require.NoError(t, err)
+		assert.Equal(t, []int64{3, 4}, ids)
+	})
+
+	t.Run("repo error propagates", func(t *testing.T) {
+		wantErr := errors.New("role ids failed")
+		svc := &RowPermissionService{userRoleRepo: &mockUserRoleRepo{err: wantErr}}
+		ids, err := svc.GetUserRoleIDs(2)
+		assert.Nil(t, ids)
+		assert.ErrorIs(t, err, wantErr)
+	})
 }

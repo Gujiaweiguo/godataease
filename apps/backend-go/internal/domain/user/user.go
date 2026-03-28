@@ -73,23 +73,27 @@ func (SysUserPerm) TableName() string {
 
 // UserCreateRequest 创建用户请求
 type UserCreateRequest struct {
-	Username string  `json:"username" binding:"required"`
-	Password string  `json:"password" binding:"required"`
-	RealName string  `json:"realName"`
-	Email    *string `json:"email"`
-	Phone    *string `json:"phone"`
-	Status   *int    `json:"status"`
+	Username       string  `json:"username" binding:"required"`
+	Password       string  `json:"password" binding:"required"`
+	RealName       string  `json:"realName"`
+	Email          *string `json:"email"`
+	Phone          *string `json:"phone"`
+	Status         *int    `json:"status"`
+	OrgID          *int64  `json:"orgId"`
+	OrganizationID *int64  `json:"organizationId"`
 }
 
 // UserUpdateRequest 更新用户请求
 type UserUpdateRequest struct {
-	ID       int64   `json:"id" binding:"required"`
-	Username string  `json:"username"`
-	RealName string  `json:"realName"`
-	Email    *string `json:"email"`
-	Phone    *string `json:"phone"`
-	Password *string `json:"password"`
-	Status   *int    `json:"status"`
+	ID             int64   `json:"id" binding:"required"`
+	Username       string  `json:"username"`
+	RealName       string  `json:"realName"`
+	Email          *string `json:"email"`
+	Phone          *string `json:"phone"`
+	Password       *string `json:"password"`
+	Status         *int    `json:"status"`
+	OrgID          *int64  `json:"orgId"`
+	OrganizationID *int64  `json:"organizationId"`
 }
 
 // UserQueryRequest 查询用户请求

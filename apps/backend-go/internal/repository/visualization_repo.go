@@ -98,6 +98,28 @@ func (r *VisualizationRepository) ListAllByTypes(types []string) ([]*visualizati
 	return list, err
 }
 
+func (r *VisualizationRepository) ListAllByTypesBatch(types []string, afterID int64, limit int, orgID *int64) ([]*visualization.DataVisualizationInfo, error) {
+	var list []*visualization.DataVisualizationInfo
+
+	q := r.db.Model(&visualization.DataVisualizationInfo{}).
+		Where("COALESCE(delete_flag, 0) = 0")
+	if len(types) > 0 {
+		q = q.Where("type IN ?", types)
+	}
+	if afterID > 0 {
+		q = q.Where("id > ?", afterID)
+	}
+	if orgID != nil && *orgID > 0 {
+		q = q.Where("org_id = ?", *orgID)
+	}
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Order("id ASC").Find(&list).Error
+	return list, err
+}
+
 func (r *VisualizationRepository) CountByNameAndPID(name string, pid *int64, excludeID *int64) (int64, error) {
 	var count int64
 	normalizedPID := int64(0)

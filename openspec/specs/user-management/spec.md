@@ -135,6 +135,19 @@ The system SHALL support bulk operations for efficient user management including
 - **WHEN** 用户被删除
 - **THEN** 系统 SHALL 调用 AuditService 记录 DELETE 操作审计日志
 
+### Requirement: Organization-Scoped User Membership Baseline
+The system SHALL define user lifecycle operations against an explicit organization-scoped membership baseline that can be reused by later role and permission changes.
+
+#### Scenario: Administrator creates user within organization scope
+- **WHEN** an administrator creates a user for a target organization
+- **THEN** the system MUST persist the user's organization-scoped membership baseline required by downstream role assignment
+- **AND** later role workflows MUST be able to discover that user through the same organization scope
+
+#### Scenario: Administrator queries users for organization administration
+- **WHEN** an administrator opens a user list under a given organization context
+- **THEN** the system MUST return users according to that organization scope
+- **AND** the result MUST remain consistent with the organization context established by foundation bootstrap
+
 ### Requirement: User management scope expands to include role workflows
 The system SHALL expand the user-management capability so that governed role workflows are hosted inside the user-management page.
 
@@ -147,6 +160,14 @@ The system SHALL expand the user-management capability so that governed role wor
 - **WHEN** a user needs to manage roles from the user-management area
 - **THEN** the user-management capability MUST provide a Role tab within the same governed page
 - **AND** the role workflows exposed there MUST remain part of the user-management experience for this change scope
+
+### Requirement: User Management Must Expose Role-Workflow Entry Consistent With Organization Context
+The system SHALL expose role-workflow entry from user management using the same organization context that governs user administration.
+
+#### Scenario: Administrator transitions from user list to role tab
+- **WHEN** an administrator opens role workflows from the user-management surface
+- **THEN** the system MUST carry forward the active organization context already established for user administration
+- **AND** role member discovery MUST remain consistent with that carried context
 
 ### Requirement: Excel User Import with Partial Success
 The system SHALL provide Excel-based user bulk import with template validation, partial-success processing, and downloadable error reports.

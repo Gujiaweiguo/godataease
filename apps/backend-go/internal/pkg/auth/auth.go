@@ -12,6 +12,7 @@ type Claims struct {
 	UserID   uint64 `json:"user_id"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
+	OrgID    uint64 `json:"org_id"`
 	jwt.RegisteredClaims
 }
 
@@ -36,12 +37,18 @@ func NewJWT(config *JWTConfig) *JWT {
 }
 
 func (j *JWT) GenerateToken(userID uint64, username, role string) (string, error) {
+	return j.GenerateTokenWithOrgID(userID, username, role, 0)
+}
+
+func (j *JWT) GenerateTokenWithOrgID(userID uint64, username, role string, orgID uint64) (string, error) {
+	expiresAt := j.ExpirationTime()
 	claims := Claims{
 		UserID:   userID,
 		Username: username,
 		Role:     role,
+		OrgID:    orgID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(j.config.Expire) * time.Second)),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
@@ -49,6 +56,14 @@ func (j *JWT) GenerateToken(userID uint64, username, role string) (string, error
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(j.config.Secret))
+}
+
+func (j *JWT) ExpirationTime() time.Time {
+	return time.Now().Add(time.Duration(j.config.Expire) * time.Second)
+}
+
+func (j *JWT) ExpirationUnixMilli() int64 {
+	return j.ExpirationTime().UnixMilli()
 }
 
 func (j *JWT) ParseToken(tokenString string) (*Claims, error) {
@@ -82,7 +97,7 @@ func (j *JWT) RefreshToken(tokenString string) (string, error) {
 		return "", err
 	}
 
-	return j.GenerateToken(claims.UserID, claims.Username, claims.Role)
+	return j.GenerateTokenWithOrgID(claims.UserID, claims.Username, claims.Role, claims.OrgID)
 }
 
 func HashPassword(password string) (string, error) {

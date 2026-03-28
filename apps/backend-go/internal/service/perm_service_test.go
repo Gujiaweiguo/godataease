@@ -21,6 +21,14 @@ type failingCreatePermRepo struct {
 	repository.PermRepositoryInterface
 }
 
+type failingUpdatePermRepo struct {
+	repository.PermRepositoryInterface
+}
+
+type failingListPermRepo struct {
+	repository.PermRepositoryInterface
+}
+
 func (r *failingDeletePermRepo) Delete(permID int64) error {
 	return errors.New("delete failed")
 }
@@ -31,6 +39,14 @@ func (r *failingCheckPermRepo) CheckKeyExists(permKey string, excludePermID int6
 
 func (r *failingCreatePermRepo) Create(p *permission.SysPerm) error {
 	return errors.New("create failed")
+}
+
+func (r *failingUpdatePermRepo) Update(p *permission.SysPerm) error {
+	return errors.New("update failed")
+}
+
+func (r *failingListPermRepo) List() ([]*permission.SysPerm, error) {
+	return nil, errors.New("list failed")
 }
 
 func setupPermService() *PermService {
@@ -191,4 +207,133 @@ func TestCreatePerm_CreateError(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error from CreatePerm when repository create fails")
 	}
+}
+
+func TestCreatePerm_DefaultTypeAndCustomStatus(t *testing.T) {
+	svc := setupPermService()
+	disabled := permission.StatusDisabled
+
+	permID, err := svc.CreatePerm(&permission.PermCreateRequest{PermName: "Default Type", PermKey: "default:type", Status: &disabled})
+	if err != nil {
+		t.Fatalf("CreatePerm failed: %v", err)
+	}
+
+	created, err := svc.GetPermByID(permID)
+	if err != nil {
+		t.Fatalf("GetPermByID failed: %v", err)
+	}
+	if created.PermType != permission.PermTypeMenu {
+		t.Fatalf("Expected default perm type %s, got %s", permission.PermTypeMenu, created.PermType)
+	}
+	if created.Status != disabled {
+		t.Fatalf("Expected status %d, got %d", disabled, created.Status)
+	}
+}
+
+func TestUpdatePerm(t *testing.T) {
+	t.Run("returns not found when permission missing", func(t *testing.T) {
+		svc := setupPermService()
+
+		err := svc.UpdatePerm(&permission.PermUpdateRequest{PermID: 999, PermName: "missing"})
+		if err == nil {
+			t.Fatal("Expected not found error")
+		}
+	})
+
+	t.Run("rejects duplicate changed key", func(t *testing.T) {
+		svc := setupPermService()
+		_, _ = svc.CreatePerm(&permission.PermCreateRequest{PermName: "Perm A", PermKey: "perm:a"})
+		permID, _ := svc.CreatePerm(&permission.PermCreateRequest{PermName: "Perm B", PermKey: "perm:b"})
+
+		err := svc.UpdatePerm(&permission.PermUpdateRequest{PermID: permID, PermKey: "perm:a"})
+		if err == nil {
+			t.Fatal("Expected duplicate key error")
+		}
+	})
+
+	t.Run("updates changed fields and changed key", func(t *testing.T) {
+		svc := setupPermService()
+		desc := "old desc"
+		permID, _ := svc.CreatePerm(&permission.PermCreateRequest{PermName: "Perm A", PermKey: "perm:a", PermDesc: &desc})
+		newDesc := "new desc"
+		disabled := permission.StatusDisabled
+
+		err := svc.UpdatePerm(&permission.PermUpdateRequest{PermID: permID, PermName: "Perm A Updated", PermKey: "perm:a:updated", PermType: permission.PermTypeButton, PermDesc: &newDesc, Status: &disabled})
+		if err != nil {
+			t.Fatalf("UpdatePerm failed: %v", err)
+		}
+
+		updated, err := svc.GetPermByID(permID)
+		if err != nil {
+			t.Fatalf("GetPermByID failed: %v", err)
+		}
+		if updated.PermName != "Perm A Updated" || updated.PermKey != "perm:a:updated" || updated.PermType != permission.PermTypeButton {
+			t.Fatalf("Unexpected updated permission: %+v", updated)
+		}
+		if updated.PermDesc == nil || *updated.PermDesc != newDesc {
+			t.Fatal("Expected updated perm desc")
+		}
+		if updated.Status != disabled {
+			t.Fatalf("Expected status %d, got %d", disabled, updated.Status)
+		}
+		if updated.UpdateTime == nil {
+			t.Fatal("Expected update time to be set")
+		}
+	})
+
+	t.Run("propagates check and update errors", func(t *testing.T) {
+		base := repository.NewMockPermRepository()
+		_ = base.Create(&permission.SysPerm{PermName: "Perm A", PermKey: "perm:a", PermType: permission.PermTypeMenu, Status: permission.StatusEnabled, DelFlag: permission.DelFlagNormal})
+		svc := NewPermService(&failingCheckPermRepo{PermRepositoryInterface: base})
+
+		err := svc.UpdatePerm(&permission.PermUpdateRequest{PermID: 1, PermKey: "perm:b"})
+		if err == nil {
+			t.Fatal("Expected check key error")
+		}
+
+		base2 := repository.NewMockPermRepository()
+		_ = base2.Create(&permission.SysPerm{PermName: "Perm B", PermKey: "perm:b", PermType: permission.PermTypeMenu, Status: permission.StatusEnabled, DelFlag: permission.DelFlagNormal})
+		svc = NewPermService(&failingUpdatePermRepo{PermRepositoryInterface: base2})
+		err = svc.UpdatePerm(&permission.PermUpdateRequest{PermID: 1, PermName: "broken update"})
+		if err == nil {
+			t.Fatal("Expected update error")
+		}
+	})
+}
+
+func TestListPerms_NormalizationAndErrors(t *testing.T) {
+	t.Run("normalizes invalid page inputs and handles out of range", func(t *testing.T) {
+		svc := setupPermService()
+		for i := 1; i <= 3; i++ {
+			_, _ = svc.CreatePerm(&permission.PermCreateRequest{PermName: fmt.Sprintf("Perm %d", i), PermKey: fmt.Sprintf("perm:%d", i)})
+		}
+
+		result, err := svc.ListPerms(&permission.PermQueryRequest{Current: 0, Size: 0})
+		if err != nil {
+			t.Fatalf("ListPerms failed: %v", err)
+		}
+		if result.Current != 1 || result.Size != 10 {
+			t.Fatalf("Expected normalized pagination 1/10, got %d/%d", result.Current, result.Size)
+		}
+		if len(result.List.([]*permission.SysPerm)) != 3 {
+			t.Fatalf("Expected 3 items, got %d", len(result.List.([]*permission.SysPerm)))
+		}
+
+		result, err = svc.ListPerms(&permission.PermQueryRequest{Current: 5, Size: 2})
+		if err != nil {
+			t.Fatalf("ListPerms failed: %v", err)
+		}
+		if len(result.List.([]*permission.SysPerm)) != 0 {
+			t.Fatalf("Expected empty out-of-range page, got %d", len(result.List.([]*permission.SysPerm)))
+		}
+	})
+
+	t.Run("propagates repository list error", func(t *testing.T) {
+		svc := NewPermService(&failingListPermRepo{PermRepositoryInterface: repository.NewMockPermRepository()})
+
+		_, err := svc.ListPerms(&permission.PermQueryRequest{Current: 1, Size: 10})
+		if err == nil {
+			t.Fatal("Expected list error")
+		}
+	})
 }

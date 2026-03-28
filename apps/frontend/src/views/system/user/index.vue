@@ -71,12 +71,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
+import { useRoute, useRouter } from 'vue-router'
 import { queryUserApi, userCreateApi, userUpdateApi, userDeleteApi } from '@/api/auth'
 import { queryUserOptionsApi } from '@/api/org'
 import RoleTab from './RoleTab.vue'
 
+const route = useRoute()
+const router = useRouter()
 const activeTab = ref('user')
 const loading = ref(false)
 const userList = ref([])
@@ -197,7 +200,36 @@ const handleSubmit = async () => {
   }
 }
 
+const syncActiveTabFromRoute = () => {
+  const tab = typeof route.query.tab === 'string' ? route.query.tab : 'user'
+  activeTab.value = tab === 'role' ? 'role' : 'user'
+}
+
+watch(
+  () => route.query.tab,
+  () => {
+    syncActiveTabFromRoute()
+  },
+  { immediate: true }
+)
+
+watch(activeTab, (tab: string) => {
+  const nextTab = tab === 'role' ? 'role' : 'user'
+  const currentTab = typeof route.query.tab === 'string' ? route.query.tab : undefined
+  if ((currentTab || 'user') === nextTab) {
+    return
+  }
+
+  router.replace({
+    query: {
+      ...route.query,
+      tab: nextTab
+    }
+  })
+})
+
 onMounted(() => {
+  syncActiveTabFromRoute()
   loadUserList()
   loadOrganizationList()
 })
@@ -209,8 +241,8 @@ onMounted(() => {
 }
 
 .user-tabs {
-  background: #fff;
   padding: 16px;
+  background: #fff;
   border-radius: 4px;
 }
 
@@ -219,8 +251,8 @@ onMounted(() => {
 }
 
 .toolbar {
-  margin-bottom: 16px;
   display: flex;
+  margin-bottom: 16px;
   justify-content: flex-end;
 }
 </style>

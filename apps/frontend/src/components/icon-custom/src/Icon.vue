@@ -23,7 +23,9 @@ const svgClass = computed(() => {
     :class="svgClass"
     aria-hidden="true"
   ></div>
-  <slot v-else />
+  <span v-else class="svg-container" :class="svgClass" aria-hidden="true">
+    <slot />
+  </span>
 </template>
 <style lang="less" scope>
 .svg-icon {

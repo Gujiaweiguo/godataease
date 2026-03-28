@@ -134,6 +134,139 @@ func TestDatasetServiceIntegration_Save_Folder(t *testing.T) {
 	assert.Equal(t, "Save Test Folder", ds.Name)
 }
 
+func TestDatasetServiceIntegration_Save_InheritsParentResourcePermissions(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	svc := NewDatasetService(repo)
+	svc.SetResourcePermissionService(resourcePermSvc)
+
+	parent, err := svc.Save(&dataset.WriteRequest{Name: "Governed Dataset Folder", NodeType: dataset.NodeTypeFolder})
+	require.NoError(t, err)
+	require.NoError(t, resourcePermSvc.RegisterResource(parent.ID, parent.Name, permission.ResourceTypeDataset, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(parent.ID, permission.ResourceTypeDataset, []int64{21, 22}))
+
+	child, err := svc.Save(&dataset.WriteRequest{Name: "Inherited Dataset", NodeType: dataset.NodeTypeDataset, PID: &parent.ID})
+	require.NoError(t, err)
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(child.ID, permission.ResourceTypeDataset)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{21, 22}, permIDs)
+}
+
+func TestDatasetServiceIntegration_BackfillGovernedResources(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewDatasetService(repo)
+	backfillSvc := NewDatasetService(repo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	governedParent, err := seedSvc.Save(&dataset.WriteRequest{Name: "Governed Legacy Dataset Folder", NodeType: dataset.NodeTypeFolder})
+	require.NoError(t, err)
+	plainParent, err := seedSvc.Save(&dataset.WriteRequest{Name: "Ungoverned Legacy Dataset Folder", NodeType: dataset.NodeTypeFolder})
+	require.NoError(t, err)
+
+	governedChild, err := seedSvc.Save(&dataset.WriteRequest{Name: "Legacy Governed Dataset", NodeType: dataset.NodeTypeDataset, PID: &governedParent.ID})
+	require.NoError(t, err)
+	plainChild, err := seedSvc.Save(&dataset.WriteRequest{Name: "Legacy Plain Dataset", NodeType: dataset.NodeTypeDataset, PID: &plainParent.ID})
+	require.NoError(t, err)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(governedParent.ID, governedParent.Name, permission.ResourceTypeDataset, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(governedParent.ID, permission.ResourceTypeDataset, []int64{31, 32}))
+
+	report, err := backfillSvc.BackfillGovernedResources()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, report.Scanned, 4)
+	assert.Equal(t, 1, report.Governed)
+	assert.Contains(t, report.ResourceIDs, governedChild.ID)
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(governedChild.ID, permission.ResourceTypeDataset)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{31, 32}, permIDs)
+
+	plainPermIDs, plainExists, err := resourcePermRepo.GetResourcePermissionIDs(plainChild.ID, permission.ResourceTypeDataset)
+	require.NoError(t, err)
+	assert.False(t, plainExists)
+	assert.Empty(t, plainPermIDs)
+
+	report, err = backfillSvc.BackfillGovernedResources()
+	require.NoError(t, err)
+	assert.Equal(t, 1, report.Governed)
+
+	var resourceCount int64
+	require.NoError(t, testDB.Model(&permission.SysResource{}).
+		Where("resource_type = ? AND resource_name = ?", permission.ResourceTypeDataset, governedChild.Name).
+		Count(&resourceCount).Error)
+	assert.Equal(t, int64(1), resourceCount)
+
+	var resourcePermCount int64
+	require.NoError(t, testDB.Model(&permission.SysResourcePerm{}).
+		Where("resource_id = ?", int64(2_000_000_000_000)+governedChild.ID).
+		Count(&resourcePermCount).Error)
+	assert.Equal(t, int64(2), resourcePermCount)
+}
+
+func TestDatasetServiceIntegration_BackfillGovernedResourcesWithOptions(t *testing.T) {
+	cleanupTables(&permission.SysResourcePerm{}, &permission.SysResource{}, &dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+	resourcePermSvc := NewResourcePermissionService(resourcePermRepo, nil)
+	seedSvc := NewDatasetService(repo)
+	backfillSvc := NewDatasetService(repo)
+	backfillSvc.SetResourcePermissionService(resourcePermSvc)
+
+	governedParent, err := seedSvc.Save(&dataset.WriteRequest{Name: "Batch Governed Dataset Folder", NodeType: dataset.NodeTypeFolder})
+	require.NoError(t, err)
+	plainParent, err := seedSvc.Save(&dataset.WriteRequest{Name: "Batch Plain Dataset Folder", NodeType: dataset.NodeTypeFolder})
+	require.NoError(t, err)
+	governedChild, err := seedSvc.Save(&dataset.WriteRequest{Name: "Batch Governed Dataset", NodeType: dataset.NodeTypeDataset, PID: &governedParent.ID})
+	require.NoError(t, err)
+	plainChild, err := seedSvc.Save(&dataset.WriteRequest{Name: "Batch Plain Dataset", NodeType: dataset.NodeTypeDataset, PID: &plainParent.ID})
+	require.NoError(t, err)
+
+	require.NoError(t, resourcePermSvc.RegisterResource(governedParent.ID, governedParent.Name, permission.ResourceTypeDataset, nil))
+	require.NoError(t, resourcePermSvc.ReplaceResourcePermissions(governedParent.ID, permission.ResourceTypeDataset, []int64{71, 72}))
+
+	batch1, err := backfillSvc.BackfillGovernedResourcesWithOptions(&GovernanceBackfillOptions{Limit: 2})
+	require.NoError(t, err)
+	assert.Equal(t, 2, batch1.Scanned)
+	assert.Equal(t, 0, batch1.Governed)
+	assert.Equal(t, 2, batch1.Skipped)
+	assert.Equal(t, plainParent.ID, batch1.NextAfterID)
+	if assert.Len(t, batch1.SkippedItems, 2) {
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, batch1.SkippedItems[1].Reason)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[0].Remediation)
+		assert.Equal(t, GovernanceBackfillRemediationDataCleanup, batch1.SkippedItems[1].Remediation)
+	}
+
+	batch2, err := backfillSvc.BackfillGovernedResourcesWithOptions(&GovernanceBackfillOptions{AfterID: batch1.NextAfterID, Limit: 2})
+	require.NoError(t, err)
+	assert.Equal(t, 2, batch2.Scanned)
+	assert.Equal(t, 1, batch2.Governed)
+	assert.Equal(t, 1, batch2.Skipped)
+	assert.Contains(t, batch2.ResourceIDs, governedChild.ID)
+	if assert.Len(t, batch2.SkippedItems, 1) {
+		assert.Equal(t, plainChild.ID, batch2.SkippedItems[0].ResourceID)
+		assert.Equal(t, plainParent.ID, batch2.SkippedItems[0].ParentID)
+		assert.Equal(t, GovernanceBackfillSkipReasonParentNotGoverned, batch2.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillRemediationGovernParent, batch2.SkippedItems[0].Remediation)
+	}
+
+	permIDs, exists, err := resourcePermRepo.GetResourcePermissionIDs(governedChild.ID, permission.ResourceTypeDataset)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.ElementsMatch(t, []int64{71, 72}, permIDs)
+}
+
 func TestDatasetServiceIntegration_Save_DuplicateName(t *testing.T) {
 	cleanupTables(&dataset.CoreDatasetGroup{})
 

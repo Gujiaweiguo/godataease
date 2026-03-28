@@ -809,8 +809,39 @@ func (s *DatasetService) Create(req *dataset.WriteRequest) (*dataset.CoreDataset
 	if err = s.repo.CreateGroup(group); err != nil {
 		return nil, err
 	}
+	if err = s.applyInheritedPermissionsOnCreate(group.ID, group.Name, pid); err != nil {
+		_ = s.repo.SoftDeleteGroup(group.ID)
+		return nil, err
+	}
 
 	return group, nil
+}
+
+func (s *DatasetService) applyInheritedPermissionsOnCreate(resourceID int64, resourceName string, pid int64) error {
+	if s.resourcePermService == nil || pid <= 0 {
+		return nil
+	}
+	return s.resourcePermService.InheritParentResourcePermissions(pid, resourceID, resourceName, permission.ResourceTypeDataset)
+}
+
+func (s *DatasetService) BackfillGovernedResources() (*DatasetGovernanceBackfillReport, error) {
+	return s.BackfillGovernedResourcesWithOptions(nil)
+}
+
+func (s *DatasetService) BackfillGovernedResourcesWithOptions(options *GovernanceBackfillOptions) (*DatasetGovernanceBackfillReport, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("dataset repository not initialized")
+	}
+	if s.resourcePermService == nil {
+		return nil, fmt.Errorf("resource permission service not initialized")
+	}
+	return runGovernanceBackfillWithOptions(options, permission.ResourceTypeDataset, func(normalized GovernanceBackfillOptions) ([]*dataset.CoreDatasetGroup, error) {
+		return s.repo.ListGroupsBatch(nil, normalized.AfterID, normalized.Limit)
+	}, func(item *dataset.CoreDatasetGroup) governanceBackfillItem {
+		return governanceBackfillItem{resourceID: item.ID, parentID: item.PID, resourceName: item.Name}
+	}, func(parentID, resourceID int64, resourceName string) (bool, error) {
+		return s.resourcePermService.TryInheritParentResourcePermissions(parentID, resourceID, resourceName, permission.ResourceTypeDataset)
+	})
 }
 
 func (s *DatasetService) Rename(id int64, name string) (*dataset.CoreDatasetGroup, error) {

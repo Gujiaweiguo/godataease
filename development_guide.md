@@ -86,21 +86,39 @@ godataease/
 - **MySQL**: 8.0+
 - **Redis**: 7.0+
 
-### 2. 启动方式（Docker Compose）
+### 2. 启动方式（推荐：本地前后端 + Docker Redis + 外部 MySQL）
 
 ```bash
-# 在项目根目录启动服务
-docker network create my-net
-docker compose -f infra/compose/docker-compose.yml up -d --build
+# 在项目根目录启动 Redis 容器
+docker compose -f infra/compose/docker-compose.yml up -d godataease-redis
 
-# 访问地址
-# 前端: http://localhost:8080
-# 后端 API: http://localhost:8080/api
+# 启动本地 Go 后端
+cd apps/backend-go
+DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
+
+# 启动本地前端
+cd ../frontend
+npm install
+npm run dev
 ```
 
-说明：当前 `infra/compose/docker-compose.yml` 启动 `godataease-app + godataease-redis`，MySQL 需要提前可用，且可在 `my-net` 网络中通过 `mysql8:3306` 访问。
+说明：推荐日常开发将前端与 Go 后端都运行在宿主机；Redis 使用 Docker 容器并暴露到 `127.0.0.1:16379`；MySQL 继续使用外部实例。
 
-### 3. 前端开发模式
+默认访问地址：
+- 前端: `http://localhost:5173`
+- 后端 API: `http://localhost:8080/api`
+- 后端健康检查: `http://localhost:8080/health`
+
+### 3. 容器化开发（可选）
+
+```bash
+docker network create my-net
+docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d
+```
+
+说明：该模式会运行 `godataease-app + godataease-redis`，适合做容器路径验证，不再作为首选本地开发循环。
+
+### 4. 前端开发模式
 
 ```bash
 cd apps/frontend
@@ -111,10 +129,10 @@ npm install
 # 启动开发服务器
 npm run dev
 
-# 访问: http://localhost:8080
+# 访问: http://localhost:5173
 ```
 
-### 4. Go 后端开发模式
+### 5. Go 后端开发模式
 
 ```bash
 cd apps/backend-go
@@ -125,16 +143,16 @@ go mod tidy
 # 运行
 make run
 
-# 本机 MySQL/Redis（localhost）
-make run-local
+# 连接外部 MySQL + Docker Redis
+DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
 
 # 或直接运行
 go run ./cmd/api
 ```
 
-提示：本地运行端口由 `apps/backend-go/configs/config.yaml` 的 `server.port` 控制（当前仓库默认值为 `8100`）。
+提示：本地运行端口由 `apps/backend-go/configs/config.yaml` 的 `server.port` 控制，当前仓库默认值为 `8080`。
 
-### 5. Java 后端开发模式（仅参考）
+### 6. Java 后端开发模式（仅参考）
 
 ```bash
 # 编译后端

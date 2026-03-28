@@ -24,9 +24,12 @@ watch(formatData, () => {
   emits('update:modelValue', formatData.value)
 })
 
-watch([props.theme], () => {
-  format()
-})
+watch(
+  () => props.theme,
+  () => {
+	format()
+  }
+)
 onMounted(() => {
   format()
 })

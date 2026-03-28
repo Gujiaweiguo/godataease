@@ -49,12 +49,23 @@ const iconMap = {
   log
 }
 
-const titleWithIcon = props => {
+const renderMenuIcon = icon => {
+  const iconComponent = iconMap[icon]
+  if (!iconComponent) {
+    return null
+  }
+  return h(ElIcon, null, { default: () => h(iconComponent, { className: 'svg-icon logo' }) })
+}
+
+const renderMenuLabel = props => {
   const { title, icon } = props.menu?.meta || {}
-  return [
-    h(ElIcon, null, { default: () => h(iconMap[icon], { className: 'svg-icon logo' }) }),
-    h('span', null, { default: () => title })
-  ]
+  const nodes = []
+  const iconNode = renderMenuIcon(icon)
+  if (iconNode) {
+    nodes.push(iconNode)
+  }
+  nodes.push(h('span', null, title))
+  return nodes
 }
 
 const MenuItem = props => {
@@ -67,20 +78,16 @@ const MenuItem = props => {
       ElSubMenu,
       { index: path },
       {
-        title: () => titleWithIcon(props),
+        title: () => renderMenuLabel(props),
         default: () => children.map(ele => h(MenuItem, { menu: ele }))
       }
     )
   }
-  const { title, icon } = props.menu?.meta || {}
   return h(
     ElMenuItem,
     { index: path },
     {
-      title: h('span', null, { default: () => title }),
-      default: h(iconMap[icon] ? ElIcon : null, null, {
-        default: () => h(iconMap[icon], { className: 'svg-icon logo' })
-      })
+      default: () => renderMenuLabel(props)
     }
   )
 }

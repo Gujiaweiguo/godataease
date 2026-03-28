@@ -10,13 +10,33 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/repository"
 	calcitev1 "dataease/backend/proto/calcite/v1"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
+
+func setupDatasetServiceRepoTest(t *testing.T) (*DatasetService, *gorm.DB) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
+
+	repo := repository.NewDatasetRepository(db)
+	return NewDatasetService(repo), db
+}
+
+type datasetAdminChecker struct{ isAdmin bool }
+
+func (c datasetAdminChecker) IsAdmin(int64) bool { return c.isAdmin }
 
 func TestInferSQLVariableDeType(t *testing.T) {
 	cases := []struct {
@@ -24,9 +44,18 @@ func TestInferSQLVariableDeType(t *testing.T) {
 		types    []string
 		expected int
 	}{
+		{name: "empty", types: []string{}, expected: 0},
+		{name: "blank", types: []string{"   "}, expected: 0},
 		{name: "datetime", types: []string{"DATETIME"}, expected: 1},
+		{name: "timestamp", types: []string{"timestamp"}, expected: 1},
+		{name: "date", types: []string{"date"}, expected: 1},
+		{name: "year", types: []string{"year"}, expected: 1},
 		{name: "double", types: []string{"DOUBLE"}, expected: 3},
+		{name: "decimal", types: []string{"decimal(10,2)"}, expected: 3},
+		{name: "numeric", types: []string{"numeric"}, expected: 3},
 		{name: "bigint", types: []string{"BIGINT"}, expected: 2},
+		{name: "smallint", types: []string{"smallint"}, expected: 2},
+		{name: "boolean", types: []string{"boolean"}, expected: 4},
 		{name: "text", types: []string{"TEXT"}, expected: 0},
 	}
 
@@ -92,6 +121,11 @@ type mockCalciteValidateErrorServer struct {
 	validateCalls int32
 }
 
+type mockCalciteValidateSuccessServer struct {
+	calcitev1.UnimplementedCalciteServiceServer
+	validateCalls int32
+}
+
 func (m *mockCalciteValidateServer) ParseSQL(context.Context, *calcitev1.ParseSQLRequest) (*calcitev1.ParseSQLResponse, error) {
 	return &calcitev1.ParseSQLResponse{NormalizedSql: "SELECT 1"}, nil
 }
@@ -108,6 +142,15 @@ func (m *mockCalciteValidateErrorServer) ParseSQL(context.Context, *calcitev1.Pa
 func (m *mockCalciteValidateErrorServer) ValidateSQL(context.Context, *calcitev1.ValidateSQLRequest) (*calcitev1.ValidateSQLResponse, error) {
 	atomic.AddInt32(&m.validateCalls, 1)
 	return nil, status.Error(codes.Unavailable, "calcite unavailable")
+}
+
+func (m *mockCalciteValidateSuccessServer) ParseSQL(context.Context, *calcitev1.ParseSQLRequest) (*calcitev1.ParseSQLResponse, error) {
+	return &calcitev1.ParseSQLResponse{NormalizedSql: "SELECT 1"}, nil
+}
+
+func (m *mockCalciteValidateSuccessServer) ValidateSQL(context.Context, *calcitev1.ValidateSQLRequest) (*calcitev1.ValidateSQLResponse, error) {
+	atomic.AddInt32(&m.validateCalls, 1)
+	return &calcitev1.ValidateSQLResponse{Valid: true}, nil
 }
 
 func startMockCalciteServer(t *testing.T, srv calcitev1.CalciteServiceServer) (string, func()) {
@@ -321,6 +364,43 @@ func TestSetCalciteConfig_DefaultPreserve(t *testing.T) {
 	assert.Equal(t, 2, svc.calciteRetries)
 }
 
+func TestDatasetService_CalciteHelpersDirect(t *testing.T) {
+	t.Run("validate with calcite disabled returns nil", func(t *testing.T) {
+		svc := NewDatasetService(nil)
+		require.NoError(t, svc.validateWithCalciteIfEnabled("SELECT 1"))
+	})
+
+	t.Run("ensure calcite client creates and reuses client", func(t *testing.T) {
+		mock := &mockCalciteValidateSuccessServer{}
+		addr, cleanup := startMockCalciteServer(t, mock)
+		defer cleanup()
+
+		svc := NewDatasetService(nil)
+		svc.SetCalciteConfig(addr, 0, -1)
+
+		client1, err := svc.ensureCalciteClient()
+		require.NoError(t, err)
+		require.NotNil(t, client1)
+
+		client2, err := svc.ensureCalciteClient()
+		require.NoError(t, err)
+		assert.Same(t, client1, client2)
+
+		require.NoError(t, svc.validateWithCalciteIfEnabled("SELECT 1"))
+		assert.Greater(t, atomic.LoadInt32(&mock.validateCalls), int32(0))
+	})
+
+	t.Run("ensure calcite client returns constructor error for blank address", func(t *testing.T) {
+		svc := NewDatasetService(nil)
+		svc.calciteAddress = "   "
+
+		client, err := svc.ensureCalciteClient()
+		require.Error(t, err)
+		assert.Nil(t, client)
+		assert.Contains(t, err.Error(), "calcite address is required")
+	})
+}
+
 func TestDatasetService_EarlyValidation(t *testing.T) {
 	svc := NewDatasetService(nil)
 
@@ -393,3 +473,702 @@ func TestPreviewSQL_CalciteEmptyAddress(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 }
+
+func TestDatasetService_RepoBackedWrappers(t *testing.T) {
+	t.Run("set resource permission service stores dependency", func(t *testing.T) {
+		svc := NewDatasetService(nil)
+		permSvc := &ResourcePermissionService{}
+		svc.SetResourcePermissionService(permSvc)
+		assert.Same(t, permSvc, svc.resourcePermService)
+	})
+
+	t.Run("tree get group and fields use repository data", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		folderType := dataset.NodeTypeFolder
+		datasetType := dataset.NodeTypeDataset
+		level1 := 1
+		level2 := 2
+		rootPID := int64(0)
+		childPID := int64(1)
+		fieldName := "amount"
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, Level: &level1, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "Sales", PID: &childPID, Level: &level2, NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 11, DatasetGroupID: 2, Name: &fieldName}).Error)
+
+		tree, err := svc.Tree(&dataset.TreeRequest{})
+		require.NoError(t, err)
+		require.Len(t, tree, 1)
+		assert.Equal(t, int64(1), tree[0].ID)
+		require.Len(t, tree[0].Children, 1)
+		assert.Equal(t, int64(2), tree[0].Children[0].ID)
+
+		keyword := "Sale"
+		tree, err = svc.Tree(&dataset.TreeRequest{Keyword: &keyword})
+		require.NoError(t, err)
+		require.Len(t, tree, 0)
+
+		group, err := svc.GetGroupByID(2)
+		require.NoError(t, err)
+		assert.Equal(t, "Sales", group.Name)
+
+		fields, err := svc.Fields(&dataset.FieldsRequest{DatasetGroupID: 2})
+		require.NoError(t, err)
+		require.Len(t, fields, 1)
+		require.NotNil(t, fields[0].Name)
+		assert.Equal(t, "amount", *fields[0].Name)
+	})
+
+	t.Run("preview wrappers read dataset table rows and permission helper short-circuits", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		physicalTable := "orders_preview"
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 21, DatasetGroupID: 5, PhysicalTable: &physicalTable}).Error)
+		require.NoError(t, db.Exec("CREATE TABLE orders_preview (name TEXT, amount INTEGER)").Error)
+		require.NoError(t, db.Exec("INSERT INTO orders_preview (name, amount) VALUES ('alice', 10), ('bob', 20)").Error)
+
+		preview, err := svc.Preview(&dataset.PreviewRequest{DatasetGroupID: 5, Limit: 1})
+		require.NoError(t, err)
+		require.NotNil(t, preview)
+		assert.Equal(t, int64(2), preview.Total)
+		require.Len(t, preview.Rows, 1)
+		assert.Contains(t, preview.Columns, "amount")
+		assert.Contains(t, preview.Columns, "name")
+
+		previewWithPerm, err := svc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: 5, Limit: 1}, 7)
+		require.NoError(t, err)
+		require.NotNil(t, previewWithPerm)
+		assert.Equal(t, int64(2), previewWithPerm.Total)
+		require.Len(t, previewWithPerm.Rows, 1)
+
+		require.NoError(t, svc.ensureDatasourceDependenciesViewable(5, 7))
+		require.NoError(t, svc.ensureDatasourceDependenciesViewable(0, 7))
+		require.NoError(t, svc.ensureDatasourceDependenciesViewable(5, 0))
+	})
+}
+
+func setupDatasetEnumFixture(t *testing.T) (*DatasetService, *gorm.DB) {
+	t.Helper()
+
+	svc, db := setupDatasetServiceRepoTest(t)
+	rootPID := int64(0)
+	rootLevel := 0
+	childLevel := 1
+	rootType := dataset.NodeTypeFolder
+	childType := dataset.NodeTypeDataset
+	ordersTable := "orders_enum"
+	otherTable := "other_enum"
+	sqlVariables := `[{"variableName":"regionVar","type":["VARCHAR"],"params":["north"]},{"variableName":"amountVar","type":["DOUBLE"],"params":[1]}]`
+	blankSQLVariables := `[{"variableName":"   ","type":["VARCHAR"]}]`
+	invalidSQLVariables := `not-json`
+	queryName := "status_label"
+	queryOrigin := "status"
+	queryType := 0
+	queryDatasetID := int64(101)
+	displayOrigin := "status_name"
+	displayType := 0
+	displayDatasetID := int64(101)
+	sortOrigin := "sort_rank"
+	sortType := 2
+	sortDatasetID := int64(101)
+	filterOrigin := "region"
+	filterType := 0
+	filterDatasetID := int64(101)
+	crossOrigin := "category"
+	crossType := 0
+	crossDatasetID := int64(102)
+	floatOrigin := "amount_text"
+	floatType := 3
+	blankName := "fallback_name"
+	blankDatasetID := int64(0)
+	blankGroupID := int64(2)
+
+	require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, Level: &rootLevel, NodeType: &rootType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "Sales", PID: int64PtrDataset(1), Level: &childLevel, NodeType: &childType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3, Name: "Loop", PID: int64PtrDataset(3), Level: &childLevel, NodeType: &childType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 4, Name: "Orphan", PID: int64PtrDataset(99), Level: &childLevel, NodeType: &childType}).Error)
+
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 101, DatasetGroupID: 2, PhysicalTable: &ordersTable, SQLVariables: &sqlVariables}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 102, DatasetGroupID: 2, PhysicalTable: &otherTable, SQLVariables: &blankSQLVariables}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 103, DatasetGroupID: 4, PhysicalTable: &ordersTable, SQLVariables: &invalidSQLVariables}).Error)
+
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 11, DatasetGroupID: 2, DatasetTableID: &queryDatasetID, Name: &queryName, OriginName: &queryOrigin, DeType: &queryType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 12, DatasetGroupID: 2, DatasetTableID: &displayDatasetID, OriginName: &displayOrigin, DeType: &displayType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 13, DatasetGroupID: 2, DatasetTableID: &sortDatasetID, OriginName: &sortOrigin, DeType: &sortType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 14, DatasetGroupID: 2, DatasetTableID: &filterDatasetID, OriginName: &filterOrigin, DeType: &filterType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 15, DatasetGroupID: 2, DatasetTableID: &crossDatasetID, OriginName: &crossOrigin, DeType: &crossType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 16, DatasetGroupID: 2, OriginName: strPtrDataset(""), Name: &blankName, DeType: &filterType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 17, DatasetGroupID: 2, DatasetTableID: &queryDatasetID, OriginName: &floatOrigin, DeType: &floatType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 18, DatasetGroupID: blankGroupID, DatasetTableID: &blankDatasetID, OriginName: strPtrDataset("  "), Name: strPtrDataset("   "), DataeaseName: strPtrDataset("  ")}).Error)
+
+	require.NoError(t, db.Exec("CREATE TABLE orders_enum (status TEXT, status_name TEXT, sort_rank INTEGER, region TEXT, amount_text TEXT)").Error)
+	require.NoError(t, db.Exec("INSERT INTO orders_enum (status, status_name, sort_rank, region, amount_text) VALUES ('A', 'Alpha', 2, 'North', '1.23E+3'), ('A', 'Alpha', 2, 'North', '1.23E+3'), ('B', 'Beta', 1, 'North', '2.00E+2'), ('C', 'Gamma', 3, 'South', '3.50E+1'), ('', 'Blank', 4, 'North', NULL)").Error)
+	require.NoError(t, db.Exec("CREATE TABLE other_enum (category TEXT)").Error)
+	require.NoError(t, db.Exec("INSERT INTO other_enum (category) VALUES ('X'), ('Y')").Error)
+
+	return svc, db
+}
+
+func TestDatasetService_SQLParamsAndEnumHelpers(t *testing.T) {
+	t.Run("dataset full name walks hierarchy and stops on loops or missing parents", func(t *testing.T) {
+		svc, _ := setupDatasetEnumFixture(t)
+
+		fullName, err := svc.datasetFullName(2)
+		require.NoError(t, err)
+		assert.Equal(t, "Root/Sales", fullName)
+
+		fullName, err = svc.datasetFullName(3)
+		require.NoError(t, err)
+		assert.Equal(t, "Loop", fullName)
+
+		fullName, err = svc.datasetFullName(4)
+		require.NoError(t, err)
+		assert.Equal(t, "Orphan", fullName)
+
+		fullName, err = svc.datasetFullName(0)
+		require.NoError(t, err)
+		assert.Equal(t, "", fullName)
+	})
+
+	t.Run("get sql params skips invalid inputs and parses valid variables", func(t *testing.T) {
+		svc, _ := setupDatasetEnumFixture(t)
+
+		params, err := svc.GetSQLParams(nil)
+		require.NoError(t, err)
+		assert.Empty(t, params)
+
+		params, err = svc.GetSQLParams([]int64{-1, 2, 4, 999})
+		require.NoError(t, err)
+		require.Len(t, params, 2)
+		assert.Equal(t, "regionVar", params[0].VariableName)
+		assert.Equal(t, "Root/Sales", params[0].DatasetFullName)
+		assert.Equal(t, 0, params[0].DeType)
+		assert.Equal(t, "amountVar", params[1].VariableName)
+		assert.Equal(t, 3, params[1].DeType)
+	})
+
+	t.Run("resolve enum field target uses origin dataease name and table fallbacks", func(t *testing.T) {
+		svc, _ := setupDatasetEnumFixture(t)
+
+		field, tableName, columnName, err := svc.resolveEnumFieldTarget(11)
+		require.NoError(t, err)
+		assert.Equal(t, int64(11), field.ID)
+		assert.Equal(t, "orders_enum", tableName)
+		assert.Equal(t, "status", columnName)
+
+		field, tableName, columnName, err = svc.resolveEnumFieldTarget(16)
+		require.NoError(t, err)
+		assert.Equal(t, int64(16), field.ID)
+		assert.Equal(t, "orders_enum", tableName)
+		assert.Equal(t, "fallback_name", columnName)
+
+		field, tableName, columnName, err = svc.resolveEnumFieldTarget(18)
+		require.Error(t, err)
+		assert.Nil(t, field)
+		assert.Equal(t, "", tableName)
+		assert.Equal(t, "", columnName)
+		assert.Contains(t, err.Error(), "origin name is required")
+	})
+
+	t.Run("build enum filter clauses keeps same-table valid in filters only", func(t *testing.T) {
+		svc, _ := setupDatasetEnumFixture(t)
+
+		clauses, err := svc.buildEnumFilterClauses([]dataset.EnumFilter{{Operator: "eq", FieldID: "14", Value: []interface{}{"North"}}, {Operator: "in", FieldID: "14,999,15", Value: []interface{}{"North", "North", ""}}, {Operator: "in", FieldID: "", Value: []interface{}{"North"}}, {Operator: "in", FieldID: "14", Value: []interface{}{}}}, "orders_enum")
+		require.NoError(t, err)
+		require.Len(t, clauses, 1)
+		assert.Equal(t, "region", clauses[0].Column)
+		assert.Equal(t, []string{"North"}, clauses[0].Values)
+	})
+}
+
+func TestDatasetService_EnumQueries(t *testing.T) {
+	t.Run("get field enum deduplicates values and applies filters", func(t *testing.T) {
+		svc, _ := setupDatasetEnumFixture(t)
+
+		values, err := svc.GetFieldEnum(nil)
+		require.NoError(t, err)
+		assert.Empty(t, values)
+
+		values, err = svc.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{11, 11, 17, 999, -1}, Filter: []dataset.EnumFilter{{FieldID: "14", Operator: "in", Value: []interface{}{"North"}}}})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A", "B", "1230", "200"}, values)
+
+		wrapped, err := svc.GetFieldEnumDs(11)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"A", "B", "C"}, wrapped)
+
+		wrapped, err = svc.GetFieldEnumDs(0)
+		require.NoError(t, err)
+		assert.Empty(t, wrapped)
+	})
+
+	t.Run("get field enum obj handles fallbacks search sort and dedupe", func(t *testing.T) {
+		svc, _ := setupDatasetEnumFixture(t)
+
+		items, err := svc.GetFieldEnumObj(nil)
+		require.NoError(t, err)
+		assert.Empty(t, items)
+
+		items, err = svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 999})
+		require.NoError(t, err)
+		assert.Empty(t, items)
+
+		items, err = svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 11, DisplayID: 15, SortID: 15, Sort: "DESC", SearchText: "a", Filter: []dataset.EnumFilter{{FieldID: "14", Operator: "in", Value: []interface{}{"North"}}}})
+		require.NoError(t, err)
+		require.Len(t, items, 1)
+		assert.Equal(t, map[string]interface{}{"11": "A"}, items[0])
+
+		items, err = svc.GetFieldEnumObj(&dataset.EnumValueRequest{QueryID: 11, DisplayID: 12, SortID: 13, Sort: "ASC", Filter: []dataset.EnumFilter{{FieldID: "14", Operator: "in", Value: []interface{}{"North"}}}, ResultMode: 1})
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+		assert.Equal(t, map[string]interface{}{"11": "B", "12": "Beta"}, items[0])
+		assert.Equal(t, map[string]interface{}{"11": "A", "12": "Alpha"}, items[1])
+	})
+}
+
+func TestDatasetService_GroupMutations(t *testing.T) {
+	t.Run("create save rename move and delete exercise sqlite-backed paths", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		rootLevel := 0
+		folderType := dataset.NodeTypeFolder
+		datasetType := dataset.NodeTypeDataset
+		dashboardType := "dashboard"
+		chartTableName := "table_for_chart"
+		require.NoError(t, db.Exec("CREATE TABLE core_chart_view (id INTEGER PRIMARY KEY AUTOINCREMENT, table_id INTEGER)").Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, Level: &rootLevel, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "ChildA", PID: int64PtrDataset(1), Level: intPtrDataset(1), NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3, Name: "ChildB", PID: int64PtrDataset(1), Level: intPtrDataset(1), NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 4, Name: "Grand", PID: int64PtrDataset(2), Level: intPtrDataset(2), NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 201, DatasetGroupID: 2, PhysicalTable: &chartTableName}).Error)
+		require.NoError(t, db.Exec("INSERT INTO core_chart_view (table_id) VALUES (201)").Error)
+
+		created, err := svc.Create(&dataset.WriteRequest{Name: "CreatedRoot", NodeType: "", Type: &dashboardType})
+		require.NoError(t, err)
+		require.NotNil(t, created)
+		assert.Equal(t, "CreatedRoot", created.Name)
+		require.NotNil(t, created.PID)
+		assert.Equal(t, int64(0), *created.PID)
+		require.NotNil(t, created.NodeType)
+		assert.Equal(t, dataset.NodeTypeFolder, *created.NodeType)
+
+		createdChild, err := svc.Create(&dataset.WriteRequest{Name: "CreatedChild", PID: int64PtrDataset(1), NodeType: dataset.NodeTypeDataset})
+		require.NoError(t, err)
+		require.NotNil(t, createdChild.Level)
+		assert.Equal(t, 1, *createdChild.Level)
+
+		_, err = svc.Create(&dataset.WriteRequest{Name: "ChildA", PID: int64PtrDataset(1)})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists")
+
+		saved, err := svc.Save(&dataset.WriteRequest{ID: 2, Name: "  ", PID: int64PtrDataset(0), NodeType: "unknown", Type: &dashboardType})
+		require.NoError(t, err)
+		assert.Equal(t, "ChildA", saved.Name)
+		require.NotNil(t, saved.PID)
+		assert.Equal(t, int64(0), *saved.PID)
+		require.NotNil(t, saved.NodeType)
+		assert.Equal(t, dataset.NodeTypeDataset, *saved.NodeType)
+		require.NotNil(t, saved.Type)
+		assert.Equal(t, "dashboard", *saved.Type)
+
+		_, err = svc.Save(&dataset.WriteRequest{ID: 999, Name: "missing"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset not found")
+
+		_, err = svc.Save(&dataset.WriteRequest{ID: 3, Name: "ChildA", PID: int64PtrDataset(0)})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists")
+
+		renamed, err := svc.Rename(3, "ChildB-Renamed")
+		require.NoError(t, err)
+		assert.Equal(t, "ChildB-Renamed", renamed.Name)
+
+		_, err = svc.Rename(3, "CreatedChild")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists")
+
+		_, err = svc.Rename(999, "missing")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset not found")
+
+		_, err = svc.Move(3, 999)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "destination folder not found")
+
+		_, err = svc.Move(2, 4)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "child of current dataset")
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 50, Name: "ChildB-Renamed", PID: &rootPID, Level: &rootLevel, NodeType: &datasetType}).Error)
+
+		_, err = svc.Move(3, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists")
+
+		_, err = svc.Rename(50, "RootUnique")
+		require.NoError(t, err)
+
+		moved, err := svc.Move(3, 0)
+		require.NoError(t, err)
+		require.NotNil(t, moved.PID)
+		assert.Equal(t, int64(0), *moved.PID)
+
+		hasRelation, err := svc.PerDelete(2)
+		require.NoError(t, err)
+		assert.True(t, hasRelation)
+
+		hasRelation, err = svc.PerDelete(3)
+		require.NoError(t, err)
+		assert.False(t, hasRelation)
+
+		err = svc.Delete(2)
+		require.NoError(t, err)
+
+		deletedChild, err := svc.GetGroupByID(2)
+		require.Error(t, err)
+		assert.Nil(t, deletedChild)
+
+		deletedGrand, err := svc.GetGroupByID(4)
+		require.Error(t, err)
+		assert.Nil(t, deletedGrand)
+	})
+}
+
+func TestDatasetService_PreviewPermissionAndBackfillBranches(t *testing.T) {
+	t.Run("preview handles empty table and permission preview default limit", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		emptyTable := "empty_preview"
+		permTable := "perm_preview"
+		datasourceID := int64(100)
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 301, DatasetGroupID: 30, PhysicalTable: &emptyTable}).Error)
+		require.NoError(t, db.Exec("CREATE TABLE empty_preview (name TEXT, amount INTEGER)").Error)
+
+		preview, err := svc.Preview(&dataset.PreviewRequest{DatasetGroupID: 30, Limit: 0})
+		require.NoError(t, err)
+		require.NotNil(t, preview)
+		assert.Empty(t, preview.Columns)
+		assert.Empty(t, preview.Rows)
+		assert.Equal(t, int64(0), preview.Total)
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 302, DatasetGroupID: 31, PhysicalTable: &permTable, DatasourceID: &datasourceID}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 303, DatasetGroupID: 31, PhysicalTable: &permTable, DatasourceID: &datasourceID}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 304, DatasetGroupID: 31, PhysicalTable: &permTable, DatasourceID: int64PtrDataset(0)}).Error)
+		require.NoError(t, db.Exec("CREATE TABLE perm_preview (name TEXT, amount INTEGER)").Error)
+		require.NoError(t, db.Exec("INSERT INTO perm_preview (name, amount) VALUES ('alice', 10), ('bob', 20)").Error)
+
+		svc.resourcePermService = &ResourcePermissionService{adminChecker: datasetAdminChecker{isAdmin: true}}
+		resp, err := svc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: 31, Limit: 0}, 9)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, int64(2), resp.Total)
+		require.Len(t, resp.Rows, 2)
+		assert.Contains(t, resp.Columns, "amount")
+		assert.Contains(t, resp.Columns, "name")
+
+		require.NoError(t, svc.ensureDatasourceDependenciesViewable(31, 9))
+	})
+
+	t.Run("permission dependency denial and lightweight guards", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		denyTable := "deny_preview"
+		datasourceID := int64(200)
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 401, DatasetGroupID: 40, PhysicalTable: &denyTable, DatasourceID: &datasourceID}).Error)
+		require.NoError(t, db.Exec("CREATE TABLE deny_preview (name TEXT)").Error)
+		require.NoError(t, db.Exec("INSERT INTO deny_preview (name) VALUES ('x')").Error)
+
+		svc.resourcePermService = &ResourcePermissionService{}
+		err := svc.ensureDatasourceDependenciesViewable(40, 9)
+		require.ErrorIs(t, err, ErrDatasetDatasourcePermissionDenied)
+
+		resp, err := svc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: 40, Limit: 1}, 9)
+		require.ErrorIs(t, err, ErrDatasetDatasourcePermissionDenied)
+		assert.Nil(t, resp)
+
+		hasRelation, err := svc.PerDelete(0)
+		require.Error(t, err)
+		assert.False(t, hasRelation)
+
+		svc.resourcePermService = &ResourcePermissionService{}
+		require.NoError(t, svc.applyInheritedPermissionsOnCreate(1, "dataset", 0))
+
+		svc = NewDatasetService(nil)
+		report, err := svc.BackfillGovernedResources()
+		require.Error(t, err)
+		assert.Nil(t, report)
+		assert.Contains(t, err.Error(), "dataset repository not initialized")
+
+		svc, _ = setupDatasetServiceRepoTest(t)
+		report, err = svc.BackfillGovernedResourcesWithOptions(nil)
+		require.Error(t, err)
+		assert.Nil(t, report)
+		assert.Contains(t, err.Error(), "resource permission service not initialized")
+	})
+
+	t.Run("preview with permission applies row permission select and where clauses", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		permTable := "row_perm_preview"
+		datasetTableID := int64(501)
+		createBy := "tester"
+		now := time.Now()
+
+		require.NoError(t, db.AutoMigrate(&permission.DataPermRow{}, &permission.DataPermColumn{}))
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: datasetTableID, DatasetGroupID: 32, PhysicalTable: &permTable}).Error)
+		require.NoError(t, db.Exec("CREATE TABLE row_perm_preview (`11` TEXT, `12` TEXT)").Error)
+		require.NoError(t, db.Exec("INSERT INTO row_perm_preview (`11`, `12`) VALUES ('A', 'hide-a'), ('B', 'hide-b')").Error)
+
+		expr := `{"logic":"and","items":[{"fieldId":11,"filterType":"logic","term":"eq","value":"A"}]}`
+		require.NoError(t, db.Create(&permission.DataPermRow{DatasetID: 32, DatasetGroupID: 32, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 9, ExpressionTree: expr, Status: 1, CreateBy: &createBy, CreateTime: &now}).Error)
+		require.NoError(t, db.Create(&permission.DataPermColumn{DatasetID: 32, DatasetGroupID: 32, FieldName: "11", PermType: "show", Status: 1, CreateBy: &createBy, CreateTime: &now}).Error)
+		require.NoError(t, db.Create(&permission.DataPermColumn{DatasetID: 32, DatasetGroupID: 32, FieldName: "12", PermType: "disable", Status: 1, CreateBy: &createBy, CreateTime: &now}).Error)
+
+		rowPermRepo := repository.NewRowPermissionRepository(db)
+		colPermRepo := repository.NewColumnPermissionRepository(db)
+		svc.rowPermissionService = NewRowPermissionService(rowPermRepo, colPermRepo, nil, nil)
+
+		resp, err := svc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: 32, Limit: 0}, 9)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, int64(2), resp.Total)
+		require.Len(t, resp.Rows, 1)
+		assert.Equal(t, []string{"11"}, resp.Columns)
+		assert.Equal(t, "A", resp.Rows[0]["11"])
+		_, hiddenExists := resp.Rows[0]["12"]
+		assert.False(t, hiddenExists)
+	})
+}
+
+func TestDatasetService_CreateRollbackAndRecursiveHelpers(t *testing.T) {
+	t.Run("create rolls back when inherited permissions fail and backfill repo nil is guarded", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		rootLevel := 0
+		folderType := dataset.NodeTypeFolder
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, Level: &rootLevel, NodeType: &folderType}).Error)
+
+		svc.resourcePermService = &ResourcePermissionService{}
+		created, err := svc.Create(&dataset.WriteRequest{Name: "NeedsPerms", PID: int64PtrDataset(1), NodeType: dataset.NodeTypeDataset})
+		require.Error(t, err)
+		assert.Nil(t, created)
+		assert.Contains(t, err.Error(), "repository not initialized")
+
+		var deleted dataset.CoreDatasetGroup
+		require.NoError(t, db.Unscoped().Where("name = ?", "NeedsPerms").First(&deleted).Error)
+		require.NotNil(t, deleted.DelFlag)
+		assert.Equal(t, 1, *deleted.DelFlag)
+
+		svc = NewDatasetService(nil)
+		report, err := svc.BackfillGovernedResourcesWithOptions(nil)
+		require.Error(t, err)
+		assert.Nil(t, report)
+		assert.Contains(t, err.Error(), "dataset repository not initialized")
+	})
+
+	t.Run("recursive helpers traverse deep trees", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		folderType := dataset.NodeTypeFolder
+		datasetType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "A", PID: int64PtrDataset(1), NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3, Name: "B", PID: int64PtrDataset(2), NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 4, Name: "C", PID: int64PtrDataset(3), NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 5, Name: "Sibling", PID: int64PtrDataset(1), NodeType: &datasetType}).Error)
+
+		descendant, err := svc.isDescendant(1, 4)
+		require.NoError(t, err)
+		assert.True(t, descendant)
+
+		descendant, err = svc.isDescendant(2, 5)
+		require.NoError(t, err)
+		assert.False(t, descendant)
+
+		require.NoError(t, svc.deleteRecursive(2))
+		_, err = svc.GetGroupByID(2)
+		require.Error(t, err)
+		_, err = svc.GetGroupByID(3)
+		require.Error(t, err)
+		_, err = svc.GetGroupByID(4)
+		require.Error(t, err)
+
+		sibling, err := svc.GetGroupByID(5)
+		require.NoError(t, err)
+		assert.Equal(t, "Sibling", sibling.Name)
+	})
+}
+
+func TestDatasetService_GroupMutationExtraBranches(t *testing.T) {
+	t.Run("move returns source not found and succeeds into non-root folder", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		level0 := 0
+		level1 := 1
+		folderType := dataset.NodeTypeFolder
+		datasetType := dataset.NodeTypeDataset
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, Level: &level0, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "Source", PID: &rootPID, Level: &level1, NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3, Name: "Dest", PID: &rootPID, Level: &level1, NodeType: &datasetType}).Error)
+
+		_, err := svc.Move(999, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset not found")
+
+		moved, err := svc.Move(2, 3)
+		require.NoError(t, err)
+		require.NotNil(t, moved.PID)
+		assert.Equal(t, int64(3), *moved.PID)
+	})
+
+	t.Run("move propagates update failure", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		level0 := 0
+		level1 := 1
+		folderType := dataset.NodeTypeFolder
+		datasetType := dataset.NodeTypeDataset
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, Level: &level0, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "SourceErr", PID: &rootPID, Level: &level1, NodeType: &datasetType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3, Name: "DestErr", PID: &rootPID, Level: &level1, NodeType: &datasetType}).Error)
+		require.NoError(t, db.Exec("CREATE TRIGGER deny_dataset_move_update BEFORE UPDATE ON core_dataset_group BEGIN SELECT RAISE(FAIL, 'deny dataset move update'); END;").Error)
+
+		moved, err := svc.Move(2, 3)
+		require.Error(t, err)
+		assert.Nil(t, moved)
+		assert.Contains(t, err.Error(), "deny dataset move update")
+	})
+
+	t.Run("create handles missing parent and nil parent level fallback", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		folderType := dataset.NodeTypeFolder
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "RootNilLevel", PID: &rootPID, Level: nil, NodeType: &folderType}).Error)
+
+		_, err := svc.Create(&dataset.WriteRequest{Name: "MissingParent", PID: int64PtrDataset(999), NodeType: dataset.NodeTypeDataset})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "destination folder not found")
+
+		created, err := svc.Create(&dataset.WriteRequest{Name: "NilLevelChild", PID: int64PtrDataset(1), NodeType: dataset.NodeTypeDataset})
+		require.NoError(t, err)
+		require.NotNil(t, created.Level)
+		assert.Equal(t, 1, *created.Level)
+	})
+}
+
+func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
+	t.Run("save delegates to create for new records", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		folderType := dataset.NodeTypeFolder
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, NodeType: &folderType}).Error)
+
+		created, err := svc.Save(&dataset.WriteRequest{Name: "SavedNew", PID: int64PtrDataset(1), NodeType: dataset.NodeTypeDataset})
+		require.NoError(t, err)
+		require.NotNil(t, created)
+		assert.Equal(t, "SavedNew", created.Name)
+		require.NotNil(t, created.PID)
+		assert.Equal(t, int64(1), *created.PID)
+
+		created, err = svc.Save(&dataset.WriteRequest{Name: "MissingParent", PID: int64PtrDataset(999), NodeType: dataset.NodeTypeDataset})
+		require.Error(t, err)
+		assert.Nil(t, created)
+		assert.Contains(t, err.Error(), "destination folder not found")
+	})
+
+	t.Run("save propagates update failure for existing record", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		folderType := dataset.NodeTypeFolder
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Existing", PID: &rootPID, NodeType: &folderType}).Error)
+		require.NoError(t, db.Exec("CREATE TRIGGER deny_dataset_save_update BEFORE UPDATE ON core_dataset_group BEGIN SELECT RAISE(FAIL, 'deny dataset save update'); END;").Error)
+
+		updated, err := svc.Save(&dataset.WriteRequest{ID: 1, Name: "ExistingUpdated", PID: int64PtrDataset(0), NodeType: dataset.NodeTypeFolder})
+		require.Error(t, err)
+		assert.Nil(t, updated)
+		assert.Contains(t, err.Error(), "deny dataset save update")
+	})
+
+	t.Run("preview sql executes query and returns normalized payload", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TABLE preview_sql_rows (name TEXT, amount INTEGER)").Error)
+		require.NoError(t, db.Exec("INSERT INTO preview_sql_rows (name, amount) VALUES ('alice', 10), ('bob', 20)").Error)
+
+		rawSQL := "SELECT name, amount FROM preview_sql_rows ORDER BY amount DESC"
+		result, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte(rawSQL))})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, base64.StdEncoding.EncodeToString([]byte(rawSQL)), result["sql"])
+
+		previewData, ok := result["data"].(dataset.SQLPreviewData)
+		require.True(t, ok)
+		require.Len(t, previewData.Fields, 2)
+		assert.Equal(t, "amount", previewData.Fields[0].OriginName)
+		assert.Equal(t, 2, previewData.Fields[0].DeType)
+		assert.Equal(t, "name", previewData.Fields[1].OriginName)
+		assert.Equal(t, 0, previewData.Fields[1].DeType)
+		require.Len(t, previewData.Data, 2)
+		assert.Equal(t, "bob", previewData.Data[0]["name"])
+		assert.Equal(t, int64(20), previewData.Data[0]["amount"])
+		assert.Equal(t, "alice", previewData.Data[1]["name"])
+	})
+}
+
+func TestDatasetService_DeleteRecursiveErrorAndBackfillExecution(t *testing.T) {
+	t.Run("deleteRecursive propagates soft delete failure", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		folderType := dataset.NodeTypeFolder
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "Child", PID: int64PtrDataset(1), NodeType: &folderType}).Error)
+		require.NoError(t, db.Exec("CREATE TRIGGER deny_dataset_soft_delete BEFORE UPDATE ON core_dataset_group BEGIN SELECT RAISE(FAIL, 'deny dataset soft delete'); END;").Error)
+
+		err := svc.deleteRecursive(1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "deny dataset soft delete")
+	})
+
+	t.Run("backfill executes inherited and skipped paths", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		childPID := int64(1)
+		orphanParent := int64(99)
+		folderType := dataset.NodeTypeFolder
+		require.NoError(t, db.AutoMigrate(&permission.SysResource{}, &permission.SysResourcePerm{}))
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 1, Name: "Root", PID: &rootPID, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 2, Name: "Child", PID: &childPID, NodeType: &folderType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3, Name: "OrphanChild", PID: &orphanParent, NodeType: &folderType}).Error)
+
+		resourceRepo := repository.NewResourcePermissionRepository(db)
+		svc.resourcePermService = NewResourcePermissionService(resourceRepo, nil)
+		require.NoError(t, resourceRepo.RegisterResource(1, "Root", permission.ResourceTypeDataset, &rootPID))
+		require.NoError(t, resourceRepo.ReplaceResourcePermissions(1, permission.ResourceTypeDataset, []int64{101, 101}))
+
+		report, err := svc.BackfillGovernedResourcesWithOptions(&GovernanceBackfillOptions{AfterID: -5, Limit: 0})
+		require.NoError(t, err)
+		require.NotNil(t, report)
+		assert.Equal(t, permission.ResourceTypeDataset, report.ResourceType)
+		assert.Equal(t, int64(0), report.AfterID)
+		assert.Equal(t, DefaultGovernanceBackfillLimit, report.Limit)
+		assert.Equal(t, 3, report.Scanned)
+		assert.Equal(t, 1, report.Governed)
+		assert.Equal(t, 2, report.Skipped)
+		assert.Equal(t, int64(3), report.NextAfterID)
+		assert.Equal(t, []int64{2}, report.ResourceIDs)
+		require.Len(t, report.SkippedItems, 2)
+		assert.Equal(t, GovernanceBackfillSkipReasonMissingParent, report.SkippedItems[0].Reason)
+		assert.Equal(t, GovernanceBackfillSkipReasonParentNotGoverned, report.SkippedItems[1].Reason)
+
+		permIDs, exists, err := resourceRepo.GetResourcePermissionIDs(2, permission.ResourceTypeDataset)
+		require.NoError(t, err)
+		assert.True(t, exists)
+		assert.Equal(t, []int64{101}, permIDs)
+	})
+}
+
+func int64PtrDataset(v int64) *int64 { return &v }
+
+func intPtrDataset(v int) *int { return &v }
+
+func strPtrDataset(v string) *string { return &v }

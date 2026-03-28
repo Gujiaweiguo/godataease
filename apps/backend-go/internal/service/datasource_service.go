@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/integration/seatunnel"
 	"dataease/backend/internal/repository"
 
@@ -34,14 +35,17 @@ var repeatCheckSchemaTypes = map[string]struct{}{
 const apiDefinitionTypeTable = "table"
 
 type DatasourceService struct {
-	repo             *repository.DatasourceRepository
-	excelService     *ExcelService
-	seatunnelAddress string
-	seatunnelTimeout time.Duration
-	seatunnelRetries int
-	seatunnelClient  *seatunnel.Client
-	seatunnelMu      sync.Mutex
+	repo                *repository.DatasourceRepository
+	excelService        *ExcelService
+	resourcePermService *ResourcePermissionService
+	seatunnelAddress    string
+	seatunnelTimeout    time.Duration
+	seatunnelRetries    int
+	seatunnelClient     *seatunnel.Client
+	seatunnelMu         sync.Mutex
 }
+
+const datasourceTypeFolder = "folder"
 
 func NewDatasourceService(repo *repository.DatasourceRepository) *DatasourceService {
 	return &DatasourceService{
@@ -51,6 +55,10 @@ func NewDatasourceService(repo *repository.DatasourceRepository) *DatasourceServ
 		seatunnelTimeout: 15 * time.Second,
 		seatunnelRetries: 1,
 	}
+}
+
+func (s *DatasourceService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
+	s.resourcePermService = resourcePermSvc
 }
 
 func (s *DatasourceService) SetSeatunnelConfig(address string, timeout time.Duration, retries int) {
@@ -328,6 +336,10 @@ func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.Core
 	if err = s.repo.Create(ds); err != nil {
 		return nil, err
 	}
+	if err = s.applyInheritedPermissionsOnCreate(ds.ID, ds.Name, pid); err != nil {
+		_ = s.repo.SoftDelete(ds.ID)
+		return nil, err
+	}
 	return ds, nil
 }
 
@@ -393,6 +405,33 @@ func (s *DatasourceService) CreateFolder(name string, pid int64) (*datasource.Co
 		PID:      &pid,
 		Type:     datasource.TypeFolder,
 		NodeType: datasource.TypeFolder,
+	})
+}
+
+func (s *DatasourceService) applyInheritedPermissionsOnCreate(resourceID int64, resourceName string, pid int64) error {
+	if s.resourcePermService == nil || pid <= 0 {
+		return nil
+	}
+	return s.resourcePermService.InheritParentResourcePermissions(pid, resourceID, resourceName, permission.ResourceTypeDatasource)
+}
+
+func (s *DatasourceService) BackfillGovernedResources() (*DatasourceGovernanceBackfillReport, error) {
+	return s.BackfillGovernedResourcesWithOptions(nil)
+}
+
+func (s *DatasourceService) BackfillGovernedResourcesWithOptions(options *GovernanceBackfillOptions) (*DatasourceGovernanceBackfillReport, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("datasource repository not initialized")
+	}
+	if s.resourcePermService == nil {
+		return nil, fmt.Errorf("resource permission service not initialized")
+	}
+	return runGovernanceBackfillWithOptions(options, permission.ResourceTypeDatasource, func(normalized GovernanceBackfillOptions) ([]*datasource.CoreDatasource, error) {
+		return s.repo.ListBatch(nil, normalized.AfterID, normalized.Limit)
+	}, func(item *datasource.CoreDatasource) governanceBackfillItem {
+		return governanceBackfillItem{resourceID: item.ID, parentID: item.PID, resourceName: item.Name}
+	}, func(parentID, resourceID int64, resourceName string) (bool, error) {
+		return s.resourcePermService.TryInheritParentResourcePermissions(parentID, resourceID, resourceName, permission.ResourceTypeDatasource)
 	})
 }
 
@@ -559,7 +598,7 @@ func normalizedPID(pid *int64) int64 {
 
 func shouldSkipRepeatCheck(dsType string) bool {
 	lowerType := strings.ToLower(strings.TrimSpace(dsType))
-	if lowerType == "folder" || lowerType == "es" {
+	if lowerType == datasourceTypeFolder || lowerType == "es" {
 		return true
 	}
 	if strings.Contains(lowerType, "api") || strings.Contains(lowerType, "excel") {

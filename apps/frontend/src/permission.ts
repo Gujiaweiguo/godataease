@@ -19,6 +19,7 @@ import { useEmbedded } from '@/store/modules/embedded'
 import { useLoading } from '@/hooks/web/useLoading'
 import { isDynamicNavigationEnabled } from '@/utils/featureFlags'
 import { isBootstrapSessionValid } from '@/utils/authBootstrap'
+import { bootstrapInteractiveInBackground } from '@/utils/interactiveBootstrap'
 const appearanceStore = useAppearanceStoreWithOut()
 const { wsCache } = useCache()
 const permissionStore = usePermissionStoreWithOut()
@@ -121,8 +122,7 @@ const loadAuthorizedRoutes = async () => {
     router.addRoute(route as unknown as RouteRecordRaw)
   })
   permissionStore.setIsAddRouters(true)
-  interactiveStore.clear()
-  await interactiveStore.initInteractive(true)
+  bootstrapInteractiveInBackground(interactiveStore)
 }
 
 const refreshPermissionRoutes = async (force = false) => {

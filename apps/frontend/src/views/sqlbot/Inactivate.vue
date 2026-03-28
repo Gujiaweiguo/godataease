@@ -42,19 +42,21 @@ const handleCommand = (command: string) => {
 <style scoped>
 .inactivate-div {
   position: absolute;
-  right: 32px;
   top: 92px;
+  right: 32px;
+  display: flex;
   height: auto;
   padding: 8px 16px;
-  display: flex;
   border-radius: 4px;
 }
+
 .inactivate-button {
   display: flex;
-  align-items: center;
-  cursor: pointer;
   font-size: 14px;
+  cursor: pointer;
+  align-items: center;
 }
+
 .api-img {
   width: 24px;
   height: 24px;

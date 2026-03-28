@@ -11,6 +11,7 @@ import (
 
 type RowPermissionStore interface {
 	PagerByDatasetID(datasetID int64, page, size int) ([]*permission.DataPermRow, int64, error)
+	PagerByDatasetIDAndTarget(datasetID int64, targetType string, targetID int64, page, size int) ([]*permission.DataPermRow, int64, error)
 	GetByID(id int64) (*permission.DataPermRow, error)
 	Create(perm *permission.DataPermRow) error
 	Update(perm *permission.DataPermRow) error
@@ -91,7 +92,25 @@ func (s *DataPermissionAdminService) RowPermissionPage(datasetID int64, page, si
 	if err != nil {
 		return nil, err
 	}
+	return s.buildRowPermissionPage(datasetID, rows, total, page, size)
+}
 
+func (s *DataPermissionAdminService) RowPermissionPageByTarget(datasetID int64, targetType string, targetID int64, page, size int) (*DataPermissionPage, error) {
+	if targetType != permission.AuthTargetTypeRole && targetType != permission.AuthTargetTypeUser {
+		return nil, fmt.Errorf("targetType %s is not supported", targetType)
+	}
+	if targetID <= 0 {
+		return nil, fmt.Errorf("targetId is required")
+	}
+
+	rows, total, err := s.rowStore.PagerByDatasetIDAndTarget(datasetID, targetType, targetID, page, size)
+	if err != nil {
+		return nil, err
+	}
+	return s.buildRowPermissionPage(datasetID, rows, total, page, size)
+}
+
+func (s *DataPermissionAdminService) buildRowPermissionPage(datasetID int64, rows []*permission.DataPermRow, total int64, page, size int) (*DataPermissionPage, error) {
 	fieldsByID, _, err := s.datasetFieldMaps(datasetID)
 	if err != nil {
 		return nil, err

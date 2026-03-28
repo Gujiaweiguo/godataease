@@ -272,6 +272,27 @@ export const getSqlParams = async (data): Promise<ParamsDetail[]> => {
 export const rowPermissionList = (page: number, limit: number, datasetId: number) =>
   request.get({ url: '/dataset/rowPermissions/pager/' + datasetId + '/' + page + '/' + limit })
 
+export const rowPermissionListByTarget = (
+  page: number,
+  limit: number,
+  datasetId: number,
+  targetType: string,
+  targetId: number
+) =>
+  request.get({
+    url:
+      '/dataset/rowPermissions/pagerByTarget/' +
+      datasetId +
+      '/' +
+      targetType +
+      '/' +
+      targetId +
+      '/' +
+      page +
+      '/' +
+      limit
+  })
+
 export const columnPermissionList = (page: number, limit: number, datasetId: number) =>
   request.get({ url: '/dataset/columnPermissions/pager/' + datasetId + '/' + page + '/' + limit })
 

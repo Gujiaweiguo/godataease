@@ -1,0 +1,356 @@
+# Test Gate - Unified Testing Workflow
+# Can be called by CI or archive process
+# Usage:
+#   jobs:
+#     test-gate:
+#       uses: ./.github/workflows/test-gate.yml
+#       with:
+#         run_unit: true
+#         run_integration: true
+#         run_e2e: true
+#         ref: ${{ github.sha }}
+
+name: Test Gate
+
+on:
+  workflow_call:
+    inputs:
+      run_unit:
+        description: 'Run unit tests'
+        required: false
+        default: true
+        type: boolean
+      run_integration:
+        description: 'Run integration tests'
+        required: false
+        default: true
+        type: boolean
+      run_e2e:
+        description: 'Run E2E tests'
+        required: false
+        default: false
+        type: boolean
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        default: ''
+        type: string
+      skip_if_no_changes:
+        description: 'Skip if no relevant changes detected'
+        required: false
+        default: true
+        type: boolean
+
+  workflow_dispatch:
+    inputs:
+      run_unit:
+        description: 'Run unit tests'
+        required: true
+        default: true
+        type: boolean
+      run_integration:
+        description: 'Run integration tests'
+        required: true
+        default: true
+        type: boolean
+      run_e2e:
+        description: 'Run E2E tests'
+        required: true
+        default: false
+        type: boolean
+      ref:
+        description: 'Git ref to checkout (branch/tag/sha)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  # Detect what changed to optimize test execution
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      has_changes: ${{ steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'apps/backend-go/**'
+            frontend:
+              - 'apps/frontend/**'
+
+  # Unit Tests - Fast feedback
+  unit-tests:
+    needs: detect-changes
+    if: |
+      inputs.run_unit && 
+      (!inputs.skip_if_no_changes || needs.detect-changes.outputs.has_changes == 'true')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      # Backend unit tests
+      - name: Set up Go
+        if: needs.detect-changes.outputs.backend == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Backend unit tests
+        if: needs.detect-changes.outputs.backend == 'true'
+        working-directory: apps/backend-go
+        run: |
+          go mod tidy
+          make test
+
+      # Frontend unit tests
+      - name: Setup Node.js
+        if: needs.detect-changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package.json
+
+      - name: Frontend unit tests
+        if: needs.detect-changes.outputs.frontend == 'true'
+        working-directory: apps/frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run ts:check
+          npm run test -- --run
+
+  # Integration Tests - Requires MySQL
+  integration-tests:
+    needs: detect-changes
+    if: |
+      inputs.run_integration && 
+      (!inputs.skip_if_no_changes || needs.detect-changes.outputs.backend == 'true')
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Admin168
+          MYSQL_DATABASE: dataease_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run integration tests
+        working-directory: apps/backend-go
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_PORT: 3306
+          TEST_DB_USER: root
+          TEST_DB_PASSWORD: Admin168
+          TEST_DB_NAME: dataease_test
+        run: |
+          go mod tidy
+          make test-integration
+
+  # E2E Tests - Full stack verification
+  e2e-tests:
+    needs: detect-changes
+    if: |
+      inputs.run_e2e && 
+      (!inputs.skip_if_no_changes || needs.detect-changes.outputs.has_changes == 'true')
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Admin168
+          MYSQL_DATABASE: dataease_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7.0
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      # Setup and build backend
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build backend
+        working-directory: apps/backend-go
+        run: |
+          go mod tidy
+          make build
+
+      - name: Start backend
+        working-directory: apps/backend-go
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_NAME: dataease_test
+          DATABASE_USER: root
+          DATABASE_PASSWORD: Admin168
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          SERVER_PORT: 8080
+        run: |
+          ./dataease-backend &
+          sleep 10
+          curl -f http://localhost:8080/health || exit 1
+
+      # Setup and build frontend
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package.json
+
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: |
+          npm ci
+          npm run build:base
+
+      - name: Start frontend
+        working-directory: apps/frontend
+        run: |
+          npm run preview -- --host 0.0.0.0 --port 5173 &
+          npx wait-on http://localhost:5173 -t 60000
+
+      # Run E2E tests
+      - name: Install Playwright browsers
+        working-directory: apps/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: apps/frontend
+        run: npm run e2e
+        env:
+          E2E_BASE_URL: http://localhost:5173
+          E2E_API_URL: http://localhost:8080
+          E2E_USERNAME: admin
+          E2E_PASSWORD: DataEase123456
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report/
+          retention-days: 7
+
+  # Summary job - all tests must pass
+  test-gate-summary:
+    needs: [detect-changes, unit-tests, integration-tests, e2e-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.evaluate.outputs.passed }}
+      summary: ${{ steps.evaluate.outputs.summary }}
+    steps:
+      - name: Evaluate test results
+        id: evaluate
+        run: |
+          PASSED=true
+          SUMMARY="## Test Gate Results\n\n"
+          
+          # Check unit tests
+          if [[ "${{ inputs.run_unit }}" == "true" ]]; then
+            if [[ "${{ needs.detect-changes.outputs.has_changes }}" == "false" && "${{ inputs.skip_if_no_changes }}" == "true" ]]; then
+              SUMMARY+="- Unit tests: SKIPPED (no changes)\n"
+            elif [[ "${{ needs.unit-tests.result }}" == "success" ]]; then
+              SUMMARY+="- Unit tests: PASSED\n"
+            elif [[ "${{ needs.unit-tests.result }}" == "skipped" ]]; then
+              SUMMARY+="- Unit tests: SKIPPED\n"
+            else
+              SUMMARY+="- Unit tests: FAILED\n"
+              PASSED=false
+            fi
+          fi
+          
+          # Check integration tests
+          if [[ "${{ inputs.run_integration }}" == "true" ]]; then
+            if [[ "${{ needs.detect-changes.outputs.backend }}" == "false" && "${{ inputs.skip_if_no_changes }}" == "true" ]]; then
+              SUMMARY+="- Integration tests: SKIPPED (no backend changes)\n"
+            elif [[ "${{ needs.integration-tests.result }}" == "success" ]]; then
+              SUMMARY+="- Integration tests: PASSED\n"
+            elif [[ "${{ needs.integration-tests.result }}" == "skipped" ]]; then
+              SUMMARY+="- Integration tests: SKIPPED\n"
+            else
+              SUMMARY+="- Integration tests: FAILED\n"
+              PASSED=false
+            fi
+          fi
+          
+          # Check E2E tests
+          if [[ "${{ inputs.run_e2e }}" == "true" ]]; then
+            if [[ "${{ needs.detect-changes.outputs.has_changes }}" == "false" && "${{ inputs.skip_if_no_changes }}" == "true" ]]; then
+              SUMMARY+="- E2E tests: SKIPPED (no changes)\n"
+            elif [[ "${{ needs.e2e-tests.result }}" == "success" ]]; then
+              SUMMARY+="- E2E tests: PASSED\n"
+            elif [[ "${{ needs.e2e-tests.result }}" == "skipped" ]]; then
+              SUMMARY+="- E2E tests: SKIPPED\n"
+            else
+              SUMMARY+="- E2E tests: FAILED\n"
+              PASSED=false
+            fi
+          fi
+          
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          printf "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          printf "$SUMMARY"
+          
+          if [[ "$PASSED" != "true" ]]; then
+            echo "::error::Test gate failed - see summary above"
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "${{ steps.evaluate.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
