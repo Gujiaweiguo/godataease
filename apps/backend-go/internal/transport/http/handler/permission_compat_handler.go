@@ -305,35 +305,14 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 	}
 	resourcePermIDs = append(resourcePermIDs, preservedDirectPermIDs...)
 	for _, target := range req.TargetPerms {
-		targetType := normalizeTargetType(target.TargetType, target.SourceType)
-		targetID := normalizeTargetID(target.TargetID, target.SourceID)
-		if targetType != "role" || targetID <= 0 {
-			response.Error(c, "500000", "Failed: only role targets are supported in the current resource-perspective save slice")
+		matchedPermIDs, err := h.collectMatchedTargetPermIDs(target, req.Flag)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
 			return
 		}
+		resourcePermIDs = append(resourcePermIDs, matchedPermIDs...)
 
-		permIDs := target.PermIDs
-		if len(permIDs) == 0 && len(target.Permissions) > 0 {
-			permIDs = make([]int64, 0, len(target.Permissions))
-			for _, item := range target.Permissions {
-				if item.ID > 0 {
-					permIDs = append(permIDs, item.ID)
-				}
-			}
-		}
-
-		for _, permID := range permIDs {
-			matches, matchErr := h.permissionMatchesResourceType(permID, req.Flag)
-			if matchErr != nil {
-				response.Error(c, "500000", "Failed: "+matchErr.Error())
-				return
-			}
-			if matches {
-				resourcePermIDs = append(resourcePermIDs, permID)
-			}
-		}
-
-		if err := h.saveRolePermsForResourceType(targetID, permIDs, req.Flag); err != nil {
+		if err := h.saveRolePermsForResourceType(normalizeTargetID(target.TargetID, target.SourceID), extractTargetPermIDs(target), req.Flag); err != nil {
 			response.Error(c, "500000", "Failed: "+err.Error())
 			return
 		}
@@ -345,6 +324,41 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+}
+
+func (h *PermissionCompatHandler) collectMatchedTargetPermIDs(target targetPermissionTarget, resourceType string) ([]int64, error) {
+	targetType := normalizeTargetType(target.TargetType, target.SourceType)
+	targetID := normalizeTargetID(target.TargetID, target.SourceID)
+	if targetType != "role" || targetID <= 0 {
+		return nil, fmt.Errorf("only role targets are supported in the current resource-perspective save slice")
+	}
+
+	permIDs := extractTargetPermIDs(target)
+	matchedPermIDs := make([]int64, 0, len(permIDs))
+	for _, permID := range permIDs {
+		matches, err := h.permissionMatchesResourceType(permID, resourceType)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			matchedPermIDs = append(matchedPermIDs, permID)
+		}
+	}
+	return matchedPermIDs, nil
+}
+
+func extractTargetPermIDs(target targetPermissionTarget) []int64 {
+	if len(target.PermIDs) > 0 || len(target.Permissions) == 0 {
+		return target.PermIDs
+	}
+
+	permIDs := make([]int64, 0, len(target.Permissions))
+	for _, item := range target.Permissions {
+		if item.ID > 0 {
+			permIDs = append(permIDs, item.ID)
+		}
+	}
+	return permIDs
 }
 
 func (h *PermissionCompatHandler) collectDirectResourcePermIDs(resourceID int64, resourceType string) ([]int64, error) {
