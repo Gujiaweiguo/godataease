@@ -5,10 +5,12 @@ on:
     branches: [main, dev]
     paths:
       - 'apps/frontend/**'
+      - '.github/workflows/frontend.yml'
   pull_request:
     branches: [main, dev]
     paths:
       - 'apps/frontend/**'
+      - '.github/workflows/frontend.yml'
   schedule:
     - cron: '30 19 * * *'
   workflow_dispatch:
