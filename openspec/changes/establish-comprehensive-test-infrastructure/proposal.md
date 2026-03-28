@@ -14,11 +14,12 @@
 
 1. **单元测试补充**
    - 确保所有核心模块有测试覆盖
-   - 建立覆盖率基线（当前：84.5%）
+   - 建立覆盖率基线（当前：backend service integration gate 为 84.5%，`make test` 全量单测覆盖率为 28.6%）
 
 2. **集成测试规范化**
    - 使用 test-gate.yml 工作流
    - 确保 CI 和归档前自动运行
+   - 明确 84.5% 基线对应 backend service integration coverage gate，而非整体单测覆盖率
 
 3. **E2E 测试自动化**
    - 更新 e2e.yml 支持 workflow_call

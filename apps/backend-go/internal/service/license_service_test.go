@@ -581,3 +581,101 @@ func TestLicense_Version_DEBuildVersion(t *testing.T) {
 		t.Errorf("Expected version 'v2.0.0-de-test', got '%s'", version)
 	}
 }
+
+func TestLicense_ParseLicenseInfo_NonJSONObjectReturnsNil(t *testing.T) {
+	if info := parseLicenseInfo("plain-license-content"); info != nil {
+		t.Fatalf("expected nil for non-json content, got %#v", info)
+	}
+}
+
+func TestLicense_ParseLicenseInfo_InvalidJSONReturnsNil(t *testing.T) {
+	if info := parseLicenseInfo(`{"broken":`); info != nil {
+		t.Fatalf("expected nil for invalid json, got %#v", info)
+	}
+}
+
+func TestLicense_ParseLicenseInfo_MapsAlternateKeys(t *testing.T) {
+	info := parseLicenseInfo(`{"company":"Alt Corp","expire":"2030-01-02","serial":"SER-1","seat":12,"comment":"note","isv":"partner"}`)
+	if info == nil {
+		t.Fatal("expected parsed license info")
+	}
+	if info.Corporation != "Alt Corp" || info.Expired != "2030-01-02" || info.SerialNo != "SER-1" {
+		t.Fatalf("unexpected alternate key mapping: %#v", info)
+	}
+	if info.Count != 12 || info.Remark != "note" || info.ISV != "partner" {
+		t.Fatalf("unexpected alternate numeric/string mapping: %#v", info)
+	}
+}
+
+func TestLicense_FirstString_SkipsBlankAndNonStringValues(t *testing.T) {
+	m := map[string]interface{}{
+		"blank":  "   ",
+		"count":  10,
+		"actual": "  value  ",
+	}
+
+	if got := firstString(m, "blank", "count", "actual"); got != "value" {
+		t.Fatalf("expected trimmed fallback string, got %q", got)
+	}
+	if got := firstString(m, "blank", "count"); got != "" {
+		t.Fatalf("expected empty string when no usable string found, got %q", got)
+	}
+}
+
+func TestLicense_BuildLicenseResult_FillsDefaultFieldsFromSparseJSON(t *testing.T) {
+	result := buildLicenseResult(`{"company":"Sparse Corp"}`)
+	if result.Status != "valid" || result.License == nil {
+		t.Fatalf("expected valid sparse result, got %#v", result)
+	}
+	if result.License.Edition != "Enterprise" || result.License.Version != "2.x" {
+		t.Fatalf("expected default edition/version, got %#v", result.License)
+	}
+	if result.License.Corporation != "Sparse Corp" || result.License.Count != 100 {
+		t.Fatalf("expected mapped corporation and default count, got %#v", result.License)
+	}
+	if result.License.SerialNo == "" || len(result.License.SerialNo) != 16 {
+		t.Fatalf("expected generated serial number, got %#v", result.License)
+	}
+	if result.License.Expired == "" {
+		t.Fatalf("expected default expiry, got %#v", result.License)
+	}
+}
+
+func TestLicense_BuildLicenseResult_PreservesProvidedEditionVersionSerial(t *testing.T) {
+	result := buildLicenseResult(`{"corporation":"Provided Corp","expire":"2031-02-03","edition":"Starter","version":"9.9","serialNo":"SERIAL-XYZ","count":7}`)
+	if result.License == nil {
+		t.Fatal("expected license info")
+	}
+	if result.License.Edition != "Starter" || result.License.Version != "9.9" || result.License.SerialNo != "SERIAL-XYZ" {
+		t.Fatalf("expected provided edition/version/serial to be preserved, got %#v", result.License)
+	}
+	if result.License.Corporation != "Provided Corp" || result.License.Count != 7 || result.License.Expired != "2031-02-03" {
+		t.Fatalf("unexpected preserved values: %#v", result.License)
+	}
+}
+
+func TestLicense_BuildLicenseResult_GeneratesSerialWhenMissing(t *testing.T) {
+	result := buildLicenseResult(`{"corporation":"No Serial Corp","expire":"2031-02-03"}`)
+	if result.License == nil || result.License.SerialNo == "" {
+		t.Fatalf("expected generated serial number, got %#v", result)
+	}
+	if len(result.License.SerialNo) != 16 {
+		t.Fatalf("expected 16-char generated serial, got %q", result.License.SerialNo)
+	}
+}
+
+func TestLicense_ShortHash_IsStableUppercaseLength(t *testing.T) {
+	first := shortHash("same-input")
+	second := shortHash("same-input")
+	if first != second {
+		t.Fatalf("expected stable hash, got %q and %q", first, second)
+	}
+	if len(first) != 16 {
+		t.Fatalf("expected 16-char hash, got %q", first)
+	}
+	for _, r := range first {
+		if !(r >= '0' && r <= '9') && !(r >= 'A' && r <= 'F') {
+			t.Fatalf("expected uppercase hex hash, got %q", first)
+		}
+	}
+}

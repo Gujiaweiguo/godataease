@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -122,4 +123,100 @@ func TestResourceGovernanceAdminService_BackfillResources_RejectsUnsupportedType
 	if err.Error() != fmt.Sprintf("unsupported resource type: %s", permission.ResourceTypeDashboard) {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestResourceGovernanceAdminService_BackfillResources_RejectsNilRequest(t *testing.T) {
+	svc := NewResourceGovernanceAdminService(nil, nil, nil)
+
+	_, err := svc.BackfillResources(nil)
+	if err == nil {
+		t.Fatalf("expected nil request to be rejected")
+	}
+	if err.Error() != "backfill request is required" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResourceGovernanceAdminService_BackfillResources_DispatchesDataset(t *testing.T) {
+	datasetRunner := &mockDatasetGovernanceRunner{report: &DatasetGovernanceBackfillReport{ResourceType: permission.ResourceTypeDataset, Governed: 3}}
+	svc := NewResourceGovernanceAdminService(nil, datasetRunner, nil)
+
+	report, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: permission.ResourceTypeDataset, AfterID: 6, Limit: 2})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if report.ResourceType != permission.ResourceTypeDataset || report.Governed != 3 {
+		t.Fatalf("unexpected dataset report: %+v", report)
+	}
+	if datasetRunner.last == nil || datasetRunner.last.AfterID != 6 || datasetRunner.last.Limit != 2 {
+		t.Fatalf("expected dataset options to be forwarded, got %+v", datasetRunner.last)
+	}
+}
+
+func TestResourceGovernanceAdminService_BackfillResources_TrimmedResourceTypeStillDispatches(t *testing.T) {
+	datasetRunner := &mockDatasetGovernanceRunner{report: &DatasetGovernanceBackfillReport{ResourceType: permission.ResourceTypeDataset, Governed: 1}}
+	svc := NewResourceGovernanceAdminService(nil, datasetRunner, nil)
+
+	_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: " " + permission.ResourceTypeDataset + " ", AfterID: 1, Limit: 1})
+	if err != nil {
+		t.Fatalf("expected trimmed resource type to dispatch, got %v", err)
+	}
+	if datasetRunner.last == nil || datasetRunner.last.AfterID != 1 || datasetRunner.last.Limit != 1 {
+		t.Fatalf("expected trimmed dataset options to be forwarded, got %+v", datasetRunner.last)
+	}
+}
+
+func TestResourceGovernanceAdminService_BackfillResources_ServiceNotInitialized(t *testing.T) {
+	t.Run("datasource service not initialized", func(t *testing.T) {
+		svc := NewResourceGovernanceAdminService(nil, nil, nil)
+		_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: permission.ResourceTypeDatasource})
+		if err == nil || err.Error() != "datasource governance service not initialized" {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("dataset service not initialized", func(t *testing.T) {
+		svc := NewResourceGovernanceAdminService(nil, nil, nil)
+		_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: permission.ResourceTypeDataset})
+		if err == nil || err.Error() != "dataset governance service not initialized" {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("visualization service not initialized", func(t *testing.T) {
+		svc := NewResourceGovernanceAdminService(nil, nil, nil)
+		_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: "visualization"})
+		if err == nil || err.Error() != "visualization governance service not initialized" {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestResourceGovernanceAdminService_BackfillResources_RunnerError(t *testing.T) {
+	t.Run("datasource runner error", func(t *testing.T) {
+		expected := errors.New("datasource backfill failed")
+		svc := NewResourceGovernanceAdminService(&mockDatasourceGovernanceRunner{err: expected}, nil, nil)
+		_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: permission.ResourceTypeDatasource})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected datasource runner error, got %v", err)
+		}
+	})
+
+	t.Run("dataset runner error", func(t *testing.T) {
+		expected := errors.New("dataset backfill failed")
+		svc := NewResourceGovernanceAdminService(nil, &mockDatasetGovernanceRunner{err: expected}, nil)
+		_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: permission.ResourceTypeDataset})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected dataset runner error, got %v", err)
+		}
+	})
+
+	t.Run("visualization runner error", func(t *testing.T) {
+		expected := errors.New("visualization backfill failed")
+		svc := NewResourceGovernanceAdminService(nil, nil, &mockVisualizationGovernanceRunner{err: expected})
+		_, err := svc.BackfillResources(&ResourceGovernanceBackfillRequest{ResourceType: "visualization"})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected visualization runner error, got %v", err)
+		}
+	})
 }

@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 
 	"gorm.io/driver/sqlite"
@@ -31,6 +33,29 @@ func setupOrgService(t *testing.T) (*OrgService, *mockOrgRepository) {
 	orgRepo := repository.NewOrgRepository(db)
 	// Pass nil for auditSvc, userRepo, roleRepo as they are optional for most tests
 	return NewOrgService(orgRepo, nil, nil, nil), &mockOrgRepository{repo: orgRepo, db: db}
+}
+
+func setupOrgServiceWithAudit(t *testing.T) (*OrgService, *mockOrgRepository, *repository.AuditLogRepository, *repository.UserRepository, *repository.UserRoleRepository) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+
+	if err := db.AutoMigrate(&org.SysOrg{}, &audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{}, &user.SysUser{}, &user.SysUserRole{}); err != nil {
+		t.Fatalf("migrate audit-aware org fixtures failed: %v", err)
+	}
+
+	orgRepo := repository.NewOrgRepository(db)
+	auditLogRepo := repository.NewAuditLogRepository(db)
+	loginFailureRepo := repository.NewLoginFailureRepository(db)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(db)
+	auditSvc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+	userRepo := repository.NewUserRepository(db)
+	userRoleRepo := repository.NewUserRoleRepository(db)
+
+	return NewOrgService(orgRepo, auditSvc, userRepo, nil), &mockOrgRepository{repo: orgRepo, db: db}, auditLogRepo, userRepo, userRoleRepo
 }
 
 func createSeedOrg(t *testing.T, mockRepo *mockOrgRepository, name string, parentID int64, level int) *org.SysOrg {
@@ -175,6 +200,36 @@ func TestOrgUpdateOrg_DuplicateName(t *testing.T) {
 	}
 }
 
+func TestOrgUpdateOrg_UnchangedNameSkipsDuplicateCheckAndNilDescKeepsExisting(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	desc := "old desc"
+	existing := createSeedOrg(t, mockRepo, "SameName", org.RootParentID, 1)
+	existing.OrgDesc = &desc
+	if err := mockRepo.repo.Update(existing); err != nil {
+		t.Fatalf("seed update failed: %v", err)
+	}
+	createSeedOrg(t, mockRepo, "OtherOrg", org.RootParentID, 1)
+
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "SameName", OrgDesc: nil})
+	if err != nil {
+		t.Fatalf("UpdateOrg failed: %v", err)
+	}
+
+	updated, err := mockRepo.repo.GetByID(existing.OrgID)
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if updated.OrgName != "SameName" {
+		t.Fatalf("expected unchanged org name, got %s", updated.OrgName)
+	}
+	if updated.OrgDesc == nil || *updated.OrgDesc != desc {
+		t.Fatalf("expected existing description to be preserved, got %#v", updated.OrgDesc)
+	}
+	if updated.UpdateTime == nil {
+		t.Fatal("expected update time to be set")
+	}
+}
+
 func TestOrgDeleteOrg_Success(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 	existing := createSeedOrg(t, mockRepo, "ToDelete", org.RootParentID, 1)
@@ -201,6 +256,35 @@ func TestOrgDeleteOrg_HasChildren(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cannot delete organization with") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOrgDeleteOrg_HasChildren_RecordsFailedAuditLog(t *testing.T) {
+	svc, mockRepo, auditLogRepo, _, _ := setupOrgServiceWithAudit(t)
+	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
+	createSeedOrg(t, mockRepo, "Child", parent.OrgID, 2)
+
+	err := svc.DeleteOrg(parent.OrgID, 7, "operator", "127.0.0.1")
+	if err == nil {
+		t.Fatal("expected children exists error, got nil")
+	}
+
+	logs, total, logErr := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	if logErr != nil {
+		t.Fatalf("query audit logs failed: %v", logErr)
+	}
+	if total != 1 || len(logs) != 1 {
+		t.Fatalf("expected one audit log, got total=%d logs=%d", total, len(logs))
+	}
+	log := logs[0]
+	if log.Status != audit.StatusFailed || log.ActionName != "删除组织" || log.Operation != audit.OperationDelete {
+		t.Fatalf("unexpected failed audit log: %+v", log)
+	}
+	if log.ResourceName == nil || *log.ResourceName != "Parent" {
+		t.Fatalf("expected resource name Parent, got %+v", log.ResourceName)
+	}
+	if log.FailureReason == nil || !strings.Contains(*log.FailureReason, "无法删除") {
+		t.Fatalf("expected failure reason to mention child orgs, got %+v", log.FailureReason)
 	}
 }
 
@@ -236,6 +320,18 @@ func TestOrgListOrgs(t *testing.T) {
 	}
 }
 
+func TestOrgListOrgs_Empty(t *testing.T) {
+	svc, _ := setupOrgService(t)
+
+	orgs, err := svc.ListOrgs()
+	if err != nil {
+		t.Fatalf("ListOrgs failed: %v", err)
+	}
+	if orgs == nil || len(orgs) != 0 {
+		t.Fatalf("expected empty non-nil org slice, got %#v", orgs)
+	}
+}
+
 func TestOrgListByParentID(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
@@ -248,6 +344,19 @@ func TestOrgListByParentID(t *testing.T) {
 	}
 	if len(orgs) != 2 {
 		t.Fatalf("expected 2 orgs, got %d", len(orgs))
+	}
+}
+
+func TestOrgListByParentID_Empty(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
+
+	orgs, err := svc.ListByParentID(parent.OrgID)
+	if err != nil {
+		t.Fatalf("ListByParentID failed: %v", err)
+	}
+	if orgs == nil || len(orgs) != 0 {
+		t.Fatalf("expected empty non-nil child slice, got %#v", orgs)
 	}
 }
 
@@ -284,6 +393,37 @@ func TestOrgGetOrgTree_MultiLevel(t *testing.T) {
 	}
 
 	_ = root2
+}
+
+func TestOrgGetOrgTree_OrphanNodeSkipped(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	createSeedOrg(t, mockRepo, "Root", org.RootParentID, 1)
+	createSeedOrg(t, mockRepo, "Orphan", 99999, 2)
+
+	tree, err := svc.GetOrgTree()
+	if err != nil {
+		t.Fatalf("GetOrgTree failed: %v", err)
+	}
+	if len(tree) != 1 {
+		t.Fatalf("expected only rooted node in tree, got %d", len(tree))
+	}
+	if len(tree[0].Children) != 0 {
+		t.Fatalf("expected orphan to be skipped, got children %+v", tree[0].Children)
+	}
+}
+
+func TestOrgGetOrgTree_OnlyOrphansReturnsEmptyRoots(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	createSeedOrg(t, mockRepo, "Orphan1", 99998, 2)
+	createSeedOrg(t, mockRepo, "Orphan2", 99999, 2)
+
+	tree, err := svc.GetOrgTree()
+	if err != nil {
+		t.Fatalf("GetOrgTree failed: %v", err)
+	}
+	if len(tree) != 0 {
+		t.Fatalf("expected no rooted nodes, got %#v", tree)
+	}
 }
 
 func TestOrgUpdateOrgStatus(t *testing.T) {
@@ -325,6 +465,89 @@ func TestOrgCheckOrgNameExists(t *testing.T) {
 	}
 	if notExists {
 		t.Fatal("expected name to not exist")
+	}
+}
+
+func TestOrgDeleteOrg_NotFound(t *testing.T) {
+	svc, _ := setupOrgService(t)
+	err := svc.DeleteOrg(404, 1, "test-user", "127.0.0.1")
+	if err == nil {
+		t.Fatal("expected organization not found error")
+	}
+	if !strings.Contains(err.Error(), "organization not found") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOrgDeleteOrg_Success_WithAffectedUsers_RecordsSuccessAuditLog(t *testing.T) {
+	svc, mockRepo, auditLogRepo, userRepo, userRoleRepo := setupOrgServiceWithAudit(t)
+	existing := createSeedOrg(t, mockRepo, "AuditedDelete", org.RootParentID, 1)
+
+	u := &user.SysUser{Username: "user-a", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	if err := userRepo.Create(u); err != nil {
+		t.Fatalf("seed user failed: %v", err)
+	}
+	if err := userRoleRepo.Create(&user.SysUserRole{UserID: u.UserID, RoleID: 1, OrgID: existing.OrgID}); err != nil {
+		t.Fatalf("seed user role failed: %v", err)
+	}
+
+	err := svc.DeleteOrg(existing.OrgID, 9, "operator", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("DeleteOrg failed: %v", err)
+	}
+
+	logs, total, logErr := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	if logErr != nil {
+		t.Fatalf("query audit logs failed: %v", logErr)
+	}
+	if total != 1 || len(logs) != 1 {
+		t.Fatalf("expected one audit log, got total=%d logs=%d", total, len(logs))
+	}
+	log := logs[0]
+	if log.Status != audit.StatusSuccess {
+		t.Fatalf("expected success audit log, got %+v", log)
+	}
+	if log.AfterValue == nil || !strings.Contains(*log.AfterValue, "影响资源: [1 users]") {
+		t.Fatalf("expected affected users in after value, got %+v", log.AfterValue)
+	}
+	if log.BeforeValue == nil || !strings.Contains(*log.BeforeValue, "AuditedDelete") {
+		t.Fatalf("expected before value to mention org name, got %+v", log.BeforeValue)
+	}
+}
+
+func TestOrgDeleteOrg_Success_UserCountLookupFailureStillDeletes(t *testing.T) {
+	svc, mockRepo, _, _, _ := setupOrgServiceWithAudit(t)
+	existing := createSeedOrg(t, mockRepo, "CountErrorDelete", org.RootParentID, 1)
+	if err := mockRepo.db.Exec("DROP TABLE sys_user_role").Error; err != nil {
+		t.Fatalf("drop user role table failed: %v", err)
+	}
+
+	err := svc.DeleteOrg(existing.OrgID, 10, "operator", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("DeleteOrg should ignore user count lookup error, got %v", err)
+	}
+
+	_, err = mockRepo.repo.GetByID(existing.OrgID)
+	if err == nil {
+		t.Fatal("expected org to be deleted despite user count lookup failure")
+	}
+}
+
+func TestOrgDeleteOrg_Success_AuditFailureDoesNotBlockDelete(t *testing.T) {
+	svc, mockRepo, _, _, _ := setupOrgServiceWithAudit(t)
+	existing := createSeedOrg(t, mockRepo, "AuditFailureDelete", org.RootParentID, 1)
+	if err := mockRepo.db.Exec("CREATE TRIGGER deny_audit_insert BEFORE INSERT ON de_audit_log BEGIN SELECT RAISE(FAIL, 'deny audit insert'); END;").Error; err != nil {
+		t.Fatalf("create audit trigger failed: %v", err)
+	}
+
+	err := svc.DeleteOrg(existing.OrgID, 11, "operator", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("DeleteOrg should ignore audit failure, got %v", err)
+	}
+
+	_, err = mockRepo.repo.GetByID(existing.OrgID)
+	if err == nil {
+		t.Fatal("expected org to be deleted even when audit insert fails")
 	}
 }
 
@@ -460,5 +683,14 @@ func TestOrgUpdateOrgStatus_UpdateFailed(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to update organization status") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOrgPtrHelpers(t *testing.T) {
+	if got := ptrStr("hello"); got == nil || *got != "hello" {
+		t.Fatalf("expected ptrStr to return pointer to value, got %#v", got)
+	}
+	if got := ptrStatus(audit.StatusSuccess); got == nil || *got != audit.StatusSuccess {
+		t.Fatalf("expected ptrStatus to return pointer to status, got %#v", got)
 	}
 }

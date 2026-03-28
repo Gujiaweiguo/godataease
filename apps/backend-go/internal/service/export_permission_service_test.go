@@ -165,6 +165,11 @@ func TestExportPermissionService_CheckDatasetExport(t *testing.T) {
 	if !result.HasPermission {
 		t.Errorf("User with export permission should be able to export dataset, got %v", result.HasPermission)
 	}
+
+	result = exportSvc.CheckDatasetExport(ctx, 2, 200)
+	if result.HasPermission {
+		t.Error("User without export permission should not be able to export dataset")
+	}
 }
 
 func TestExportPermissionService_CanExportImage(t *testing.T) {
@@ -179,6 +184,11 @@ func TestExportPermissionService_CanExportImage(t *testing.T) {
 	canExport := exportSvc.CanExportImage(ctx, 1, permission.ResourceTypeDashboard, 100)
 	if !canExport {
 		t.Error("User with export permission should be able to export image")
+	}
+
+	canExport = exportSvc.CanExportImage(ctx, 2, permission.ResourceTypeDashboard, 100)
+	if canExport {
+		t.Error("User without export permission should not be able to export image")
 	}
 }
 
@@ -195,6 +205,11 @@ func TestExportPermissionService_CanExportPDF(t *testing.T) {
 	if !canExport {
 		t.Error("User with export permission should be able to export PDF")
 	}
+
+	canExport = exportSvc.CanExportPDF(ctx, 2, permission.ResourceTypeDashboard, 100)
+	if canExport {
+		t.Error("User without export permission should not be able to export PDF")
+	}
 }
 
 func TestExportPermissionService_CanExportExcel(t *testing.T) {
@@ -209,6 +224,11 @@ func TestExportPermissionService_CanExportExcel(t *testing.T) {
 	canExport := exportSvc.CanExportExcel(ctx, 1, permission.ResourceTypeDataset, 100)
 	if !canExport {
 		t.Error("User with export permission should be able to export Excel")
+	}
+
+	canExport = exportSvc.CanExportExcel(ctx, 2, permission.ResourceTypeDataset, 100)
+	if canExport {
+		t.Error("User without export permission should not be able to export Excel")
 	}
 }
 
@@ -330,5 +350,148 @@ func TestExportPermissionService_CheckScreenAndDatasourceExport(t *testing.T) {
 	datasource := exportSvc.CheckDatasourceExport(ctx, 1, 201)
 	if !datasource.HasPermission {
 		t.Error("expected datasource export permission")
+	}
+}
+
+func TestExportPermissionService_CheckExportPermission_DefaultTypeFallsBackToExportPerm(t *testing.T) {
+	mockRepo := newMockExportResourcePermRepo()
+	mockRepo.userPermOk[1] = map[int64]bool{1: true}
+	mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+	resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+	exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+	result := exportSvc.CheckExportPermission(context.Background(), &ExportCheckRequest{UserID: 1, ResourceType: permission.ResourceTypeDashboard, ResourceID: 100, ExportType: ExportType("unknown")})
+	if !result.CanExport || result.RequiredPerm != permission.PermKeyExport {
+		t.Fatalf("expected default export permission fallback, got %+v", result)
+	}
+}
+
+func TestExportPermissionService_CheckExportPermission_PropagatesDeniedReason(t *testing.T) {
+	mockRepo := newMockExportResourcePermRepo()
+	mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+	resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+	exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+	result := exportSvc.CheckExportPermission(context.Background(), &ExportCheckRequest{UserID: 2, ResourceType: permission.ResourceTypeDashboard, ResourceID: 100, ExportType: ExportTypeImage})
+	if result.CanExport {
+		t.Fatal("expected denied export")
+	}
+	if result.Reason != "no_roles" || result.RequiredPerm != permission.PermKeyExport {
+		t.Fatalf("unexpected denied result: %+v", result)
+	}
+}
+
+func TestExportPermissionService_CheckScreenExport_Denied(t *testing.T) {
+	resourceSvc := NewResourcePermissionService(newMockExportResourcePermRepo(), &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+	exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+	result := exportSvc.CheckScreenExport(context.Background(), 2, 101)
+	if result.HasPermission {
+		t.Fatal("expected denied screen export")
+	}
+}
+
+func TestExportPermissionService_CheckDatasourceExport_Denied(t *testing.T) {
+	resourceSvc := NewResourcePermissionService(newMockExportResourcePermRepo(), &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+	exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+	result := exportSvc.CheckDatasourceExport(context.Background(), 2, 201)
+	if result.HasPermission {
+		t.Fatal("expected denied datasource export")
+	}
+}
+
+func TestExportPermissionService_CheckBatchExportPermission_EmptyAndMixed(t *testing.T) {
+	t.Run("empty ids returns empty map", func(t *testing.T) {
+		mockRepo := newMockExportResourcePermRepo()
+		mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+		resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+		exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+		result := exportSvc.CheckBatchExportPermission(context.Background(), 1, permission.ResourceTypeDashboard, nil)
+		if len(result) != 0 {
+			t.Fatalf("expected empty result, got %+v", result)
+		}
+	})
+
+	t.Run("mixed permissions", func(t *testing.T) {
+		mockRepo := newMockExportResourcePermRepo()
+		mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+		mockRepo.userPermOk[1] = map[int64]bool{1: true}
+		resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+		exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+		result := exportSvc.CheckBatchExportPermission(context.Background(), 1, permission.ResourceTypeDashboard, []int64{100, 200, 300})
+		if len(result) != 3 || !result[100] || !result[200] || !result[300] {
+			t.Fatalf("expected all mapped export permissions, got %+v", result)
+		}
+
+		result = exportSvc.CheckBatchExportPermission(context.Background(), 2, permission.ResourceTypeDashboard, []int64{100, 200})
+		if result[100] || result[200] {
+			t.Fatalf("expected denied batch permissions, got %+v", result)
+		}
+	})
+
+	t.Run("duplicate ids remain stable", func(t *testing.T) {
+		mockRepo := newMockExportResourcePermRepo()
+		mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+		mockRepo.userPermOk[1] = map[int64]bool{1: true}
+		resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+		exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+		result := exportSvc.CheckBatchExportPermission(context.Background(), 1, permission.ResourceTypeDashboard, []int64{100, 100, 200})
+		if len(result) != 2 || !result[100] || !result[200] {
+			t.Fatalf("expected duplicate ids to collapse to stable map entries, got %+v", result)
+		}
+
+		result = exportSvc.CheckBatchExportPermission(context.Background(), 2, permission.ResourceTypeDashboard, []int64{300, 300})
+		if len(result) != 1 || result[300] {
+			t.Fatalf("expected denied duplicate id result, got %+v", result)
+		}
+	})
+}
+
+func TestExportPermissionService_FilterExportableResources_EmptyAndMixed(t *testing.T) {
+	t.Run("empty ids returns empty slice", func(t *testing.T) {
+		mockRepo := newMockExportResourcePermRepo()
+		mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+		resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+		exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+		result := exportSvc.FilterExportableResources(context.Background(), 1, permission.ResourceTypeDashboard, nil)
+		if len(result) != 0 {
+			t.Fatalf("expected empty exportable slice, got %+v", result)
+		}
+	})
+
+	t.Run("mixed permissions keeps order of allowed ids", func(t *testing.T) {
+		mockRepo := newMockExportResourcePermRepo()
+		mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+		mockRepo.userPermOk[1] = map[int64]bool{1: true}
+		resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+		exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+		result := exportSvc.FilterExportableResources(context.Background(), 1, permission.ResourceTypeDashboard, []int64{300, 100, 200})
+		if len(result) != 3 || result[0] != 300 || result[1] != 100 || result[2] != 200 {
+			t.Fatalf("expected ordered allowed ids, got %+v", result)
+		}
+
+		result = exportSvc.FilterExportableResources(context.Background(), 2, permission.ResourceTypeDashboard, []int64{300, 100, 200})
+		if len(result) != 0 {
+			t.Fatalf("expected no exportable ids, got %+v", result)
+		}
+	})
+}
+
+func TestExportPermissionService_CanExportTemplate_RequiresManageNotExport(t *testing.T) {
+	mockRepo := newMockExportResourcePermRepo()
+	mockRepo.userPermOk[1] = map[int64]bool{1: true}
+	mockRepo.permKeys[permission.PermKeyExport] = &permission.SysPerm{PermID: 1, PermKey: permission.PermKeyExport}
+	mockRepo.permKeys[permission.PermKeyManage] = &permission.SysPerm{PermID: 2, PermKey: permission.PermKeyManage}
+	resourceSvc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+	exportSvc := NewExportPermissionService(resourceSvc, nil)
+
+	if exportSvc.CanExportTemplate(context.Background(), 1, permission.ResourceTypeDashboard, 100) {
+		t.Fatal("expected template export to require manage permission, not export")
 	}
 }

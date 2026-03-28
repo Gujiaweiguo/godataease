@@ -1,294 +1,202 @@
 package service
 
 import (
-	"errors"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/msgcenter"
+	"dataease/backend/internal/repository"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-// MockMsgCenterRepository for testing
-type MockMsgCenterRepository struct {
-	readStatus   map[string]bool
-	markReadErr  error
-	isReadErr    error
-	markBatchErr error
+type testCoreMsgSetting struct {
+	ID     int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	MsgID  string     `gorm:"column:msg_id;size:100;uniqueIndex:idx_msg_user"`
+	UserID int64      `gorm:"column:user_id;index;uniqueIndex:idx_msg_user"`
+	Status string     `gorm:"column:status;size:20"`
+	ReadAt *time.Time `gorm:"column:read_at"`
 }
 
-func NewMockMsgCenterRepository() *MockMsgCenterRepository {
-	return &MockMsgCenterRepository{
-		readStatus: make(map[string]bool),
-	}
+func (testCoreMsgSetting) TableName() string {
+	return "core_msg_setting"
 }
 
-func (m *MockMsgCenterRepository) MarkAsRead(msgID string, userID int64) error {
-	if m.markReadErr != nil {
-		return m.markReadErr
-	}
-	key := msgID + "-" + string(rune(userID))
-	m.readStatus[key] = true
-	return nil
+func setupMsgCenterServiceRepoTest(t *testing.T) (*MsgCenterService, *repository.MsgCenterRepository, *gorm.DB) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&testCoreMsgSetting{}))
+
+	repo := repository.NewMsgCenterRepository(db)
+	return NewMsgCenterService(repo), repo, db
 }
 
-func (m *MockMsgCenterRepository) MarkBatchAsRead(msgIDs []string, userID int64) (int, error) {
-	if m.markBatchErr != nil {
-		return 0, m.markBatchErr
-	}
-	updated := 0
-	for _, msgID := range msgIDs {
-		key := msgID + "-" + string(rune(userID))
-		if !m.readStatus[key] {
-			m.readStatus[key] = true
-			updated++
-		}
-	}
-	return updated, nil
+func setupClosedMsgCenterServiceRepoTest(t *testing.T) *MsgCenterService {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&testCoreMsgSetting{}))
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	return NewMsgCenterService(repository.NewMsgCenterRepository(db))
 }
 
-func (m *MockMsgCenterRepository) IsRead(msgID string, userID int64) (bool, error) {
-	if m.isReadErr != nil {
-		return false, m.isReadErr
-	}
-	key := msgID + "-" + string(rune(userID))
-	return m.readStatus[key], nil
+func TestMsgCenterService_Read(t *testing.T) {
+	t.Run("returns failure when is read check errors", func(t *testing.T) {
+		svc := setupClosedMsgCenterServiceRepoTest(t)
+
+		resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
+		require.NotNil(t, resp)
+		assert.False(t, resp.Success)
+		assert.False(t, resp.AlreadyRead)
+	})
+
+	t.Run("returns already read when message was already marked", func(t *testing.T) {
+		svc, repo, _ := setupMsgCenterServiceRepoTest(t)
+		require.NoError(t, repo.MarkAsRead("msg-1", 1))
+
+		resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.True(t, resp.AlreadyRead)
+	})
+
+	t.Run("marks unread message as read", func(t *testing.T) {
+		svc, repo, _ := setupMsgCenterServiceRepoTest(t)
+
+		resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-2"}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.False(t, resp.AlreadyRead)
+
+		read, err := repo.IsRead("msg-2", 1)
+		require.NoError(t, err)
+		assert.True(t, read)
+	})
+
+	t.Run("returns failure when mark as read fails", func(t *testing.T) {
+		svc, repo, db := setupMsgCenterServiceRepoTest(t)
+		require.NoError(t, db.Exec(`
+			CREATE TRIGGER msgcenter_insert_fail
+			BEFORE INSERT ON core_msg_setting
+			BEGIN
+				SELECT RAISE(FAIL, 'forced insert failure');
+			END;
+		`).Error)
+
+		resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-4"}, 1)
+		require.NotNil(t, resp)
+		assert.False(t, resp.Success)
+		assert.False(t, resp.AlreadyRead)
+
+		read, err := repo.IsRead("msg-4", 1)
+		assert.NoError(t, err)
+		assert.False(t, read)
+	})
+
+	t.Run("isolates read state per user", func(t *testing.T) {
+		svc, _, _ := setupMsgCenterServiceRepoTest(t)
+
+		firstUser := svc.Read(&msgcenter.ReadRequest{ID: "msg-3"}, 1)
+		secondUser := svc.Read(&msgcenter.ReadRequest{ID: "msg-3"}, 2)
+		firstUserAgain := svc.Read(&msgcenter.ReadRequest{ID: "msg-3"}, 1)
+
+		assert.False(t, firstUser.AlreadyRead)
+		assert.False(t, secondUser.AlreadyRead)
+		assert.True(t, firstUserAgain.AlreadyRead)
+	})
 }
 
-func (m *MockMsgCenterRepository) GetReadStatusMap(msgIDs []string, userID int64) (map[string]bool, error) {
-	result := make(map[string]bool)
-	for _, msgID := range msgIDs {
-		key := msgID + "-" + string(rune(userID))
-		result[msgID] = m.readStatus[key]
-	}
-	return result, nil
+func TestMsgCenterService_ReadBatch(t *testing.T) {
+	t.Run("returns zero updates when repository swallows errors", func(t *testing.T) {
+		svc := setupClosedMsgCenterServiceRepoTest(t)
+
+		resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-1"}}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.Zero(t, resp.Updated)
+	})
+
+	t.Run("empty input succeeds with zero updates", func(t *testing.T) {
+		svc, _, _ := setupMsgCenterServiceRepoTest(t)
+
+		resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: nil}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.Zero(t, resp.Updated)
+	})
+
+	t.Run("marks only unread messages", func(t *testing.T) {
+		svc, repo, _ := setupMsgCenterServiceRepoTest(t)
+		require.NoError(t, repo.MarkAsRead("msg-a", 1))
+
+		resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-a", "msg-b", "msg-c"}}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.Equal(t, 2, resp.Updated)
+	})
+
+	t.Run("returns zero updates when all messages were already read", func(t *testing.T) {
+		svc, repo, _ := setupMsgCenterServiceRepoTest(t)
+		require.NoError(t, repo.MarkAsRead("msg-a", 1))
+		require.NoError(t, repo.MarkAsRead("msg-b", 1))
+
+		resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-a", "msg-b"}}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.Zero(t, resp.Updated)
+	})
+
+	t.Run("isolates read batch state per user", func(t *testing.T) {
+		svc, repo, _ := setupMsgCenterServiceRepoTest(t)
+
+		resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-user-scope"}}, 1)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Success)
+		assert.Equal(t, 1, resp.Updated)
+
+		firstUserRead, err := repo.IsRead("msg-user-scope", 1)
+		require.NoError(t, err)
+		secondUserRead, err := repo.IsRead("msg-user-scope", 2)
+		require.NoError(t, err)
+		assert.True(t, firstUserRead)
+		assert.False(t, secondUserRead)
+	})
 }
 
-// Test using direct service instantiation with mock
-// Test using direct service instantiation with mock
-func setupMsgCenterServiceForTest(mockReadStatus map[string]bool, mockErr error) *testableMsgCenterService {
-	return &testableMsgCenterService{
-		readStatus: mockReadStatus,
-		mockErr:    mockErr,
-	}
+func TestMsgCenterService_List(t *testing.T) {
+	t.Run("defaults invalid pagination", func(t *testing.T) {
+		svc, _, _ := setupMsgCenterServiceRepoTest(t)
+
+		resp := svc.List(&msgcenter.ListRequest{Current: 0, Size: 0})
+		require.NotNil(t, resp)
+		assert.Equal(t, 1, resp.Current)
+		assert.Equal(t, 10, resp.Size)
+		assert.Empty(t, resp.List)
+		assert.Zero(t, resp.Total)
+	})
+
+	t.Run("preserves valid pagination", func(t *testing.T) {
+		svc, _, _ := setupMsgCenterServiceRepoTest(t)
+
+		resp := svc.List(&msgcenter.ListRequest{Current: 2, Size: 20})
+		require.NotNil(t, resp)
+		assert.Equal(t, 2, resp.Current)
+		assert.Equal(t, 20, resp.Size)
+	})
 }
 
-// testableMsgCenterService is a test-friendly version of MsgCenterService
-type testableMsgCenterService struct {
-	readStatus map[string]bool
-	mockErr    error
-}
-
-func (s *testableMsgCenterService) Count(_ *msgcenter.CountRequest) int64 {
-	return 0
-}
-
-func (s *testableMsgCenterService) List(req *msgcenter.ListRequest) *msgcenter.ListResponse {
-	current := req.Current
-	if current < 1 {
-		current = 1
-	}
-	size := req.Size
-	if size < 1 {
-		size = 10
-	}
-
-	return &msgcenter.ListResponse{
-		List:    make([]msgcenter.Message, 0),
-		Total:   0,
-		Current: current,
-		Size:    size,
-	}
-}
-
-func (s *testableMsgCenterService) Read(req *msgcenter.ReadRequest, userID int64) *msgcenter.ReadResponse {
-	if s.mockErr != nil {
-		return &msgcenter.ReadResponse{Success: false, AlreadyRead: false}
-	}
-
-	key := req.ID + "-" + string(rune(userID))
-	if s.readStatus[key] {
-		return &msgcenter.ReadResponse{Success: true, AlreadyRead: true}
-	}
-
-	s.readStatus[key] = true
-	return &msgcenter.ReadResponse{Success: true, AlreadyRead: false}
-}
-
-func (s *testableMsgCenterService) ReadBatch(req *msgcenter.ReadBatchRequest, userID int64) *msgcenter.ReadBatchResponse {
-	if s.mockErr != nil {
-		return &msgcenter.ReadBatchResponse{Success: false, Updated: 0}
-	}
-
-	updated := 0
-	for _, msgID := range req.IDs {
-		key := msgID + "-" + string(rune(userID))
-		if !s.readStatus[key] {
-			s.readStatus[key] = true
-			updated++
-		}
-	}
-
-	return &msgcenter.ReadBatchResponse{Success: true, Updated: updated}
-}
-
-func TestMsgCenter_Read_FirstTime(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
-	if !resp.Success {
-		t.Error("Expected Success to be true")
-	}
-	if resp.AlreadyRead {
-		t.Error("Expected AlreadyRead to be false for first read")
-	}
-}
-
-func TestMsgCenter_Read_AlreadyRead(t *testing.T) {
-	readStatus := map[string]bool{"msg-1-" + string(rune(1)): true}
-	svc := setupMsgCenterServiceForTest(readStatus, nil)
-
-	resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
-	if !resp.Success {
-		t.Error("Expected Success to be true")
-	}
-	if !resp.AlreadyRead {
-		t.Error("Expected AlreadyRead to be true for already read message")
-	}
-}
-
-func TestMsgCenter_Read_Error(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), errors.New("db error"))
-
-	resp := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
-	if resp.Success {
-		t.Error("Expected Success to be false on error")
-	}
-}
-
-func TestMsgCenter_ReadBatch(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-1", "msg-2", "msg-3"}}, 1)
-	if !resp.Success {
-		t.Error("Expected Success to be true")
-	}
-	if resp.Updated != 3 {
-		t.Errorf("Expected Updated to be 3, got %d", resp.Updated)
-	}
-
-	// Read same messages again - should return 0 updated
-	resp2 := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-1", "msg-2", "msg-3"}}, 1)
-	if resp2.Updated != 0 {
-		t.Errorf("Expected Updated to be 0 for already read, got %d", resp2.Updated)
-	}
-}
-
-func TestMsgCenter_ReadBatch_EmptyIDs(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{}}, 1)
-	if !resp.Success {
-		t.Error("Expected Success to be true")
-	}
-	if resp.Updated != 0 {
-		t.Errorf("Expected Updated to be 0 for empty IDs, got %d", resp.Updated)
-	}
-}
-
-func TestMsgCenter_ReadBatch_Error(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), errors.New("db error"))
-
-	resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-1"}}, 1)
-	if resp.Success {
-		t.Error("Expected Success to be false on error")
-	}
-	if resp.Updated != 0 {
-		t.Errorf("Expected Updated to be 0 on error, got %d", resp.Updated)
-	}
-}
-
-func TestMsgCenter_List_Empty(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	resp := svc.List(&msgcenter.ListRequest{Current: 1, Size: 10})
-	if resp == nil {
-		t.Fatal("Expected non-nil response")
-	}
-	if resp.Total != 0 {
-		t.Errorf("Expected Total to be 0, got %d", resp.Total)
-	}
-	if len(resp.List) != 0 {
-		t.Errorf("Expected empty list, got %d items", len(resp.List))
-	}
-}
-
-func TestMsgCenter_List_DefaultPagination(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	// Test with invalid pagination values
-	resp := svc.List(&msgcenter.ListRequest{Current: 0, Size: 0})
-	if resp.Current != 1 {
-		t.Errorf("Expected Current to default to 1, got %d", resp.Current)
-	}
-	if resp.Size != 10 {
-		t.Errorf("Expected Size to default to 10, got %d", resp.Size)
-	}
-}
-
-func TestMsgCenter_List_CustomPagination(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	resp := svc.List(&msgcenter.ListRequest{Current: 2, Size: 20})
-	if resp.Current != 2 {
-		t.Errorf("Expected Current to be 2, got %d", resp.Current)
-	}
-	if resp.Size != 20 {
-		t.Errorf("Expected Size to be 20, got %d", resp.Size)
-	}
-}
-
-func TestMsgCenter_Count_Zero(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
+func TestMsgCenterService_Count(t *testing.T) {
+	svc, _, _ := setupMsgCenterServiceRepoTest(t)
 
 	count := svc.Count(&msgcenter.CountRequest{})
-	if count != 0 {
-		t.Errorf("Expected Count to be 0, got %d", count)
-	}
-}
-
-func TestMsgCenter_DifferentUsers(t *testing.T) {
-	svc := setupMsgCenterServiceForTest(make(map[string]bool), nil)
-
-	// User 1 reads message
-	resp1 := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
-	if resp1.AlreadyRead {
-		t.Error("First read for user 1 should return AlreadyRead=false")
-	}
-
-	// User 2 reads same message - should be first read for them
-	resp2 := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 2)
-	if resp2.AlreadyRead {
-		t.Error("First read for user 2 should return AlreadyRead=false")
-	}
-
-	// User 1 reads again - should be already read
-	resp3 := svc.Read(&msgcenter.ReadRequest{ID: "msg-1"}, 1)
-	if !resp3.AlreadyRead {
-		t.Error("Second read for user 1 should return AlreadyRead=true")
-	}
-}
-
-func TestMsgCenter_ReadBatch_PartiallyRead(t *testing.T) {
-	readStatus := map[string]bool{
-		"msg-1-" + string(rune(1)): true,
-	}
-	svc := setupMsgCenterServiceForTest(readStatus, nil)
-
-	// msg-1 already read, msg-2 and msg-3 are new
-	resp := svc.ReadBatch(&msgcenter.ReadBatchRequest{IDs: []string{"msg-1", "msg-2", "msg-3"}}, 1)
-	if !resp.Success {
-		t.Error("Expected Success to be true")
-	}
-	if resp.Updated != 2 {
-		t.Errorf("Expected Updated to be 2 (only new messages), got %d", resp.Updated)
-	}
+	assert.Zero(t, count)
 }

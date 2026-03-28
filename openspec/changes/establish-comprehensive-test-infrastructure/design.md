@@ -27,7 +27,7 @@
 
 | Component | Unit | Integration | E2E | Coverage |
 |-----------|------|-------------|-----|----------|
-| Backend | ✅ | ✅ | ❌ | ~84.5% |
+| Backend | ✅ | ✅ | ❌ | `make test`=28.6%，service integration gate=84.5% |
 | Frontend | ✅ | ❌ | ⚠️ | Unknown |
 
 ## Decisions
@@ -35,7 +35,7 @@
 1. **CI 只运行单元+集成**：快速反馈（5分钟内）
 2. **归档前运行全部**：包括 E2E，确保质量
 3. **E2E 可跳过**：但需要显式确认
-4. **覆盖率基线**：84.5%，不降即可
+4. **覆盖率基线**：service integration coverage gate 为 84.5%，全量单测覆盖率现状需单独治理
 
 ## Implementation
 
