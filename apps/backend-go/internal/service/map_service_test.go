@@ -36,7 +36,7 @@ func setupClosedMapServiceRepoTest(t *testing.T) *MapService {
 	return NewMapService(repository.NewAreaRepository(db))
 }
 
-func TestMapService_GetWorldTree(t *testing.T) {
+func TestMapService_GetWorldTree_Unit(t *testing.T) {
 	t.Run("empty data returns world root", func(t *testing.T) {
 		svc, _ := setupMapServiceRepoTest(t)
 

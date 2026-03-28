@@ -103,7 +103,7 @@ func TestEmbeddedService_GetTokenArgsAndLimitCount(t *testing.T) {
 	assert.Equal(t, 5, svc.GetLimitCount())
 }
 
-func TestEmbeddedService_GetDomainList(t *testing.T) {
+func TestEmbeddedService_GetDomainList_Unit(t *testing.T) {
 	t.Run("deduplicates parsed domains", func(t *testing.T) {
 		svc, db := setupEmbeddedServiceRepoTest(t)
 		require.NoError(t, db.Create(&embedded.CoreEmbedded{Name: "A", AppId: "appA", AppSecret: "secret", Domain: "http://a.com,http://b.com", SecretLength: embedded.DefaultSecretLength}).Error)
@@ -124,7 +124,7 @@ func TestEmbeddedService_GetDomainList(t *testing.T) {
 	})
 }
 
-func TestEmbeddedService_InitIframe(t *testing.T) {
+func TestEmbeddedService_InitIframe_Unit(t *testing.T) {
 	t.Run("empty token", func(t *testing.T) {
 		svc, _ := setupEmbeddedServiceRepoTest(t)
 

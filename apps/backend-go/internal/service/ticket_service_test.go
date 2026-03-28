@@ -37,7 +37,7 @@ func setupClosedTicketServiceRepoTest(t *testing.T) *TicketService {
 	return NewTicketService(repository.NewTicketRepository(db))
 }
 
-func TestTicketService_CreateTicket(t *testing.T) {
+func TestTicketService_CreateTicket_Unit(t *testing.T) {
 	t.Run("uses provided ticket", func(t *testing.T) {
 		svc, _, _ := setupTicketServiceRepoTest(t)
 
@@ -84,7 +84,7 @@ func TestTicketService_CreateTicket(t *testing.T) {
 	})
 }
 
-func TestTicketService_ValidateTicket(t *testing.T) {
+func TestTicketService_ValidateTicket_Unit(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		svc, _, _ := setupTicketServiceRepoTest(t)
 
@@ -156,7 +156,7 @@ func TestTicketService_ValidateTicket(t *testing.T) {
 	})
 }
 
-func TestTicketService_ListTickets(t *testing.T) {
+func TestTicketService_ListTickets_Unit(t *testing.T) {
 	t.Run("default pagination", func(t *testing.T) {
 		svc, _, _ := setupTicketServiceRepoTest(t)
 
@@ -201,7 +201,7 @@ func TestTicketService_ListTickets(t *testing.T) {
 	})
 }
 
-func TestTicketService_DeleteTicket(t *testing.T) {
+func TestTicketService_DeleteTicket_Unit(t *testing.T) {
 	svc, repo, _ := setupTicketServiceRepoTest(t)
 	_, err := svc.CreateTicket(&ticket.TicketCreateRequest{Ticket: "ticket-to-delete", UUID: "user-del", Exp: time.Now().Unix() + 3600})
 	require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestTicketService_DeleteTicket(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestTicketService_TempTicket(t *testing.T) {
+func TestTicketService_TempTicket_Unit(t *testing.T) {
 	svc, _, _ := setupTicketServiceRepoTest(t)
 
 	ticket1 := svc.TempTicket()

@@ -36,7 +36,7 @@ func setupClosedGeoServiceRepoTest(t *testing.T) *GeoService {
 	return NewGeoService(repository.NewGeoRepository(db))
 }
 
-func TestGeoService_ListAreas(t *testing.T) {
+func TestGeoService_ListAreas_Unit(t *testing.T) {
 	t.Run("returns empty slice when table empty", func(t *testing.T) {
 		svc, _ := setupGeoServiceRepoTest(t)
 
@@ -67,7 +67,7 @@ func TestGeoService_ListAreas(t *testing.T) {
 	})
 }
 
-func TestGeoService_GetArea(t *testing.T) {
+func TestGeoService_GetArea_Unit(t *testing.T) {
 	t.Run("returns persisted area", func(t *testing.T) {
 		svc, db := setupGeoServiceRepoTest(t)
 		require.NoError(t, db.Create(&geo.GeometryArea{ID: "440100", Name: "Guangzhou", Code: "440100", GeoJSON: `{"type":"Feature"}`}).Error)

@@ -335,7 +335,7 @@ func TestRetainMToN_EdgeCases(t *testing.T) {
 	}
 }
 
-func TestColumnPermissionService_GetColumnPermissions(t *testing.T) {
+func TestColumnPermissionService_GetColumnPermissions_Unit(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		svc, _, _ := setupColumnPermissionServiceRepoTest(t)
 
@@ -364,7 +364,7 @@ func TestColumnPermissionService_GetColumnPermissions(t *testing.T) {
 	})
 }
 
-func TestColumnPermissionService_GetDisabledColumns(t *testing.T) {
+func TestColumnPermissionService_GetDisabledColumns_Unit(t *testing.T) {
 	t.Run("filters disable perms only", func(t *testing.T) {
 		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
 		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "mobile", PermType: permission.PermTypeDisable}))
@@ -392,7 +392,7 @@ func TestColumnPermissionService_GetDisabledColumns(t *testing.T) {
 	})
 }
 
-func TestColumnPermissionService_GetMaskRules(t *testing.T) {
+func TestColumnPermissionService_GetMaskRules_Unit(t *testing.T) {
 	t.Run("parses only mask rules and skips invalid json", func(t *testing.T) {
 		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
 		validRule := `{"builtInRule":"keep_first_and_last_three"}`
@@ -434,7 +434,7 @@ func TestColumnPermissionService_GetMaskRules(t *testing.T) {
 	})
 }
 
-func TestColumnPermissionService_ParseMaskRule(t *testing.T) {
+func TestColumnPermissionService_ParseMaskRule_Unit(t *testing.T) {
 	svc := &ColumnPermissionService{}
 	assert.Nil(t, svc.parseMaskRule(""))
 	assert.Nil(t, svc.parseMaskRule("not-json"))

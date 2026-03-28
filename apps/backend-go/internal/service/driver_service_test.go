@@ -36,7 +36,7 @@ func setupClosedDriverServiceRepoTest(t *testing.T) *DriverService {
 	return NewDriverService(repository.NewDriverRepository(db))
 }
 
-func TestDriverService_List(t *testing.T) {
+func TestDriverService_List_Unit(t *testing.T) {
 	t.Run("returns empty list", func(t *testing.T) {
 		svc, _ := setupDriverServiceRepoTest(t)
 
@@ -84,7 +84,7 @@ func TestDriverService_List(t *testing.T) {
 	})
 }
 
-func TestDriverService_ListByType(t *testing.T) {
+func TestDriverService_ListByType_Unit(t *testing.T) {
 	t.Run("returns empty list for missing type", func(t *testing.T) {
 		svc, _ := setupDriverServiceRepoTest(t)
 
@@ -128,7 +128,7 @@ func TestDriverService_ListByType(t *testing.T) {
 	})
 }
 
-func TestDriverService_GetByID(t *testing.T) {
+func TestDriverService_GetByID_Unit(t *testing.T) {
 	t.Run("returns mapped driver", func(t *testing.T) {
 		svc, db := setupDriverServiceRepoTest(t)
 		require.NoError(t, db.Create(&driver.Driver{Name: "Test Driver", Type: "test"}).Error)
@@ -175,7 +175,7 @@ func TestDriverService_GetByID(t *testing.T) {
 	})
 }
 
-func TestDriverService_ListDriverJars(t *testing.T) {
+func TestDriverService_ListDriverJars_Unit(t *testing.T) {
 	t.Run("returns empty list", func(t *testing.T) {
 		svc, _ := setupDriverServiceRepoTest(t)
 

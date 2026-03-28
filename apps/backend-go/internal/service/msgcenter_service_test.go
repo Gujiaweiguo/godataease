@@ -49,7 +49,7 @@ func setupClosedMsgCenterServiceRepoTest(t *testing.T) *MsgCenterService {
 	return NewMsgCenterService(repository.NewMsgCenterRepository(db))
 }
 
-func TestMsgCenterService_Read(t *testing.T) {
+func TestMsgCenterService_Read_Unit(t *testing.T) {
 	t.Run("returns failure when is read check errors", func(t *testing.T) {
 		svc := setupClosedMsgCenterServiceRepoTest(t)
 
@@ -115,7 +115,7 @@ func TestMsgCenterService_Read(t *testing.T) {
 	})
 }
 
-func TestMsgCenterService_ReadBatch(t *testing.T) {
+func TestMsgCenterService_ReadBatch_Unit(t *testing.T) {
 	t.Run("returns zero updates when repository swallows errors", func(t *testing.T) {
 		svc := setupClosedMsgCenterServiceRepoTest(t)
 
@@ -172,7 +172,7 @@ func TestMsgCenterService_ReadBatch(t *testing.T) {
 	})
 }
 
-func TestMsgCenterService_List(t *testing.T) {
+func TestMsgCenterService_List_Unit(t *testing.T) {
 	t.Run("defaults invalid pagination", func(t *testing.T) {
 		svc, _, _ := setupMsgCenterServiceRepoTest(t)
 
@@ -194,7 +194,7 @@ func TestMsgCenterService_List(t *testing.T) {
 	})
 }
 
-func TestMsgCenterService_Count(t *testing.T) {
+func TestMsgCenterService_Count_Unit(t *testing.T) {
 	svc, _, _ := setupMsgCenterServiceRepoTest(t)
 
 	count := svc.Count(&msgcenter.CountRequest{})

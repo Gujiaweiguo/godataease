@@ -45,7 +45,7 @@ func boolPtr(v bool) *bool { return &v }
 
 func int64Ptr(v int64) *int64 { return &v }
 
-func intPtr(v int) *int { return &v }
+func intPtrVisualization(v int) *int { return &v }
 
 func TestVisualizationServiceHelpers(t *testing.T) {
 	t.Run("resolve interactive visualization types", func(t *testing.T) {
@@ -257,7 +257,7 @@ func TestVisualizationService_UpdateMovePublishRecover(t *testing.T) {
 		require.NoError(t, err)
 
 		status := 2
-		item, err := svc.UpdatePublishStatus(&visualization.UpdateRequest{ID: id, Status: intPtr(status)}, "publisher")
+		item, err := svc.UpdatePublishStatus(&visualization.UpdateRequest{ID: id, Status: intPtrVisualization(status)}, "publisher")
 		require.NoError(t, err)
 		require.NotNil(t, item.Status)
 		assert.Equal(t, 2, *item.Status)
@@ -469,7 +469,7 @@ func TestVisualizationService_NameCanvasAndDelegationErrors(t *testing.T) {
 		err := svc.Move(&visualization.MoveRequest{ID: 1, PID: &pid}, "tester")
 		require.Error(t, err)
 
-		item, err := svc.UpdatePublishStatus(&visualization.UpdateRequest{ID: 1, Status: intPtr(statusVal)}, "tester")
+		item, err := svc.UpdatePublishStatus(&visualization.UpdateRequest{ID: 1, Status: intPtrVisualization(statusVal)}, "tester")
 		require.Error(t, err)
 		assert.Nil(t, item)
 
@@ -672,7 +672,7 @@ func TestVisualizationService_CopyAndUpdateExtraBranches(t *testing.T) {
 		require.NotNil(t, item.UpdateBy)
 		assert.Equal(t, "updater", *item.UpdateBy)
 
-		published, err := svc.UpdatePublishStatus(&visualization.UpdateRequest{ID: 999, Status: intPtr(1)}, "publisher")
+		published, err := svc.UpdatePublishStatus(&visualization.UpdateRequest{ID: 999, Status: intPtrVisualization(1)}, "publisher")
 		require.Error(t, err)
 		assert.Nil(t, published)
 

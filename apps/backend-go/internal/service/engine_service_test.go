@@ -36,7 +36,7 @@ func setupClosedEngineServiceRepoTest(t *testing.T) *EngineService {
 	return NewEngineService(repository.NewEngineRepository(db))
 }
 
-func TestEngineService_GetEngine(t *testing.T) {
+func TestEngineService_GetEngine_Unit(t *testing.T) {
 	t.Run("returns nil when repository empty", func(t *testing.T) {
 		svc, _ := setupEngineServiceRepoTest(t)
 
@@ -68,7 +68,7 @@ func TestEngineService_GetEngine(t *testing.T) {
 	})
 }
 
-func TestEngineService_Validate(t *testing.T) {
+func TestEngineService_Validate_Unit(t *testing.T) {
 	svc, _ := setupEngineServiceRepoTest(t)
 
 	result, err := svc.Validate(&engine.ValidateRequest{Type: strPtr("doris")})
@@ -78,7 +78,7 @@ func TestEngineService_Validate(t *testing.T) {
 	assert.Equal(t, "Engine validation not implemented", result.Message)
 }
 
-func TestEngineService_ValidateByID(t *testing.T) {
+func TestEngineService_ValidateByID_Unit(t *testing.T) {
 	svc, _ := setupEngineServiceRepoTest(t)
 
 	result, err := svc.ValidateByID(1)
@@ -88,7 +88,7 @@ func TestEngineService_ValidateByID(t *testing.T) {
 	assert.Equal(t, "Engine validation not implemented", result.Message)
 }
 
-func TestEngineService_SupportSetKey(t *testing.T) {
+func TestEngineService_SupportSetKey_Unit(t *testing.T) {
 	svc, _ := setupEngineServiceRepoTest(t)
 
 	result, err := svc.SupportSetKey()

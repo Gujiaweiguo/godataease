@@ -43,7 +43,7 @@ func setupClosedStaticServiceRepoTest(t *testing.T) *StaticService {
 	)
 }
 
-func TestStaticService_ListResources(t *testing.T) {
+func TestStaticService_ListResources_Unit(t *testing.T) {
 	t.Run("returns empty list", func(t *testing.T) {
 		svc, _ := setupStaticServiceRepoTest(t)
 
@@ -73,7 +73,7 @@ func TestStaticService_ListResources(t *testing.T) {
 	})
 }
 
-func TestStaticService_GetResource(t *testing.T) {
+func TestStaticService_GetResource_Unit(t *testing.T) {
 	t.Run("returns persisted resource", func(t *testing.T) {
 		svc, db := setupStaticServiceRepoTest(t)
 		require.NoError(t, db.Create(&static.StaticResource{ID: "test-res", Name: "Test Resource", Path: "/test/path", Type: "image"}).Error)
@@ -102,7 +102,7 @@ func TestStaticService_GetResource(t *testing.T) {
 	})
 }
 
-func TestStaticService_ListStores(t *testing.T) {
+func TestStaticService_ListStores_Unit(t *testing.T) {
 	t.Run("returns empty list", func(t *testing.T) {
 		svc, _ := setupStaticServiceRepoTest(t)
 
@@ -132,7 +132,7 @@ func TestStaticService_ListStores(t *testing.T) {
 	})
 }
 
-func TestStaticService_ListTypefaces(t *testing.T) {
+func TestStaticService_ListTypefaces_Unit(t *testing.T) {
 	t.Run("returns empty list", func(t *testing.T) {
 		svc, _ := setupStaticServiceRepoTest(t)
 

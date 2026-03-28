@@ -171,7 +171,7 @@ func TestDatasourceService_ResolveConfig_ErrorsWithoutRepoLookup(t *testing.T) {
 	assert.Equal(t, "datasource configuration is required", err.Error())
 }
 
-func TestDatasourceService_SetSeatunnelConfig(t *testing.T) {
+func TestDatasourceService_SetSeatunnelConfig_Unit(t *testing.T) {
 	svc := NewDatasourceService(nil)
 	svc.SetSeatunnelConfig(" 127.0.0.1:1234 ", 5*time.Second, 3)
 	svc.seatunnelClient = &seatunnel.Client{}
@@ -184,7 +184,7 @@ func TestDatasourceService_SetSeatunnelConfig(t *testing.T) {
 	assert.Nil(t, svc.seatunnelClient)
 }
 
-func TestDatasourceService_CompatDatasourceID(t *testing.T) {
+func TestDatasourceService_CompatDatasourceID_Unit(t *testing.T) {
 	svc, db := setupDatasourceServiceRepoTest(t)
 	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 120, Name: "existing", Type: "mysql"}).Error)
 	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 230, Name: "nearest", Type: "mysql"}).Error)
@@ -208,7 +208,7 @@ func TestDatasourceService_CompatDatasourceID(t *testing.T) {
 	assert.Equal(t, int64(400), resolvedID)
 }
 
-func TestDatasourceService_CheckRepeat(t *testing.T) {
+func TestDatasourceService_CheckRepeat_Unit(t *testing.T) {
 	svc, db := setupDatasourceServiceRepoTest(t)
 	oracleCfg := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "db.local", Port: 1521, Database: "analytics", Schema: "BI"})
 	malformedCfg := "not-json"
@@ -254,7 +254,7 @@ func TestDatasourceService_ResolveConfig_WithRepo(t *testing.T) {
 	assert.Equal(t, "datasource not found", err.Error())
 }
 
-func TestDatasourceService_ListSyncRecord(t *testing.T) {
+func TestDatasourceService_ListSyncRecord_Unit(t *testing.T) {
 	t.Run("validates datasource id and repo availability", func(t *testing.T) {
 		svc := NewDatasourceService(nil)
 
@@ -414,7 +414,7 @@ func TestDatasourceService_PreviewAndExcelWrappers(t *testing.T) {
 	})
 }
 
-func TestDatasourceService_Save(t *testing.T) {
+func TestDatasourceService_Save_Unit(t *testing.T) {
 	t.Run("rejects empty name", func(t *testing.T) {
 		svc, _ := setupDatasourceServiceRepoTest(t)
 
@@ -451,7 +451,7 @@ func TestDatasourceService_Save(t *testing.T) {
 	})
 }
 
-func TestDatasourceService_Update(t *testing.T) {
+func TestDatasourceService_Update_Unit(t *testing.T) {
 	t.Run("requires datasource id", func(t *testing.T) {
 		svc, _ := setupDatasourceServiceRepoTest(t)
 
@@ -495,7 +495,7 @@ func TestDatasourceService_Update(t *testing.T) {
 	})
 }
 
-func TestDatasourceService_Rename(t *testing.T) {
+func TestDatasourceService_Rename_Unit(t *testing.T) {
 	t.Run("validates missing datasource and name", func(t *testing.T) {
 		svc, _ := setupDatasourceServiceRepoTest(t)
 
@@ -531,7 +531,7 @@ func TestDatasourceService_Rename(t *testing.T) {
 	})
 }
 
-func TestDatasourceService_Move(t *testing.T) {
+func TestDatasourceService_Move_Unit(t *testing.T) {
 	t.Run("validates id and self destination", func(t *testing.T) {
 		svc, _ := setupDatasourceServiceRepoTest(t)
 
@@ -759,7 +759,7 @@ func TestDatasourceService_SyncTaskHelpers(t *testing.T) {
 	})
 }
 
-func TestDatasourceService_CheckAPIDatasource(t *testing.T) {
+func TestDatasourceService_CheckAPIDatasource_Unit(t *testing.T) {
 	svc := NewDatasourceService(nil)
 
 	_, err := svc.CheckAPIDatasource(nil)
