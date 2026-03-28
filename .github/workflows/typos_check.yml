@@ -1,5 +1,30 @@
 name: Typos Check
-on: [push, pull_request]
+
+on:
+  push:
+    paths:
+      - 'apps/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'openspec/**'
+      - 'scripts/**'
+      - '.github/**'
+      - '*.md'
+      - '*.txt'
+      - '*.yml'
+      - '*.yaml'
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'openspec/**'
+      - 'scripts/**'
+      - '.github/**'
+      - '*.md'
+      - '*.txt'
+      - '*.yml'
+      - '*.yaml'
 
 jobs:
   run:
