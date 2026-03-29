@@ -30,6 +30,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_drift_check:
+        description: 'Run contract drift check'
+        required: false
+        default: false
+        type: boolean
       ref:
         description: 'Git ref to checkout'
         required: false
@@ -55,6 +60,16 @@ on:
         type: boolean
       run_e2e:
         description: 'Run E2E tests'
+        required: true
+        default: false
+        type: boolean
+      run_drift_check:
+        description: 'Run contract drift check'
+        required: true
+        default: false
+        type: boolean
+      skip_if_no_changes:
+        description: 'Skip if no relevant changes detected'
         required: true
         default: false
         type: boolean
@@ -128,7 +143,7 @@ jobs:
           npm ci
           npm run lint
           npm run ts:check
-          npm run test -- --run
+          npm run test:core
 
   # Integration Tests - Requires MySQL
   integration-tests:
@@ -137,6 +152,8 @@ jobs:
       inputs.run_integration && 
       (!inputs.skip_if_no_changes || needs.detect-changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
+    env:
+      SERVICE_COVERAGE_THRESHOLD: '84.5'
     
     services:
       mysql:
@@ -173,6 +190,25 @@ jobs:
         run: |
           go mod tidy
           make test-integration
+
+      - name: Run service integration coverage gate
+        working-directory: apps/backend-go
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_PORT: 3306
+          TEST_DB_USER: root
+          TEST_DB_PASSWORD: Admin168
+          TEST_DB_NAME: dataease_test
+        run: |
+          go test -tags=integration -coverprofile=coverage.out ./internal/service/...
+          coverage=$(go tool cover -func=coverage.out | awk '/^total:/{gsub("%", "", $3); print $3}')
+          if [ -z "$coverage" ]; then
+            echo "Failed to parse service coverage from coverage.out"
+            exit 1
+          fi
+          echo "Service integration coverage: ${coverage}% (threshold: ${SERVICE_COVERAGE_THRESHOLD}%)"
+          echo "- Service integration coverage: ${coverage}% (threshold: ${SERVICE_COVERAGE_THRESHOLD}%)" >> "$GITHUB_STEP_SUMMARY"
+          awk -v c="$coverage" -v t="$SERVICE_COVERAGE_THRESHOLD" 'BEGIN { if ((c + 0) < (t + 0)) { printf("Coverage %s%% is below threshold %s%%\n", c, t); exit 1 } }'
 
   # E2E Tests - Full stack verification
   e2e-tests:
@@ -281,9 +317,38 @@ jobs:
           path: apps/frontend/playwright-report/
           retention-days: 7
 
+  drift-check:
+    needs: detect-changes
+    if: |
+      inputs.run_drift_check &&
+      (!inputs.skip_if_no_changes || needs.detect-changes.outputs.backend == 'true')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install drift-check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3 python3-pip
+          python3 -m pip install --user pyyaml
+
+      - name: Run drift check
+        working-directory: apps/backend-go
+        run: |
+          go mod tidy
+          make drift-check
+
   # Summary job - all tests must pass
   test-gate-summary:
-    needs: [detect-changes, unit-tests, integration-tests, e2e-tests]
+    needs: [detect-changes, unit-tests, integration-tests, e2e-tests, drift-check]
     if: always()
     runs-on: ubuntu-latest
     outputs:
@@ -334,6 +399,20 @@ jobs:
               SUMMARY+="- E2E tests: SKIPPED\n"
             else
               SUMMARY+="- E2E tests: FAILED\n"
+              PASSED=false
+            fi
+          fi
+
+          # Check drift-check
+          if [[ "${{ inputs.run_drift_check }}" == "true" ]]; then
+            if [[ "${{ needs.detect-changes.outputs.backend }}" == "false" && "${{ inputs.skip_if_no_changes }}" == "true" ]]; then
+              SUMMARY+="- Drift check: SKIPPED (no backend changes)\n"
+            elif [[ "${{ needs.drift-check.result }}" == "success" ]]; then
+              SUMMARY+="- Drift check: PASSED\n"
+            elif [[ "${{ needs.drift-check.result }}" == "skipped" ]]; then
+              SUMMARY+="- Drift check: SKIPPED\n"
+            else
+              SUMMARY+="- Drift check: FAILED\n"
               PASSED=false
             fi
           fi

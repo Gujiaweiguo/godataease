@@ -11,6 +11,8 @@ metadata:
 
 Verify that an implementation matches the change artifacts (specs, tasks, design).
 
+This verification is advisory for archive readiness. It does not replace the archive test gate defined in `openspec/config.yaml`.
+
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**

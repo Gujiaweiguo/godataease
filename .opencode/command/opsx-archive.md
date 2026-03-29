@@ -43,7 +43,50 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Assess delta spec sync state**
+4. **Run test gate (CI + E2E + drift-check)**
+
+   Before archiving, ensure the archive gate passes. This is a HARD REQUIREMENT.
+
+   **4a. Check CI status for current branch**
+
+   Run `gh pr list --head <current-branch> --json number,statusCheckRollup` to find the PR for this change.
+   If no PR exists, warn the user and ask to create one first.
+
+   Check if all CI checks passed:
+   - If all passed: Note "CI checks passed"
+   - If any failed: Block archive, tell user to fix CI failures first
+   - If pending: Offer to wait or cancel
+
+   **4b. Trigger and verify archive test gate workflow**
+
+   Archive requires E2E tests and drift-check in addition to already-passed CI.
+
+   ```bash
+   gh workflow run test-gate.yml \
+     -f run_unit=false \
+     -f run_integration=false \
+     -f run_e2e=true \
+     -f run_drift_check=true \
+     --ref <current-branch>
+   ```
+
+   Wait for the workflow to complete:
+   ```bash
+   gh run watch <run-id> --exit-status
+   ```
+
+   **If archive test gate fails:**
+   - Block archive with clear error message
+   - Show failure details from the workflow run
+   - Tell user to fix issues and retry
+
+   **If user wants to skip E2E:**
+   - Prompt user for explicit confirmation
+   - Only allow skip with explicit acknowledgment of risk
+   - Re-run workflow with `run_e2e=false` and `run_drift_check=true`
+   - Add warning to archive summary
+
+5. **Assess delta spec sync state**
 
    Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
 
@@ -58,7 +101,7 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, execute `/opsx-sync` logic. Proceed to archive regardless of choice.
 
-5. **Perform the archive**
+6. **Perform the archive**
 
    Create the archive directory if it doesn't exist:
    ```bash
@@ -75,7 +118,7 @@ Archive a completed change in the experimental workflow.
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **Display summary**
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
@@ -93,6 +136,7 @@ Archive a completed change in the experimental workflow.
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs
+**Tests:** ✓ CI passed, archive test gate passed
 
 All artifacts complete. All tasks complete.
 ```
@@ -106,6 +150,7 @@ All artifacts complete. All tasks complete.
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
 **Specs:** No delta specs
+**Tests:** ✓ CI passed, archive test gate passed
 
 All artifacts complete. All tasks complete.
 ```
@@ -119,6 +164,7 @@ All artifacts complete. All tasks complete.
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
 **Specs:** Sync skipped (user chose to skip)
+**Tests:** ✓ CI passed, archive test gate passed (or "E2E skipped with acknowledgment; drift-check passed")
 
 **Warnings:**
 - Archived with 2 incomplete artifacts
@@ -152,3 +198,5 @@ Target archive directory already exists.
 - Show clear summary of what happened
 - If sync is requested, use /opsx-sync approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- **Test Gate (HARD REQUIREMENT)**: CI must pass, archive test gate must pass, and drift-check must pass before archive
+- Only allow E2E skip with explicit user acknowledgment

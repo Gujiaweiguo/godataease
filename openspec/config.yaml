@@ -14,7 +14,7 @@ context: |
 test_gate:
   # CI tests (run on every PR)
   ci:
-    - Unit tests (make test / npm test)
+    - Unit tests (make test / npm run test:core)
     - Integration tests (make test-integration)
     - Lint and type check (golangci-lint / npm run lint + ts:check)
   
