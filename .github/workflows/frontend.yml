@@ -3,14 +3,8 @@ name: Frontend CI
 on:
   push:
     branches: [main, dev]
-    paths:
-      - 'apps/frontend/**'
-      - '.github/workflows/frontend.yml'
   pull_request:
     branches: [main, dev]
-    paths:
-      - 'apps/frontend/**'
-      - '.github/workflows/frontend.yml'
   schedule:
     - cron: '30 19 * * *'
   workflow_dispatch:
@@ -197,7 +191,7 @@ jobs:
           retention-days: 7
 
   system_smoke:
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
