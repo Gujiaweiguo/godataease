@@ -110,3 +110,47 @@
 ## 10. E2E Test Account Configuration
 
 For detailed test account setup and required permissions, and required permissions, and troubleshooting steps, see [Frontend E2E Test Account Configuration](./frontend-e2e-test-account.md).
+
+## 11. 升级为 Required Check 的准入标准
+
+在将 `system_smoke` 升级为 GitHub branch protection 的 required check 之前，至少需要满足以下条件：
+
+### 11.1 前置条件
+
+- 已在仓库 Actions secrets 中配置：
+  - `E2E_BASE_URL`
+  - `E2E_PASSWORD`
+  - 可选：`E2E_USERNAME`（默认 `admin`）
+- `E2E_BASE_URL` 对 GitHub runner 可访问，且目标环境稳定可登录。
+- 测试账号可用，并具备当前 smoke 用例所需权限；至少覆盖 `SYS-SMK-004/005/006`。
+
+### 11.2 运行质量门槛
+
+- 在最近 10 次相关 PR 运行中，`system_smoke` 的真实执行率应 ≥ 80%。
+- 在最近 10 次真实执行中，通过率应 ≥ 90%。
+- 同一 PR 重跑后出现 pass/fail 反转的 flaky 情况应 ≤ 1 次。
+
+### 11.3 失败质量要求
+
+- 失败应能快速归因为以下类型之一：环境不可达、登录失败、权限不足、测试时序/选择器问题、真实功能回归。
+- 环境类失败占比应明显低于真实代码回归；若大多数失败仍是环境问题，不应升级为 required check。
+
+### 11.4 时长与范围要求
+
+- `system_smoke` 的总耗时需稳定在团队可接受范围内，不应频繁超时。
+- 当前至少以下核心 smoke 用例需保持稳定：
+  - `SYS-SMK-004`：登录成功
+  - `SYS-SMK-005`：数据源列表加载
+  - `SYS-SMK-006`：数据源创建入口
+
+### 11.5 升级决策
+
+只有在以下条件同时满足时，才建议将 `system_smoke` 纳入 required checks：
+
+- Secrets 与测试环境均已稳定配置
+- 真实执行率与通过率达标
+- flaky 可控
+- 失败大多代表真实回归，而不是环境噪音
+- 核心 smoke 用例稳定
+
+当前阶段为 **Phase 1：PR 可见且语义真实**。下一阶段应先完成 secrets / 环境接入与稳定性观察，再考虑正式升级为 required check。
