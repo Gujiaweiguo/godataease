@@ -124,14 +124,14 @@ Notes:
 - L2 集成/契约层（接口与数据）：Backend 仓储/HTTP 集成测试、契约差异检查（contract diff / drift-check）。
 - L3 端到端冒烟层（关键流程）：登录、权限、数据源创建/编辑/校验等关键用户路径。
 
-- 若修改 API 兼容相关逻辑，增加执行 `make drift-check`（必要时结合 contract diff workflow）。
+- 当前 CI 会对 Backend 变更执行 `make drift-check`；若修改 API 兼容相关逻辑，本地验证也应补充执行。
 
 ### AI 最低验证要求（提交前）
 - 修改 Frontend 代码至少执行：`npm run lint`、`npm run ts:check`。
-- 若修改 Frontend 业务逻辑（store/composable/utils/api 处理），应补充或执行对应 Vitest 用例（`npm run test -- --run`）。
+- 若修改 Frontend 业务逻辑（store/composable/utils/api 处理），应补充或执行对应 Vitest 用例（优先 `npm run test:core` 或受影响测试集）。
 - 修改 Backend 代码至少执行：`make test`。
 - 若修改 Repository/SQL/迁移/持久化逻辑，增加执行 `make test-integration`（环境不满足时需在结论中明确说明未执行原因与风险）。
-- 若修改 API 兼容相关逻辑，增加执行 `make drift-check`（必要时结合 contract diff workflow）。
+- 若修改 API 兼容相关逻辑，应额外执行 `make drift-check`；同时注意当前 Backend CI 已会对后端变更执行该检查。
 
 ### Backend 数据库测试规则（强制）
 
@@ -194,11 +194,11 @@ func TestUserServiceIntegration_CreateUser(t *testing.T) {
 - 变更 `events/embedding`、`hooks/event`、`embedded store/token utils`：执行 `npm run test:affected:embedding`。
 - 变更 `views/visualized/data/datasource`、`api/datasource`、`interactive store`：执行 `npm run test:affected:datasource`（数据源专属最小测试集）。
 - 变更 `config/axios`、`store`、`utils` 等共享基础模块：执行 `npm run test:core`。
-- 其他普通前端变更：至少执行 `npm run test:ci`（smoke）。
+- 其他普通前端变更：至少执行 `npm run test:core`；仅 `npm run test:ci` 不足以代表当前 CI 的实际覆盖范围。
 
 ### CI 与门禁建议（当前仓库适配）
-- Frontend `ts:check` 建议尽快改为阻断（当前工作流为 non-blocking）。
-- Frontend `test:ci` 建议从示例测试扩展为“变更影响范围测试”或“核心模块测试集合”。
+- Frontend `ts:check` 当前已在 `quality` job 中阻断。
+- Frontend 基础测试门禁以 `test:core` / 受影响测试集为准，`test:ci` 仍仅适合作为轻量示例烟雾测试。
 - Backend 保持 `make test` 阻断；`integration` 标签测试建议加入夜间定时任务或手动门禁流程。
 
 ### Legacy (Read Only)
