@@ -50,7 +50,7 @@ Archive a completed change in the experimental workflow.
 
     **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Run test gate (unit + integration + E2E)**
+4. **Run test gate (CI + E2E + drift-check)**
 
     Before archiving, ensure all tests pass. This is a HARD REQUIREMENT.
 
@@ -64,15 +64,16 @@ Archive a completed change in the experimental workflow.
     - If any failed: Block archive, tell user to fix CI failures first
     - If pending: Offer to wait or cancel
 
-    **4b. Trigger and verify E2E tests**
+    **4b. Trigger and verify archive test gate workflow**
 
-    E2E tests are required before archive but not run on every PR.
+    Archive requires E2E tests and drift-check in addition to already-passed CI.
 
     ```bash
     gh workflow run test-gate.yml \
       -f run_unit=false \
       -f run_integration=false \
       -f run_e2e=true \
+      -f run_drift_check=true \
       --ref <current-branch>
     ```
 
@@ -81,7 +82,7 @@ Archive a completed change in the experimental workflow.
     gh run watch <run-id> --exit-status
     ```
 
-    **If E2E tests fail:**
+    **If archive test gate fails:**
     - Block archive with clear error message
     - Show failure details from the workflow run
     - Tell user to fix issues and retry
@@ -89,6 +90,7 @@ Archive a completed change in the experimental workflow.
     **If user wants to skip E2E:**
     - Use **AskUserQuestion tool** to confirm
     - Only allow skip with explicit acknowledgment of risk
+    - Re-run workflow with `run_e2e=false` and `run_drift_check=true`
     - Add warning to archive summary
 
 5. **Assess delta spec sync state**
@@ -141,7 +143,7 @@ Archive a completed change in the experimental workflow.
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
-**Tests:** ✓ CI passed, E2E passed (or "E2E skipped with acknowledgment")
+**Tests:** ✓ CI passed, archive test gate passed (or "E2E skipped with acknowledgment; drift-check passed")
 
 All artifacts complete. All tasks complete.
 ```
@@ -154,5 +156,5 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
-- **Test Gate (HARD REQUIREMENT)**: CI must pass and E2E tests must pass before archive
+- **Test Gate (HARD REQUIREMENT)**: CI must pass, archive test gate must pass, and drift-check must pass before archive
 - Only allow E2E skip with explicit user acknowledgment

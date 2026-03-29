@@ -116,7 +116,38 @@ This skill allows you to batch-archive changes, handling spec conflicts intellig
 
    If there are incomplete changes, make clear they'll be archived with warnings.
 
-8. **Execute archive for each confirmed change**
+8. **Run batch test gate (CI + E2E + drift-check)**
+
+    Before archiving any selected changes, ensure the branch-level archive gate passes. This is a HARD REQUIREMENT.
+
+    a. **Check CI status for current branch**
+       - Run `gh pr list --head <current-branch> --json number,statusCheckRollup` to find the PR for the selected changes
+       - If no PR exists, warn the user and ask to create one first
+       - If any CI checks failed, block the bulk archive until fixed
+
+    b. **Trigger and verify archive test gate workflow**
+       ```bash
+       gh workflow run test-gate.yml \
+         -f run_unit=false \
+         -f run_integration=false \
+         -f run_e2e=true \
+         -f run_drift_check=true \
+         --ref <current-branch>
+       ```
+
+       Wait for the workflow to complete:
+       ```bash
+       gh run watch <run-id> --exit-status
+       ```
+
+       If the archive test gate fails, block the entire bulk archive.
+
+    c. **If user wants to skip E2E**
+       - Require explicit user acknowledgment of risk
+       - Re-run workflow with `run_e2e=false` and `run_drift_check=true`
+       - Add warning to the bulk archive summary
+
+9. **Execute archive for each confirmed change**
 
    Process changes in the determined order (respecting conflict resolution):
 
@@ -136,7 +167,7 @@ This skill allows you to batch-archive changes, handling spec conflicts intellig
       - Failed: error during archive (record error)
       - Skipped: user chose not to archive (if applicable)
 
-9. **Display summary**
+10. **Display summary**
 
    Show final results:
 
@@ -150,6 +181,10 @@ This skill allows you to batch-archive changes, handling spec conflicts intellig
 
    Skipped 1 change:
    - add-verify-skill (user chose not to archive incomplete)
+
+   Test gate summary:
+   - CI passed
+   - Archive test gate passed
 
    Spec sync summary:
    - 4 delta specs synced to main specs
@@ -204,6 +239,10 @@ Archived N changes:
 - <change-1> -> archive/YYYY-MM-DD-<change-1>/
 - <change-2> -> archive/YYYY-MM-DD-<change-2>/
 
+Test gate summary:
+- CI passed
+- Archive test gate passed
+
 Spec sync summary:
 - N delta specs synced to main specs
 - No conflicts (or: M conflicts resolved)
@@ -244,3 +283,5 @@ No active changes found. Use `/opsx-new` to create a new change.
 - Preserve .openspec.yaml when moving to archive
 - Archive directory target uses current date: YYYY-MM-DD-<name>
 - If archive target exists, fail that change but continue with others
+- **Test Gate (HARD REQUIREMENT)**: CI must pass, archive test gate must pass, and drift-check must pass before any selected changes are archived
+- Only allow E2E skip with explicit user acknowledgment
