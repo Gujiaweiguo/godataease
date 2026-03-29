@@ -68,14 +68,15 @@
 
 ## 7. 建议执行方式
 
-- PR 阶段：保持现有 `quality` 门禁 + 可选 E2E 手动执行
+- PR 阶段：`Frontend CI` 会自动运行 `system_smoke`；若 secrets 缺失则按当前逻辑跳过
 - Nightly 阶段：已接入 `frontend.yml` 的 `system_smoke` job，默认每日自动执行
 - 周复盘：记录“通过率、失败原因、修复时长、是否误报”
 
 ## 8. CI / Nightly 执行入口
 
 - 手动触发：GitHub Actions -> `Frontend CI` -> `Run workflow`，勾选 `run_system_smoke=true`
-- 定时触发：`Frontend CI` 每日按 cron 自动运行 `system_smoke`（非阻断）
+- 定时触发：`Frontend CI` 每日按 cron 自动运行 `system_smoke`
+- PR 触发：`Frontend CI` 在 PR 中自动运行 `system_smoke`（需要 `E2E_BASE_URL`、`E2E_PASSWORD` secrets 可用）
 - 本地命令：`npm run e2e:system-smoke`
 
 ### 必需 Secrets

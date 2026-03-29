@@ -5,10 +5,12 @@ on:
     branches: [main, dev]
     paths:
       - 'apps/frontend/**'
+      - '.github/workflows/frontend.yml'
   pull_request:
     branches: [main, dev]
     paths:
       - 'apps/frontend/**'
+      - '.github/workflows/frontend.yml'
   schedule:
     - cron: '30 19 * * *'
   workflow_dispatch:
@@ -19,7 +21,7 @@ on:
         default: false
         type: boolean
       run_system_smoke:
-        description: 'Run non-blocking system smoke tests'
+        description: 'Run system smoke tests'
         required: false
         default: false
         type: boolean
@@ -195,9 +197,8 @@ jobs:
           retention-days: 7
 
   system_smoke:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: apps/frontend
