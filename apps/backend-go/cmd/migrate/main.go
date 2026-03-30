@@ -47,7 +47,7 @@ func main() {
 
 	fmt.Printf("Migrated %d tables\n", len(models))
 
-	fmt.Println("Creating default admin user...")
+	fmt.Println("Creating/updating default admin user...")
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 
@@ -61,11 +61,19 @@ func main() {
 		CreateTime: time.Now(),
 	}
 
-	result := db.Where("username = ?", "admin").FirstOrCreate(&adminUser)
+	result := db.Where("username = ?", "admin").
+		Assign(map[string]interface{}{
+			"password":  string(hashedPassword),
+			"nick_name": adminUser.NickName,
+			"status":    adminUser.Status,
+			"del_flag":  adminUser.DelFlag,
+			"from":      adminUser.From,
+		}).
+		FirstOrCreate(&adminUser)
 	if result.Error != nil {
 		log.Printf("Warning: Failed to create admin user: %v", result.Error)
 	} else {
-		fmt.Println("Admin user created/verified (password: admin123)")
+		fmt.Println("Admin user created/updated (password: admin123)")
 	}
 
 	fmt.Println("Creating default organization...")
