@@ -76,36 +76,39 @@ godataease/
 └── openspec/               # OpenSpec 规范
 ```
 
-### 本地开发（推荐：本地前后端 + Docker Redis + 外部 MySQL）
+### 本地开发（推荐：本地前后端 + Docker Redis + 共用 MySQL）
 
 ```bash
 # 克隆项目
 git clone https://github.com/Gujiaweiguo/godataease.git
 cd godataease
 
-# 安装前端依赖
-cd apps/frontend
-npm install
+# 1. 启动 Redis 容器（加入 my-net 网络，复用已有的 mysql8 容器）
+docker compose -f infra/compose/docker-compose.dev.yml --env-file infra/compose/.env.dev up -d
 
-# 启动 Redis 容器（宿主机端口 16379）
-cd ../..
-docker compose -f infra/compose/docker-compose.yml up -d godataease-redis
-
-# 启动 Go 后端（连接外部 MySQL + Docker Redis）
+# 2. 启动 Go 后端
 cd apps/backend-go
-DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
+DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=Admin168 REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
 
-# 启动前端开发服务器
+# 3. 启动前端开发服务器
 cd ../frontend
-npm run dev  # 访问 http://localhost:5173
+npm install
+npm run dev
 ```
 
-本地混合开发默认端口：
+本地开发默认端口：
 - 前端：`http://localhost:5173`
 - 后端：`http://localhost:8080`
 - Redis（Docker）：`127.0.0.1:16379`
+- MySQL（共用 mysql8 容器）：`127.0.0.1:3306`
 
-说明：当前推荐的本地开发方式是前后端都在宿主机运行；Redis 通过 Docker 提供；MySQL 继续使用已有外部实例。
+配置文件：
+- 开发环境: `infra/compose/.env.dev`（可手工修改）
+- 正式环境: `infra/compose/.env.prod`（可手工修改）
+
+默认登录凭据：
+- 用户名: `admin`
+- 密码: `admin123`
 
 ### 打包构建
 
@@ -119,94 +122,23 @@ cd apps/frontend
 npm run build:base
 ```
 
-### 容器部署（Docker Compose）
+### 正式环境部署（全容器化）
 
-使用 Docker Compose 部署完整的开发环境（MySQL + Redis + DataEase）。
-
-#### 部署步骤
-
-1. 构建 Go 后端
+所有服务（前后端、MySQL、Redis、Nginx）全部容器化。
 
 ```bash
-cd apps/backend-go
-make build
+# 构建
+./scripts/dev.sh build
+
+# 启动正式环境
+./scripts/dev.sh prod-start
+
+# 访问
+# 应用地址: http://localhost:8080
+# API 文档: http://localhost:8080/doc.html
 ```
 
-2. 构建前端资源
-
-```bash
-cd apps/frontend
-npm install
-npm run build:base
-```
-
-3. 创建外部网络（供容器互联）
-
-```bash
-docker network create my-net
-```
-
-4. 启动服务
-
-```bash
-cd ../../
-docker compose -f infra/compose/docker-compose.yml up -d --build
-```
-
-当前 `infra/compose/docker-compose.yml` 默认启动：
-- **godataease-redis**: Redis 7.0 缓存（默认映射到宿主机 `16379`）
-- **godataease-app**: DataEase 应用（默认端口 `8080`）
-
-说明：MySQL 需提前可用，并可在 `my-net` 网络内通过主机名 `mysql8` 访问。
-
-5. 自定义配置（可选）
-
-在项目根目录创建 `.env`：
-
-```env
-DB_PORT=3306
-DB_NAME=dataease_dev
-DB_USER=root
-DB_PASSWORD=Admin168
-SERVER_PORT=8080
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_EXTERNAL_PORT=16379
-```
-
-如果你的 MySQL 主机名不是 `mysql8`，请修改 `infra/compose/docker-compose.yml` 中 `godataease-app.environment.DATABASE_HOST`。
-
-6. 访问服务
-
-- 应用地址: http://localhost:8080
-- API 文档: http://localhost:8080/doc.html
-
-7. 查看日志
-
-```bash
-# 查看所有服务日志
-docker compose logs -f
-
-# 查看特定服务日志
-docker compose logs -f godataease-app
-docker compose logs -f godataease-redis
-```
-
-8. 停止服务
-
-```bash
-# 停止并删除容器
-docker compose down
-
-# 停止并删除容器和数据卷（⚠️ 会清除数据）
-docker compose down -v
-```
-
-#### 连接已有 MySQL
-
-当前开发编排默认即复用外部 MySQL（主机名 `mysql8`），请确保：
-- 该 MySQL 实例已加入 `my-net` 网络
-- 数据库、账号与 `.env` 中 `DB_*` 配置一致
+配置文件 `infra/compose/.env.prod` 可手工修改，修改后重启生效。
 
 更多开发指南请参考 [development_guide.md](./development_guide.md)、[AGENTS.md](./AGENTS.md) 和 [开发验证清单 Runbook](./docs/runbook/dev-validation-checklist.md)。
 

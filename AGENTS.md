@@ -41,23 +41,25 @@ Run in `/opt/code/godataease`:
 - Docker API docs: `http://localhost:8080/doc.html`
 - Legacy Java emergency operations: see `legacy/README-READONLY.md`
 
-### 开发模式（推荐：本地前后端 + Docker Redis + 外部 MySQL）
+### 开发模式（推荐：本地前后端 + Docker Redis + 共用 MySQL）
 
 **快速入口脚本**：
 ```bash
-./scripts/dev.sh redis-start   # 启动本地开发所需 Redis 容器
-./scripts/dev.sh redis-stop    # 停止本地开发 Redis 容器
-./scripts/dev.sh local-help    # 查看本地混合开发命令
+./scripts/dev.sh dev-start       # 启动开发环境基础设施（Redis）
+./scripts/dev.sh dev-backend     # 启动本地 Go 后端（新终端）
+./scripts/dev.sh dev-frontend    # 启动本地前端（新终端）
+./scripts/dev.sh dev-stop        # 停止开发环境
+./scripts/dev.sh                 # 查看所有命令
 ```
 
 **手动方式**：
 ```bash
-# 1. 启动 Redis 容器（宿主机端口 16379）
-docker compose -f infra/compose/docker-compose.yml up -d godataease-redis
+# 1. 启动 Redis 容器（宿主机端口 16379，加入 my-net 网络）
+docker compose -f infra/compose/docker-compose.dev.yml --env-file infra/compose/.env.dev up -d
 
-# 2. 启动本地 Go 后端（连接外部 MySQL + Docker Redis）
+# 2. 启动本地 Go 后端（连接共用 mysql8 + Docker Redis）
 cd apps/backend-go
-DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
+DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=Admin168 REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
 
 # 3. 启动本地前端开发服务器
 cd ../frontend
@@ -68,23 +70,45 @@ npm run dev
 curl http://localhost:8080/health
 ```
 
-**本地混合开发默认端口**：
+**本地开发默认端口**：
 | 服务 | 地址 |
 |------|------|
 | 前端 Vite | `http://localhost:5173` |
 | Go 后端 | `http://localhost:8080` |
 | Redis (Docker) | `127.0.0.1:16379` |
+| MySQL (共用) | `127.0.0.1:3306`（my-net 中的 mysql8 容器）|
 
-### 容器化开发（可选，用于集成验证）
+**配置文件**：
+- 开发环境: `infra/compose/.env.dev`
+- 正式环境: `infra/compose/.env.prod`
+- 修改配置后重启服务生效
+
+**默认登录凭据**：
+- 用户名: `admin`
+- 密码: `admin123`
+
+### 正式环境部署（全容器化）
 
 ```bash
+# 构建
 ./scripts/dev.sh build
-./scripts/dev.sh start
-./scripts/dev.sh stop
-./scripts/dev.sh restart
+
+# 启动
+./scripts/dev.sh prod-start
+
+# 停止
+./scripts/dev.sh prod-stop
 ```
 
-说明：容器化开发会将本地产物挂载进 `godataease-app`，适合验证镜像运行路径，不再作为日常首选开发循环。
+### 正式环境（全容器化）
+
+```bash
+./scripts/dev.sh prod-build   # 构建生产镜像
+./scripts/dev.sh prod-start   # 启动正式环境
+./scripts/dev.sh prod-stop    # 停止正式环境
+```
+
+说明：正式环境将前后端、MySQL、Redis、Nginx 全部容器化，适合生产部署和集成验证。
 
 ### Go Backend (`apps/backend-go`)
 Run in `/opt/code/godataease/apps/backend-go`:
