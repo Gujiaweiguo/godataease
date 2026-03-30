@@ -42,14 +42,6 @@ test('admin navigation should show new first-level groups', async ({ page, conte
   await expect(page.locator('body')).toContainText(/组织权限|系统设置|工具箱/)
 })
 
-/**
- * New menu hierarchy (post-restructure):
- *   组织权限 → 用户管理, 组织管理, 角色管理, 权限管理
- *   系统设置 → 菜单管理, 系统参数, 字体管理
- *   工具箱 → 数据导出中心
- *
- * URLs are unchanged — only parent groups were reorganized.
- */
 test('system-management menu navigation should reach recovered admin pages', async ({ page, context }) => {
   const opened = await loginAndWaitForShell(page, context)
   if (!opened) return
@@ -59,6 +51,9 @@ test('system-management menu navigation should reach recovered admin pages', asy
 
   await navigateByMenuText(page, '组织管理', '/system/org')
   await expect(page.locator('.org-management')).toBeVisible()
+
+  await navigateByMenuText(page, '角色管理', '/system/role')
+  await expect(page.locator('.role-management')).toBeVisible()
 
   await navigateByMenuText(page, '菜单管理', '/system/menu')
   await expect(page.locator('.menu-management')).toBeVisible()
