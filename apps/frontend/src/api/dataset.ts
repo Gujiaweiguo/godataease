@@ -372,13 +372,13 @@ export const getFunction = async (): Promise<DatasetDetail[]> => {
 }
 
 export const exportTasksRecords = () =>
-  request.post({ url: `/api/exportCenter/exportTasks/records`, data: {} })
+  request.post({ url: `/exportCenter/exportTasks/records`, data: {} })
 
 export const exportTasks = (page: number, limit: number, status: string) =>
-  request.post({ url: `/api/exportCenter/exportTasks/${status}/${page}/${limit}`, data: {} })
+  request.post({ url: `/exportCenter/exportTasks/${status}/${page}/${limit}`, data: {} })
 
 export const exportRetry = async (id): Promise<IResponse> => {
-  return request.post({ url: '/api/exportCenter/retry/' + id, data: {} }).then(res => {
+  return request.post({ url: '/exportCenter/retry/' + id, data: {} }).then(res => {
     return res?.data
   })
 }

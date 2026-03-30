@@ -35,13 +35,21 @@ const navigateByMenuText = async (page: Page, label: string, expectedUrlPart: st
   await expect(page).not.toHaveURL(/401|404/)
 }
 
-test('system-management menu labels should remain visible after login', async ({ page, context }) => {
+test('admin navigation should show new first-level groups', async ({ page, context }) => {
   const opened = await loginAndWaitForShell(page, context)
   if (!opened) return
 
-  await expect(page.locator('body')).toContainText(/用户管理|组织管理|菜单管理|权限管理/)
+  await expect(page.locator('body')).toContainText(/组织权限|系统设置|工具箱/)
 })
 
+/**
+ * New menu hierarchy (post-restructure):
+ *   组织权限 → 用户管理, 组织管理, 角色管理, 权限管理
+ *   系统设置 → 菜单管理, 系统参数, 字体管理
+ *   工具箱 → 数据导出中心
+ *
+ * URLs are unchanged — only parent groups were reorganized.
+ */
 test('system-management menu navigation should reach recovered admin pages', async ({ page, context }) => {
   const opened = await loginAndWaitForShell(page, context)
   if (!opened) return

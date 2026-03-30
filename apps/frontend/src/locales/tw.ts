@@ -2606,6 +2606,7 @@ export default {
     personal_setting: '個人設定',
     test_resource_pool: '測試資源池',
     system_setting: '系統設定',
+    org_permission: '組織權限',
     input_content: '請輸入內容',
     create: '新建',
     edit: '編輯',

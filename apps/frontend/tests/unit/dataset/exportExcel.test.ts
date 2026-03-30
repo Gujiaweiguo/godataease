@@ -92,10 +92,21 @@ describe('ExportExcel page init', () => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     hoisted.exportTasksRecords.mockResolvedValue({
-      data: { ALL: 2, IN_PROGRESS: 1, SUCCESS: 1, FAILED: 0, PENDING: 0 }
+      code: '000000',
+      data: {
+        ALL: 2,
+        IN_PROGRESS: 1,
+        SUCCESS: 1,
+        FAILED: 0,
+        PENDING: 0
+      }
     })
     hoisted.exportTasks.mockResolvedValue({
-      data: { total: 1, records: [{ id: 'task-1', exportStatus: 'FAILED' }] }
+      code: '000000',
+      data: {
+        total: 1,
+        records: [{ id: 'task-1', exportStatus: 'FAILED' }]
+      }
     })
   })
 

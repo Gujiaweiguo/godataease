@@ -11,6 +11,8 @@ import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { usePermissionStore } from '@/store/modules/permission'
 import { buildMenuSelectPath, resolveActiveTopPath, resolveSideMenus, resolveTopMenus } from './menu-utils'
 import { isDynamicNavigationEnabled } from '@/utils/featureFlags'
+import { executeMenuAction } from '@/utils/menu-actions'
+import type { UserMenuItem } from '@/store/modules/permission'
 
 const appearanceStore = useAppearanceStoreWithOut()
 const tempColor = computed(() => {
@@ -73,18 +75,38 @@ const activeIndex = computed(() => {
   const arr = route.path.split('/')
   return arr[arr.length - 1]
 })
+const findUserMenuItem = (fullPath: string, menus: UserMenuItem[]): UserMenuItem | null => {
+  for (const menu of menus) {
+    if (menu.path === fullPath) return menu
+    if (menu.children?.length) {
+      const found = findUserMenuItem(fullPath, menu.children)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 const menuSelect = (index: string, indexPath: string[]) => {
   //   自定义事件
   if (isExternal(index)) {
     const openType = wsCache.get('open-backend') === '1' ? '_self' : '_blank'
     window.open(index, openType)
-  } else {
-    if (dynamicNavigationEnabled.value) {
-      push(buildMenuSelectPath(path.value, index, indexPath))
+    return
+  }
+  // Build the full resolved path to look up menu metadata
+  const resolvedPath = dynamicNavigationEnabled.value
+    ? buildMenuSelectPath(path.value, index, indexPath)
+    : `${path.value}/${indexPath.join('/')}`
+  // Check if this menu item is an event-type menu (menuType === 'event')
+  const menuItem = findUserMenuItem(resolvedPath, permissionStore.getUserMenus)
+  if (menuItem?.menuType === 'event') {
+    const event = menuItem.actionConfig?.event as string | undefined
+    if (event) {
+      executeMenuAction(event, menuItem.actionConfig)
       return
     }
-    push(`${path.value}/${indexPath.join('/')}`)
   }
+  push(resolvedPath)
 }
 </script>
 

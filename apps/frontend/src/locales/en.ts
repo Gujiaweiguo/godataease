@@ -2676,6 +2676,7 @@ export default {
     personal_setting: 'Personal settings',
     test_resource_pool: 'Test resource pool',
     system_setting: 'System Settings',
+    org_permission: 'Organization & Permission',
     input_content: 'Please enter content',
     create: 'Create',
     edit: 'Edit',

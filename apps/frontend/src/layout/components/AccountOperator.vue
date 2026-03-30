@@ -91,8 +91,7 @@ const openPopover = () => {
   unref(popoverRef).popperRef?.delayHide?.()
 }
 
-if (uid.value === '1') {
-  linkLoaded([{ id: 4, link: '/sys-setting/parameter', label: t('commons.system_setting') }])
+if (String(uid.value) === '1') {
   const desktop = wsCache.get('app.desktop')
   if (!desktop) {
     linkLoaded([{ id: 2, link: '/modify-pwd/index', label: t('user.change_password') }])
