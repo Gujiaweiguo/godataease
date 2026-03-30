@@ -86,37 +86,56 @@ godataease/
 - **MySQL**: 8.0+
 - **Redis**: 7.0+
 
-### 2. 启动方式（推荐：本地前后端 + Docker Redis + 外部 MySQL）
+### 2. 启动方式（推荐：本地前后端 + Docker Redis + 共用 MySQL）
 
 ```bash
-# 在项目根目录启动 Redis 容器
-docker compose -f infra/compose/docker-compose.yml up -d godataease-redis
+# 快速启动（使用脚本）
+./scripts/dev.sh dev-start       # 启动 Redis 容器
+./scripts/dev.sh dev-backend     # 启动后端（新终端）
+./scripts/dev.sh dev-frontend    # 启动前端（新终端）
 
-# 启动本地 Go 后端
+# 或手动启动：
+# 1. 启动 Redis 容器
+docker compose -f infra/compose/docker-compose.dev.yml --env-file infra/compose/.env.dev up -d
+
+# 2. 启动本地 Go 后端
 cd apps/backend-go
-DATABASE_HOST=<external-mysql-host> DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=<password> REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
+DATABASE_HOST=127.0.0.1 DATABASE_PORT=3306 DATABASE_NAME=dataease_dev DATABASE_USER=root DATABASE_PASSWORD=Admin168 REDIS_HOST=127.0.0.1 REDIS_PORT=16379 make run-local
 
-# 启动本地前端
+# 3. 启动本地前端
 cd ../frontend
 npm install
 npm run dev
 ```
 
-说明：推荐日常开发将前端与 Go 后端都运行在宿主机；Redis 使用 Docker 容器并暴露到 `127.0.0.1:16379`；MySQL 继续使用外部实例。
+说明：开发环境推荐前后端在宿主机运行，Redis 使用 Docker 容器（端口 16379），MySQL 共用 my-net 网络中已有的 mysql8 容器（端口 3306）。
+
+配置文件：
+- 开发环境: `infra/compose/.env.dev`
+- 正式环境: `infra/compose/.env.prod`
 
 默认访问地址：
 - 前端: `http://localhost:5173`
 - 后端 API: `http://localhost:8080/api`
 - 后端健康检查: `http://localhost:8080/health`
+- API 文档: `http://localhost:8080/doc.html`
 
-### 3. 容器化开发（可选）
+默认登录凭据：
+- 用户名: `admin`
+- 密码: `admin123`
+
+### 3. 正式环境（全容器化）
 
 ```bash
-docker network create my-net
-docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d
+# 构建并启动
+./scripts/dev.sh prod-build
+./scripts/dev.sh prod-start
+
+# 停止
+./scripts/dev.sh prod-stop
 ```
 
-说明：该模式会运行 `godataease-app + godataease-redis`，适合做容器路径验证，不再作为首选本地开发循环。
+说明：正式环境将前后端、MySQL、Redis、Nginx 全部容器化，配置文件为 `infra/compose/.env.prod`。
 
 ### 4. 前端开发模式
 
