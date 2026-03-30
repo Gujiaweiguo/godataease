@@ -10,8 +10,9 @@ import HeaderMenuItem from './HeaderMenuItem.vue'
 import { resolveActiveTopPath, resolveTopMenus } from './menu-utils'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { Icon } from '@/components/icon-custom'
-import MoreMenu from './MoreMenu.vue'
 import { useRouter, useRoute } from 'vue-router_2'
+import { executeMenuAction } from '@/utils/menu-actions'
+import type { LayoutMenuRoute } from './menu-utils'
 import AccountOperator from '@/layout/components/AccountOperator.vue'
 import { isDesktop } from '@/utils/ModelUtil'
 import { XpackComponent } from '@/components/plugin'
@@ -84,14 +85,41 @@ const activeIndex = computed(() => {
 const showMsg = ref(false)
 const showToolbox = ref(false)
 const showOverlay = ref(false)
+const findRouteByIndexPath = (
+  indexPath: string,
+  routes: LayoutMenuRoute[],
+  parentPath = ''
+): LayoutMenuRoute | null => {
+  for (const route of routes) {
+    const fullPath = parentPath ? `${parentPath}/${route.path}` : route.path
+    if (fullPath === indexPath) {
+      return route
+    }
+    if (route.children?.length) {
+      const found = findRouteByIndexPath(indexPath, route.children, fullPath)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 const handleSelect = (index: string) => {
   // 自定义事件
   if (isExternal(index)) {
     const openType = wsCache.get('open-backend') === '1' ? '_self' : '_blank'
     window.open(index, openType)
-  } else {
-    push(index)
+    return
   }
+  // 事件类型菜单（如数据导出中心）
+  const matched = findRouteByIndexPath(index, routers.value)
+  if (matched?.menuType === 'event') {
+    const event = matched.actionConfig?.event as string | undefined
+    if (event) {
+      executeMenuAction(event, matched.actionConfig)
+      return
+    }
+  }
+  push(index)
 }
 const initShowMsg = () => {
   showMsg.value = permissionStore.getRouters.some(route => route.path === '/msg')
@@ -171,7 +199,6 @@ onMounted(() => {
           <Icon name="dv-ai"><dvAi @click="handleAiClick" class="svg-icon" /></Icon>
         </el-icon>
       </el-tooltip>
-      <MoreMenu />
       <el-tooltip
         v-if="showMsg"
         effect="dark"

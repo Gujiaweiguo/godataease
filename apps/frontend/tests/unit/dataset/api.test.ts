@@ -41,27 +41,27 @@ describe('Dataset API wrappers', () => {
   })
 
   it('requests export-center task counters through the records alias', async () => {
-    requestMock.post.mockResolvedValueOnce({ data: { ALL: 3, FAILED: 1 } })
+    requestMock.post.mockResolvedValueOnce({ code: '000000', data: { ALL: 3, FAILED: 1 } })
 
     const result = await exportTasksRecords()
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/api/exportCenter/exportTasks/records',
+      url: '/exportCenter/exportTasks/records',
       data: {}
     })
-    expect(result).toEqual({ data: { ALL: 3, FAILED: 1 } })
+    expect(result).toEqual({ code: '000000', data: { ALL: 3, FAILED: 1 } })
   })
 
   it('requests export-center tasks for the given status and pagination', async () => {
-    requestMock.post.mockResolvedValueOnce({ data: { total: 1, records: [] } })
+    requestMock.post.mockResolvedValueOnce({ code: '000000', data: { total: 1, records: [] } })
 
     const result = await exportTasks(2, 20, 'FAILED')
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/api/exportCenter/exportTasks/FAILED/2/20',
+      url: '/exportCenter/exportTasks/FAILED/2/20',
       data: {}
     })
-    expect(result).toEqual({ data: { total: 1, records: [] } })
+    expect(result).toEqual({ code: '000000', data: { total: 1, records: [] } })
   })
 
   it('retries an export task through the retry alias', async () => {
@@ -70,7 +70,7 @@ describe('Dataset API wrappers', () => {
     const result = await exportRetry('task-9')
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/api/exportCenter/retry/task-9',
+      url: '/exportCenter/retry/task-9',
       data: {}
     })
     expect(result).toEqual({ code: '000000' })

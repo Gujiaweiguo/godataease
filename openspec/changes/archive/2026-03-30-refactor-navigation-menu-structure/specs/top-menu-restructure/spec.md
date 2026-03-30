@@ -1,9 +1,4 @@
-# top-menu-restructure Specification
-
-## Purpose
-Define the governed top-level information architecture for the post-refactor application shell so primary navigation remains compact, role-consistent, and semantically stable.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Four-entry top navigation
 The system SHALL restructure the governed primary navigation into six first-level entries: Workbench, Visualization, Data Management, Organization & Permission, System Settings, and Toolbox.

@@ -93,26 +93,26 @@ const handleClick = (tab?: { paneName?: string | number }) => {
   exportTasksRecords().then(res => {
     tabList.value.forEach(item => {
       if (item.name === 'ALL') {
-        item.label = t('data_set.all') + '(' + res.data.ALL + ')'
+        item.label = t('data_set.all') + '(' + (res.data?.ALL ?? 0) + ')'
       }
       if (item.name === 'IN_PROGRESS') {
-        item.label = t('data_set.exporting') + '(' + res.data.IN_PROGRESS + ')'
+        item.label = t('data_set.exporting') + '(' + (res.data?.IN_PROGRESS ?? 0) + ')'
       }
       if (item.name === 'SUCCESS') {
-        item.label = t('data_set.success') + '(' + res.data.SUCCESS + ')'
+        item.label = t('data_set.success') + '(' + (res.data?.SUCCESS ?? 0) + ')'
       }
       if (item.name === 'FAILED') {
-        item.label = t('data_set.fail') + '(' + res.data.FAILED + ')'
+        item.label = t('data_set.fail') + '(' + (res.data?.FAILED ?? 0) + ')'
       }
       if (item.name === 'PENDING') {
-        item.label = t('data_set.waiting') + '(' + res.data.PENDING + ')'
+        item.label = t('data_set.waiting') + '(' + (res.data?.PENDING ?? 0) + ')'
       }
     })
   })
   exportTasks(state.paginationConfig.currentPage, state.paginationConfig.pageSize, activeName.value)
     .then(res => {
-      state.paginationConfig.total = res.data.total
-      tableData.value = res.data.records
+      state.paginationConfig.total = res.data?.total ?? 0
+      tableData.value = res.data?.records ?? []
     })
     .finally(() => {
       drawerLoading.value = false
@@ -130,19 +130,19 @@ const init = params => {
       exportTasksRecords().then(res => {
         tabList.value.forEach(item => {
           if (item.name === 'ALL') {
-            item.label = t('data_set.all') + '(' + res.data.ALL + ')'
+            item.label = t('data_set.all') + '(' + (res.data?.ALL ?? 0) + ')'
           }
           if (item.name === 'IN_PROGRESS') {
-            item.label = t('data_set.exporting') + '(' + res.data.IN_PROGRESS + ')'
+            item.label = t('data_set.exporting') + '(' + (res.data?.IN_PROGRESS ?? 0) + ')'
           }
           if (item.name === 'SUCCESS') {
-            item.label = t('data_set.success') + '(' + res.data.SUCCESS + ')'
+            item.label = t('data_set.success') + '(' + (res.data?.SUCCESS ?? 0) + ')'
           }
           if (item.name === 'FAILED') {
-            item.label = t('data_set.fail') + '(' + res.data.FAILED + ')'
+            item.label = t('data_set.fail') + '(' + (res.data?.FAILED ?? 0) + ')'
           }
           if (item.name === 'PENDING') {
-            item.label = t('data_set.waiting') + '(' + res.data.PENDING + ')'
+            item.label = t('data_set.waiting') + '(' + (res.data?.PENDING ?? 0) + ')'
           }
         })
       })
@@ -151,8 +151,8 @@ const init = params => {
         state.paginationConfig.pageSize,
         activeName.value
       ).then(res => {
-        state.paginationConfig.total = res.data.total
-        tableData.value = res.data.records
+        state.paginationConfig.total = res.data?.total ?? 0
+        tableData.value = res.data?.records ?? []
       })
     }
   }, 5000)

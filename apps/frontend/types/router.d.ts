@@ -32,6 +32,8 @@ declare global {
     children?: AppRouteRecordRaw[]
     props?: Recordable
     fullPath?: string
+    menuType?: string
+    actionConfig?: Record<string, unknown>
   }
 
   interface AppCustomRouteRecordRaw extends Omit<RouteRecordRaw, 'meta' | 'children'> {
@@ -45,5 +47,7 @@ declare global {
     path: string
     redirect?: string
     children?: AppCustomRouteRecordRaw[]
+    menuType?: string
+    actionConfig?: Record<string, unknown>
   }
 }

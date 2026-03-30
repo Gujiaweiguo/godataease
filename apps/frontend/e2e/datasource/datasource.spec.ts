@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { getLoginButton, getPasswordInput, getUsernameInput } from '../utils/auth'
+import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
 
 // Note: These tests require backend service for authentication
 // Run with: E2E_BASE_URL=http://localhost:8080 E2E_USERNAME=admin E2E_PASSWORD=your_password npm run e2e
@@ -44,7 +44,14 @@ const detectDatasourcePageState = async page => {
 }
 
 const ensureLoggedIn = async page => {
+  await page.context().clearCookies()
+  await page.goto('/')
+  await page.evaluate(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
   await page.goto('/#/login')
+  await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
 
   if (!(await getUsernameInput(page).isVisible().catch(() => false))) {
     await page.evaluate(() => {
@@ -52,10 +59,10 @@ const ensureLoggedIn = async page => {
       sessionStorage.clear()
     })
     await page.goto('/#/login')
+    await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
   }
 
-  await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
-  await expect(getPasswordInput(page)).toBeVisible({ timeout: 10000 })
+  await expect.poll(() => hasLoginForm(page), { timeout: 20000 }).toBeTruthy()
 
   await loginWithValidCredentials(page)
 

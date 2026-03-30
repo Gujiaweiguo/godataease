@@ -24,7 +24,26 @@ func (h *MenuHandler) Query(c *gin.Context) {
 		response.Error(c, "500000", err.Error())
 		return
 	}
+	applyMenuTitles(result, requestLocale(c, nil))
 	response.Success(c, result)
+}
+
+func applyMenuTitles(menus []*menu.MenuVO, locale string) {
+	for _, current := range menus {
+		if current == nil {
+			continue
+		}
+		if current.Meta != nil {
+			titleKey := current.Name
+			if current.Meta.Title != "" {
+				titleKey = current.Meta.Title
+			}
+			current.Meta.Title = ResolveMenuTitle(titleKey, locale)
+		}
+		if len(current.Children) > 0 {
+			applyMenuTitles(current.Children, locale)
+		}
+	}
 }
 
 type CreateMenuRequest struct {

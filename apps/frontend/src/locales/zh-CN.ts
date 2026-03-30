@@ -2612,6 +2612,7 @@ export default {
     personal_setting: '个人设置',
     test_resource_pool: '测试资源池',
     system_setting: '系统设置',
+    org_permission: '组织权限',
     input_content: '请输入内容',
     create: '新建',
     edit: '编辑',

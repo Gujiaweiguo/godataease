@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { getLoginButton, getPasswordInput, getUsernameInput } from '../utils/auth'
+import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
 
 type OfficialModuleCase = {
   name: string
@@ -67,13 +67,19 @@ const loginIfNeeded = async (page: Page) => {
   const username = process.env.E2E_USERNAME || 'admin'
   const password = process.env.E2E_PASSWORD || 'DataEase123456'
 
+  await page.context().clearCookies()
+  await page.goto('/')
+  await page.evaluate(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
   await page.goto('/#/login')
+  await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
 
   const shouldLogin = /#\/login|\/login/.test(page.url())
 
   if (shouldLogin) {
-    await expect(getUsernameInput(page)).toBeVisible({ timeout: 10000 })
-    await expect(getPasswordInput(page)).toBeVisible({ timeout: 10000 })
+    await expect.poll(() => hasLoginForm(page), { timeout: 20000 }).toBeTruthy()
 
     await getUsernameInput(page).fill(username)
     await getPasswordInput(page).fill(password)

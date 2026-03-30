@@ -47,7 +47,9 @@ const generateRoutesFnWithParent = (
       name: route.name,
       redirect: route.redirect,
       meta: route.meta,
-      props: route.props as Recordable
+      props: route.props as Recordable,
+      menuType: route.menuType,
+      actionConfig: route.actionConfig
     }
 
     if (route.component) {
@@ -111,8 +113,10 @@ export const formatRoute = (arr: AppCustomRouteRecordRaw[]): AppCustomRouteRecor
 
     if (children?.length === 1 && router.path !== '/data') {
       const [route] = children
-      router.path = `${path}/${route.path}`
-      router.children = []
+      if (route.menuType !== 'event') {
+        router.path = `${path}/${route.path}`
+        router.children = []
+      }
     }
     return router
   })
