@@ -381,7 +381,7 @@ jobs:
         working-directory: apps/frontend
         run: |
           mkdir -p test-results/system-smoke
-          PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/system-smoke/results.json npm run e2e:system-smoke -- --reporter=list,json
+          PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/system-smoke/results.json npx playwright test e2e/system-management-menu-smoke.spec.ts --reporter=list,json
         env:
           E2E_BASE_URL: http://localhost:5173
           E2E_API_URL: http://localhost:8080
