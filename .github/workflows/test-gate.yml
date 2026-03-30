@@ -318,6 +318,40 @@ jobs:
           sleep 10
           curl -f http://localhost:8080/health || exit 1
 
+      - name: Seed E2E admin identity
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot -pAdmin168 dataease_test <<'SQL'
+          INSERT INTO sys_org (org_id, org_name, parent_id, level, status, del_flag, create_time)
+          VALUES (1, 'Default Org', 0, 1, 1, 0, NOW())
+          ON DUPLICATE KEY UPDATE
+            org_name = VALUES(org_name),
+            status = VALUES(status),
+            del_flag = VALUES(del_flag);
+
+          INSERT INTO sys_role (role_id, role_name, role_code, role_type, status, create_time)
+          VALUES (1, 'Admin', 'admin', 'system', 1, NOW())
+          ON DUPLICATE KEY UPDATE
+            role_name = VALUES(role_name),
+            role_code = VALUES(role_code),
+            role_type = VALUES(role_type),
+            status = VALUES(status);
+
+          INSERT INTO sys_user (user_id, username, password, nick_name, status, del_flag, `from`, create_time)
+          VALUES (1, 'admin', '$2b$10$tjXRoXceWaFAGgQZOQgpzuY2OrV1F2zsdFifcvhY0ms8inlxomiGi', 'Admin', 1, 0, 0, NOW())
+          ON DUPLICATE KEY UPDATE
+            username = VALUES(username),
+            password = VALUES(password),
+            nick_name = VALUES(nick_name),
+            status = VALUES(status),
+            del_flag = VALUES(del_flag);
+
+          INSERT INTO sys_user_role (user_id, role_id, org_id)
+          VALUES (1, 1, 1)
+          ON DUPLICATE KEY UPDATE
+            role_id = VALUES(role_id),
+            org_id = VALUES(org_id);
+          SQL
+
       # Setup and build frontend
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -345,7 +379,9 @@ jobs:
 
       - name: Run E2E tests
         working-directory: apps/frontend
-        run: npm run e2e
+        run: |
+          mkdir -p test-results/system-smoke
+          PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/system-smoke/results.json npm run e2e:system-smoke -- --reporter=list,json
         env:
           E2E_BASE_URL: http://localhost:5173
           E2E_API_URL: http://localhost:8080
