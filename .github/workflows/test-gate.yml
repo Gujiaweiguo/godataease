@@ -253,6 +253,49 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: Prepare backend config
+        working-directory: apps/backend-go
+        run: |
+          cat > configs/config.yaml <<'EOF'
+          server:
+            port: 8080
+            mode: debug
+          database:
+            host: 127.0.0.1
+            port: 3306
+            name: dataease_test
+            user: root
+            password: Admin168
+            max_open_conns: 100
+            max_idle_conns: 10
+          redis:
+            host: 127.0.0.1
+            port: 6379
+            password: ""
+            db: 0
+            pool_size: 100
+          jwt:
+            secret: ci-test-gate-secret
+            expire: 86400
+          log:
+            level: info
+            format: console
+          telemetry:
+            enabled: false
+            endpoint: ""
+          integration:
+            calcite:
+              address: ""
+              timeout_sec: 10
+              max_retries: 1
+            seatunnel:
+              address: ""
+              timeout_sec: 15
+              max_retries: 1
+          menu:
+            hardcoded_fallback: false
+          EOF
+
       - name: Build backend
         working-directory: apps/backend-go
         run: |
