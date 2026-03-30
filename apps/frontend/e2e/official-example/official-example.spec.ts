@@ -68,6 +68,11 @@ const loginIfNeeded = async (page: Page) => {
   const password = process.env.E2E_PASSWORD || 'DataEase123456'
 
   await page.context().clearCookies()
+  await page.goto('/')
+  await page.evaluate(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
   await page.goto('/#/login')
 
   const shouldLogin = /#\/login|\/login/.test(page.url())

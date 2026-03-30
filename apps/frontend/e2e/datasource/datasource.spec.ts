@@ -45,6 +45,11 @@ const detectDatasourcePageState = async page => {
 
 const ensureLoggedIn = async page => {
   await page.context().clearCookies()
+  await page.goto('/')
+  await page.evaluate(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
   await page.goto('/#/login')
 
   if (!(await getUsernameInput(page).isVisible().catch(() => false))) {
