@@ -154,6 +154,9 @@ func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm) e
 	if strings.TrimSpace(req.FilterField) == "" {
 		return fmt.Errorf("filterField is required")
 	}
+	if len(req.WhiteList) > 0 {
+		return fmt.Errorf("whiteList is not supported in T8")
+	}
 
 	_, fieldsByName, err := s.datasetFieldMaps(req.DatasetID)
 	if err != nil {

@@ -48,7 +48,11 @@ func (s *ColumnPermissionService) GetMaskRules(datasetID int64) (map[string]*per
 
 	rules := make(map[string]*permission.DesensitizationRule)
 	for _, perm := range perms {
-		if perm.PermType == permission.PermTypeMask && perm.MaskRule != "" {
+		if perm.PermType == permission.PermTypeMask {
+			if perm.MaskRule == "" {
+				rules[perm.FieldName] = &permission.DesensitizationRule{BuiltInRule: permission.BuiltInRuleCompleteDesensitization}
+				continue
+			}
 			rule := s.parseMaskRule(perm.MaskRule)
 			if rule != nil {
 				rules[perm.FieldName] = rule
