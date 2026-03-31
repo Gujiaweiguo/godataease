@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
@@ -13,10 +14,11 @@ import (
 )
 
 type RowPermissionService struct {
-	rowPermRepo    *repository.RowPermissionRepository
-	columnPermRepo *repository.ColumnPermissionRepository
-	userRoleRepo   UserRoleRepositoryInterface
-	adminChecker   AdminCheckerInterface
+	rowPermRepo          *repository.RowPermissionRepository
+	columnPermRepo       *repository.ColumnPermissionRepository
+	userRoleRepo         UserRoleRepositoryInterface
+	adminChecker         AdminCheckerInterface
+	datasetFieldResolver DatasetFieldResolver
 }
 
 type UserRoleRepositoryInterface interface {
@@ -25,6 +27,10 @@ type UserRoleRepositoryInterface interface {
 
 type AdminCheckerInterface interface {
 	IsAdmin(userID int64) bool
+}
+
+type DatasetFieldResolver interface {
+	GetFieldByID(id int64) (*dataset.CoreDatasetTableField, error)
 }
 
 func NewRowPermissionService(
@@ -39,6 +45,10 @@ func NewRowPermissionService(
 		userRoleRepo:   userRoleRepo,
 		adminChecker:   adminChecker,
 	}
+}
+
+func (s *RowPermissionService) SetDatasetFieldResolver(resolver DatasetFieldResolver) {
+	s.datasetFieldResolver = resolver
 }
 
 func (s *RowPermissionService) GetRowPermissionsTree(datasetID, userID int64) ([]*permission.DataPermRow, error) {
@@ -209,13 +219,30 @@ func (s *RowPermissionService) buildItemCondition(item *permission.DatasetRowPer
 		return "", nil
 	}
 
-	field := fmt.Sprintf("`%d`", item.FieldID)
+	field := s.resolveFieldReference(item.FieldID)
 
 	if item.FilterType == "enum" && len(item.EnumValue) > 0 {
 		return s.buildEnumCondition(field, item.EnumValue)
 	}
 
 	return s.buildLogicCondition(field, item.Term, item.Value)
+}
+
+func (s *RowPermissionService) resolveFieldReference(fieldID int64) string {
+	if s.datasetFieldResolver == nil {
+		return fmt.Sprintf("`%d`", fieldID)
+	}
+	field, err := s.datasetFieldResolver.GetFieldByID(fieldID)
+	if err != nil || field == nil {
+		return fmt.Sprintf("`%d`", fieldID)
+	}
+	if field.OriginName != nil && strings.TrimSpace(*field.OriginName) != "" {
+		return fmt.Sprintf("`%s`", strings.TrimSpace(*field.OriginName))
+	}
+	if field.Name != nil && strings.TrimSpace(*field.Name) != "" {
+		return fmt.Sprintf("`%s`", strings.TrimSpace(*field.Name))
+	}
+	return fmt.Sprintf("`%d`", fieldID)
 }
 
 //nolint:gocyclo
