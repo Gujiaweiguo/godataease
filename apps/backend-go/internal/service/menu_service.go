@@ -158,6 +158,10 @@ func (s *MenuService) GetByID(id int64) (*menu.CoreMenu, error) {
 	return s.repo.GetByID(id)
 }
 
+func (s *MenuService) GetByPath(path string) (*menu.CoreMenu, error) {
+	return s.repo.GetByPath(path)
+}
+
 func (s *MenuService) Create(m *menu.CoreMenu) error {
 	return s.repo.Create(m)
 }

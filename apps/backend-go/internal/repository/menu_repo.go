@@ -38,6 +38,15 @@ func (r *MenuRepository) GetByID(id int64) (*menu.CoreMenu, error) {
 	return &m, nil
 }
 
+func (r *MenuRepository) GetByPath(path string) (*menu.CoreMenu, error) {
+	var m menu.CoreMenu
+	err := r.db.Where("path = ?", path).First(&m).Error
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 func (r *MenuRepository) Create(m *menu.CoreMenu) error {
 	return r.db.Create(m).Error
 }

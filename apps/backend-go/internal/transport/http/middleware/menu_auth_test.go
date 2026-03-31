@@ -5,7 +5,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"dataease/backend/internal/domain/menu"
+	"dataease/backend/internal/domain/role"
+	"dataease/backend/internal/repository"
+	"dataease/backend/internal/service"
+
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -19,6 +27,22 @@ func createTestMenuAuthMiddleware() *MenuAuthMiddleware {
 		roleMenuService: nil,
 		menuService:     nil,
 	}
+}
+
+func createBackedMenuAuthMiddleware(t *testing.T) *MenuAuthMiddleware {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &role.RoleMenu{}, &menu.CoreMenu{}))
+	roleRepo := repository.NewRoleRepository(db)
+	roleMenuRepo := repository.NewRoleMenuRepository(db)
+	menuRepo := repository.NewMenuRepository(db)
+	require.NoError(t, roleRepo.Create(&role.SysRole{RoleID: 2, RoleName: "role-2", RoleCode: "role-2", Status: role.StatusEnabled}))
+	require.NoError(t, roleRepo.Create(&role.SysRole{RoleID: 3, RoleName: "role-3", RoleCode: "role-3", Status: role.StatusEnabled}))
+	dashboard := &menu.CoreMenu{ID: 101, Name: "Dashboard", Path: "/dashboard", Type: 2, Auth: true, MenuSort: 1}
+	require.NoError(t, menuRepo.Create(dashboard))
+	require.NoError(t, roleMenuRepo.SaveRoleMenus(2, []int64{dashboard.ID}))
+	return NewMenuAuthMiddleware(service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo), service.NewMenuServiceWithRoleFilter(menuRepo, roleMenuRepo))
 }
 
 func TestCheckMenuAccess_NoRole(t *testing.T) {
@@ -299,10 +323,10 @@ func TestRequireMenuAuth_AdminBypass(t *testing.T) {
 
 func TestRequireMenuAuth_NonAdminDenied(t *testing.T) {
 	r := gin.New()
-	middleware := createTestMenuAuthMiddleware()
+	middleware := createBackedMenuAuthMiddleware(t)
 
 	r.GET("/protected", func(c *gin.Context) {
-		c.Set("role_ids", []int64{2, 3}) // Non-admin roles
+		c.Set("role_ids", []int64{3})
 		c.Next()
 	}, middleware.RequireMenuAuth("/dashboard"), func(c *gin.Context) {
 		c.JSON(200, gin.H{"success": true})
@@ -324,6 +348,26 @@ func TestRequireMenuAuth_NonAdminDenied(t *testing.T) {
 	expectedMsg := "Menu access denied: /dashboard"
 	if resp["msg"] != expectedMsg {
 		t.Errorf("expected '%s' message, got %v", expectedMsg, resp["msg"])
+	}
+}
+
+func TestRequireMenuAuth_AuthorizedRoleAllowed(t *testing.T) {
+	r := gin.New()
+	middleware := createBackedMenuAuthMiddleware(t)
+
+	r.GET("/protected", func(c *gin.Context) {
+		c.Set("role_ids", []int64{2})
+		c.Next()
+	}, middleware.RequireMenuAuth("/dashboard"), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("GET", "/protected", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("expected status 200 for authorized role, got %d", w.Code)
 	}
 }
 

@@ -161,6 +161,62 @@ func TestPermissionCompatHandlerIntegration_MenuPermissionAndSaveRoundTrip(t *te
 	assert.Contains(t, invalidBody["msg"], "menu not found")
 }
 
+func TestPermissionCompatHandlerIntegration_MenuTargetPermissionAndSaveRoundTrip(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := openPermissionCompatHandlerTestDB(t)
+	roleRepo := repository.NewRoleRepository(db)
+	menuRepo := repository.NewMenuRepository(db)
+	roleMenuRepo := repository.NewRoleMenuRepository(db)
+
+	menuSvc := service.NewMenuService(menuRepo)
+	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	h := NewPermissionCompatHandler(menuSvc, nil, roleMenuSvc, nil)
+
+	testRole := &role.SysRole{RoleName: "Menu Target Role", RoleCode: "menu_target_role", Status: 1}
+	require.NoError(t, roleRepo.Create(testRole))
+
+	menuA := &menu.CoreMenu{Name: "User", Pid: 0, MenuSort: 1, Path: "/system/user", Type: 2, Auth: true}
+	menuB := &menu.CoreMenu{Name: "Permission", Pid: 0, MenuSort: 2, Path: "/system/permission", Type: 2, Auth: true}
+	require.NoError(t, menuRepo.Create(menuA))
+	require.NoError(t, menuRepo.Create(menuB))
+	require.NoError(t, roleMenuRepo.SaveRoleMenus(testRole.RoleID, []int64{menuA.ID}))
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterPermissionCompatRoutes(api, h)
+
+	queryReq := httptest.NewRequest(http.MethodPost, "/api/auth/menuTargetPermission", strings.NewReader(fmt.Sprintf(`{"roleId":%d}`, testRole.RoleID)))
+	queryReq.Header.Set("Content-Type", "application/json")
+	queryResp := httptest.NewRecorder()
+	r.ServeHTTP(queryResp, queryReq)
+	require.Equal(t, http.StatusOK, queryResp.Code)
+
+	var queryBody struct {
+		Code string `json:"code"`
+		Data struct {
+			MenuIDs []int64 `json:"menuIds"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(queryResp.Body.Bytes(), &queryBody))
+	assert.Equal(t, "000000", queryBody.Code)
+	assert.Equal(t, []int64{menuA.ID}, queryBody.Data.MenuIDs)
+
+	saveReq := httptest.NewRequest(http.MethodPost, "/api/auth/saveMenuTargetPer", strings.NewReader(fmt.Sprintf(`{"roleId":%d,"targetPerms":[{"targetType":"role","targetId":%d,"permIds":[%d,%d]}]}`, testRole.RoleID, testRole.RoleID, menuA.ID, menuB.ID)))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveResp := httptest.NewRecorder()
+	r.ServeHTTP(saveResp, saveReq)
+	require.Equal(t, http.StatusOK, saveResp.Code)
+
+	var saveBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(saveResp.Body.Bytes(), &saveBody))
+	assert.Equal(t, "000000", saveBody["code"])
+
+	persistedMenuIDs, err := roleMenuRepo.GetMenuIDsByRoleID(testRole.RoleID)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []int64{menuA.ID, menuB.ID}, persistedMenuIDs)
+}
+
 func TestPermissionCompatHandlerIntegration_BusiTargetPermissionAndSaveRoundTrip(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

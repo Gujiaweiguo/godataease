@@ -17,6 +17,7 @@ type PermissionCompatHandler struct {
 	permService         *service.PermService
 	roleMenuService     *service.RoleMenuService
 	resourcePermService *service.ResourcePermissionService
+	roleService         *service.RoleService
 }
 
 func NewPermissionCompatHandler(
@@ -31,6 +32,10 @@ func NewPermissionCompatHandler(
 		roleMenuService:     roleMenuService,
 		resourcePermService: resourcePermService,
 	}
+}
+
+func (h *PermissionCompatHandler) SetRoleService(roleService *service.RoleService) {
+	h.roleService = roleService
 }
 
 type permissionSaveRequest struct {
@@ -170,6 +175,12 @@ func (h *PermissionCompatHandler) SaveBusiPer(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	if h.roleService != nil {
+		if err := h.roleService.ValidatePermissionInheritance(req.RoleID, req.PermIDs); err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+	}
 
 	if err := h.saveRolePerms(req.RoleID, req.PermIDs); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -199,8 +210,30 @@ func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	if req.RoleID <= 0 {
+		response.Error(c, "500000", "Invalid request: roleId is required")
+		return
+	}
+	if h.menuService == nil || h.roleMenuService == nil {
+		response.Error(c, "500000", "menu target permission compatibility is not configured")
+		return
+	}
 
-	response.Error(c, "501000", "Not Implemented: menu target permission compatibility is unavailable")
+	menus, err := h.menuService.Query()
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	auth, err := h.roleMenuService.GetRoleMenuAuth(req.RoleID)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"menuTree": menus,
+		"menuIds":  auth.MenuIDs,
+	})
 }
 
 func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
@@ -277,8 +310,35 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	if h.roleMenuService == nil {
+		response.Error(c, "500000", "save menu target permission compatibility is not configured")
+		return
+	}
 
-	response.Error(c, "501000", "Not Implemented: save menu target permission compatibility is unavailable")
+	roleID := req.RoleID
+	menuIDs := make([]int64, 0)
+	for _, target := range req.TargetPerms {
+		targetType := normalizeTargetType(target.TargetType, target.SourceType)
+		if targetType != "role" {
+			response.Error(c, "500000", "Invalid request: only role targets are supported")
+			return
+		}
+		if roleID == 0 {
+			roleID = normalizeTargetID(target.TargetID, target.SourceID)
+		}
+		menuIDs = append(menuIDs, extractTargetPermIDs(target)...)
+	}
+	if roleID <= 0 {
+		response.Error(c, "500000", "Invalid request: roleId is required")
+		return
+	}
+
+	if err := h.roleMenuService.SaveRoleMenuAuth(&service.SaveRoleMenuRequest{RoleID: roleID, MenuIDs: uniqueInt64(menuIDs)}); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
 }
 
 func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
