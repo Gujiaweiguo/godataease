@@ -326,6 +326,30 @@ func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func (h *UserHandler) SwitchEnable(c *gin.Context) {
+	if h.userService == nil {
+		response.Error(c, "500000", "user service is not configured")
+		return
+	}
+
+	var req user.UserUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	if req.ID <= 0 || req.Status == nil {
+		response.Error(c, "500000", "Invalid request: id and status are required")
+		return
+	}
+
+	if err := h.userService.UpdateUserStatus(req.ID, *req.Status); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func RegisterUserRoutes(r *gin.RouterGroup, h *UserHandler) {
 	userGroup := r.Group("/system/user")
 	{
@@ -333,6 +357,7 @@ func RegisterUserRoutes(r *gin.RouterGroup, h *UserHandler) {
 		userGroup.POST("/create", h.CreateUser)
 		userGroup.POST("/update", h.UpdateUser)
 		userGroup.POST("/delete/:id", h.DeleteUser)
+		userGroup.POST("/enable", h.SwitchEnable)
 		userGroup.GET("/options", h.GetUserOptions)
 	}
 

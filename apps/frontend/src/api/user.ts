@@ -72,7 +72,7 @@ export const downErrorRecordApi = (key: string) =>
   request.get({ url: `/user/errorRecord/${key}`, responseType: 'blob' })
 
 export const clearErrorApi = (key: string) => {
-  request.get({ url: `/user/clearErrorRecord/${key}` })
+	return request.get({ url: `/user/clearErrorRecord/${key}` })
 }
 
 export const batchDelApi = data => request.post({ url: '/user/batchDel', data })
