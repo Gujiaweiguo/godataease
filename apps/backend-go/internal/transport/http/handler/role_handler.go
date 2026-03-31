@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"dataease/backend/internal/domain/role"
@@ -223,6 +224,10 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 	}
 
 	if err := h.service.UnmountUser(&req); err != nil {
+		if errors.Is(err, service.ErrLastRoleRemovalBlocked) {
+			response.Error(c, "500000", service.ErrLastRoleRemovalBlocked.Error())
+			return
+		}
 		response.Error(c, "500000", err.Error())
 		return
 	}

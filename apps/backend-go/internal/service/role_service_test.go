@@ -1,9 +1,11 @@
 package service
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
@@ -19,10 +21,12 @@ func setupRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRepositor
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	repo := repository.NewRoleRepository(db)
-	return NewRoleService(repo, nil, nil), repo
+	svc := NewRoleService(repo, nil, nil)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, repo
 }
 
 func setupRoleServiceWithReposTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository) {
@@ -30,12 +34,14 @@ func setupRoleServiceWithReposTest(t *testing.T) (*RoleService, *repository.Role
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	return NewRoleService(roleRepo, userRepo, userRoleRepo), roleRepo, userRepo, userRoleRepo
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, roleRepo, userRepo, userRoleRepo
 }
 
 func setupRoleServiceWithReposAndDBTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository, *gorm.DB) {
@@ -43,12 +49,14 @@ func setupRoleServiceWithReposAndDBTest(t *testing.T) (*RoleService, *repository
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	return NewRoleService(roleRepo, userRepo, userRoleRepo), roleRepo, userRepo, userRoleRepo, db
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, roleRepo, userRepo, userRoleRepo, db
 }
 
 func setupRoleServiceWithoutUserRoleTableTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository) {
@@ -56,12 +64,14 @@ func setupRoleServiceWithoutUserRoleTableTest(t *testing.T) (*RoleService, *repo
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	return NewRoleService(roleRepo, userRepo, userRoleRepo), roleRepo, userRepo, userRoleRepo
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, roleRepo, userRepo, userRoleRepo
 }
 
 func setupRoleServiceWithoutRoleTableTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository) {
@@ -69,12 +79,14 @@ func setupRoleServiceWithoutRoleTableTest(t *testing.T) (*RoleService, *reposito
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&user.SysUserRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	return NewRoleService(roleRepo, userRepo, userRoleRepo), roleRepo, userRepo, userRoleRepo
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, roleRepo, userRepo, userRoleRepo
 }
 
 func setupClosedRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRepository) {
@@ -82,12 +94,14 @@ func setupClosedRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRep
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 	repo := repository.NewRoleRepository(db)
+	svc := NewRoleService(repo, nil, nil)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	require.NoError(t, sqlDB.Close())
-	return NewRoleService(repo, nil, nil), repo
+	return svc, repo
 }
 
 func setupClosedRoleServiceWithReposTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository) {
@@ -95,14 +109,16 @@ func setupClosedRoleServiceWithReposTest(t *testing.T) (*RoleService, *repositor
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	require.NoError(t, sqlDB.Close())
-	return NewRoleService(roleRepo, userRepo, userRoleRepo), roleRepo, userRepo, userRoleRepo
+	return svc, roleRepo, userRepo, userRoleRepo
 }
 
 func seedRole(t *testing.T, repo *repository.RoleRepository, name, code string, roleType *string, createTime time.Time) {
@@ -614,7 +630,8 @@ func TestRoleService_UnmountUser_RejectsLastRole(t *testing.T) {
 
 	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 31, Rid: roleA.RoleID})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot remove user's last role")
+	assert.ErrorIs(t, err, ErrLastRoleRemovalBlocked)
+	assert.Equal(t, "cannot remove user's last role", err.Error())
 }
 
 func TestRoleService_UnmountUser_Success(t *testing.T) {
@@ -654,6 +671,7 @@ func TestRoleService_UnmountUser_CountUserRolesError(t *testing.T) {
 	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to check user role count")
+	assert.False(t, errors.Is(err, ErrLastRoleRemovalBlocked))
 }
 
 func TestRoleService_BeforeUnmountInfo_CountError(t *testing.T) {
@@ -840,16 +858,33 @@ func TestRoleService_ValidatePermissionInheritance_RootRole(t *testing.T) {
 }
 
 func TestRoleService_ValidatePermissionInheritance_WithParent(t *testing.T) {
-	svc, repo := setupRoleServiceTest(t)
+	svc, repo, _, _, db := setupRoleServiceWithReposAndDBTest(t)
 	parentType := role.RoleTypeSystem
 	rootParent := int64(0)
 	parent := &role.SysRole{RoleName: "Parent", RoleCode: "parent", RoleType: &parentType, Status: role.StatusEnabled, ParentID: &rootParent}
 	require.NoError(t, repo.Create(parent))
 	child := &role.SysRole{RoleName: "Child", RoleCode: "child", Status: role.StatusEnabled, ParentID: &parent.RoleID}
 	require.NoError(t, repo.Create(child))
+	require.NoError(t, db.Create(&permission.SysRolePerm{RoleID: parent.RoleID, PermID: 5}).Error)
+	require.NoError(t, db.Create(&permission.SysRolePerm{RoleID: parent.RoleID, PermID: 6}).Error)
 
 	err := svc.ValidatePermissionInheritance(child.RoleID, []int64{5, 6})
 	require.NoError(t, err)
+}
+
+func TestRoleService_ValidatePermissionInheritance_RejectsPermissionOutsideParentScope(t *testing.T) {
+	svc, repo, _, _, db := setupRoleServiceWithReposAndDBTest(t)
+	parentType := role.RoleTypeSystem
+	rootParent := int64(0)
+	parent := &role.SysRole{RoleName: "Parent", RoleCode: "parent", RoleType: &parentType, Status: role.StatusEnabled, ParentID: &rootParent}
+	require.NoError(t, repo.Create(parent))
+	child := &role.SysRole{RoleName: "Child", RoleCode: "child", Status: role.StatusEnabled, ParentID: &parent.RoleID}
+	require.NoError(t, repo.Create(child))
+	require.NoError(t, db.Create(&permission.SysRolePerm{RoleID: parent.RoleID, PermID: 5}).Error)
+
+	err := svc.ValidatePermissionInheritance(child.RoleID, []int64{5, 6})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "permission inheritance violation")
 }
 
 func TestRoleService_ValidatePermissionInheritance_RoleNotFound(t *testing.T) {

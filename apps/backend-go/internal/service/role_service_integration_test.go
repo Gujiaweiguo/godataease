@@ -5,6 +5,7 @@ package service
 import (
 	"testing"
 
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
@@ -14,13 +15,15 @@ import (
 
 // Helper function to create RoleService with all dependencies
 func newTestRoleService(t *testing.T) *RoleService {
-	cleanupTables(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{})
+	cleanupTables(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}, &permission.SysRolePerm{})
 
 	repo := repository.NewRoleRepository(testDB)
 	userRepo := repository.NewUserRepository(testDB)
 	userRoleRepo := repository.NewUserRoleRepository(testDB)
 
-	return NewRoleService(repo, userRepo, userRoleRepo)
+	svc := NewRoleService(repo, userRepo, userRoleRepo)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(testDB))
+	return svc
 }
 
 func TestRoleServiceIntegration_Create(t *testing.T) {
@@ -681,14 +684,33 @@ func TestRoleServiceIntegration_CreateRoleWithInheritance_UsesRoleKeyAndDesc(t *
 
 func TestRoleServiceIntegration_ValidatePermissionInheritance_WithParent(t *testing.T) {
 	svc := newTestRoleService(t)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
 
 	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParent"}, "tester")
 	require.NoError(t, err)
 
 	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "InheritanceChild"}, &parentID, "tester")
 	require.NoError(t, err)
+	require.NoError(t, resourcePermRepo.GrantPermToRole(parentID, 1))
+	require.NoError(t, resourcePermRepo.GrantPermToRole(parentID, 2))
+	require.NoError(t, resourcePermRepo.GrantPermToRole(parentID, 3))
 
 	require.NoError(t, svc.ValidatePermissionInheritance(childID, []int64{1, 2, 3}))
+}
+
+func TestRoleServiceIntegration_ValidatePermissionInheritance_RejectsExtraPermission(t *testing.T) {
+	svc := newTestRoleService(t)
+	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
+
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParentLimited"}, "tester")
+	require.NoError(t, err)
+	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "InheritanceChildLimited"}, &parentID, "tester")
+	require.NoError(t, err)
+	require.NoError(t, resourcePermRepo.GrantPermToRole(parentID, 1))
+
+	err = svc.ValidatePermissionInheritance(childID, []int64{1, 2})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "permission inheritance violation")
 }
 
 func TestRoleServiceIntegration_CreateRoleWithInheritance_ParentNotFound(t *testing.T) {

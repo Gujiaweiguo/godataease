@@ -1,7 +1,9 @@
 package service
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,14 +15,21 @@ import (
 	"go.uber.org/zap"
 )
 
+var ErrLastRoleRemovalBlocked = errors.New("cannot remove user's last role")
+
 type RoleService struct {
-	repo         *repository.RoleRepository
-	userRepo     *repository.UserRepository
-	userRoleRepo *repository.UserRoleRepository
+	repo             *repository.RoleRepository
+	userRepo         *repository.UserRepository
+	userRoleRepo     *repository.UserRoleRepository
+	resourcePermRepo *repository.ResourcePermissionRepository
 }
 
 func NewRoleService(repo *repository.RoleRepository, userRepo *repository.UserRepository, userRoleRepo *repository.UserRoleRepository) *RoleService {
 	return &RoleService{repo: repo, userRepo: userRepo, userRoleRepo: userRoleRepo}
+}
+
+func (s *RoleService) SetResourcePermissionRepository(repo *repository.ResourcePermissionRepository) {
+	s.resourcePermRepo = repo
 }
 
 func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string) (int64, error) {
@@ -300,7 +309,7 @@ func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
 	// 唯一角色安全约束：禁止移除用户的最后一个角色
 	if count <= 1 {
 		logger.Warn("Reject unmount last role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("count", count))
-		return fmt.Errorf("cannot remove user's last role: user must have at least one role")
+		return fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
 	}
 
 	if err := s.repo.UnbindUserRole(req.Uid, req.Rid); err != nil {
@@ -502,14 +511,35 @@ func (s *RoleService) ValidatePermissionInheritance(roleID int64, permIDs []int6
 	if rle.ParentID == nil || *rle.ParentID == 0 {
 		return nil
 	}
+	if len(permIDs) == 0 {
+		return nil
+	}
+	if s.resourcePermRepo == nil {
+		return fmt.Errorf("resource permission repository is not configured")
+	}
 
-	// TODO: 实现权限边界验证
-	// 这需要查询父角色的权限列表，并验证新分配的权限是否在父角色权限范围内
-	// 当前版本先记录日志，后续迭代完善
+	parentPermIDs, err := s.resourcePermRepo.GetRolePerms(*rle.ParentID)
+	if err != nil {
+		return fmt.Errorf("failed to load parent role permissions: %w", err)
+	}
+
+	parentPermSet := make(map[int64]struct{}, len(parentPermIDs))
+	for _, permID := range parentPermIDs {
+		parentPermSet[permID] = struct{}{}
+	}
+
+	for _, permID := range permIDs {
+		if _, ok := parentPermSet[permID]; ok {
+			continue
+		}
+		return fmt.Errorf("permission inheritance violation: permission %d exceeds parent role scope", permID)
+	}
+
 	logger.Info("Permission inheritance validation",
 		zap.Int64("roleID", roleID),
 		zap.Int64("parentID", *rle.ParentID),
-		zap.Int("permCount", len(permIDs)))
+		zap.Int("permCount", len(permIDs)),
+		zap.Int64s("validatedPermIDs", slices.Clone(permIDs)))
 
 	return nil
 }

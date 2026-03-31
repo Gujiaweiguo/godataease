@@ -173,3 +173,18 @@ func TestRoleHandler_MountUser_UsesContextOrgWhenMissingInRequest(t *testing.T) 
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "000000", resp["code"])
 }
+
+func TestRoleHandler_UnmountUser_LastRoleReturnsDeterministicErrorEnvelope(t *testing.T) {
+	r := setupRoleHandlerTestRouter(t)
+	body := []byte(`{"rid":1,"uid":1}`)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/role/unMountUser", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp["code"])
+	assert.Equal(t, service.ErrLastRoleRemovalBlocked.Error(), resp["msg"])
+}
