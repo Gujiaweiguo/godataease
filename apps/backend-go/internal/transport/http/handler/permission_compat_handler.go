@@ -319,7 +319,7 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 	menuIDs := make([]int64, 0)
 	for _, target := range req.TargetPerms {
 		targetType := normalizeTargetType(target.TargetType, target.SourceType)
-		if targetType != "role" {
+		if targetType != permission.AuthTargetTypeRole {
 			response.Error(c, "500000", "Invalid request: only role targets are supported")
 			return
 		}
@@ -389,7 +389,7 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 func (h *PermissionCompatHandler) collectMatchedTargetPermIDs(target targetPermissionTarget, resourceType string) ([]int64, error) {
 	targetType := normalizeTargetType(target.TargetType, target.SourceType)
 	targetID := normalizeTargetID(target.TargetID, target.SourceID)
-	if targetType != "role" || targetID <= 0 {
+	if targetType != permission.AuthTargetTypeRole || targetID <= 0 {
 		return nil, fmt.Errorf("only role targets are supported in the current resource-perspective save slice")
 	}
 
