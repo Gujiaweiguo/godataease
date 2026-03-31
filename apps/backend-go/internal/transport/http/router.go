@@ -132,6 +132,7 @@ type Router struct {
 	permissionCompatHandler   *handler.PermissionCompatHandler
 	dataPermissionHandler     *handler.DataPermissionHandler
 	resourceGovernanceHandler *handler.ResourceGovernanceHandler
+	menuAuthMiddleware        *middleware.MenuAuthMiddleware
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -155,6 +156,9 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
 	userPermRepo := repository.NewUserPermRepository(db)
+	middleware.SetRoleIDsResolver(func(userID uint64) ([]int64, error) {
+		return userRoleRepo.GetRoleIDsByUserID(int64(userID))
+	})
 	userService := service.NewUserService(userRepo, userRoleRepo, userPermRepo)
 	userImportService := service.NewUserImportService(userService)
 	userHandler := handler.NewUserHandler(userService, userImportService)
@@ -189,6 +193,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	// RoleMenu module initialization
 	roleMenuService := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
 	roleMenuHandler := handler.NewRoleMenuHandler(roleMenuService)
+	menuAuthMiddleware := middleware.NewMenuAuthMiddleware(roleMenuService, menuService)
 
 	// Map module initialization
 	areaRepo := repository.NewAreaRepository(db)
@@ -228,6 +233,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	rowPermRepo := repository.NewRowPermissionRepository(db)
 	columnPermRepo := repository.NewColumnPermissionRepository(db)
 	rowPermService := service.NewRowPermissionService(rowPermRepo, columnPermRepo, userRoleRepo, adminChecker)
+	rowPermService.SetDatasetFieldResolver(datasetRepo)
 	datasetService := service.NewDatasetServiceWithPermission(datasetRepo, rowPermService)
 	if application != nil && application.Config != nil {
 		calciteCfg := application.Config.Integration.Calcite
@@ -241,6 +247,8 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	chartRepo := repository.NewChartRepository(db)
 	chartService := service.NewChartService(chartRepo)
+	chartService.SetRowPermissionService(rowPermService)
+	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnPermRepo))
 	chartHandler := handler.NewChartHandler(chartService)
 	dataPermissionService := service.NewDataPermissionAdminService(rowPermRepo, columnPermRepo, chartService)
 	dataPermissionHandler := handler.NewDataPermissionHandler(dataPermissionService)
@@ -289,6 +297,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
+	roleService.SetResourcePermissionRepository(resourcePermRepo)
 	resourcePermService := service.NewResourcePermissionService(resourcePermRepo, adminChecker)
 	datasourceService.SetResourcePermissionService(resourcePermService)
 	datasetService.SetResourcePermissionService(resourcePermService)
@@ -297,6 +306,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
+	permissionCompatHandler.SetRoleService(roleService)
 	resourceGovernanceHandler := handler.NewResourceGovernanceHandler(resourceGovernanceAdminService, adminChecker)
 
 	// Export module initialization
@@ -358,6 +368,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		permissionCompatHandler:   permissionCompatHandler,
 		dataPermissionHandler:     dataPermissionHandler,
 		resourceGovernanceHandler: resourceGovernanceHandler,
+		menuAuthMiddleware:        menuAuthMiddleware,
 	}
 }
 
@@ -469,8 +480,12 @@ func (r *Router) registerAPIRoutes() {
 		protectedRoleDe2API.Use(middleware.Auth(jwtInstance))
 		roleDe2API = protectedRoleDe2API
 		roleMenuAPI = protectedRoleAPI
-		permissionCompatAPI = protectedRoleAPI
-		permissionCompatDe2API = protectedRoleDe2API
+		protectedPermissionCompatAPI := r.engine.Group("/api")
+		protectedPermissionCompatAPI.Use(middleware.Auth(jwtInstance), r.menuAuthMiddleware.RequireMenuAuth("/system/permission"))
+		permissionCompatAPI = protectedPermissionCompatAPI
+		protectedPermissionCompatDe2API := r.engine.Group("/de2api")
+		protectedPermissionCompatDe2API.Use(middleware.Auth(jwtInstance), r.menuAuthMiddleware.RequireMenuAuth("/system/permission"))
+		permissionCompatDe2API = protectedPermissionCompatDe2API
 		dataPermissionAPI = protectedRoleAPI
 		protectedDatasourceDe2API := r.engine.Group("/de2api")
 		protectedDatasourceDe2API.Use(middleware.Auth(jwtInstance))
@@ -506,7 +521,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterAuditRoutes(auditAPI, r.auditHandler)
 		handler.RegisterUserRoutes(userAPI, r.userHandler)
 		handler.RegisterOrgRoutes(api, r.orgHandler)
-		handler.RegisterPermRoutes(api, r.permHandler)
+		handler.RegisterPermRoutes(permissionCompatAPI, r.permHandler)
 		handler.RegisterEmbeddedRoutes(api, r.embeddedHandler)
 		handler.RegisterRoleRoutes(roleAPI, r.roleHandler)
 		handler.RegisterRoleRoutes(roleDe2API, r.roleHandler)

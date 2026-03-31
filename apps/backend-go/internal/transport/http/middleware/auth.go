@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -13,9 +14,14 @@ import (
 )
 
 var auditService *service.AuditService
+var roleIDsResolver func(uint64) ([]int64, error)
 
 func SetAuditService(svc *service.AuditService) {
 	auditService = svc
+}
+
+func SetRoleIDsResolver(resolver func(uint64) ([]int64, error)) {
+	roleIDsResolver = resolver
 }
 
 func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
@@ -48,9 +54,24 @@ func Auth(jwtInstance *auth.JWT) gin.HandlerFunc {
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 		c.Set("org_id", claims.OrgID)
+		if roleIDsResolver != nil {
+			if roleIDs, resolveErr := safeResolveRoleIDs(claims.UserID); resolveErr == nil {
+				c.Set("role_ids", roleIDs)
+			}
+		}
 
 		c.Next()
 	}
+}
+
+func safeResolveRoleIDs(userID uint64) (roleIDs []int64, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			roleIDs = nil
+			err = fmt.Errorf("role resolver panic: %v", r)
+		}
+	}()
+	return roleIDsResolver(userID)
 }
 
 func GetUserID(c *gin.Context) uint64 {
