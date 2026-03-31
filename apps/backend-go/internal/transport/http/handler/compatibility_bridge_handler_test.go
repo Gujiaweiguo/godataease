@@ -14,6 +14,7 @@ import (
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
 	calcitev1 "dataease/backend/proto/calcite/v1"
@@ -21,6 +22,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type bridgeResp struct {
@@ -571,6 +574,78 @@ func TestApiAliasChartSaveAndListByDQ(t *testing.T) {
 	}
 	if len(listResp.Data.DimensionList) != 1 {
 		t.Fatalf("expected alias list dimension size 1, got %d", len(listResp.Data.DimensionList))
+	}
+}
+
+func TestDatasetFieldListWithPermissions_FiltersDisabledAndMarksMasked(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	checked := true
+	groupD := "d"
+	groupQ := "q"
+	varcharType := "VARCHAR"
+	intType := "INT"
+	region := "region"
+	amount := "amount"
+	deTypeD := 0
+	deTypeQ := 2
+
+	repo := &fakeBridgeChartRepo{
+		dsFields: map[int64][]*dataset.CoreDatasetTableField{11: {
+			{ID: 1, DatasetGroupID: 11, Name: &region, OriginName: &region, DataeaseName: &region, GroupType: &groupD, Type: &varcharType, DeType: &deTypeD, Checked: &checked},
+			{ID: 2, DatasetGroupID: 11, Name: &amount, OriginName: &amount, DataeaseName: &amount, GroupType: &groupQ, Type: &intType, DeType: &deTypeQ, Checked: &checked},
+		}},
+	}
+	chartService := service.NewChartService(repo)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err = db.AutoMigrate(&permission.DataPermColumn{}); err != nil {
+		t.Fatalf("migrate permission columns failed: %v", err)
+	}
+	columnRepo := repository.NewColumnPermissionRepository(db)
+	if err = columnRepo.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "amount", PermType: permission.PermTypeDisable, Status: 1}); err != nil {
+		t.Fatalf("create disable permission failed: %v", err)
+	}
+	if err = columnRepo.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}); err != nil {
+		t.Fatalf("create mask permission failed: %v", err)
+	}
+	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo))
+	chartHandler := NewChartHandler(chartService)
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(42))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, nil)
+
+	req := httptest.NewRequest("GET", "/api/datasetField/listWithPermissions/11", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	var resp struct {
+		Code string             `json:"code"`
+		Data []chart.ChartField `json:"data"`
+	}
+	if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "000000" {
+		t.Fatalf("expected code 000000, got %s", resp.Code)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected region plus count field, got %#v", resp.Data)
+	}
+	if resp.Data[0].OriginName != "region" || !resp.Data[0].Desensitized {
+		t.Fatalf("expected region field to be present and desensitized, got %#v", resp.Data[0])
+	}
+	if resp.Data[1].ID != -1 {
+		t.Fatalf("expected count pseudo field to remain, got %#v", resp.Data[1])
 	}
 }
 

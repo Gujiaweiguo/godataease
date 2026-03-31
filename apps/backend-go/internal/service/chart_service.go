@@ -10,6 +10,7 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
 )
 
 type ChartRepository interface {
@@ -27,11 +28,26 @@ type ChartRepository interface {
 }
 
 type ChartService struct {
-	repo ChartRepository
+	repo                    ChartRepository
+	rowPermissionService    *RowPermissionService
+	columnPermissionService *ColumnPermissionService
+}
+
+type permissionAwareChartRepo interface {
+	QueryRowsWithFilter(chartID int64, selectColumns string, whereClause string, whereArgs []interface{}, limit int) ([]map[string]interface{}, int64, error)
+	GetDatasetGroupIDByChartID(chartID int64) (int64, error)
 }
 
 func NewChartService(repo ChartRepository) *ChartService {
 	return &ChartService{repo: repo}
+}
+
+func (s *ChartService) SetRowPermissionService(rowPermSvc *RowPermissionService) {
+	s.rowPermissionService = rowPermSvc
+}
+
+func (s *ChartService) SetColumnPermissionService(columnPermSvc *ColumnPermissionService) {
+	s.columnPermissionService = columnPermSvc
 }
 
 func (s *ChartService) Query(req *chart.ChartQueryRequest) (*chart.CoreChartView, error) {
@@ -63,6 +79,51 @@ func (s *ChartService) QueryData(req *chart.ChartDataRequest) (*chart.ChartDataR
 		Rows:    rows,
 		Total:   total,
 	}, nil
+}
+
+func (s *ChartService) QueryDataWithPermission(req *chart.ChartDataRequest, userID int64) (*chart.ChartDataResponse, error) {
+	permissionRepo, ok := s.repo.(permissionAwareChartRepo)
+	if !ok || userID <= 0 {
+		return s.QueryData(req)
+	}
+
+	datasetGroupID, err := permissionRepo.GetDatasetGroupIDByChartID(req.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	limit := 100
+	if req.ResultCount != nil && *req.ResultCount > 0 {
+		limit = *req.ResultCount
+	}
+
+	selectColumns := "*"
+	whereClause := ""
+	var whereArgs []interface{}
+	if s.rowPermissionService != nil {
+		selectColumns, _ = s.rowPermissionService.BuildSelectColumns(datasetGroupID, userID)
+		whereResult, _ := s.rowPermissionService.BuildWhereClause(datasetGroupID, userID)
+		if whereResult != nil {
+			whereClause = whereResult.Clause
+			whereArgs = whereResult.Args
+		}
+	}
+
+	rows, total, err := permissionRepo.QueryRowsWithFilter(req.ID, selectColumns, whereClause, whereArgs, limit)
+	if err != nil {
+		return nil, err
+	}
+	rows = s.applyColumnRules(datasetGroupID, userID, rows)
+
+	columns := make([]string, 0)
+	if len(rows) > 0 {
+		for col := range rows[0] {
+			columns = append(columns, col)
+		}
+		sort.Strings(columns)
+	}
+
+	return &chart.ChartDataResponse{ChartID: req.ID, Columns: columns, Rows: rows, Total: total}, nil
 }
 
 func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) { //nolint:gocyclo // chart view construction with multiple field types
@@ -168,6 +229,32 @@ func (s *ChartService) ListByDQ(datasetGroupID int64, chartID int64) (*chart.Cha
 	}
 
 	return &chart.ChartFieldListResponse{DimensionList: dimensionList, QuotaList: quotaList}, nil
+}
+
+func (s *ChartService) ListByDQWithPermission(datasetGroupID int64, chartID int64, userID int64) (*chart.ChartFieldListResponse, error) {
+	resp, err := s.ListByDQ(datasetGroupID, chartID)
+	if err != nil {
+		return nil, err
+	}
+	if s.columnPermissionService == nil || userID <= 0 {
+		return resp, nil
+	}
+	if s.rowPermissionService != nil && s.rowPermissionService.IsAdmin(userID) {
+		return resp, nil
+	}
+
+	disabledColumns, err := s.columnPermissionService.GetDisabledColumns(datasetGroupID)
+	if err != nil {
+		return resp, nil
+	}
+	maskRules, err := s.columnPermissionService.GetMaskRules(datasetGroupID)
+	if err != nil {
+		return resp, nil
+	}
+	return &chart.ChartFieldListResponse{
+		DimensionList: s.filterChartFields(resp.DimensionList, disabledColumns, maskRules),
+		QuotaList:     s.filterChartFields(resp.QuotaList, disabledColumns, maskRules),
+	}, nil
 }
 
 func (s *ChartService) CopyField(id int64, chartID int64) error {
@@ -301,6 +388,53 @@ func convertToChartField(field *dataset.CoreDatasetTableField) chart.ChartField 
 		Desensitized:   false,
 		Summary:        summary,
 	}
+}
+
+func (s *ChartService) applyColumnRules(datasetGroupID int64, userID int64, rows []map[string]interface{}) []map[string]interface{} {
+	if len(rows) == 0 || s.columnPermissionService == nil {
+		return rows
+	}
+	if s.rowPermissionService != nil && s.rowPermissionService.IsAdmin(userID) {
+		return rows
+	}
+	disabledColumns, _ := s.columnPermissionService.GetDisabledColumns(datasetGroupID)
+	maskRules, _ := s.columnPermissionService.GetMaskRules(datasetGroupID)
+	for i := range rows {
+		rows[i] = s.columnPermissionService.FilterDisabledColumns(rows[i], disabledColumns)
+		rows[i] = s.columnPermissionService.MaskRowData(rows[i], maskRules)
+	}
+	return rows
+}
+
+func (s *ChartService) filterChartFields(fields []chart.ChartField, disabledColumns map[string]bool, maskRules map[string]*permission.DesensitizationRule) []chart.ChartField {
+	result := make([]chart.ChartField, 0, len(fields))
+	for _, field := range fields {
+		if field.ID == -1 {
+			result = append(result, field)
+			continue
+		}
+		fieldKey := chartFieldPermissionKey(field)
+		if fieldKey != "" && disabledColumns[fieldKey] {
+			continue
+		}
+		if fieldKey != "" {
+			if _, ok := maskRules[fieldKey]; ok {
+				field.Desensitized = true
+			}
+		}
+		result = append(result, field)
+	}
+	return result
+}
+
+func chartFieldPermissionKey(field chart.ChartField) string {
+	for _, key := range []string{field.OriginName, field.Name, field.DataeaseName, field.FieldShortName} {
+		trimmed := strings.TrimSpace(key)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func marshalJSONField(body map[string]interface{}, key string) (string, bool) {

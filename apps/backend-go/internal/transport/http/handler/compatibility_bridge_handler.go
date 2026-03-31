@@ -899,7 +899,13 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Invalid chart ID")
 					return
 				}
-				result, err := chartHandler.service.ListByDQ(datasetGroupID, chartID)
+				userID := int64(middleware.GetUserID(c))
+				var result *chart.ChartFieldListResponse
+				if userID > 0 {
+					result, err = chartHandler.service.ListByDQWithPermission(datasetGroupID, chartID, userID)
+				} else {
+					result, err = chartHandler.service.ListByDQ(datasetGroupID, chartID)
+				}
 				if err != nil {
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
@@ -957,7 +963,13 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Invalid dataset ID")
 					return
 				}
-				result, err := chartHandler.service.ListByDQ(datasetID, 0)
+				userID := int64(middleware.GetUserID(c))
+				var result *chart.ChartFieldListResponse
+				if userID > 0 {
+					result, err = chartHandler.service.ListByDQWithPermission(datasetID, 0, userID)
+				} else {
+					result, err = chartHandler.service.ListByDQ(datasetID, 0)
+				}
 				if err != nil {
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
@@ -970,7 +982,13 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Invalid dataset ID")
 					return
 				}
-				result, err := chartHandler.service.ListByDQ(datasetID, 0)
+				userID := int64(middleware.GetUserID(c))
+				var result *chart.ChartFieldListResponse
+				if userID > 0 {
+					result, err = chartHandler.service.ListByDQWithPermission(datasetID, 0, userID)
+				} else {
+					result, err = chartHandler.service.ListByDQ(datasetID, 0)
+				}
 				if err != nil {
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
@@ -1024,6 +1042,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			userGroup.GET("/errorRecord/:key", user.DownloadErrorRecord)
 			userGroup.GET("/clearErrorRecord/:key", user.ClearErrorRecord)
 			userGroup.GET("/defaultPwd", user.GetDefaultPassword)
+			userGroup.POST("/enable", user.SwitchEnable)
 			userGroup.POST("/resetPwd/:uid", middleware.AuditLog(middleware.AuditConfig{
 				ActionType:   audit.ActionTypeUserAction,
 				ActionName:   "RESET_USER_PASSWORD",
