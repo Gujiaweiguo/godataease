@@ -5,7 +5,9 @@ package service
 import (
 	"testing"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
@@ -171,6 +173,41 @@ func TestOrgServiceIntegration_Delete(t *testing.T) {
 	// Verify deleted
 	_, err = orgRepo.GetByID(existing.OrgID)
 	assert.Error(t, err)
+
+	var deleted org.SysOrg
+	err = testDB.Unscoped().Where("org_id = ?", existing.OrgID).First(&deleted).Error
+	assert.NoError(t, err)
+	assert.Equal(t, org.DelFlagDeleted, deleted.DelFlag)
+}
+
+func TestOrgServiceIntegration_Delete_AuditDispositionIncludesAffectedUsers(t *testing.T) {
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
+	userRepo := repository.NewUserRepository(testDB)
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+
+	existing := &org.SysOrg{OrgName: "ToDeleteAudit", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
+	err := orgRepo.Create(existing)
+	assert.NoError(t, err)
+
+	u := &user.SysUser{Username: "org-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	err = userRepo.Create(u)
+	assert.NoError(t, err)
+	err = testDB.Create(&user.SysUserRole{UserID: u.UserID, RoleID: 1, OrgID: existing.OrgID}).Error
+	assert.NoError(t, err)
+
+	err = svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
+	assert.NoError(t, err)
+
+	logs, total, err := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	assert.Len(t, logs, 1)
+	assert.NotNil(t, logs[0].OrganizationID)
+	assert.Equal(t, existing.OrgID, *logs[0].OrganizationID)
+	assert.NotNil(t, logs[0].AfterValue)
+	assert.Contains(t, *logs[0].AfterValue, "disposition=soft-delete")
+	assert.Contains(t, *logs[0].AfterValue, "affected_users=1")
 }
 
 func TestOrgServiceIntegration_DeleteWithChildren(t *testing.T) {

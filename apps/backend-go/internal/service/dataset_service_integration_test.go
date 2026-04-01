@@ -593,6 +593,7 @@ func TestDatasetServiceIntegration_PreviewAndPreviewWithPermission(t *testing.T)
 		nil,
 		nil,
 	)
+	rowSvc.SetDatasetFieldResolver(repo)
 	permSvc := NewDatasetServiceWithPermission(repo, rowSvc)
 	previewWithPerm, err := permSvc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: group.ID, Limit: 10}, 30001)
 	assert.NoError(t, err)
@@ -601,8 +602,49 @@ func TestDatasetServiceIntegration_PreviewAndPreviewWithPermission(t *testing.T)
 	assert.Contains(t, previewWithPerm.Columns, "region")
 	assert.Contains(t, previewWithPerm.Columns, "city")
 	assert.NotContains(t, previewWithPerm.Columns, "amount")
+	assert.Equal(t, "******", previewWithPerm.Rows[0]["region"])
+	assert.Equal(t, "******", previewWithPerm.Rows[0]["city"])
 
 	err = testDB.Exec("DROP TABLE IF EXISTS it_preview_ds").Error
+	assert.NoError(t, err)
+}
+
+func TestDatasetServiceIntegration_PreviewWithPermission_AppliesRowFilterUsingDatasetFieldNames(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &chart.CoreChartView{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_preview_row_ds").Error
+	err := testDB.Exec("CREATE TABLE it_preview_row_ds (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64), city VARCHAR(64))").Error
+	assert.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_preview_row_ds (region, city) VALUES ('East','Shanghai'),('West','Chengdu')").Error
+	assert.NoError(t, err)
+
+	repo := repository.NewDatasetRepository(testDB)
+	group, err := NewDatasetService(repo).Save(&dataset.WriteRequest{Name: "PreviewRowDS", NodeType: "dataset"})
+	assert.NoError(t, err)
+
+	table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_preview_row_ds")}
+	err = testDB.Create(table).Error
+	assert.NoError(t, err)
+	field := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("region"), Name: dsSvcStrPtr("region")}
+	err = testDB.Create(field).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&permission.DataPermRow{DatasetID: group.ID, DatasetGroupID: group.ID, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 30003, Status: 1, ExpressionTree: fmt.Sprintf(`{"logic":"OR","items":[{"fieldId":%d,"term":"eq","value":"East"}]}`, field.ID)}).Error
+	assert.NoError(t, err)
+
+	rowSvc := NewRowPermissionService(repository.NewRowPermissionRepository(testDB), repository.NewColumnPermissionRepository(testDB), nil, nil)
+	rowSvc.SetDatasetFieldResolver(repo)
+	permSvc := NewDatasetServiceWithPermission(repo, rowSvc)
+
+	preview, err := permSvc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: group.ID, Limit: 10}, 30003)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), preview.Total)
+	assert.Len(t, preview.Rows, 1)
+	assert.Equal(t, "East", preview.Rows[0]["region"])
+
+	err = testDB.Exec("DROP TABLE IF EXISTS it_preview_row_ds").Error
 	assert.NoError(t, err)
 }
 

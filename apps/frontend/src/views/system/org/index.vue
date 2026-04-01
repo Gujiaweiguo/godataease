@@ -77,12 +77,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
-import { orgCreateApi, orgUpdateApi, orgDeleteApi, orgListApi } from '@/api/org'
+import { orgCreateApi, orgUpdateApi, orgDeleteApi, orgTreeApi } from '@/api/org'
 
 const router = useRouter()
 
 const orgList = ref([])
-const orgTreeData = computed(() => buildTreeData(orgList.value))
+const orgTreeData = computed(() => orgList.value)
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const form = ref({
@@ -94,68 +94,49 @@ const form = ref({
   status: 1
 })
 
-const rules = {
+const rules: Record<
+  string,
+  Array<{ required: boolean; message: string; trigger: 'blur' | 'change' }>
+> = {
   orgName: [{ required: true, message: '请输入组织名称', trigger: 'blur' }],
   parentId: [{ required: true, message: '请选择父组织', trigger: 'change' }],
   level: [{ required: true, message: '请输入层级', trigger: 'blur' }]
 }
 
-const buildTreeData = (flatList: any[]) => {
-  const tree: any[] = []
-  const map = new Map()
-
-  flatList.forEach(org => {
-    const node = {
-      ...org,
-      children: []
-    }
-    map.set(org.orgId, node)
-  })
-
-  flatList.forEach(org => {
-    if (org.parentId && map.has(org.parentId)) {
-      const parent = map.get(org.parentId)
-      if (parent) {
-        parent.children.push(org)
+const flattenTreeData = (nodes: any[]): any[] => {
+  const result: any[] = []
+  const walk = (items: any[]): void => {
+    items.forEach((item: any) => {
+      result.push(item)
+      if (Array.isArray(item.children) && item.children.length > 0) {
+        walk(item.children)
       }
-    } else if (!org.parentId) {
-      tree.push(org)
-    }
-  })
-
-  return tree
+    })
+  }
+  walk(nodes)
+  return result
 }
 
 const getParentName = (parentId: number | null) => {
   if (!parentId) return '无'
-  const parent = orgList.value.find((org: any) => org.orgId === parentId)
+  const parent = flattenTreeData(orgList.value).find((org: any) => org.orgId === parentId)
   return parent ? parent.orgName : '未知'
 }
 
 const loadOrgList = async () => {
   try {
-    const res = await orgListApi()
-    console.log('API Response:', res)
-    console.log('res.data:', res.data)
-    console.log('res.data type:', typeof res.data)
-    console.log('Is array:', Array.isArray(res.data))
-    console.log('orgList before:', orgList.value.length)
+    const res = await orgTreeApi()
 
     if (res.code === '000000') {
-      // API 直接返回数组
       if (Array.isArray(res.data)) {
         orgList.value = res.data
-        console.log('orgList after assignment:', orgList.value.length)
       } else if (res.data?.list && Array.isArray(res.data.list)) {
         orgList.value = res.data.list
-        console.log('orgList after assignment from list:', orgList.value.length)
       } else {
         orgList.value = []
-        console.log('orgList is empty, setting to empty array')
       }
     }
   } catch (error) {
-    console.error('Error loading org list:', error)
     ElMessage.error('加载组织列表失败')
   }
 }
@@ -194,7 +175,7 @@ const handleAddChild = (row: any) => {
 
 const handleDelete = async (orgId: number) => {
   try {
-    await ElMessageBox.confirm('确定要删除该组织吗?删除后所有子组织也将被删除。', '提示', {
+    await ElMessageBox.confirm('确定要删除该组织吗？请先删除或迁移其子组织；当前删除将保留可审计记录。', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'

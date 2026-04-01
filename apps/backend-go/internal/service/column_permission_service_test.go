@@ -244,6 +244,17 @@ func TestFilterDisabledColumns(t *testing.T) {
 	}
 }
 
+func TestGetMaskRules_EmptyMaskRuleFallsBackToDefaultDesensitization(t *testing.T) {
+	svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
+	require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}))
+
+	rules, err := svc.GetMaskRules(9)
+	require.NoError(t, err)
+	require.Contains(t, rules, "region")
+	require.NotNil(t, rules["region"])
+	assert.Equal(t, permission.BuiltInRuleCompleteDesensitization, rules["region"].BuiltInRule)
+}
+
 func TestFilterDisabledColumns_EmptyFilter(t *testing.T) {
 	svc := &ColumnPermissionService{}
 	row := map[string]interface{}{
@@ -424,13 +435,15 @@ func TestColumnPermissionService_GetMaskRules_Unit(t *testing.T) {
 		assert.Empty(t, rules)
 	})
 
-	t.Run("empty mask rule skipped", func(t *testing.T) {
+	t.Run("empty mask rule falls back to default desensitization", func(t *testing.T) {
 		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
 		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 11, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: ""}))
 
 		rules, err := svc.GetMaskRules(11)
 		require.NoError(t, err)
-		assert.Empty(t, rules)
+		require.Contains(t, rules, "mobile")
+		require.NotNil(t, rules["mobile"])
+		assert.Equal(t, permission.BuiltInRuleCompleteDesensitization, rules["mobile"].BuiltInRule)
 	})
 }
 

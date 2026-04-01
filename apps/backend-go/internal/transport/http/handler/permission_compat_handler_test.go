@@ -1,14 +1,21 @@
 package handler
 
 import (
+	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/domain/role"
+	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 	"encoding/json"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type mockTargetResourcePermRepo struct {
@@ -337,44 +344,61 @@ func (m *mockTargetResourcePermRepo) buildResourceUsers(resourceType string) []*
 	return results
 }
 
-func TestPermissionCompatHandler_TargetPermissionEndpointsReturnExplicitNonSuccess(t *testing.T) {
+func TestPermissionCompatHandler_MenuTargetPermissionAndSaveRoundTrip(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := &PermissionCompatHandler{}
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &role.RoleMenu{}, &menu.CoreMenu{}))
+	roleRepo := repository.NewRoleRepository(db)
+	menuRepo := repository.NewMenuRepository(db)
+	roleMenuRepo := repository.NewRoleMenuRepository(db)
+	menuSvc := service.NewMenuService(menuRepo)
+	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	h := NewPermissionCompatHandler(menuSvc, nil, roleMenuSvc, nil)
 
-	tests := []struct {
-		name string
-		path string
-		body string
-		code string
-	}{
-		{name: "menu target permission", path: "/auth/menuTargetPermission", body: `{"roleId":1}`, code: "501000"},
-		{name: "save menu target permission", path: "/auth/saveMenuTargetPer", body: `{"roleId":1,"targetPerms":[]}`, code: "501000"},
-	}
+	testRole := &role.SysRole{RoleName: "menu-target-role", RoleCode: "menu-target-role", Status: 1}
+	require.NoError(t, roleRepo.Create(testRole))
+	menuA := &menu.CoreMenu{Name: "User", Path: "/system/user", Type: 2, Auth: true, MenuSort: 1}
+	menuB := &menu.CoreMenu{Name: "Permission", Path: "/system/permission", Type: 2, Auth: true, MenuSort: 2}
+	require.NoError(t, menuRepo.Create(menuA))
+	require.NoError(t, menuRepo.Create(menuB))
+	require.NoError(t, roleMenuRepo.SaveRoleMenus(testRole.RoleID, []int64{menuA.ID}))
 
 	r := gin.New()
 	api := r.Group("/api")
 	RegisterPermissionCompatRoutes(api, h)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", "/api"+tt.path, strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, req)
-
-			if w.Code != 200 {
-				t.Fatalf("expected status 200, got %d", w.Code)
-			}
-
-			var resp map[string]interface{}
-			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-				t.Fatalf("unmarshal response failed: %v", err)
-			}
-			if resp["code"] != tt.code {
-				t.Fatalf("expected code %s, got %#v", tt.code, resp["code"])
-			}
-		})
+	queryReq := httptest.NewRequest("POST", "/api/auth/menuTargetPermission", strings.NewReader(`{"roleId":`+strconv.FormatInt(testRole.RoleID, 10)+`}`))
+	queryReq.Header.Set("Content-Type", "application/json")
+	queryResp := httptest.NewRecorder()
+	r.ServeHTTP(queryResp, queryReq)
+	require.Equal(t, 200, queryResp.Code)
+	var queryBody struct {
+		Code string `json:"code"`
+		Data struct {
+			MenuIDs []int64 `json:"menuIds"`
+		} `json:"data"`
 	}
+	require.NoError(t, json.Unmarshal(queryResp.Body.Bytes(), &queryBody))
+	require.Equal(t, "000000", queryBody.Code)
+	require.Equal(t, []int64{menuA.ID}, queryBody.Data.MenuIDs)
+
+	saveReq := httptest.NewRequest("POST", "/api/auth/saveMenuTargetPer", strings.NewReader(`{"roleId":`+strconv.FormatInt(testRole.RoleID, 10)+`,"targetPerms":[{"targetType":"role","targetId":`+strconv.FormatInt(testRole.RoleID, 10)+`,"permIds":[`+strconv.FormatInt(menuA.ID, 10)+`,`+strconv.FormatInt(menuB.ID, 10)+`]}]}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveResp := httptest.NewRecorder()
+	r.ServeHTTP(saveResp, saveReq)
+	require.Equal(t, 200, saveResp.Code)
+	var saveBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(saveResp.Body.Bytes(), &saveBody))
+	require.Equal(t, "000000", saveBody["code"])
+
+	queryAfterReq := httptest.NewRequest("POST", "/api/auth/menuTargetPermission", strings.NewReader(`{"roleId":`+strconv.FormatInt(testRole.RoleID, 10)+`}`))
+	queryAfterReq.Header.Set("Content-Type", "application/json")
+	queryAfterResp := httptest.NewRecorder()
+	r.ServeHTTP(queryAfterResp, queryAfterReq)
+	require.Equal(t, 200, queryAfterResp.Code)
+	require.NoError(t, json.Unmarshal(queryAfterResp.Body.Bytes(), &queryBody))
+	require.ElementsMatch(t, []int64{menuA.ID, menuB.ID}, queryBody.Data.MenuIDs)
 }
 
 func TestPermissionCompatHandler_SaveBusiTargetPerUpdatesOnlyRolePermsForResourceType(t *testing.T) {

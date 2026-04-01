@@ -2,16 +2,34 @@ package handler
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	domainauth "dataease/backend/internal/domain/auth"
+	"dataease/backend/internal/domain/user"
+	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
+
+func setupUserHandlerWithRepo(t *testing.T) (*UserHandler, *gorm.DB) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&user.SysUser{}))
+	userRepo := repository.NewUserRepository(db)
+	userSvc := service.NewUserService(userRepo, nil, nil)
+	return NewUserHandler(userSvc, service.NewUserImportService(userSvc)), db
+}
 
 func TestUserHandler_GetDefaultPassword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -237,4 +255,46 @@ func TestUserHandler_SwitchOrg_ReturnsTokenVO(t *testing.T) {
 	data := resp["data"].(map[string]interface{})
 	assert.Equal(t, "new-token", data["token"])
 	assert.Equal(t, float64(3), data["oid"])
+}
+
+func TestUserHandler_SwitchEnable_InvalidPayload(t *testing.T) {
+	h, _ := setupUserHandlerWithRepo(t)
+	r := gin.New()
+	r.POST("/user/enable", h.SwitchEnable)
+
+	req := httptest.NewRequest(http.MethodPost, "/user/enable", strings.NewReader(`{"id":1}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp["code"])
+	assert.Contains(t, resp["msg"], "id and status are required")
+}
+
+func TestUserHandler_SwitchEnable_Success(t *testing.T) {
+	h, repoDB := setupUserHandlerWithRepo(t)
+	r := gin.New()
+	r.POST("/user/enable", h.SwitchEnable)
+
+	userRepo := repository.NewUserRepository(repoDB)
+	require.NoError(t, userRepo.Create(&user.SysUser{Username: "toggle-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
+
+	var existing user.SysUser
+	require.NoError(t, repoDB.Where("username = ?", "toggle-user").First(&existing).Error)
+	req := httptest.NewRequest(http.MethodPost, "/user/enable", strings.NewReader(`{"id":`+strconv.FormatInt(existing.UserID, 10)+`,"status":0}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+
+	var updated user.SysUser
+	require.NoError(t, repoDB.First(&updated, "user_id = ?", existing.UserID).Error)
+	assert.Equal(t, user.StatusDisabled, updated.Status)
 }

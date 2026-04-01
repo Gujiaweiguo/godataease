@@ -138,7 +138,6 @@ func TestDataPermissionAdminService_SaveRowPermission(t *testing.T) {
 		TargetID:    7,
 		FilterField: "region",
 		FilterValue: "east",
-		WhiteList:   []int64{2, 3},
 	})
 	if err != nil {
 		t.Fatalf("SaveRowPermission failed: %v", err)
@@ -300,6 +299,9 @@ func TestDataPermissionAdminService_SaveRowPermission_Validation(t *testing.T) {
 	}
 	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeDept, FilterField: "region"}); err == nil || !strings.Contains(err.Error(), "filterType dept is not supported") {
 		t.Fatalf("unexpected filterType validation error: %v", err)
+	}
+	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "region", WhiteList: []int64{2}}); err == nil || err.Error() != "whiteList is not supported in T8" {
+		t.Fatalf("unexpected whiteList validation error: %v", err)
 	}
 	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "   "}); err == nil || err.Error() != "filterField is required" {
 		t.Fatalf("unexpected filterField validation error: %v", err)

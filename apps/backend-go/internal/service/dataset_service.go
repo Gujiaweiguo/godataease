@@ -207,6 +207,15 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 	if err != nil {
 		return nil, err
 	}
+	if s.rowPermissionService != nil && s.rowPermissionService.columnPermRepo != nil {
+		columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+		disabledColumns, _ := columnSvc.GetDisabledColumns(req.DatasetGroupID)
+		maskRules, _ := columnSvc.GetMaskRules(req.DatasetGroupID)
+		for i := range rows {
+			rows[i] = columnSvc.FilterDisabledColumns(rows[i], disabledColumns)
+			rows[i] = columnSvc.MaskRowData(rows[i], maskRules)
+		}
+	}
 	total, err := s.repo.CountRows(tableName)
 	if err != nil {
 		return nil, err

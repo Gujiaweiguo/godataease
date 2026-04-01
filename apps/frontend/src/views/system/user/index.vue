@@ -19,9 +19,13 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" width="300" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+                <el-button link type="primary" @click="handleToggleStatus(row)">
+                  {{ Number(row.status) === 1 ? '禁用' : '启用' }}
+                </el-button>
+                <el-button link type="warning" @click="handleResetPassword(row)">重置密码</el-button>
                 <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
               </template>
             </el-table-column>
@@ -76,6 +80,7 @@ import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { useRoute, useRouter } from 'vue-router'
 import { queryUserApi, userCreateApi, userUpdateApi, userDeleteApi } from '@/api/auth'
 import { queryUserOptionsApi } from '@/api/org'
+import { defaultPwdApi, resetPwdApi, switchEnableApi } from '@/api/user'
 import RoleTab from './RoleTab.vue'
 
 const route = useRoute()
@@ -101,7 +106,8 @@ const normalizeUsers = (items: any[] = []) => {
     ...item,
     id: Number(item.id || item.userId),
     userId: Number(item.userId || item.id),
-    realName: item.realName || item.nickName || ''
+    realName: item.realName || item.nickName || '',
+    status: Number(item.status ?? 1)
   }))
 }
 
@@ -177,6 +183,65 @@ const handleDelete = async (id: number) => {
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
+    }
+  }
+}
+
+const resolveDefaultPassword = async () => {
+  const res = await defaultPwdApi()
+  if (res.code === '000000') {
+    return res.data?.defaultPwd || ''
+  }
+  return ''
+}
+
+const handleToggleStatus = async (row: any) => {
+  const nextStatus = Number(row.status) === 1 ? 0 : 1
+  const actionText = nextStatus === 1 ? '启用' : '禁用'
+
+  try {
+    await ElMessageBox.confirm(`确定要${actionText}用户“${row.username}”吗?`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    const res = await switchEnableApi({
+      id: row.userId || row.id,
+      status: nextStatus
+    })
+
+    if (res.code === '000000') {
+      ElMessage.success(`${actionText}成功`)
+      loadUserList()
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(`${actionText}失败`)
+    }
+  }
+}
+
+const handleResetPassword = async (row: any) => {
+  try {
+    const defaultPassword = await resolveDefaultPassword()
+    const confirmText = defaultPassword
+      ? `确定要将用户“${row.username}”的密码重置为默认密码吗?\n默认密码：${defaultPassword}`
+      : `确定要将用户“${row.username}”的密码重置为默认密码吗?`
+
+    await ElMessageBox.confirm(confirmText, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    const res = await resetPwdApi(row.userId || row.id)
+    if (res.code === '000000') {
+      ElMessage.success('密码重置成功')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('密码重置失败')
     }
   }
 }

@@ -283,6 +283,9 @@ func TestOrgDeleteOrg_HasChildren_RecordsFailedAuditLog(t *testing.T) {
 	if log.ResourceName == nil || *log.ResourceName != "Parent" {
 		t.Fatalf("expected resource name Parent, got %+v", log.ResourceName)
 	}
+	if log.OrganizationID == nil || *log.OrganizationID != parent.OrgID {
+		t.Fatalf("expected organization id %d, got %+v", parent.OrgID, log.OrganizationID)
+	}
 	if log.FailureReason == nil || !strings.Contains(*log.FailureReason, "无法删除") {
 		t.Fatalf("expected failure reason to mention child orgs, got %+v", log.FailureReason)
 	}
@@ -507,7 +510,10 @@ func TestOrgDeleteOrg_Success_WithAffectedUsers_RecordsSuccessAuditLog(t *testin
 	if log.Status != audit.StatusSuccess {
 		t.Fatalf("expected success audit log, got %+v", log)
 	}
-	if log.AfterValue == nil || !strings.Contains(*log.AfterValue, "影响资源: [1 users]") {
+	if log.OrganizationID == nil || *log.OrganizationID != existing.OrgID {
+		t.Fatalf("expected organization id %d, got %+v", existing.OrgID, log.OrganizationID)
+	}
+	if log.AfterValue == nil || !strings.Contains(*log.AfterValue, "disposition=soft-delete") || !strings.Contains(*log.AfterValue, "affected_users=1") {
 		t.Fatalf("expected affected users in after value, got %+v", log.AfterValue)
 	}
 	if log.BeforeValue == nil || !strings.Contains(*log.BeforeValue, "AuditedDelete") {
@@ -516,7 +522,7 @@ func TestOrgDeleteOrg_Success_WithAffectedUsers_RecordsSuccessAuditLog(t *testin
 }
 
 func TestOrgDeleteOrg_Success_UserCountLookupFailureStillDeletes(t *testing.T) {
-	svc, mockRepo, _, _, _ := setupOrgServiceWithAudit(t)
+	svc, mockRepo, auditLogRepo, _, _ := setupOrgServiceWithAudit(t)
 	existing := createSeedOrg(t, mockRepo, "CountErrorDelete", org.RootParentID, 1)
 	if err := mockRepo.db.Exec("DROP TABLE sys_user_role").Error; err != nil {
 		t.Fatalf("drop user role table failed: %v", err)
@@ -530,6 +536,17 @@ func TestOrgDeleteOrg_Success_UserCountLookupFailureStillDeletes(t *testing.T) {
 	_, err = mockRepo.repo.GetByID(existing.OrgID)
 	if err == nil {
 		t.Fatal("expected org to be deleted despite user count lookup failure")
+	}
+
+	logs, total, logErr := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	if logErr != nil {
+		t.Fatalf("query audit logs failed: %v", logErr)
+	}
+	if total != 1 || len(logs) != 1 {
+		t.Fatalf("expected one audit log, got total=%d logs=%d", total, len(logs))
+	}
+	if logs[0].AfterValue == nil || !strings.Contains(*logs[0].AfterValue, "affected_users=unknown") {
+		t.Fatalf("expected unknown affected user count in after value, got %+v", logs[0].AfterValue)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -39,7 +40,14 @@ func (h *ChartHandler) Data(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.QueryData(&req)
+	userID := int64(middleware.GetUserID(c))
+	var result *chart.ChartDataResponse
+	var err error
+	if userID > 0 {
+		result, err = h.service.QueryDataWithPermission(&req, userID)
+	} else {
+		result, err = h.service.QueryData(&req)
+	}
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return

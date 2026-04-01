@@ -117,29 +117,32 @@ func (s *OrgService) DeleteOrg(orgID int64, operatorID int64, operatorName strin
 		if s.auditSvc != nil {
 			resourceType := string(audit.ResourceTypeOrganization)
 			_, _ = s.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
-				UserID:        &operatorID,
-				Username:      &operatorName,
-				ActionType:    audit.ActionTypeSystemConfig,
-				ActionName:    "删除组织",
-				ResourceType:  &resourceType,
-				ResourceID:    &orgID,
-				ResourceName:  &orgInfo.OrgName,
-				Operation:     audit.OperationDelete,
-				IPAddress:     &ipAddress,
-				Status:        ptrStatus(audit.StatusFailed),
-				FailureReason: ptrStr(fmt.Sprintf("组织下存在 %d 个子组织，无法删除", childrenCount)),
+				UserID:         &operatorID,
+				Username:       &operatorName,
+				ActionType:     audit.ActionTypeSystemConfig,
+				ActionName:     "删除组织",
+				ResourceType:   &resourceType,
+				ResourceID:     &orgID,
+				ResourceName:   &orgInfo.OrgName,
+				OrganizationID: &orgID,
+				Operation:      audit.OperationDelete,
+				IPAddress:      &ipAddress,
+				Status:         ptrStatus(audit.StatusFailed),
+				FailureReason:  ptrStr(fmt.Sprintf("组织下存在 %d 个子组织，无法删除", childrenCount)),
 			})
 		}
 		return fmt.Errorf("cannot delete organization with %d child organizations - please delete or move child organizations first", childrenCount)
 	}
 
 	// 3. 检查关联资源（可选，用于审计记录）
-	var affectedResources []string
+	affectedUsers := "0"
 	if s.userRepo != nil {
 		// 检查组织下用户
-		userCount, _ := s.userRepo.CountByOrgID(orgID)
-		if userCount > 0 {
-			affectedResources = append(affectedResources, fmt.Sprintf("%d users", userCount))
+		userCount, countErr := s.userRepo.CountByOrgID(orgID)
+		if countErr != nil {
+			affectedUsers = "unknown"
+		} else {
+			affectedUsers = fmt.Sprintf("%d", userCount)
 		}
 	}
 
@@ -151,24 +154,22 @@ func (s *OrgService) DeleteOrg(orgID int64, operatorID int64, operatorName strin
 
 	// 5. 记录成功的审计日志
 	if s.auditSvc != nil {
-		afterValue := fmt.Sprintf("组织已删除，原名称: %s", orgInfo.OrgName)
-		if len(affectedResources) > 0 {
-			afterValue += fmt.Sprintf(", 影响资源: %v", affectedResources)
-		}
+		afterValue := fmt.Sprintf("disposition=soft-delete; org_name=%s; affected_users=%s", orgInfo.OrgName, affectedUsers)
 		resourceType := string(audit.ResourceTypeOrganization)
 		_, _ = s.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
-			UserID:       &operatorID,
-			Username:     &operatorName,
-			ActionType:   audit.ActionTypeSystemConfig,
-			ActionName:   "删除组织",
-			ResourceType: &resourceType,
-			ResourceID:   &orgID,
-			ResourceName: &orgInfo.OrgName,
-			Operation:    audit.OperationDelete,
-			IPAddress:    &ipAddress,
-			BeforeValue:  ptrStr(fmt.Sprintf("OrgName: %s, Level: %d", orgInfo.OrgName, orgInfo.Level)),
-			AfterValue:   ptrStr(afterValue),
-			Status:       ptrStatus(audit.StatusSuccess),
+			UserID:         &operatorID,
+			Username:       &operatorName,
+			ActionType:     audit.ActionTypeSystemConfig,
+			ActionName:     "删除组织",
+			ResourceType:   &resourceType,
+			ResourceID:     &orgID,
+			ResourceName:   &orgInfo.OrgName,
+			OrganizationID: &orgID,
+			Operation:      audit.OperationDelete,
+			IPAddress:      &ipAddress,
+			BeforeValue:    ptrStr(fmt.Sprintf("OrgName: %s, Level: %d", orgInfo.OrgName, orgInfo.Level)),
+			AfterValue:     ptrStr(afterValue),
+			Status:         ptrStatus(audit.StatusSuccess),
 		})
 	}
 	logger.Info("Organization deleted", zap.Int64("orgId", orgID), zap.String("orgName", orgInfo.OrgName))

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type MenuAuthMiddleware struct {
@@ -110,9 +111,36 @@ func (m *MenuAuthMiddleware) RequireMenuAuth(menuPath string) gin.HandlerFunc {
 		}
 
 		// 通过路径查找菜单并检查授权
-		// 这里需要根据实际菜单路径检查逻辑实现
-		// 简化版本：直接返回 403
-		response.Forbidden(c, "Menu access denied: "+menuPath)
-		c.Abort()
+		if m.menuService == nil || m.roleMenuService == nil {
+			response.Forbidden(c, "Menu access denied: "+menuPath)
+			c.Abort()
+			return
+		}
+
+		menuItem, err := m.menuService.GetByPath(menuPath)
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				response.Forbidden(c, "Menu access denied: "+menuPath)
+				c.Abort()
+				return
+			}
+			response.Error(c, "500000", "Failed to resolve menu path")
+			c.Abort()
+			return
+		}
+
+		authorized, err := m.roleMenuService.IsMenuAuthorized(roleIDSlice, menuItem.ID)
+		if err != nil {
+			response.Error(c, "500000", "Failed to check menu authorization")
+			c.Abort()
+			return
+		}
+		if !authorized {
+			response.Forbidden(c, "Menu access denied: "+menuPath)
+			c.Abort()
+			return
+		}
+
+		c.Next()
 	}
 }

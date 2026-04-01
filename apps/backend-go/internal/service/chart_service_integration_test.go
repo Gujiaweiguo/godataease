@@ -8,6 +8,7 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
@@ -222,6 +223,115 @@ func TestChartServiceIntegration_ValidationErrors(t *testing.T) {
 
 	err = svc.DeleteFieldByChart(0)
 	assert.Error(t, err)
+}
+
+func TestChartServiceIntegration_QueryDataWithPermission_AppliesRowAndColumnRules(t *testing.T) {
+	ensureChartServiceTables(t)
+	clearChartServiceTables(t)
+	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+
+	chartRepo := repository.NewChartRepository(testDB)
+	datasetRepo := repository.NewDatasetRepository(testDB)
+	rowPermRepo := repository.NewRowPermissionRepository(testDB)
+	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
+
+	rowPermSvc := NewRowPermissionService(rowPermRepo, columnPermRepo, nil, nil)
+	rowPermSvc.SetDatasetFieldResolver(datasetRepo)
+	columnPermSvc := NewColumnPermissionService(columnPermRepo)
+	svc := NewChartService(chartRepo)
+	svc.SetRowPermissionService(rowPermSvc)
+	svc.SetColumnPermissionService(columnPermSvc)
+
+	tableName := "it_chart_data_rows"
+	err := testDB.Create(&dataset.CoreDatasetTable{Name: chartSvcStringPtr("it_dataset_perm"), DatasetGroupID: 9301, PhysicalTable: &tableName}).Error
+	assert.NoError(t, err)
+
+	var dsTable dataset.CoreDatasetTable
+	err = testDB.Where("dataset_group_id = ?", 9301).First(&dsTable).Error
+	assert.NoError(t, err)
+
+	regionName := "region"
+	amountName := "amount"
+	groupD := "d"
+	groupQ := "q"
+	varcharType := "VARCHAR"
+	intType := "INT"
+	deTypeD := 0
+	deTypeQ := 2
+	checked := true
+	err = testDB.Create(&dataset.CoreDatasetTableField{DatasetGroupID: 9301, DatasetTableID: &dsTable.ID, Name: &regionName, OriginName: &regionName, GroupType: &groupD, Type: &varcharType, DeType: &deTypeD, Checked: &checked}).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&dataset.CoreDatasetTableField{DatasetGroupID: 9301, DatasetTableID: &dsTable.ID, Name: &amountName, OriginName: &amountName, GroupType: &groupQ, Type: &intType, DeType: &deTypeQ, Checked: &checked}).Error
+	assert.NoError(t, err)
+
+	var regionField dataset.CoreDatasetTableField
+	err = testDB.Where("dataset_group_id = ? AND origin_name = ?", 9301, "region").First(&regionField).Error
+	assert.NoError(t, err)
+
+	err = testDB.Create(&chart.CoreChartView{Title: chartSvcStringPtr("Sales by Region Governed"), TableID: &dsTable.ID, Type: chartSvcStringPtr("bar")}).Error
+	assert.NoError(t, err)
+	var view chart.CoreChartView
+	err = testDB.Where("title = ?", "Sales by Region Governed").First(&view).Error
+	assert.NoError(t, err)
+
+	err = testDB.Exec("INSERT INTO `it_chart_data_rows` (`region`, `amount`) VALUES (?, ?), (?, ?)", "East", 100, "West", 200).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&permission.DataPermRow{DatasetID: 9301, DatasetGroupID: 9301, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 40001, Status: 1, ExpressionTree: fmt.Sprintf(`{"logic":"OR","items":[{"fieldId":%d,"term":"eq","value":"East"}]}`, regionField.ID)}).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&permission.DataPermColumn{DatasetID: 9301, DatasetGroupID: 9301, FieldName: "amount", PermType: permission.PermTypeDisable, Status: 1}).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&permission.DataPermColumn{DatasetID: 9301, DatasetGroupID: 9301, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}).Error
+	assert.NoError(t, err)
+
+	limit := 10
+	dataResp, err := svc.QueryDataWithPermission(&chart.ChartDataRequest{ID: view.ID, ResultCount: &limit}, 40001)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), dataResp.Total)
+	assert.Len(t, dataResp.Rows, 1)
+	assert.NotContains(t, dataResp.Columns, "amount")
+	assert.Contains(t, dataResp.Columns, "region")
+	assert.Equal(t, "******", dataResp.Rows[0]["region"])
+}
+
+func TestChartServiceIntegration_ListByDQWithPermission_FiltersDisabledAndMarksMasked(t *testing.T) {
+	ensureChartServiceTables(t)
+	clearChartServiceTables(t)
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+
+	chartRepo := repository.NewChartRepository(testDB)
+	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
+	svc := NewChartService(chartRepo)
+	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo))
+
+	datasetGroupID := int64(9401)
+	chartID := int64(9402)
+	checked := true
+	groupD := "d"
+	groupQ := "q"
+	varcharType := "VARCHAR"
+	intType := "INT"
+	deTypeD := 0
+	deTypeQ := 2
+	region := "region"
+	amount := "amount"
+
+	err := testDB.Create(&dataset.CoreDatasetTableField{DatasetGroupID: datasetGroupID, Name: &region, OriginName: &region, DataeaseName: &region, GroupType: &groupD, Type: &varcharType, DeType: &deTypeD, Checked: &checked}).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&dataset.CoreDatasetTableField{DatasetGroupID: datasetGroupID, ChartID: &chartID, Name: &amount, OriginName: &amount, DataeaseName: &amount, GroupType: &groupQ, Type: &intType, DeType: &deTypeQ, Checked: &checked}).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&permission.DataPermColumn{DatasetID: datasetGroupID, DatasetGroupID: datasetGroupID, FieldName: "amount", PermType: permission.PermTypeDisable, Status: 1}).Error
+	assert.NoError(t, err)
+	err = testDB.Create(&permission.DataPermColumn{DatasetID: datasetGroupID, DatasetGroupID: datasetGroupID, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}).Error
+	assert.NoError(t, err)
+
+	fieldResp, err := svc.ListByDQWithPermission(datasetGroupID, chartID, 40002)
+	assert.NoError(t, err)
+	assert.Len(t, fieldResp.DimensionList, 1)
+	assert.Equal(t, "region", fieldResp.DimensionList[0].OriginName)
+	assert.True(t, fieldResp.DimensionList[0].Desensitized)
+	assert.Len(t, fieldResp.QuotaList, 1)
+	assert.Equal(t, int64(-1), fieldResp.QuotaList[0].ID)
 }
 
 func chartSvcStringPtr(v string) *string {
