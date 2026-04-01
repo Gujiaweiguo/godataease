@@ -225,6 +225,10 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 		return
 	}
 
+	if req.OrgId <= 0 {
+		req.OrgId = middleware.GetOrgID(c)
+	}
+
 	if err := h.service.UnmountUser(&req); err != nil {
 		if errors.Is(err, service.ErrLastRoleRemovalBlocked) {
 			response.Error(c, "500000", service.ErrLastRoleRemovalBlocked.Error())
@@ -243,6 +247,10 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
+	}
+
+	if req.OrgId <= 0 {
+		req.OrgId = middleware.GetOrgID(c)
 	}
 
 	count, err := h.service.BeforeUnmountInfo(&req)
