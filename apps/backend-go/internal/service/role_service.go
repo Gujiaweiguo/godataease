@@ -32,7 +32,8 @@ func (s *RoleService) SetResourcePermissionRepository(repo *repository.ResourceP
 	s.resourcePermRepo = repo
 }
 
-func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string) (int64, error) {
+func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string, callerOrgID int64) (int64, error) {
+	logger.Info("Role creation with org context", zap.Int64("orgId", callerOrgID), zap.String("createBy", createBy))
 	if req.ParentID != nil && *req.ParentID > 0 {
 		if err := s.validateInheritance(*req.ParentID); err != nil {
 			return 0, err
@@ -84,7 +85,8 @@ func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string) (int64,
 	return rle.RoleID, nil
 }
 
-func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string) error {
+func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string, callerOrgID int64) error {
+	logger.Info("Role edit with org context", zap.Int64("orgId", callerOrgID), zap.String("updateBy", updateBy))
 	if req.ID == 0 && req.RoleID > 0 {
 		req.ID = req.RoleID
 	}
@@ -141,6 +143,13 @@ func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string) error {
 }
 
 func (s *RoleService) DeleteRole(roleID int64) error {
+	rle, err := s.repo.GetByID(roleID)
+	if err != nil {
+		return nil // role not found, nothing to delete
+	}
+	if rle.RoleType != nil && *rle.RoleType == role.RoleTypeSystem {
+		return fmt.Errorf("cannot delete built-in role")
+	}
 	if err := s.repo.Delete(roleID); err != nil {
 		logger.Error("Failed to delete role", zap.Error(err))
 		return fmt.Errorf("failed to delete role: %w", err)

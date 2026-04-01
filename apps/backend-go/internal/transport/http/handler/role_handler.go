@@ -81,7 +81,8 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	}
 
 	createBy := h.getCreateBy(c)
-	id, err := h.service.CreateRole(&req, createBy)
+	callerOrgID := middleware.GetOrgID(c)
+	id, err := h.service.CreateRole(&req, createBy, callerOrgID)
 	if err != nil {
 		response.Error(c, "500000", err.Error())
 		return
@@ -98,7 +99,8 @@ func (h *RoleHandler) Edit(c *gin.Context) {
 	}
 
 	updateBy := h.getCreateBy(c)
-	if err := h.service.EditRole(&req, updateBy); err != nil {
+	callerOrgID := middleware.GetOrgID(c)
+	if err := h.service.EditRole(&req, updateBy, callerOrgID); err != nil {
 		response.Error(c, "500000", err.Error())
 		return
 	}
