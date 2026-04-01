@@ -308,8 +308,13 @@ func (s *RoleService) MountExternalUser(req *role.MountExternalUserRequest, orgI
 // UnmountUser 解绑用户与角色（含唯一角色安全约束）
 // 如果用户只有这一个角色，将拒绝移除并返回错误
 func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
-	// 检查用户的角色数量
-	count, err := s.repo.CountUserRoles(req.Uid)
+	var count int64
+	var err error
+	if req.OrgId > 0 {
+		count, err = s.repo.CountUserRolesByOrg(req.Uid, req.OrgId)
+	} else {
+		count, err = s.repo.CountUserRoles(req.Uid)
+	}
 	if err != nil {
 		logger.Error("Failed to count user roles", zap.Int64("uid", req.Uid), zap.Error(err))
 		return fmt.Errorf("failed to check user role count: %w", err)
@@ -321,18 +326,24 @@ func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
 		return fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
 	}
 
-	if err := s.repo.UnbindUserRole(req.Uid, req.Rid); err != nil {
+	if err := s.repo.UnbindUserRole(req.Uid, req.Rid, req.OrgId); err != nil {
 		logger.Error("Failed to unbind user from role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Error(err))
 		return fmt.Errorf("failed to unbind user from role: %w", err)
 	}
 
-	logger.Info("User unmounted from role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid))
+	logger.Info("User unmounted from role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("orgId", req.OrgId))
 	return nil
 }
 
 // BeforeUnmountInfo 检查解绑前用户的角色数量（用于安全提示）
 func (s *RoleService) BeforeUnmountInfo(req *role.UnmountUserRequest) (int, error) {
-	count, err := s.repo.CountUserRoles(req.Uid)
+	var count int64
+	var err error
+	if req.OrgId > 0 {
+		count, err = s.repo.CountUserRolesByOrg(req.Uid, req.OrgId)
+	} else {
+		count, err = s.repo.CountUserRoles(req.Uid)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("failed to count user roles: %w", err)
 	}

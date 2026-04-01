@@ -103,8 +103,9 @@ type MountUserRequest struct {
 
 // UnmountUserRequest 用户解绑请求
 type UnmountUserRequest struct {
-	Rid int64 `json:"rid" binding:"required"`
-	Uid int64 `json:"uid" binding:"required"`
+	Rid   int64 `json:"rid" binding:"required"`
+	Uid   int64 `json:"uid" binding:"required"`
+	OrgId int64 `json:"orgId"`
 }
 
 // MountExternalUserRequest 绑定组织外用户请求
