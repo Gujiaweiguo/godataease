@@ -200,6 +200,33 @@ func TestUserService_UpdateUserStatus(t *testing.T) {
 	})
 }
 
+func TestUserService_EnsureUserInOrg(t *testing.T) {
+	t.Run("returns nil when user belongs to org", func(t *testing.T) {
+		svc, db := setupUserServiceFullRepoTest(t)
+		require.NoError(t, db.Create(&user.SysUserRole{UserID: 301, RoleID: 1, OrgID: 7}).Error)
+
+		err := svc.EnsureUserInOrg(301, 7)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error when user does not belong to org", func(t *testing.T) {
+		svc, db := setupUserServiceFullRepoTest(t)
+		require.NoError(t, db.Create(&user.SysUserRole{UserID: 302, RoleID: 1, OrgID: 8}).Error)
+
+		err := svc.EnsureUserInOrg(302, 7)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrUserNotInCurrentOrg)
+	})
+
+	t.Run("rejects missing org context", func(t *testing.T) {
+		svc, _ := setupUserServiceFullRepoTest(t)
+
+		err := svc.EnsureUserInOrg(302, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "org id is required")
+	})
+}
+
 func TestUserService_SwitchLanguage(t *testing.T) {
 	t.Run("returns not found when user missing", func(t *testing.T) {
 		svc, _ := setupUserServiceRepoTest(t)

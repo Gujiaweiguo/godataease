@@ -24,6 +24,19 @@ type UserHandler struct {
 type identityBootstrapBuilder func(userID int64, selectedOrgID int64, requestLanguage string) (*domainauth.IdentityBootstrap, error)
 type orgSwitcher func(userID int64, targetOrgID int64, requestLanguage string) (*domainauth.TokenVO, error)
 
+func requireCurrentOrg(c *gin.Context) (int64, bool) {
+	orgID := middleware.GetOrgID(c)
+	if orgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return 0, false
+	}
+	return orgID, true
+}
+
+func int64Ptr(v int64) *int64 {
+	return &v
+}
+
 func NewUserHandler(userService *service.UserService, userImportService *service.UserImportService) *UserHandler {
 	var loadUserByID userByIDLoader
 	if userService != nil {
@@ -53,6 +66,13 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	if req.OrgID == nil {
+		req.OrgID = int64Ptr(orgID)
+	}
 
 	result, err := h.userService.SearchUsers(&req)
 	if err != nil {
@@ -69,6 +89,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	if req.OrgID == nil && req.OrganizationID == nil {
+		req.OrgID = int64Ptr(orgID)
+	}
 
 	id, err := h.userService.CreateUser(&req)
 	if err != nil {
@@ -83,6 +110,14 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	var req user.UserUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	if err := h.userService.EnsureUserInOrg(req.ID, orgID); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -101,6 +136,14 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		response.Error(c, "500000", "Invalid user ID")
 		return
 	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	if err := h.userService.EnsureUserInOrg(id, orgID); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
 
 	if err := h.userService.DeleteUser(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -111,7 +154,11 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserOptions(c *gin.Context) {
-	req := &user.UserQueryRequest{Current: 1, Size: 1000}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	req := &user.UserQueryRequest{Current: 1, Size: 1000, OrgID: int64Ptr(orgID)}
 
 	result, err := h.userService.SearchUsers(req)
 	if err != nil {
@@ -233,8 +280,12 @@ func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 			operator = value
 		}
 	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
 
-	result, err := h.userImportService.ImportUsers(file, header, operator)
+	result, err := h.userImportService.ImportUsers(file, header, operator, orgID)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -317,6 +368,14 @@ func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 		response.Error(c, "500000", "Invalid user ID")
 		return
 	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	if err = h.userService.EnsureUserInOrg(id, orgID); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
 
 	if err = h.userService.ResetPassword(id, h.userService.ResolveDefaultPassword()); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -339,6 +398,14 @@ func (h *UserHandler) SwitchEnable(c *gin.Context) {
 	}
 	if req.ID <= 0 || req.Status == nil {
 		response.Error(c, "500000", "Invalid request: id and status are required")
+		return
+	}
+	orgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
+	if err := h.userService.EnsureUserInOrg(req.ID, orgID); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 

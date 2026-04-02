@@ -25,9 +25,10 @@ func setupUserHandlerWithRepo(t *testing.T) (*UserHandler, *gorm.DB) {
 	gin.SetMode(gin.TestMode)
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&user.SysUser{}))
+	require.NoError(t, db.AutoMigrate(&user.SysUser{}, &user.SysUserRole{}))
 	userRepo := repository.NewUserRepository(db)
-	userSvc := service.NewUserService(userRepo, nil, nil)
+	userRoleRepo := repository.NewUserRoleRepository(db)
+	userSvc := service.NewUserService(userRepo, userRoleRepo, nil)
 	return NewUserHandler(userSvc, service.NewUserImportService(userSvc)), db
 }
 
@@ -277,14 +278,19 @@ func TestUserHandler_SwitchEnable_InvalidPayload(t *testing.T) {
 func TestUserHandler_SwitchEnable_Success(t *testing.T) {
 	h, repoDB := setupUserHandlerWithRepo(t)
 	r := gin.New()
-	r.POST("/user/enable", h.SwitchEnable)
+	r.POST("/user/enable", func(c *gin.Context) {
+		c.Set("org_id", int64(1))
+		h.SwitchEnable(c)
+	})
 
 	userRepo := repository.NewUserRepository(repoDB)
+	userRoleRepo := repository.NewUserRoleRepository(repoDB)
 	require.NoError(t, userRepo.Create(&user.SysUser{UserID: 1, Username: "admin", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
 	require.NoError(t, userRepo.Create(&user.SysUser{Username: "toggle-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
 
 	var existing user.SysUser
 	require.NoError(t, repoDB.Where("username = ?", "toggle-user").First(&existing).Error)
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: existing.UserID, RoleID: 1, OrgID: 1}))
 	req := httptest.NewRequest(http.MethodPost, "/user/enable", strings.NewReader(`{"id":`+strconv.FormatInt(existing.UserID, 10)+`,"status":0}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -298,4 +304,35 @@ func TestUserHandler_SwitchEnable_Success(t *testing.T) {
 	var updated user.SysUser
 	require.NoError(t, repoDB.First(&updated, "user_id = ?", existing.UserID).Error)
 	assert.Equal(t, user.StatusDisabled, updated.Status)
+}
+
+func TestUserHandler_ListUsers_DefaultsToCurrentOrg(t *testing.T) {
+	h, repoDB := setupUserHandlerWithRepo(t)
+	r := gin.New()
+	r.POST("/system/user/list", func(c *gin.Context) {
+		c.Set("org_id", int64(7))
+		h.ListUsers(c)
+	})
+
+	userRepo := repository.NewUserRepository(repoDB)
+	userRoleRepo := repository.NewUserRoleRepository(repoDB)
+	require.NoError(t, userRepo.Create(&user.SysUser{UserID: 11, Username: "org-seven-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
+	require.NoError(t, userRepo.Create(&user.SysUser{UserID: 12, Username: "org-eight-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: 11, RoleID: 1, OrgID: 7}))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: 12, RoleID: 1, OrgID: 8}))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/user/list", strings.NewReader(`{"current":1,"size":100}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+	data := resp["data"].(map[string]interface{})
+	list := data["list"].([]interface{})
+	require.Len(t, list, 1)
+	item := list[0].(map[string]interface{})
+	assert.Equal(t, "org-seven-user", item["username"])
 }
