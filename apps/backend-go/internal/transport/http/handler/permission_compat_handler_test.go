@@ -151,6 +151,59 @@ func TestPermissionCompatHandler_BusiTargetPermissionReturnsResourcePerspective(
 	}
 }
 
+func TestPermissionCompatHandler_BusiResourceFiltersByFlag(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&permission.SysPerm{}))
+
+	permRepo := repository.NewPermRepository(db)
+	permSvc := service.NewPermService(permRepo)
+	h := &PermissionCompatHandler{permService: permSvc}
+
+	require.NoError(t, db.Create(&permission.SysPerm{PermName: "Dashboard View", PermKey: "dashboard:view", PermType: permission.PermTypeData, Status: 1, DelFlag: 0}).Error)
+	require.NoError(t, db.Create(&permission.SysPerm{PermName: "Dashboard Edit", PermKey: "dashboard:edit", PermType: permission.PermTypeData, Status: 1, DelFlag: 0}).Error)
+	require.NoError(t, db.Create(&permission.SysPerm{PermName: "Dataset View", PermKey: "dataset:view", PermType: permission.PermTypeData, Status: 1, DelFlag: 0}).Error)
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterPermissionCompatRoutes(api, h)
+
+	t.Run("all returns full catalog", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/auth/busiResource/all", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, 200, w.Code)
+
+		var resp struct {
+			Code string                `json:"code"`
+			Data []*permission.SysPerm `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, "000000", resp.Code)
+		require.Len(t, resp.Data, 3)
+	})
+
+	t.Run("resource flag returns prefixed perms only", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/auth/busiResource/dashboard", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, 200, w.Code)
+
+		var resp struct {
+			Code string                `json:"code"`
+			Data []*permission.SysPerm `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, "000000", resp.Code)
+		require.Len(t, resp.Data, 2)
+		for _, item := range resp.Data {
+			require.True(t, strings.HasPrefix(item.PermKey, "dashboard:"))
+		}
+	})
+}
+
 func TestPermissionCompatHandler_UserPerspectiveReturnsUserPerspectivePayload(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

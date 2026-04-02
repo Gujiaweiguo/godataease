@@ -195,9 +195,32 @@ func (h *PermissionCompatHandler) SaveRolePermission(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) BusiResource(c *gin.Context) {
+	flag := strings.TrimSpace(c.Param("flag"))
 	list, err := h.permService.ListPerms(&permission.PermQueryRequest{Current: 1, Size: 1000})
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	if flag != "" && flag != "1" && !strings.EqualFold(flag, "all") {
+		perms, ok := list.List.([]*permission.SysPerm)
+		if !ok {
+			response.Error(c, "500000", "Failed: unexpected permission payload")
+			return
+		}
+
+		filtered := make([]*permission.SysPerm, 0, len(perms))
+		prefix := flag + ":"
+		for _, perm := range perms {
+			if perm == nil {
+				continue
+			}
+			if strings.HasPrefix(perm.PermKey, prefix) {
+				filtered = append(filtered, perm)
+			}
+		}
+
+		response.Success(c, filtered)
 		return
 	}
 
