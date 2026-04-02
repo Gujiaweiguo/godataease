@@ -29,27 +29,8 @@ export const mountExternalUserApi = data => request.post({ url: '/role/mountExte
 
 export const switchLangApi = data => request.post({ url: '/user/switchLanguage', data })
 
-export const downExcelTemplateApi = () =>
-  request.post({ url: '/user/excelTemplate', responseType: 'blob' })
-
-export const importUserApi = data =>
-  request.post({
-    url: '/user/batchImport',
-    headersType: 'multipart/form-data',
-    data
-  })
-
-export const downErrorRecordApi = (key: string) =>
-  request.get({ url: `/user/errorRecord/${key}`, responseType: 'blob' })
-
-export const clearErrorApi = (key: string) => {
-	return request.get({ url: `/user/clearErrorRecord/${key}` })
-}
-
-export const batchDelApi = data => request.post({ url: '/user/batchDel', data })
-
 export const defaultPwdApi = () => request.get({ url: '/user/defaultPwd' })
 
 export const resetPwdApi = uid => request.post({ url: `/user/resetPwd/${uid}` })
 
-export const switchEnableApi = data => request.post({ url: '/user/enable', data })
+export const switchEnableApi = data => request.post({ url: '/system/user/enable', data })
