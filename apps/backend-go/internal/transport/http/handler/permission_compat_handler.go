@@ -579,11 +579,34 @@ func normalizeTargetID(targetID, sourceID int64) int64 {
 	return sourceID
 }
 
+// RegisterPermissionCompatRoutes registers permission and menu compatibility routes.
+//
+// P4 Legacy Compat Contract classification (C1 policy lock):
+//
+//	DUAL-SUPPORT TRANSITION (C1 keep, C3 migrate):
+//	  All routes in this handler are dual-support transition routes.
+//	  They bridge the legacy permission/menu API shape to the new service layer.
+//	  C3 will migrate the frontend to use canonical permission endpoints directly.
+//
+//	Route families:
+//	  /auth/menuPermission     — menu permission tree + role menu IDs
+//	  /auth/busiPermission     — business permission list + role permission IDs
+//	  /auth/busiResource/:flag — business resource permission list
+//	  /auth/userPerspective    — user perspective permission query
+//	  /auth/menuTargetPermission  — menu target permission (role-scoped)
+//	  /auth/busiTargetPermission  — business target permission (role-scoped)
+//	  /auth/saveMenuPer        — save role menu permission
+//	  /auth/saveBusiPer        — save role business permission
+//	  /auth/saveMenuTargetPer  — save menu target permission
+//	  /auth/saveBusiTargetPer  — save business target permission
+//	  /role/permission/save    — role permission save (alias for saveBusiPer)
+//	  /system/role/permission/save — system role permission save (alias for saveBusiPer)
 func RegisterPermissionCompatRoutes(r *gin.RouterGroup, h *PermissionCompatHandler) {
 	if h == nil {
 		return
 	}
 
+	// Dual-support transition: auth permission/menu routes
 	authGroup := r.Group("/auth")
 	{
 		authGroup.GET("/menuPermission", h.MenuPermission)
@@ -600,6 +623,7 @@ func RegisterPermissionCompatRoutes(r *gin.RouterGroup, h *PermissionCompatHandl
 		authGroup.POST("/saveBusiTargetPer", h.SaveBusiTargetPer)
 	}
 
+	// Dual-support transition: role permission save aliases
 	roleGroup := r.Group("/role")
 	{
 		roleGroup.POST("/permission/save", h.SaveRolePermission)

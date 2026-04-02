@@ -105,6 +105,107 @@ func TestStatusConsistencyWithWhitelist(t *testing.T) {
 	}
 }
 
+func TestP4CompatClassificationPresent(t *testing.T) {
+	repoRoot := filepath.Join("..", "..", "..", "..")
+
+	files := []struct {
+		path        string
+		mustContain []string
+	}{
+		{
+			path: filepath.Join(repoRoot, "internal", "transport", "http", "handler", "frontend_compat_handler.go"),
+			mustContain: []string{
+				"P4 Legacy Compat Contract classification",
+				"PERMANENT SHIM",
+				"DUAL-SUPPORT TRANSITION",
+			},
+		},
+		{
+			path: filepath.Join(repoRoot, "internal", "transport", "http", "handler", "permission_compat_handler.go"),
+			mustContain: []string{
+				"P4 Legacy Compat Contract classification",
+				"DUAL-SUPPORT TRANSITION",
+			},
+		},
+		{
+			path: filepath.Join(repoRoot, "internal", "transport", "http", "handler", "compatibility_bridge_handler.go"),
+			mustContain: []string{
+				"P4 Legacy Compat Contract classification",
+				"PERMANENT SHIM",
+				"FRONTEND MIGRATION",
+				"DUAL-SUPPORT TRANSITION",
+			},
+		},
+	}
+
+	for _, f := range files {
+		content, err := os.ReadFile(f.path)
+		if err != nil {
+			t.Errorf("Could not read %s: %v", f.path, err)
+			continue
+		}
+		src := string(content)
+		for _, needle := range f.mustContain {
+			if !strings.Contains(src, needle) {
+				t.Errorf("%s missing P4 classification marker: %s", filepath.Base(f.path), needle)
+			}
+		}
+	}
+}
+
+func TestFrontendCompatRoutesCovered(t *testing.T) {
+	repoRoot := filepath.Join("..", "..", "..", "..")
+	path := filepath.Join(repoRoot, "internal", "transport", "http", "handler", "frontend_compat_handler.go")
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("Could not read frontend_compat_handler.go: %v", err)
+	}
+	src := string(content)
+
+	// These route prefixes must exist in the compat handler
+	requiredPrefixes := []string{
+		"/de2api/",
+		"/xpackComponent/",
+		"/websocket/info",
+		"/api/roleRouter/query",
+		"/api/auth/menuResource",
+		"/roleRouter/query",
+	}
+	for _, prefix := range requiredPrefixes {
+		if !strings.Contains(src, prefix) {
+			t.Errorf("frontend_compat_handler.go missing expected route prefix: %s", prefix)
+		}
+	}
+}
+
+func TestBridgeCompatRoutesCovered(t *testing.T) {
+	repoRoot := filepath.Join("..", "..", "..", "..")
+	path := filepath.Join(repoRoot, "internal", "transport", "http", "handler", "compatibility_bridge_handler.go")
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("Could not read compatibility_bridge_handler.go: %v", err)
+	}
+	src := string(content)
+
+	// These route groups must exist in the bridge handler
+	requiredGroups := []string{
+		"/datasource",
+		"/datasetTree",
+		"/datasetData",
+		"/chartData",
+		"/chart",
+		"/user",
+		"/org",
+	}
+	for _, group := range requiredGroups {
+		if !strings.Contains(src, group) {
+			t.Errorf("compatibility_bridge_handler.go missing expected route group: %s", group)
+		}
+	}
+}
+
 func extractEndpointSection(whitelist, endpoint string) string {
 	lines := strings.Split(whitelist, "\n")
 	var result []string

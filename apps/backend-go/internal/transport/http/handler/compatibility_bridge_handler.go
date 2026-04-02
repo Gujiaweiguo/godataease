@@ -19,6 +19,36 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RegisterCompatibilityBridgeRoutes registers Java-era API compatibility routes.
+//
+// P4 Legacy Compat Contract classification (C1 policy lock):
+//
+//	PERMANENT SHIM (保留 shim):
+//	  /api/login/localLogin — external system SSO dependency (handled elsewhere)
+//	  /de2api/*             — plugin/external system dependency
+//	  /xpackComponent/*     — enterprise plugin dependency
+//
+//	FRONTEND MIGRATION (C2 中执行):
+//	  /user/org/option      — migrate frontend to canonical org endpoint
+//	  /user/list            — migrate frontend to canonical user endpoint
+//	  /user/create          — migrate frontend to canonical user endpoint
+//	  /user/edit            — migrate frontend to canonical user endpoint
+//	  /user/delete/:id      — migrate frontend to canonical user endpoint
+//	  /user/options         — migrate frontend to canonical user endpoint
+//	  /user/byCurOrg        — migrate frontend to canonical user endpoint
+//	  /user/resetPwd/:uid   — migrate frontend to canonical user endpoint
+//	  /org/create           — migrate frontend to canonical org endpoint
+//	  /org/update           — migrate frontend to canonical org endpoint
+//	  /org/delete/:orgId    — migrate frontend to canonical org endpoint
+//	  /org/list             — migrate frontend to canonical org endpoint
+//
+//	DUAL-SUPPORT TRANSITION (C1 keep, C3 migrate):
+//	  /datasource/*         — datasource CRUD compatibility (C3 migrate to canonical)
+//	  /datasetTree/*        — dataset tree compatibility (C3 migrate to canonical)
+//	  /datasetData/*        — dataset data compatibility (C3 migrate to canonical)
+//	  /chartData/*          — chart data compatibility (C3 migrate to canonical)
+//	  /chart/*              — chart CRUD compatibility (C3 migrate to canonical)
+//	  /datasetField/*       — dataset field compatibility (C3 migrate to canonical)
 func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler, permMiddleware *middleware.PermissionMiddleware) { //nolint:gocyclo // large route registration for API compatibility
 	_ = user
 	_ = org
