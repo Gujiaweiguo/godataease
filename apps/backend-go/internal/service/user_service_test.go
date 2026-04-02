@@ -173,14 +173,12 @@ func TestUserService_UpdateUserStatus(t *testing.T) {
 
 	t.Run("persists new status", func(t *testing.T) {
 		svc, db := setupUserServiceRepoTest(t)
-		require.NoError(t, db.Create(&user.SysUser{Username: "status-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+		require.NoError(t, db.Create(&user.SysUser{UserID: 301, Username: "status-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
 
 		var existing user.SysUser
 		require.NoError(t, db.Where("username = ?", "status-user").First(&existing).Error)
-
 		err := svc.UpdateUserStatus(existing.UserID, user.StatusDisabled)
 		require.NoError(t, err)
-
 		var updated user.SysUser
 		require.NoError(t, db.First(&updated, "user_id = ?", existing.UserID).Error)
 		assert.Equal(t, user.StatusDisabled, updated.Status)
@@ -189,7 +187,7 @@ func TestUserService_UpdateUserStatus(t *testing.T) {
 
 	t.Run("returns wrapped update error", func(t *testing.T) {
 		svc, db := setupUserServiceRepoTest(t)
-		require.NoError(t, db.Create(&user.SysUser{Username: "status-update-error", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+		require.NoError(t, db.Create(&user.SysUser{UserID: 302, Username: "status-update-error", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
 
 		var existing user.SysUser
 		require.NoError(t, db.Where("username = ?", "status-update-error").First(&existing).Error)
@@ -323,11 +321,9 @@ func TestUserService_RecordPasswordResetAudit(t *testing.T) {
 
 func TestUserService_ResetPasswordWithAudit_PersistsAuditLog(t *testing.T) {
 	svc, db := setupUserServiceWithAuditTest(t)
-	require.NoError(t, db.Create(&user.SysUser{Username: "audit-user", Password: "old-secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
-
+	require.NoError(t, db.Create(&user.SysUser{UserID: 401, Username: "audit-user", Password: "old-secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
 	var existing user.SysUser
 	require.NoError(t, db.Where("username = ?", "audit-user").First(&existing).Error)
-
 	err := svc.ResetPasswordWithAudit(existing.UserID, "new-secret", 99, "auditor", "192.168.1.10")
 	require.NoError(t, err)
 
@@ -703,6 +699,51 @@ func TestUserService_BindUserToOrgBaseline(t *testing.T) {
 		require.NoError(t, db.Where("user_id = ? AND org_id = ?", 88, 11).First(&membership).Error)
 		assert.Equal(t, createdRole.RoleID, membership.RoleID)
 	})
+}
+
+func TestDeleteUser_BuiltInAdminProtected(t *testing.T) {
+	svc, _ := setupUserServiceFullRepoTest(t)
+
+	err := svc.DeleteUser(1)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrBuiltInUserProtected)
+}
+
+func TestUpdateUserStatus_InvalidStatus(t *testing.T) {
+	svc, _ := setupUserServiceRepoTest(t)
+
+	err := svc.UpdateUserStatus(999, 5)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidStatus)
+}
+
+func TestUpdateUserStatus_BuiltInAdminDisableProtected(t *testing.T) {
+	svc, db := setupUserServiceRepoTest(t)
+	require.NoError(t, db.Create(&user.SysUser{UserID: 1, Username: "admin", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+
+	err := svc.UpdateUserStatus(1, user.StatusDisabled)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrBuiltInUserProtected)
+}
+
+func TestResetPasswordWithAudit_BuiltInAdminProtected(t *testing.T) {
+	svc, _ := setupUserServiceRepoTest(t)
+
+	err := svc.ResetPasswordWithAudit(1, "new-secret", 99, "auditor", "192.168.1.10")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrBuiltInUserProtected)
+}
+
+func TestUpdateUserStatus_AllowEnableAdmin(t *testing.T) {
+	svc, db := setupUserServiceRepoTest(t)
+	require.NoError(t, db.Create(&user.SysUser{UserID: 1, Username: "admin", Password: "secret", Status: user.StatusDisabled, DelFlag: user.DelFlagNormal}).Error)
+
+	err := svc.UpdateUserStatus(1, user.StatusEnabled)
+	require.NoError(t, err)
+
+	var updated user.SysUser
+	require.NoError(t, db.First(&updated, "user_id = ?", 1).Error)
+	assert.Equal(t, user.StatusEnabled, updated.Status)
 }
 
 func TestUserService_EnsureDefaultOrgUserRole(t *testing.T) {
