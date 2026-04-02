@@ -25,6 +25,11 @@ const (
 	FallbackDefaultPwd     = "DataEase123456"
 )
 
+var (
+	ErrBuiltInUserProtected = fmt.Errorf("cannot modify built-in admin user")
+	ErrInvalidStatus        = fmt.Errorf("invalid status value: must be 0 (disabled) or 1 (enabled)")
+)
+
 type UserService struct {
 	userRepo     *repository.UserRepository
 	userRoleRepo *repository.UserRoleRepository
@@ -58,6 +63,10 @@ func (s *UserService) SetOrgRepository(repo *repository.OrgRepository) {
 // SetAuditService 设置审计服务
 func (s *UserService) SetAuditService(svc *AuditService) {
 	s.auditSvc = svc
+}
+
+func (s *UserService) isBuiltInAdminUser(userID int64) bool {
+	return userID == 1
 }
 
 // CreateUser 创建用户（含密码加密）
@@ -152,6 +161,10 @@ func (s *UserService) UpdateUser(req *user.UserUpdateRequest) error {
 
 // DeleteUser 删除用户（软删除）
 func (s *UserService) DeleteUser(userID int64) error {
+	if s.isBuiltInAdminUser(userID) {
+		return ErrBuiltInUserProtected
+	}
+
 	if err := s.userRepo.Delete(userID); err != nil {
 		logger.Error("Failed to delete user", zap.Error(err))
 		return fmt.Errorf("failed to delete user: %w", err)
@@ -206,6 +219,10 @@ func (s *UserService) ResetPassword(userID int64, newPassword string) error {
 
 // ResetPasswordWithAudit 重置密码（含审计日志）
 func (s *UserService) ResetPasswordWithAudit(userID int64, newPassword string, operatorID int64, operatorName string, ipAddress string) error {
+	if s.isBuiltInAdminUser(userID) {
+		return ErrBuiltInUserProtected
+	}
+
 	existing, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		s.recordPasswordResetAudit(nil, userID, operatorID, operatorName, ipAddress, audit.StatusFailed, "user not found")
@@ -283,6 +300,13 @@ func (s *UserService) ResolveDefaultPassword() string {
 
 // UpdateUserStatus 更新用户状态
 func (s *UserService) UpdateUserStatus(userID int64, status int) error {
+	if status != user.StatusEnabled && status != user.StatusDisabled {
+		return ErrInvalidStatus
+	}
+	if s.isBuiltInAdminUser(userID) && status == user.StatusDisabled {
+		return ErrBuiltInUserProtected
+	}
+
 	existing, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)

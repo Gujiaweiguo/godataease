@@ -759,6 +759,23 @@ func TestRoleServiceIntegration_CreateRoleWithInheritance_CustomParentRejected(t
 	assert.Contains(t, err.Error(), "parent role must be a built-in root role")
 }
 
+func TestRoleServiceIntegration_EditRole_SystemRoleProtected(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+
+	systemType := role.RoleTypeSystem
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "System Admin", RoleCode: "system-admin", RoleType: &systemType, Status: role.StatusEnabled}))
+
+	roles, err := repo.Query("")
+	require.NoError(t, err)
+	require.Len(t, roles, 1)
+	systemRoleID := roles[0].RoleID
+
+	err = svc.EditRole(&role.RoleEditor{RoleID: systemRoleID, Name: "Hacked Admin"}, "attacker", 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot edit built-in system role")
+}
+
 func TestRoleServiceIntegration_ValidatePermissionInheritance_NoParent(t *testing.T) {
 	svc := newTestRoleService(t)
 

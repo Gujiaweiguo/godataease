@@ -436,6 +436,28 @@ func TestUserServiceIntegration_CreateUser_CheckUsernameCount(t *testing.T) {
 	assert.Contains(t, err.Error(), "username already exists")
 }
 
+func TestUserServiceIntegration_DeleteUser_BuiltInAdminProtected(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	svc := NewUserService(userRepo, repository.NewUserRoleRepository(testDB), repository.NewUserPermRepository(testDB))
+
+	err := svc.DeleteUser(1)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrBuiltInUserProtected)
+}
+
+func TestUserServiceIntegration_UpdateUserStatus_InvalidStatus(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	svc := NewUserService(userRepo, repository.NewUserRoleRepository(testDB), repository.NewUserPermRepository(testDB))
+
+	err := svc.UpdateUserStatus(999, 5)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidStatus)
+}
+
 func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
 	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
 

@@ -922,3 +922,17 @@ func TestRoleService_ValidatePermissionInheritance_RoleNotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "role not found")
 }
+
+func TestEditRole_BuiltInSystemRoleProtected(t *testing.T) {
+	svc, repo := setupRoleServiceTest(t)
+	systemType := role.RoleTypeSystem
+	seedRole(t, repo, "SystemAdmin", "system-admin", &systemType, time.Now())
+
+	roles, err := repo.Query("")
+	require.NoError(t, err)
+	require.Len(t, roles, 1)
+
+	err = svc.EditRole(&role.RoleEditor{RoleID: roles[0].RoleID, Name: "HackedName"}, "attacker", 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot edit built-in system role")
+}
