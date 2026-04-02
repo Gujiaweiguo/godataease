@@ -62,12 +62,12 @@ func TestUserImportService_ParseRecords_MissingUsernameColumn(t *testing.T) {
 
 func TestUserImportService_ImportUsers_EarlyReturns(t *testing.T) {
 	svc := NewUserImportService(nil)
-	_, err := svc.ImportUsers(nil, nil, "")
+	_, err := svc.ImportUsers(nil, nil, "", 0)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not configured")
 
 	svc = NewUserImportService(&UserService{})
-	_, err = svc.ImportUsers(nil, nil, "")
+	_, err = svc.ImportUsers(nil, nil, "", 0)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "file is required")
 
@@ -78,7 +78,7 @@ func TestUserImportService_ImportUsers_EarlyReturns(t *testing.T) {
 	_, _ = file.Seek(0, 0)
 	defer file.Close()
 
-	_, err = svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: MaxUserImportFileSize + 1}, "")
+	_, err = svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: MaxUserImportFileSize + 1}, "", 0)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "10MB")
 }
@@ -185,10 +185,10 @@ func TestUserImportService_SaveErrorReport_WritesWorkbookRows(t *testing.T) {
 func TestUserImportService_ImportRecordValidation(t *testing.T) {
 	svc := NewUserImportService(&UserService{})
 
-	err := svc.importRecord(userImportRecord{}, "pwd")
+	err := svc.importRecord(userImportRecord{}, "pwd", 0)
 	assert.EqualError(t, err, "username is required")
 
-	err = svc.importRecord(userImportRecord{Username: "u", Email: "bad-email"}, "pwd")
+	err = svc.importRecord(userImportRecord{Username: "u", Email: "bad-email"}, "pwd", 0)
 	assert.EqualError(t, err, "invalid email format")
 }
 
@@ -204,7 +204,7 @@ func TestUserImportService_ImportUsers_ZeroOrBlankRows(t *testing.T) {
 		_, err = file.Seek(0, 0)
 		require.NoError(t, err)
 
-		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 30}, "")
+		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 30}, "", 0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Zero(t, result.TotalRows)
@@ -223,7 +223,7 @@ func TestUserImportService_ImportUsers_ZeroOrBlankRows(t *testing.T) {
 		_, err = file.Seek(0, 0)
 		require.NoError(t, err)
 
-		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 64}, "")
+		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 64}, "", 0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Zero(t, result.TotalRows)
@@ -245,7 +245,7 @@ func TestUserImportService_ImportUsers_SuccessAndFailures(t *testing.T) {
 		_, err = file.Seek(0, 0)
 		require.NoError(t, err)
 
-		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 128}, "")
+		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 128}, "", 0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Equal(t, 2, result.TotalRows)
@@ -270,7 +270,7 @@ func TestUserImportService_ImportUsers_SuccessAndFailures(t *testing.T) {
 		_, err = file.Seek(0, 0)
 		require.NoError(t, err)
 
-		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 140}, "")
+		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.csv", Size: 140}, "", 0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Equal(t, 2, result.TotalRows)
@@ -303,7 +303,7 @@ func TestUserImportService_ImportUsers_SuccessAndFailures(t *testing.T) {
 		_, err = file.Seek(0, 0)
 		require.NoError(t, err)
 
-		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.txt", Size: 16}, "")
+		result, err := svc.ImportUsers(file, &multipart.FileHeader{Filename: "users.txt", Size: 16}, "", 0)
 		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "unsupported file type")
