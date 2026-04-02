@@ -280,6 +280,7 @@ func TestUserHandler_SwitchEnable_Success(t *testing.T) {
 	r.POST("/user/enable", h.SwitchEnable)
 
 	userRepo := repository.NewUserRepository(repoDB)
+	require.NoError(t, userRepo.Create(&user.SysUser{UserID: 1, Username: "admin", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
 	require.NoError(t, userRepo.Create(&user.SysUser{Username: "toggle-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
 
 	var existing user.SysUser
