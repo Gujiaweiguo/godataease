@@ -91,10 +91,24 @@ func (r *RoleRepository) BindUserRole(userID, roleID, orgID int64) error {
 }
 
 // UnbindUserRole 解绑用户与角色
-func (r *RoleRepository) UnbindUserRole(userID, roleID int64) error {
-	return r.db.Table("sys_user_role").
-		Where("user_id = ? AND role_id = ?", userID, roleID).
-		Delete(nil).Error
+func (r *RoleRepository) UnbindUserRole(userID, roleID, orgID int64) error {
+	query := r.db.Table("sys_user_role").
+		Where("user_id = ? AND role_id = ?", userID, roleID)
+	if orgID > 0 {
+		query = query.Where("org_id = ?", orgID)
+	}
+	return query.Delete(nil).Error
+}
+
+// CountUserRolesByOrg 统计用户在指定组织内的角色数量
+func (r *RoleRepository) CountUserRolesByOrg(userID, orgID int64) (int64, error) {
+	var count int64
+	query := r.db.Table("sys_user_role").Where("user_id = ?", userID)
+	if orgID > 0 {
+		query = query.Where("org_id = ?", orgID)
+	}
+	err := query.Count(&count).Error
+	return count, err
 }
 
 // GetRolesByIDs 根据角色ID列表查询角色
