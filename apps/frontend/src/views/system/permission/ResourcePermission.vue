@@ -439,7 +439,7 @@ const loadUserList = async () => {
 
 const loadPermissionTree = async () => {
   try {
-    const res = await resourceTreeApi('1')
+    const res = await resourceTreeApi('all')
     if (res.code === '000000') {
       permissionTree.value = buildPermissionTree(res.data || [])
       await syncCheckedPermissions()
