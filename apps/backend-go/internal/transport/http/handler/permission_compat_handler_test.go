@@ -589,3 +589,82 @@ func TestPermissionCompatHandler_BusiTargetPermissionRequiresIDAndFlag(t *testin
 		t.Fatalf("expected code 500000, got %#v", resp["code"])
 	}
 }
+
+func TestPermissionCompatHandler_MenuPermissionRoundTrip(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &role.RoleMenu{}, &menu.CoreMenu{}))
+	roleRepo := repository.NewRoleRepository(db)
+	menuRepo := repository.NewMenuRepository(db)
+	roleMenuRepo := repository.NewRoleMenuRepository(db)
+	menuSvc := service.NewMenuService(menuRepo)
+	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	h := NewPermissionCompatHandler(menuSvc, nil, roleMenuSvc, nil)
+
+	testRole := &role.SysRole{RoleName: "menu-perm-role", RoleCode: "menu-perm-role", Status: 1}
+	require.NoError(t, roleRepo.Create(testRole))
+	menuA := &menu.CoreMenu{Name: "User", Path: "/system/user", Type: 2, Auth: true, MenuSort: 1}
+	menuB := &menu.CoreMenu{Name: "Role", Path: "/system/role", Type: 2, Auth: true, MenuSort: 2}
+	menuC := &menu.CoreMenu{Name: "Permission", Path: "/system/permission", Type: 2, Auth: true, MenuSort: 3}
+	require.NoError(t, menuRepo.Create(menuA))
+	require.NoError(t, menuRepo.Create(menuB))
+	require.NoError(t, menuRepo.Create(menuC))
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterPermissionCompatRoutes(api, h)
+
+	noRoleReq := httptest.NewRequest("POST", "/api/auth/menuPermission", strings.NewReader(`{}`))
+	noRoleReq.Header.Set("Content-Type", "application/json")
+	noRoleResp := httptest.NewRecorder()
+	r.ServeHTTP(noRoleResp, noRoleReq)
+	require.Equal(t, 200, noRoleResp.Code)
+
+	var noRoleBody struct {
+		Code string `json:"code"`
+		Data struct {
+			MenuTree []struct {
+				ID   int64  `json:"id"`
+				Name string `json:"name"`
+			} `json:"menuTree"`
+			MenuIDs []int64 `json:"menuIds"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(noRoleResp.Body.Bytes(), &noRoleBody))
+	require.Equal(t, "000000", noRoleBody.Code)
+	require.Empty(t, noRoleBody.Data.MenuIDs, "menuIds should be empty when no roleId")
+	require.True(t, len(noRoleBody.Data.MenuTree) > 0, "menuTree should contain the full menu tree")
+	for _, node := range noRoleBody.Data.MenuTree {
+		require.True(t, node.ID > 0, "menu tree node must have a stable id field")
+	}
+
+	saveReq := httptest.NewRequest("POST", "/api/auth/saveMenuPer", strings.NewReader(`{"roleId":`+strconv.FormatInt(testRole.RoleID, 10)+`,"menuIds":[`+strconv.FormatInt(menuA.ID, 10)+`,`+strconv.FormatInt(menuB.ID, 10)+`]}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveResp := httptest.NewRecorder()
+	r.ServeHTTP(saveResp, saveReq)
+	require.Equal(t, 200, saveResp.Code)
+	var saveBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(saveResp.Body.Bytes(), &saveBody))
+	require.Equal(t, "000000", saveBody["code"])
+
+	withRoleReq := httptest.NewRequest("POST", "/api/auth/menuPermission", strings.NewReader(`{"roleId":`+strconv.FormatInt(testRole.RoleID, 10)+`}`))
+	withRoleReq.Header.Set("Content-Type", "application/json")
+	withRoleResp := httptest.NewRecorder()
+	r.ServeHTTP(withRoleResp, withRoleReq)
+	require.Equal(t, 200, withRoleResp.Code)
+
+	var withRoleBody struct {
+		Code string `json:"code"`
+		Data struct {
+			MenuTree []struct {
+				ID int64 `json:"id"`
+			} `json:"menuTree"`
+			MenuIDs []int64 `json:"menuIds"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(withRoleResp.Body.Bytes(), &withRoleBody))
+	require.Equal(t, "000000", withRoleBody.Code)
+	require.ElementsMatch(t, []int64{menuA.ID, menuB.ID}, withRoleBody.Data.MenuIDs)
+	require.Equal(t, len(noRoleBody.Data.MenuTree), len(withRoleBody.Data.MenuTree), "menuTree should be the same full tree regardless of roleId")
+}

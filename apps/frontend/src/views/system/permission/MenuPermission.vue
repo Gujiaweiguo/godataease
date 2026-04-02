@@ -15,7 +15,7 @@
       <el-tree
         ref="menuTreeRef"
         :data="menuTree"
-        :props="{ label: 'meta title', children: 'children' }"
+        :props="treeProps"
         show-checkbox
         node-key="id"
         :default-checked-keys="selectedMenuIds"
@@ -34,7 +34,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus-secondary'
-import { queryRoleApi, menuTreeApi, roleMenuAuthApi, roleMenuAuthSaveApi } from '@/api/auth'
+import { queryRoleApi, menuPerApi, menuPerSaveApi } from '@/api/auth'
+
+const treeProps = {
+  label: (data: any) => data.meta?.title || data.name || data.path,
+  children: 'children'
+}
 
 const roleList = ref([])
 const selectedRoleId = ref(null)
@@ -53,24 +58,16 @@ const loadRoleList = async () => {
   }
 }
 
-const loadMenuTree = async () => {
+const loadMenuPermission = async (roleId: number | null) => {
   try {
-    const res = await menuTreeApi()
+    const res = await menuPerApi({ roleId: roleId || 0 })
     if (res.code === '000000') {
-      menuTree.value = buildMenuTree(res.data || [])
+      menuTree.value = res.data?.menuTree || []
+      selectedMenuIds.value = res.data?.menuIds || []
     }
   } catch (error) {
-    ElMessage.error('加载菜单列表失败')
+    ElMessage.error('加载菜单权限失败')
   }
-}
-
-const buildMenuTree = (menus: any[]) => {
-  return menus.map(menu => ({
-    id: menu.id,
-    path: menu.path,
-    meta: { title: menu.meta?.title || menu.name },
-    children: menu.children ? buildMenuTree(menu.children) : []
-  }))
 }
 
 const handleRoleChange = async () => {
@@ -79,18 +76,11 @@ const handleRoleChange = async () => {
     return
   }
 
-  try {
-    const res = await roleMenuAuthApi(selectedRoleId.value)
-    if (res.code === '000000') {
-      selectedMenuIds.value = res.data?.menuIds || []
-    }
-  } catch (error) {
-    ElMessage.error('加载菜单授权失败')
-  }
+  await loadMenuPermission(selectedRoleId.value)
 }
 
-const handleMenuCheck = (checkedKeys: any[]) => {
-  selectedMenuIds.value = checkedKeys
+const handleMenuCheck = (_data: any, checkInfo: { checkedKeys: number[] }) => {
+  selectedMenuIds.value = checkInfo.checkedKeys
 }
 
 const handleSave = async () => {
@@ -100,7 +90,7 @@ const handleSave = async () => {
   }
 
   try {
-    const res = await roleMenuAuthSaveApi({
+    const res = await menuPerSaveApi({
       roleId: selectedRoleId.value,
       menuIds: selectedMenuIds.value
     })
@@ -115,7 +105,7 @@ const handleSave = async () => {
 
 onMounted(() => {
   loadRoleList()
-  loadMenuTree()
+  loadMenuPermission(null)
 })
 </script>
 
