@@ -87,16 +87,29 @@ func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string, callerO
 
 func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string, callerOrgID int64) error {
 	logger.Info("Role edit with org context", zap.Int64("orgId", callerOrgID), zap.String("updateBy", updateBy))
-	if req.ID == 0 && req.RoleID > 0 {
-		req.ID = req.RoleID
+
+	// Normalize: RoleID takes precedence over ID
+	roleID := req.RoleID
+	if roleID == 0 {
+		roleID = req.ID
 	}
-	if req.ID == 0 {
+	if roleID == 0 {
 		return fmt.Errorf("role id is required")
 	}
 
-	rle, err := s.repo.GetByID(req.ID)
+	rle, err := s.repo.GetByID(roleID)
 	if err != nil {
 		return fmt.Errorf("role not found: %w", err)
+	}
+	if rle.RoleType != nil && *rle.RoleType == role.RoleTypeSystem {
+		return fmt.Errorf("cannot edit built-in system role")
+	}
+	if err != nil {
+		return fmt.Errorf("role not found: %w", err)
+	}
+
+	if rle.RoleType != nil && *rle.RoleType == role.RoleTypeSystem {
+		return fmt.Errorf("cannot edit built-in system role")
 	}
 
 	roleName := req.RoleName
