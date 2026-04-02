@@ -458,14 +458,45 @@ func TestUserServiceIntegration_UpdateUserStatus_InvalidStatus(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidStatus)
 }
 
-func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
+func TestUserServiceIntegration_EnsureUserInOrg(t *testing.T) {
 	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{})
 
 	userRepo := repository.NewUserRepository(testDB)
-	svc := NewUserService(userRepo, repository.NewUserRoleRepository(testDB), repository.NewUserPermRepository(testDB))
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	svc := NewUserService(userRepo, userRoleRepo, repository.NewUserPermRepository(testDB))
+
+	id, err := svc.CreateUser(&user.UserCreateRequest{
+		Username: "org-member-user",
+		Password: "password123",
+		RealName: "Org Member",
+	})
+	require.NoError(t, err)
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: id, RoleID: 1, OrgID: 9}))
+
+	require.NoError(t, svc.EnsureUserInOrg(id, 9))
+
+	err = svc.EnsureUserInOrg(id, 10)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrUserNotInCurrentOrg)
+}
+
+func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{}, &role.SysRole{}, &org.SysOrg{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	svc := NewUserService(userRepo, userRoleRepo, repository.NewUserPermRepository(testDB))
+	roleRepo := repository.NewRoleRepository(testDB)
+	orgRepo := repository.NewOrgRepository(testDB)
+	svc.SetRoleRepository(roleRepo)
+	svc.SetOrgRepository(orgRepo)
 	importSvc := NewUserImportService(svc)
 
-	_, err := svc.CreateUser(&user.UserCreateRequest{
+	require.NoError(t, orgRepo.Create(&org.SysOrg{OrgName: "Import Org", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
+	createdOrg, err := orgRepo.GetByName("Import Org")
+	require.NoError(t, err)
+
+	_, err = svc.CreateUser(&user.UserCreateRequest{
 		Username: "dupuser",
 		Password: "password123",
 		RealName: "Duplicate User",
@@ -488,7 +519,7 @@ func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	header := &multipart.FileHeader{Filename: "users.csv", Size: int64(len(csvContent))}
-	result, err := importSvc.ImportUsers(tmpFile, header, "tester")
+	result, err := importSvc.ImportUsers(tmpFile, header, "tester", createdOrg.OrgID)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, 3, result.TotalRows)
@@ -506,6 +537,10 @@ func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
 	created, err := userRepo.GetByUsername("newuser")
 	require.NoError(t, err)
 	require.NotNil(t, created)
+	memberships, err := userRoleRepo.GetByUserID(created.UserID)
+	require.NoError(t, err)
+	require.NotEmpty(t, memberships)
+	assert.Equal(t, createdOrg.OrgID, memberships[0].OrgID)
 	err = bcrypt.CompareHashAndPassword([]byte(created.Password), []byte(svc.ResolveDefaultPassword()))
 	assert.NoError(t, err)
 }
