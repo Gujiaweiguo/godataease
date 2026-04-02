@@ -28,6 +28,7 @@ const (
 var (
 	ErrBuiltInUserProtected = fmt.Errorf("cannot modify built-in admin user")
 	ErrInvalidStatus        = fmt.Errorf("invalid status value: must be 0 (disabled) or 1 (enabled)")
+	ErrUserNotInCurrentOrg  = fmt.Errorf("user not in current organization")
 )
 
 type UserService struct {
@@ -67,6 +68,25 @@ func (s *UserService) SetAuditService(svc *AuditService) {
 
 func (s *UserService) isBuiltInAdminUser(userID int64) bool {
 	return userID == 1
+}
+
+func (s *UserService) EnsureUserInOrg(userID int64, orgID int64) error {
+	if orgID <= 0 {
+		return fmt.Errorf("org id is required")
+	}
+	if s.userRoleRepo == nil {
+		return fmt.Errorf("user-role repository is not configured")
+	}
+
+	inOrg, err := s.userRoleRepo.IsUserInOrg(userID, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to validate user organization: %w", err)
+	}
+	if !inOrg {
+		return ErrUserNotInCurrentOrg
+	}
+
+	return nil
 }
 
 // CreateUser 创建用户（含密码加密）

@@ -86,7 +86,7 @@ func (s *UserImportService) GenerateTemplate() ([]byte, string, error) {
 	return buf.Bytes(), "user_import_template.xlsx", nil
 }
 
-func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.FileHeader, _ string) (*UserImportResult, error) {
+func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.FileHeader, _ string, orgID int64) (*UserImportResult, error) {
 	if s.userService == nil {
 		return nil, fmt.Errorf("user import service is not configured")
 	}
@@ -121,7 +121,7 @@ func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.F
 		}
 
 		result.TotalRows++
-		if importErr := s.importRecord(record, defaultPassword); importErr != nil {
+		if importErr := s.importRecord(record, defaultPassword, orgID); importErr != nil {
 			importErrors = append(importErrors, userImportError{Line: record.Line, Username: record.Username, Reason: importErr.Error()})
 			continue
 		}
@@ -142,7 +142,7 @@ func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.F
 	return result, nil
 }
 
-func (s *UserImportService) importRecord(record userImportRecord, defaultPassword string) error {
+func (s *UserImportService) importRecord(record userImportRecord, defaultPassword string, orgID int64) error {
 	if strings.TrimSpace(record.Username) == "" {
 		return fmt.Errorf("username is required")
 	}
@@ -156,6 +156,9 @@ func (s *UserImportService) importRecord(record userImportRecord, defaultPasswor
 		RealName: record.RealName,
 		Email:    stringPtr(record.Email),
 		Phone:    stringPtr(record.Phone),
+	}
+	if orgID > 0 {
+		req.OrgID = &orgID
 	}
 	_, err := s.userService.CreateUser(req)
 	return err
