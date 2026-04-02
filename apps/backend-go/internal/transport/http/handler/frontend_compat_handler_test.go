@@ -587,6 +587,35 @@ func assertEmptyInteractiveTreeScope(t *testing.T, data map[string]interface{}, 
 	}
 }
 
+func TestToMenuResourceIncludesID(t *testing.T) {
+	input := &menu.MenuVO{
+		ID:   42,
+		Path: "/system/user",
+		Meta: &menu.MenuMeta{Title: "user", Icon: "user-icon"},
+		Children: []*menu.MenuVO{
+			{ID: 43, Path: "system/user/list", Meta: &menu.MenuMeta{Title: "list", Icon: "list-icon"}},
+		},
+	}
+
+	result := toMenuResource(input, localeZhCN)
+
+	id, ok := result["id"].(int64)
+	if !ok || id != 42 {
+		t.Fatalf("expected id=42, got %#v", result["id"])
+	}
+
+	children := result["children"].([]map[string]interface{})
+	childID, ok := children[0]["id"].(int64)
+	if !ok || childID != 43 {
+		t.Fatalf("expected child id=43, got %#v", children[0]["id"])
+	}
+
+	meta := result["meta"].(map[string]interface{})
+	if meta["title"] != "用户管理" {
+		t.Fatalf("expected resolved title, got %q", meta["title"])
+	}
+}
+
 func TestFrontendCompatHandler_MenuQueryError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

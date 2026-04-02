@@ -444,6 +444,7 @@ func toRoleRouter(m *menu.MenuVO, isRoot bool, locale string) map[string]interfa
 
 func toMenuResource(m *menu.MenuVO, locale string) map[string]interface{} {
 	result := map[string]interface{}{
+		"id":   m.ID,
 		"path": m.Path,
 		"meta": map[string]interface{}{
 			"title": displayTitle(m, locale),
