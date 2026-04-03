@@ -344,8 +344,8 @@ func TestBuildLogicCondition_AllOperators(t *testing.T) {
 		{"lt", permission.OperatorLt, "100", "`field` < ?", 1},
 		{"ge", permission.OperatorGe, "100", "`field` >= ?", 1},
 		{"le", permission.OperatorLe, "100", "`field` <= ?", 1},
-		{"in", permission.OperatorIn, "test", "", 0},
-		{"not_in", permission.OperatorNotIn, "test", "", 0},
+		{"in", permission.OperatorIn, "a,b", "`field` IN (?, ?)", 2},
+		{"not_in", permission.OperatorNotIn, "a,b", "`field` NOT IN (?, ?)", 2},
 		{"default", "unknown", "test", "`field` = ?", 1},
 	}
 
@@ -360,6 +360,28 @@ func TestBuildLogicCondition_AllOperators(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildSetCondition(t *testing.T) {
+	svc := &RowPermissionService{}
+
+	t.Run("builds IN condition with trimmed values", func(t *testing.T) {
+		cond, args := svc.buildSetCondition("`field`", " a, b , ,c ", false)
+		assert.Equal(t, "`field` IN (?, ?, ?)", cond)
+		assert.Equal(t, []interface{}{"a", "b", "c"}, args)
+	})
+
+	t.Run("builds NOT IN condition", func(t *testing.T) {
+		cond, args := svc.buildSetCondition("`field`", "x,y", true)
+		assert.Equal(t, "`field` NOT IN (?, ?)", cond)
+		assert.Equal(t, []interface{}{"x", "y"}, args)
+	})
+
+	t.Run("drops empty values", func(t *testing.T) {
+		cond, args := svc.buildSetCondition("`field`", " , , ", false)
+		assert.Empty(t, cond)
+		assert.Nil(t, args)
+	})
 }
 
 func TestParseTreeObj_EmptyAndNil(t *testing.T) {
