@@ -101,8 +101,14 @@ func (s *ChartService) QueryDataWithPermission(req *chart.ChartDataRequest, user
 	whereClause := ""
 	var whereArgs []interface{}
 	if s.rowPermissionService != nil {
-		selectColumns, _ = s.rowPermissionService.BuildSelectColumns(datasetGroupID, userID)
-		whereResult, _ := s.rowPermissionService.BuildWhereClause(datasetGroupID, userID)
+		selectColumns, err = s.rowPermissionService.BuildSelectColumns(datasetGroupID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build row permission select columns: %w", err)
+		}
+		whereResult, err := s.rowPermissionService.BuildWhereClause(datasetGroupID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build row permission where clause: %w", err)
+		}
 		if whereResult != nil {
 			whereClause = whereResult.Clause
 			whereArgs = whereResult.Args
@@ -113,7 +119,10 @@ func (s *ChartService) QueryDataWithPermission(req *chart.ChartDataRequest, user
 	if err != nil {
 		return nil, err
 	}
-	rows = s.applyColumnRules(datasetGroupID, userID, rows)
+	rows, err = s.applyColumnRules(datasetGroupID, userID, rows)
+	if err != nil {
+		return nil, err
+	}
 
 	columns := make([]string, 0)
 	if len(rows) > 0 {
@@ -390,20 +399,26 @@ func convertToChartField(field *dataset.CoreDatasetTableField) chart.ChartField 
 	}
 }
 
-func (s *ChartService) applyColumnRules(datasetGroupID int64, userID int64, rows []map[string]interface{}) []map[string]interface{} {
+func (s *ChartService) applyColumnRules(datasetGroupID int64, userID int64, rows []map[string]interface{}) ([]map[string]interface{}, error) {
 	if len(rows) == 0 || s.columnPermissionService == nil {
-		return rows
+		return rows, nil
 	}
 	if s.rowPermissionService != nil && s.rowPermissionService.IsAdmin(userID) {
-		return rows
+		return rows, nil
 	}
-	disabledColumns, _ := s.columnPermissionService.GetDisabledColumns(datasetGroupID)
-	maskRules, _ := s.columnPermissionService.GetMaskRules(datasetGroupID)
+	disabledColumns, err := s.columnPermissionService.GetDisabledColumns(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
+	}
+	maskRules, err := s.columnPermissionService.GetMaskRules(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mask rules: %w", err)
+	}
 	for i := range rows {
 		rows[i] = s.columnPermissionService.FilterDisabledColumns(rows[i], disabledColumns)
 		rows[i] = s.columnPermissionService.MaskRowData(rows[i], maskRules)
 	}
-	return rows
+	return rows, nil
 }
 
 func (s *ChartService) filterChartFields(fields []chart.ChartField, disabledColumns map[string]bool, maskRules map[string]*permission.DesensitizationRule) []chart.ChartField {
