@@ -252,17 +252,15 @@ func (s *RowPermissionService) buildLogicCondition(field, term, value string) (s
 		return "", nil
 	}
 
-	escapedValue := s.escapeSQL(value)
-
 	switch term {
 	case permission.OperatorEq:
-		return fmt.Sprintf("%s = ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s = ?", field), []interface{}{s.escapeSQL(value)}
 	case "not_eq", "not eq":
-		return fmt.Sprintf("%s != ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s != ?", field), []interface{}{s.escapeSQL(value)}
 	case permission.OperatorLike:
-		return fmt.Sprintf("%s LIKE ?", field), []interface{}{"%" + escapedValue + "%"}
+		return fmt.Sprintf("%s LIKE ?", field), []interface{}{"%" + s.escapeSQL(value) + "%"}
 	case permission.OperatorNotLike:
-		return fmt.Sprintf("%s NOT LIKE ?", field), []interface{}{"%" + escapedValue + "%"}
+		return fmt.Sprintf("%s NOT LIKE ?", field), []interface{}{"%" + s.escapeSQL(value) + "%"}
 	case permission.OperatorNull:
 		return fmt.Sprintf("%s IS NULL", field), nil
 	case permission.OperatorNotNull:
@@ -272,20 +270,54 @@ func (s *RowPermissionService) buildLogicCondition(field, term, value string) (s
 	case permission.OperatorNotEmpty:
 		return fmt.Sprintf("%s != ''", field), nil
 	case permission.OperatorGt:
-		return fmt.Sprintf("%s > ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s > ?", field), []interface{}{s.escapeSQL(value)}
 	case permission.OperatorLt:
-		return fmt.Sprintf("%s < ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s < ?", field), []interface{}{s.escapeSQL(value)}
 	case permission.OperatorGe:
-		return fmt.Sprintf("%s >= ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s >= ?", field), []interface{}{s.escapeSQL(value)}
 	case permission.OperatorLe:
-		return fmt.Sprintf("%s <= ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s <= ?", field), []interface{}{s.escapeSQL(value)}
 	case permission.OperatorIn:
-		return "", nil
+		return s.buildSetCondition(field, value, false)
 	case permission.OperatorNotIn:
-		return "", nil
+		return s.buildSetCondition(field, value, true)
 	default:
-		return fmt.Sprintf("%s = ?", field), []interface{}{escapedValue}
+		return fmt.Sprintf("%s = ?", field), []interface{}{s.escapeSQL(value)}
 	}
+}
+
+func (s *RowPermissionService) buildSetCondition(field, value string, negated bool) (string, []interface{}) {
+	values := splitSetConditionValues(value)
+	if len(values) == 0 {
+		return "", nil
+	}
+
+	placeholders := make([]string, len(values))
+	args := make([]interface{}, len(values))
+	for i, v := range values {
+		placeholders[i] = "?"
+		args[i] = s.escapeSQL(v)
+	}
+
+	operator := "IN"
+	if negated {
+		operator = "NOT IN"
+	}
+
+	return fmt.Sprintf("%s %s (%s)", field, operator, strings.Join(placeholders, ", ")), args
+}
+
+func splitSetConditionValues(value string) []string {
+	parts := strings.Split(value, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		values = append(values, trimmed)
+	}
+	return values
 }
 
 func (s *RowPermissionService) buildEnumCondition(field string, values []string) (string, []interface{}) {

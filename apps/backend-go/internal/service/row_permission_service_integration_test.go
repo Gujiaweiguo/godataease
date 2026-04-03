@@ -234,8 +234,8 @@ func TestRowPermissionServiceIntegration_BuildLogicCondition_AllOperators(t *tes
 		{"lt operator", "lt", "50", "`field` < ?", 1},
 		{"ge operator", "ge", "100", "`field` >= ?", 1},
 		{"le operator", "le", "50", "`field` <= ?", 1},
-		{"in operator (returns empty)", "in", "a,b", "", 0},
-		{"not_in operator (returns empty)", "not_in", "a,b", "", 0},
+		{"in operator", "in", "a,b", "`field` IN (?, ?)", 2},
+		{"not_in operator", "not_in", "a,b", "`field` NOT IN (?, ?)", 2},
 		{"unknown operator defaults to eq", "unknown", "val", "`field` = ?", 1},
 	}
 
@@ -254,6 +254,32 @@ func TestRowPermissionServiceIntegration_BuildLogicCondition_AllOperators(t *tes
 			}
 		})
 	}
+}
+
+func TestRowPermissionServiceIntegration_BuildWhereClause_WithInAndNotInOperators(t *testing.T) {
+	cleanupTables(&permission.DataPermRow{}, &permission.DataPermColumn{})
+
+	rowRepo := repository.NewRowPermissionRepository(testDB)
+	colRepo := repository.NewColumnPermissionRepository(testDB)
+	svc := NewRowPermissionService(rowRepo, colRepo, nil, &rowPermAdminCheckerStub{})
+
+	err := testDB.Create(&permission.DataPermRow{
+		DatasetID:      1007,
+		DatasetGroupID: 1007,
+		AuthTargetType: permission.AuthTargetTypeUser,
+		AuthTargetID:   2007,
+		Status:         1,
+		ExpressionTree: `{"logic":"AND","items":[{"fieldId":7,"term":"in","value":"east,west"},{"fieldId":8,"term":"not_in","value":"archived,draft"}]}`,
+	}).Error
+	assert.NoError(t, err)
+
+	result, err := svc.BuildWhereClause(1007, 2007)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Contains(t, result.Clause, "`7` IN (?, ?)")
+	assert.Contains(t, result.Clause, "`8` NOT IN (?, ?)")
+	assert.Len(t, result.Args, 4)
+	assert.Equal(t, []interface{}{"east", "west", "archived", "draft"}, result.Args)
 }
 
 // TestBuildLogicCondition_EmptyValue tests that empty value returns empty for non-null operators
