@@ -113,16 +113,6 @@
         <el-form-item label="过滤值" prop="filterValue">
           <el-input v-model="rowRuleForm.filterValue" placeholder="请输入过滤值" />
         </el-form-item>
-        <el-form-item label="白名单用户">
-          <el-select v-model="rowRuleForm.whiteList" multiple placeholder="请选择白名单用户">
-            <el-option
-              v-for="user in userList"
-              :key="user.id"
-              :label="user.realName || user.username"
-              :value="user.id"
-            />
-          </el-select>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="rowRuleDialogVisible = false">取消</el-button>
@@ -211,8 +201,7 @@ const rowRuleForm = ref({
   filterType: 'role',
   targetId: null,
   filterField: '',
-  filterValue: '',
-  whiteList: []
+  filterValue: ''
 })
 
 const columnRuleForm = ref({
@@ -342,8 +331,7 @@ const handleAddRule = () => {
       filterType: isRowRoleMode.value ? 'role' : 'role',
       targetId: isRowRoleMode.value ? selectedRoleFilterId.value : null,
       filterField: '',
-      filterValue: '',
-      whiteList: []
+      filterValue: ''
     }
     rowRuleDialogVisible.value = true
   } else {
@@ -368,8 +356,10 @@ const handleEditRowRule = (row: any) => {
     return
   }
   rowRuleDialogTitle.value = '编辑行权限规则'
+  const formRow = { ...row }
+  delete formRow.whiteList
   rowRuleForm.value = {
-    ...row,
+    ...formRow,
     filterType: isRowRoleMode.value ? 'role' : row.filterType,
     targetId: isRowRoleMode.value ? selectedRoleFilterId.value : row.targetId
   }
@@ -426,8 +416,10 @@ const handleRowRuleSubmit = async () => {
       ElMessage.warning('请先选择角色')
       return
     }
+    const rowRuleFormValue = { ...rowRuleForm.value } as Record<string, unknown>
+    delete rowRuleFormValue.whiteList
     const payload = {
-      ...rowRuleForm.value,
+      ...rowRuleFormValue,
       filterType: isRowRoleMode.value ? 'role' : rowRuleForm.value.filterType,
       targetId: isRowRoleMode.value ? selectedRoleFilterId.value : rowRuleForm.value.targetId
     }
