@@ -334,6 +334,39 @@ func TestChartServiceIntegration_ListByDQWithPermission_FiltersDisabledAndMarksM
 	assert.Equal(t, int64(-1), fieldResp.QuotaList[0].ID)
 }
 
+func TestChartServiceIntegration_ListByDQWithPermission_ReturnsColumnPermissionErrors(t *testing.T) {
+	ensureChartServiceTables(t)
+	clearChartServiceTables(t)
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+	_ = testDB.AutoMigrate(&permission.DataPermColumn{})
+
+	chartRepo := repository.NewChartRepository(testDB)
+	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
+	svc := NewChartService(chartRepo)
+	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo))
+
+	datasetGroupID := int64(9403)
+	chartID := int64(9404)
+	checked := true
+	groupD := "d"
+	varcharType := "VARCHAR"
+	deTypeD := 0
+	region := "region"
+
+	err := testDB.Create(&dataset.CoreDatasetTableField{DatasetGroupID: datasetGroupID, ChartID: &chartID, Name: &region, OriginName: &region, DataeaseName: &region, GroupType: &groupD, Type: &varcharType, DeType: &deTypeD, Checked: &checked}).Error
+	assert.NoError(t, err)
+
+	err = testDB.Exec("DROP TABLE data_perm_column").Error
+	assert.NoError(t, err)
+
+	fieldResp, err := svc.ListByDQWithPermission(datasetGroupID, chartID, 40005)
+	assert.Nil(t, fieldResp)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to load disabled columns")
+
+	_ = testDB.AutoMigrate(&permission.DataPermColumn{})
+}
+
 func TestChartServiceIntegration_QueryDataWithPermission_ReturnsRowPermissionErrors(t *testing.T) {
 	ensureChartServiceTables(t)
 	clearChartServiceTables(t)

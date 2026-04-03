@@ -254,11 +254,11 @@ func (s *ChartService) ListByDQWithPermission(datasetGroupID int64, chartID int6
 
 	disabledColumns, err := s.columnPermissionService.GetDisabledColumns(datasetGroupID)
 	if err != nil {
-		return resp, nil
+		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
 	}
 	maskRules, err := s.columnPermissionService.GetMaskRules(datasetGroupID)
 	if err != nil {
-		return resp, nil
+		return nil, fmt.Errorf("failed to load mask rules: %w", err)
 	}
 	return &chart.ChartFieldListResponse{
 		DimensionList: s.filterChartFields(resp.DimensionList, disabledColumns, maskRules),
