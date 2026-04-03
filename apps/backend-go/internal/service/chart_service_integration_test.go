@@ -334,6 +334,93 @@ func TestChartServiceIntegration_ListByDQWithPermission_FiltersDisabledAndMarksM
 	assert.Equal(t, int64(-1), fieldResp.QuotaList[0].ID)
 }
 
+func TestChartServiceIntegration_QueryDataWithPermission_ReturnsRowPermissionErrors(t *testing.T) {
+	ensureChartServiceTables(t)
+	clearChartServiceTables(t)
+	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+	_ = testDB.AutoMigrate(&permission.DataPermRow{}, &permission.DataPermColumn{})
+
+	chartRepo := repository.NewChartRepository(testDB)
+	datasetRepo := repository.NewDatasetRepository(testDB)
+	rowPermRepo := repository.NewRowPermissionRepository(testDB)
+	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
+
+	rowPermSvc := NewRowPermissionService(rowPermRepo, columnPermRepo, nil, nil)
+	rowPermSvc.SetDatasetFieldResolver(datasetRepo)
+	svc := NewChartService(chartRepo)
+	svc.SetRowPermissionService(rowPermSvc)
+
+	tableName := "it_chart_data_rows"
+	err := testDB.Create(&dataset.CoreDatasetTable{Name: chartSvcStringPtr("it_chart_perm_error"), DatasetGroupID: 9501, PhysicalTable: &tableName}).Error
+	assert.NoError(t, err)
+
+	var dsTable dataset.CoreDatasetTable
+	err = testDB.Where("dataset_group_id = ?", 9501).First(&dsTable).Error
+	assert.NoError(t, err)
+
+	err = testDB.Create(&chart.CoreChartView{Title: chartSvcStringPtr("Sales by Region Error"), TableID: &dsTable.ID, Type: chartSvcStringPtr("bar")}).Error
+	assert.NoError(t, err)
+	var view chart.CoreChartView
+	err = testDB.Where("title = ?", "Sales by Region Error").First(&view).Error
+	assert.NoError(t, err)
+
+	err = testDB.Exec("INSERT INTO `it_chart_data_rows` (`region`, `amount`) VALUES (?, ?)", "East", 100).Error
+	assert.NoError(t, err)
+
+	err = testDB.Exec("DROP TABLE data_perm_row").Error
+	assert.NoError(t, err)
+
+	limit := 10
+	dataResp, err := svc.QueryDataWithPermission(&chart.ChartDataRequest{ID: view.ID, ResultCount: &limit}, 40003)
+	assert.Nil(t, dataResp)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to build row permission where clause")
+
+	_ = testDB.AutoMigrate(&permission.DataPermRow{})
+}
+
+func TestChartServiceIntegration_QueryDataWithPermission_ReturnsColumnPermissionErrors(t *testing.T) {
+	ensureChartServiceTables(t)
+	clearChartServiceTables(t)
+	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+	_ = testDB.AutoMigrate(&permission.DataPermColumn{})
+
+	chartRepo := repository.NewChartRepository(testDB)
+	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
+	svc := NewChartService(chartRepo)
+	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo))
+
+	tableName := "it_chart_data_rows"
+	err := testDB.Create(&dataset.CoreDatasetTable{Name: chartSvcStringPtr("it_chart_column_error"), DatasetGroupID: 9601, PhysicalTable: &tableName}).Error
+	assert.NoError(t, err)
+
+	var dsTable dataset.CoreDatasetTable
+	err = testDB.Where("dataset_group_id = ?", 9601).First(&dsTable).Error
+	assert.NoError(t, err)
+
+	err = testDB.Create(&chart.CoreChartView{Title: chartSvcStringPtr("Sales by Region Column Error"), TableID: &dsTable.ID, Type: chartSvcStringPtr("bar")}).Error
+	assert.NoError(t, err)
+	var view chart.CoreChartView
+	err = testDB.Where("title = ?", "Sales by Region Column Error").First(&view).Error
+	assert.NoError(t, err)
+
+	err = testDB.Exec("INSERT INTO `it_chart_data_rows` (`region`, `amount`) VALUES (?, ?)", "East", 100).Error
+	assert.NoError(t, err)
+
+	err = testDB.Exec("DROP TABLE data_perm_column").Error
+	assert.NoError(t, err)
+
+	limit := 10
+	dataResp, err := svc.QueryDataWithPermission(&chart.ChartDataRequest{ID: view.ID, ResultCount: &limit}, 40004)
+	assert.Nil(t, dataResp)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to load disabled columns")
+
+	_ = testDB.AutoMigrate(&permission.DataPermColumn{})
+}
+
 func chartSvcStringPtr(v string) *string {
 	return &v
 }

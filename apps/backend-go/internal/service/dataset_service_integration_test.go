@@ -703,6 +703,85 @@ func TestDatasetServiceIntegration_PreviewWithPermission_DeniesUnauthorizedDatas
 	assert.NoError(t, err)
 }
 
+func TestDatasetServiceIntegration_PreviewWithPermission_ReturnsRowPermissionErrors(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &chart.CoreChartView{}, &permission.DataPermRow{}, &permission.DataPermColumn{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_preview_perm_error_ds").Error
+	err := testDB.Exec("CREATE TABLE it_preview_perm_error_ds (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64))").Error
+	assert.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_preview_perm_error_ds (region) VALUES ('East')").Error
+	assert.NoError(t, err)
+
+	repo := repository.NewDatasetRepository(testDB)
+	group, err := NewDatasetService(repo).Save(&dataset.WriteRequest{Name: "PreviewPermErrorDS", NodeType: "dataset"})
+	assert.NoError(t, err)
+
+	table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_preview_perm_error_ds")}
+	err = testDB.Create(table).Error
+	assert.NoError(t, err)
+	field := &dataset.CoreDatasetTableField{DatasetGroupID: group.ID, DatasetTableID: &table.ID, OriginName: dsSvcStrPtr("region"), Name: dsSvcStrPtr("region")}
+	err = testDB.Create(field).Error
+	assert.NoError(t, err)
+
+	rowSvc := NewRowPermissionService(repository.NewRowPermissionRepository(testDB), repository.NewColumnPermissionRepository(testDB), nil, nil)
+	rowSvc.SetDatasetFieldResolver(repo)
+	permSvc := NewDatasetServiceWithPermission(repo, rowSvc)
+
+	err = testDB.Exec("DROP TABLE data_perm_row").Error
+	assert.NoError(t, err)
+
+	preview, err := permSvc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: group.ID, Limit: 10}, 30004)
+	assert.Nil(t, preview)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to build row permission where clause")
+
+	err = testDB.Exec("DROP TABLE IF EXISTS it_preview_perm_error_ds").Error
+	assert.NoError(t, err)
+	_ = testDB.AutoMigrate(&permission.DataPermRow{})
+}
+
+func TestDatasetServiceIntegration_PreviewWithPermission_ReturnsColumnPermissionErrors(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &chart.CoreChartView{}, &permission.DataPermRow{}, &permission.DataPermColumn{})
+	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
+	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
+	_ = testDB.Exec("DROP TABLE IF EXISTS it_preview_column_error_ds").Error
+	err := testDB.Exec("CREATE TABLE it_preview_column_error_ds (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64))").Error
+	assert.NoError(t, err)
+	err = testDB.Exec("INSERT INTO it_preview_column_error_ds (region) VALUES ('East')").Error
+	assert.NoError(t, err)
+
+	repo := repository.NewDatasetRepository(testDB)
+	group, err := NewDatasetService(repo).Save(&dataset.WriteRequest{Name: "PreviewColumnErrorDS", NodeType: "dataset"})
+	assert.NoError(t, err)
+
+	table := &dataset.CoreDatasetTable{DatasetGroupID: group.ID, PhysicalTable: dsSvcStrPtr("it_preview_column_error_ds")}
+	err = testDB.Create(table).Error
+	assert.NoError(t, err)
+
+	rowSvc := NewRowPermissionService(repository.NewRowPermissionRepository(testDB), repository.NewColumnPermissionRepository(testDB), nil, nil)
+	rowSvc.SetDatasetFieldResolver(repo)
+	permSvc := NewDatasetServiceWithPermission(repo, rowSvc)
+
+	err = testDB.Exec("DROP TABLE data_perm_column").Error
+	assert.NoError(t, err)
+
+	preview, err := permSvc.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: group.ID, Limit: 10}, 30005)
+	assert.Nil(t, preview)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to load disabled columns")
+
+	err = testDB.Exec("DROP TABLE IF EXISTS it_preview_column_error_ds").Error
+	assert.NoError(t, err)
+	_ = testDB.AutoMigrate(&permission.DataPermColumn{})
+}
+
 func TestDatasetServiceIntegration_Save_UpdateExisting(t *testing.T) {
 	cleanupTables(&dataset.CoreDatasetGroup{})
 	repo := repository.NewDatasetRepository(testDB)

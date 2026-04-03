@@ -195,8 +195,14 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 	var whereArgs []interface{}
 
 	if s.rowPermissionService != nil {
-		selectColumns, _ = s.rowPermissionService.BuildSelectColumns(req.DatasetGroupID, userID)
-		whereResult, _ := s.rowPermissionService.BuildWhereClause(req.DatasetGroupID, userID)
+		selectColumns, err = s.rowPermissionService.BuildSelectColumns(req.DatasetGroupID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build row permission select columns: %w", err)
+		}
+		whereResult, err := s.rowPermissionService.BuildWhereClause(req.DatasetGroupID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build row permission where clause: %w", err)
+		}
 		if whereResult != nil {
 			whereClause = whereResult.Clause
 			whereArgs = whereResult.Args
@@ -209,8 +215,14 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 	}
 	if s.rowPermissionService != nil && s.rowPermissionService.columnPermRepo != nil {
 		columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
-		disabledColumns, _ := columnSvc.GetDisabledColumns(req.DatasetGroupID)
-		maskRules, _ := columnSvc.GetMaskRules(req.DatasetGroupID)
+		disabledColumns, err := columnSvc.GetDisabledColumns(req.DatasetGroupID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load disabled columns: %w", err)
+		}
+		maskRules, err := columnSvc.GetMaskRules(req.DatasetGroupID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load mask rules: %w", err)
+		}
 		for i := range rows {
 			rows[i] = columnSvc.FilterDisabledColumns(rows[i], disabledColumns)
 			rows[i] = columnSvc.MaskRowData(rows[i], maskRules)
