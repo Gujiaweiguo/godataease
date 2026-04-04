@@ -96,8 +96,8 @@ func (s *DataPermissionAdminService) RowPermissionPage(datasetID int64, page, si
 }
 
 func (s *DataPermissionAdminService) RowPermissionPageByTarget(datasetID int64, targetType string, targetID int64, page, size int) (*DataPermissionPage, error) {
-	if targetType != permission.AuthTargetTypeRole && targetType != permission.AuthTargetTypeUser {
-		return nil, fmt.Errorf("targetType %s is not supported", targetType)
+	if !isSupportedRowPermissionTargetType(targetType) {
+		return nil, unsupportedRowPermissionTargetTypeError("targetType", targetType)
 	}
 	if targetID <= 0 {
 		return nil, fmt.Errorf("targetId is required")
@@ -148,8 +148,8 @@ func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm) e
 	if req.TargetID <= 0 {
 		return fmt.Errorf("targetId is required")
 	}
-	if req.FilterType != permission.AuthTargetTypeUser && req.FilterType != permission.AuthTargetTypeRole {
-		return fmt.Errorf("filterType %s is not supported", req.FilterType)
+	if !isSupportedRowPermissionTargetType(req.FilterType) {
+		return unsupportedRowPermissionTargetTypeError("filterType", req.FilterType)
 	}
 	if strings.TrimSpace(req.FilterField) == "" {
 		return fmt.Errorf("filterField is required")
@@ -202,6 +202,17 @@ func (s *DataPermissionAdminService) DeleteRowPermission(id int64) error {
 		return fmt.Errorf("id is required")
 	}
 	return s.rowStore.Delete(id)
+}
+
+func isSupportedRowPermissionTargetType(targetType string) bool {
+	return targetType == permission.AuthTargetTypeUser || targetType == permission.AuthTargetTypeRole
+}
+
+func unsupportedRowPermissionTargetTypeError(fieldName, targetType string) error {
+	if strings.EqualFold(targetType, "sysParams") {
+		return fmt.Errorf("%s sysParams is deferred and not supported in permission center", fieldName)
+	}
+	return fmt.Errorf("%s %s is not supported", fieldName, targetType)
 }
 
 func (s *DataPermissionAdminService) ColumnPermissionPage(datasetID int64, page, size int) (*DataPermissionPage, error) {

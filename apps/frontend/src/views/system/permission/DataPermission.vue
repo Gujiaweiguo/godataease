@@ -243,7 +243,7 @@ const getFilterTypeName = (type: string) => {
   const map: Record<string, string> = {
     role: '按角色',
     user: '按用户',
-    variable: '按系统变量'
+    variable: '按系统变量（暂不支持编辑）'
   }
   return map[type] || type
 }
@@ -351,6 +351,10 @@ const handleAddRule = () => {
 }
 
 const handleEditRowRule = (row: any) => {
+	if (row.filterType === 'variable') {
+		ElMessage.warning('系统变量行权限暂不支持在权限中心编辑，请使用原有变量配置入口维护')
+		return
+	}
   if (isRowRoleMode.value && row.filterType !== 'role') {
     ElMessage.warning('当前角色视角仅支持编辑角色行权限规则')
     return
