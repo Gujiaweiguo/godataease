@@ -92,8 +92,15 @@ test('data permission tab should load row and column pager endpoints for a datas
   await page.locator('.data-permission .el-select').click()
   await page.locator('.el-select-dropdown__item').filter({ hasText: dataset.name }).first().click()
 
-  await rowPagerResponse
-  await columnPagerResponse
+	await rowPagerResponse
+	await columnPagerResponse
 
-  await expect(page.locator('.data-permission .permission-tabs')).toBeVisible({ timeout: 10000 })
+	await expect(page.locator('.data-permission .permission-tabs')).toBeVisible({ timeout: 10000 })
+
+	await page.getByRole('button', { name: '添加规则' }).click()
+	await expect(page.locator('.el-dialog')).toContainText('添加行权限规则')
+	await page.locator('.el-dialog .el-select').nth(0).click()
+	await expect(page.locator('.el-select-dropdown__item').filter({ hasText: '按角色' })).toBeVisible()
+	await expect(page.locator('.el-select-dropdown__item').filter({ hasText: '按用户' })).toBeVisible()
+	await expect(page.locator('.el-select-dropdown__item').filter({ hasText: '按系统变量' })).toHaveCount(0)
 })
