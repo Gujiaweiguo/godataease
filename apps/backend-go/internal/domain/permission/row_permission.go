@@ -70,8 +70,7 @@ type RowPermissionDTO struct {
 	// ID 权限规则ID
 	ID int64 `json:"id"`
 	// DatasetID 数据集ID
-	DatasetID int64 `json:"datasetId"`
-	// AuthTargetType 授权目标类型: user, role, sysParams
+	DatasetID      int64  `json:"datasetId"`
 	AuthTargetType string `json:"authTargetType"`
 	// AuthTargetID 授权目标ID
 	AuthTargetID int64 `json:"authTargetId"`
@@ -79,12 +78,9 @@ type RowPermissionDTO struct {
 	Enable bool `json:"enable"`
 	// ExpressionTree 表达式树JSON
 	ExpressionTree string `json:"expressionTree"`
-	// WhiteListUser 白名单用户ID列表JSON
-	WhiteListUser string `json:"whiteListUser"`
-	// WhiteListRole 白名单角色ID列表JSON
-	WhiteListRole string `json:"whiteListRole"`
-	// WhiteListDept 白名单部门ID列表JSON
-	WhiteListDept string `json:"whiteListDept"`
+	WhiteListUser  string `json:"whiteListUser"`
+	WhiteListRole  string `json:"whiteListRole"`
+	WhiteListDept  string `json:"whiteListDept"`
 	// Tree 解析后的权限树
 	Tree *RowPermissionTree `json:"tree,omitempty"`
 }

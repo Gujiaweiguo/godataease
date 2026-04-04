@@ -156,3 +156,31 @@ func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsUnsupportedTarge
 		t.Fatalf("expected informative unsupported target type message, got %#v", resp["msg"])
 	}
 }
+
+func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsSysParamsTargetType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}))
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterDataPermissionRoutes(api, h)
+
+	req := httptest.NewRequest("GET", "/api/dataset/rowPermissions/pagerByTarget/9/sysParams/7/1/10", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["code"] != "500000" {
+		t.Fatalf("expected code 500000, got %#v", resp["code"])
+	}
+	if msg, _ := resp["msg"].(string); msg != "Failed: targetType sysParams is deferred and not supported in permission center" {
+		t.Fatalf("unexpected sysParams message: %#v", resp["msg"])
+	}
+}
