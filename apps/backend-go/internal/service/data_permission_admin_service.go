@@ -155,7 +155,7 @@ func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm) e
 		return fmt.Errorf("filterField is required")
 	}
 	if len(req.WhiteList) > 0 {
-		return fmt.Errorf("whiteList is not supported in T8")
+		return fmt.Errorf("whiteList is deferred and not supported in permission center")
 	}
 
 	_, fieldsByName, err := s.datasetFieldMaps(req.DatasetID)

@@ -89,6 +89,32 @@ test('data permission tab should load row and column pager endpoints for a datas
     response => response.url().includes(`/dataset/columnPermissions/pager/${dataset.id}/1/100`) && response.status() === 200
   )
 
+  await page.route(`**/dataset/rowPermissions/pager/${dataset.id}/1/100`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '000000',
+        msg: 'success',
+        data: {
+          list: [
+            {
+              id: 999001,
+              name: '历史变量规则',
+              filterType: 'variable',
+              targetId: 1,
+              filterField: 'region',
+              filterValue: 'east'
+            }
+          ],
+          total: 1,
+          current: 1,
+          size: 100
+        }
+      })
+    })
+  })
+
   await page.locator('.data-permission .el-select').click()
   await page.locator('.el-select-dropdown__item').filter({ hasText: dataset.name }).first().click()
 
@@ -103,4 +129,9 @@ test('data permission tab should load row and column pager endpoints for a datas
 	await expect(page.locator('.el-select-dropdown__item').filter({ hasText: '按角色' })).toBeVisible()
 	await expect(page.locator('.el-select-dropdown__item').filter({ hasText: '按用户' })).toBeVisible()
 	await expect(page.locator('.el-select-dropdown__item').filter({ hasText: '按系统变量' })).toHaveCount(0)
+	await page.getByRole('button', { name: '取消' }).click()
+
+	await page.getByRole('button', { name: '编辑' }).first().click()
+	await expect(page.locator('.el-message')).toContainText('系统变量行权限暂不支持在权限中心编辑')
+	await expect(page.locator('.el-dialog')).toHaveCount(0)
 })

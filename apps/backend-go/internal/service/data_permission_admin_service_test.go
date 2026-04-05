@@ -306,7 +306,7 @@ func TestDataPermissionAdminService_SaveRowPermission_Validation(t *testing.T) {
 	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: "sysParams", FilterField: "region"}); err == nil || err.Error() != "filterType sysParams is deferred and not supported in permission center" {
 		t.Fatalf("unexpected sysParams validation error: %v", err)
 	}
-	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "region", WhiteList: []int64{2}}); err == nil || err.Error() != "whiteList is not supported in T8" {
+	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "region", WhiteList: []int64{2}}); err == nil || err.Error() != "whiteList is deferred and not supported in permission center" {
 		t.Fatalf("unexpected whiteList validation error: %v", err)
 	}
 	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "   "}); err == nil || err.Error() != "filterField is required" {
