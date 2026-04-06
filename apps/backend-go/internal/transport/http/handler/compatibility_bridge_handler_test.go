@@ -49,7 +49,8 @@ type bridgeFieldListResp struct {
 }
 
 type mockBridgeResourcePermRepo struct {
-	hasPermission bool
+	hasPermission         bool
+	governedPermissionIDs map[int64][]int64
 }
 
 func (m *mockBridgeResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, error) {
@@ -107,7 +108,14 @@ func (m *mockBridgeResourcePermRepo) ReplaceResourcePermissions(resourceID int64
 	return nil
 }
 func (m *mockBridgeResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
-	return nil, false, nil
+	if m.governedPermissionIDs == nil {
+		return nil, false, nil
+	}
+	permIDs, exists := m.governedPermissionIDs[resourceID]
+	if !exists {
+		return nil, false, nil
+	}
+	return permIDs, true, nil
 }
 func (m *mockBridgeResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
@@ -1252,5 +1260,218 @@ func TestCompatibilityBridge_DatasetDetailWithPerm_403_Forbidden(t *testing.T) {
 
 	if w.Code != 403 {
 		t.Fatalf("expected 403 for forbidden detailWithPerm, got %d", w.Code)
+	}
+}
+
+func TestCompatibilityBridge_DatasetDetailWithPerm_400_MissingDatasetContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: false}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, &DatasetHandler{}, nil, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/datasetTree/detailWithPerm", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing row-permission dataset context, got %d", w.Code)
+	}
+
+	var resp bridgeCodeResp
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "10001" {
+		t.Fatalf("expected business code 10001 for missing row-permission dataset context, got %s", resp.Code)
+	}
+}
+
+func TestCompatibilityBridge_DatasetDetailWithPerm_UsesPermissionAwareFieldsAndPreview(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err = db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &permission.DataPermRow{}, &permission.DataPermColumn{}); err != nil {
+		t.Fatalf("migrate dataset detail tables failed: %v", err)
+	}
+
+	previewTable := "dataset_detail_perm"
+	if err = db.Create(&dataset.CoreDatasetGroup{ID: 11, Name: "Sales"}).Error; err != nil {
+		t.Fatalf("create dataset group failed: %v", err)
+	}
+	if err = db.Create(&dataset.CoreDatasetTable{ID: 111, DatasetGroupID: 11, PhysicalTable: &previewTable}).Error; err != nil {
+		t.Fatalf("create dataset table failed: %v", err)
+	}
+	if err = db.Exec("CREATE TABLE dataset_detail_perm (region TEXT, amount INTEGER)").Error; err != nil {
+		t.Fatalf("create preview table failed: %v", err)
+	}
+	if err = db.Exec("INSERT INTO dataset_detail_perm (region, amount) VALUES ('north', 10)").Error; err != nil {
+		t.Fatalf("insert preview row failed: %v", err)
+	}
+
+	checked := true
+	groupD := "d"
+	groupQ := "q"
+	varcharType := "VARCHAR"
+	intType := "INT"
+	region := "region"
+	amount := "amount"
+	deTypeD := 0
+	deTypeQ := 2
+	if err = db.Create(&dataset.CoreDatasetTableField{ID: 1, DatasetGroupID: 11, Name: &region, OriginName: &region, DataeaseName: &region, GroupType: &groupD, Type: &varcharType, DeType: &deTypeD, Checked: &checked}).Error; err != nil {
+		t.Fatalf("create region field failed: %v", err)
+	}
+	if err = db.Create(&dataset.CoreDatasetTableField{ID: 2, DatasetGroupID: 11, Name: &amount, OriginName: &amount, DataeaseName: &amount, GroupType: &groupQ, Type: &intType, DeType: &deTypeQ, Checked: &checked}).Error; err != nil {
+		t.Fatalf("create amount field failed: %v", err)
+	}
+	if err = db.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "amount", PermType: permission.PermTypeDisable, Status: 1}).Error; err != nil {
+		t.Fatalf("create disable permission failed: %v", err)
+	}
+	if err = db.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}).Error; err != nil {
+		t.Fatalf("create mask permission failed: %v", err)
+	}
+
+	datasetRepo := repository.NewDatasetRepository(db)
+	rowPermRepo := repository.NewRowPermissionRepository(db)
+	columnPermRepo := repository.NewColumnPermissionRepository(db)
+	rowPermSvc := service.NewRowPermissionService(rowPermRepo, columnPermRepo, nil, middleware.NewDefaultAdminChecker([]int64{}))
+	rowPermSvc.SetDatasetFieldResolver(datasetRepo)
+	datasetSvc := service.NewDatasetServiceWithPermission(datasetRepo, rowPermSvc)
+	datasetHandler := NewDatasetHandler(datasetSvc)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(42))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, datasetHandler, nil, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/datasetTree/detailWithPerm", strings.NewReader(`[11]`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string                   `json:"code"`
+		Data []map[string]interface{} `json:"data"`
+	}
+	if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "000000" {
+		t.Fatalf("expected success code 000000, got %s", resp.Code)
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected single dataset detail, got %#v", resp.Data)
+	}
+
+	detail := resp.Data[0]
+	fields, ok := detail["fields"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected fields object in detail, got %#v", detail["fields"])
+	}
+	dimensions, ok := fields["dimensionList"].([]interface{})
+	if !ok || len(dimensions) != 1 {
+		t.Fatalf("expected one dimension field, got %#v", fields["dimensionList"])
+	}
+	quotas, ok := fields["quotaList"].([]interface{})
+	if !ok || len(quotas) != 1 {
+		t.Fatalf("expected one quota field (count pseudo field), got %#v", fields["quotaList"])
+	}
+
+	dimension, ok := dimensions[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected dimension field object, got %#v", dimensions[0])
+	}
+	if dimension["originName"] != "region" {
+		t.Fatalf("expected region dimension field, got %#v", dimension)
+	}
+	if desensitized, ok := dimension["desensitized"].(bool); !ok || !desensitized {
+		t.Fatalf("expected region dimension field to be desensitized, got %#v", dimension)
+	}
+
+	quota, ok := quotas[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected quota field object, got %#v", quotas[0])
+	}
+	if quota["id"] != float64(-1) {
+		t.Fatalf("expected count pseudo field to remain after permission filtering, got %#v", quota)
+	}
+
+	dataSection, ok := detail["data"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected preview data section, got %#v", detail["data"])
+	}
+	rows, ok := dataSection["data"].([]interface{})
+	if !ok || len(rows) != 1 {
+		t.Fatalf("expected one preview row, got %#v", dataSection["data"])
+	}
+	row, ok := rows[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected row object, got %#v", rows[0])
+	}
+	if _, exists := row["amount"]; exists {
+		t.Fatalf("expected disabled amount column to be removed, got %#v", row)
+	}
+	if row["region"] == "north" {
+		t.Fatalf("expected masked region value in preview row, got %#v", row)
+	}
+}
+
+func TestCompatibilityBridge_DatasetDetailWithPerm_403_WhenBatchContainsForbiddenDataset(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{
+		hasPermission: true,
+		governedPermissionIDs: map[int64][]int64{
+			11: {1},
+			12: {},
+		},
+	}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(42))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, &DatasetHandler{}, nil, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/datasetTree/detailWithPerm", strings.NewReader(`[11,12]`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 when batch contains forbidden dataset, got %d", w.Code)
 	}
 }

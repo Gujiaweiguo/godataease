@@ -198,6 +198,38 @@ func TestExtractResourceID_FromJSONBody_DatasetId(t *testing.T) {
 	}
 }
 
+func TestExtractResourceID_FromJSONBody_Array(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.POST("/datasetTree/detailWithPerm", func(c *gin.Context) {
+		id, err := extractResourceID(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"id": id})
+	})
+
+	req := httptest.NewRequest("POST", "/datasetTree/detailWithPerm", strings.NewReader(`[67890,67891]`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+
+	if id, ok := resp["id"].(float64); !ok || int64(id) != 67890 {
+		t.Errorf("expected id 67890, got %v", resp["id"])
+	}
+}
+
 func TestExtractResourceID_Missing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
