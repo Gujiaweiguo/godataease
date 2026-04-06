@@ -242,69 +242,93 @@ func extractResourceID(c *gin.Context) (int64, error) {
 }
 
 func extractResourceIDs(c *gin.Context) ([]int64, error) {
-	if id := c.Param("id"); id != "" {
-		resourceID, err := parseResourceID(id)
-		if err != nil {
-			return nil, err
-		}
-		return []int64{resourceID}, nil
+	if resourceIDs, ok, err := extractResourceIDsFromRequestLine(c); ok || err != nil {
+		return resourceIDs, err
 	}
 
-	if id := c.Query("resourceId"); id != "" {
-		resourceID, err := parseResourceID(id)
-		if err != nil {
-			return nil, err
-		}
-		return []int64{resourceID}, nil
+	resourceIDs, err := extractResourceIDsFromBody(c)
+	if err != nil {
+		return nil, err
 	}
-
-	if id := c.Query("id"); id != "" {
-		resourceID, err := parseResourceID(id)
-		if err != nil {
-			return nil, err
-		}
-		return []int64{resourceID}, nil
-	}
-
-	resourceIDs := make([]int64, 0, 4)
-	var payload map[string]interface{}
-	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err == nil {
-		for _, key := range []string{"id", "resourceId", "datasetGroupId", "datasetId"} {
-			if v, ok := payload[key]; ok {
-				resourceID, parseErr := parseResourceIDFromAny(v)
-				if parseErr != nil {
-					return nil, parseErr
-				}
-				resourceIDs = append(resourceIDs, resourceID)
-			}
-		}
-		if values, ok := payload["ids"].([]interface{}); ok {
-			for _, v := range values {
-				resourceID, parseErr := parseResourceIDFromAny(v)
-				if parseErr != nil {
-					return nil, parseErr
-				}
-				resourceIDs = append(resourceIDs, resourceID)
-			}
-		}
-	}
-
-	var payloadList []interface{}
-	if err := c.ShouldBindBodyWith(&payloadList, binding.JSON); err == nil {
-		for _, v := range payloadList {
-			resourceID, parseErr := parseResourceIDFromAny(v)
-			if parseErr != nil {
-				return nil, parseErr
-			}
-			resourceIDs = append(resourceIDs, resourceID)
-		}
-	}
-
 	resourceIDs = uniqueInt64(resourceIDs)
 	if len(resourceIDs) == 0 {
 		return nil, fmt.Errorf("resource id is required")
 	}
 
+	return resourceIDs, nil
+}
+
+func extractResourceIDsFromRequestLine(c *gin.Context) ([]int64, bool, error) {
+	for _, rawID := range []string{c.Param("id"), c.Query("resourceId"), c.Query("id")} {
+		if rawID == "" {
+			continue
+		}
+		resourceID, err := parseResourceID(rawID)
+		if err != nil {
+			return nil, true, err
+		}
+		return []int64{resourceID}, true, nil
+	}
+	return nil, false, nil
+}
+
+func extractResourceIDsFromBody(c *gin.Context) ([]int64, error) {
+	resourceIDs := make([]int64, 0, 4)
+
+	var payload map[string]interface{}
+	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err == nil {
+		ids, parseErr := collectResourceIDsFromObject(payload)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		resourceIDs = append(resourceIDs, ids...)
+	}
+
+	var payloadList []interface{}
+	if err := c.ShouldBindBodyWith(&payloadList, binding.JSON); err == nil {
+		ids, parseErr := collectResourceIDsFromList(payloadList)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		resourceIDs = append(resourceIDs, ids...)
+	}
+
+	return resourceIDs, nil
+}
+
+func collectResourceIDsFromObject(payload map[string]interface{}) ([]int64, error) {
+	resourceIDs := make([]int64, 0, 4)
+	for _, key := range []string{"id", "resourceId", "datasetGroupId", "datasetId"} {
+		if value, ok := payload[key]; ok {
+			resourceID, err := parseResourceIDFromAny(value)
+			if err != nil {
+				return nil, err
+			}
+			resourceIDs = append(resourceIDs, resourceID)
+		}
+	}
+
+	values, ok := payload["ids"].([]interface{})
+	if !ok {
+		return resourceIDs, nil
+	}
+
+	ids, err := collectResourceIDsFromList(values)
+	if err != nil {
+		return nil, err
+	}
+	return append(resourceIDs, ids...), nil
+}
+
+func collectResourceIDsFromList(values []interface{}) ([]int64, error) {
+	resourceIDs := make([]int64, 0, len(values))
+	for _, value := range values {
+		resourceID, err := parseResourceIDFromAny(value)
+		if err != nil {
+			return nil, err
+		}
+		resourceIDs = append(resourceIDs, resourceID)
+	}
 	return resourceIDs, nil
 }
 
