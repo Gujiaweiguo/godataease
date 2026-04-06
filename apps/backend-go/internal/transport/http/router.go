@@ -662,7 +662,7 @@ func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
 		datasetGroup.POST("/fields", r.datasetHandler.Fields)
 		datasetGroup.POST("/preview", r.datasetHandler.Preview)
 		if r.permMiddleware != nil {
-			datasetGroup.POST("/previewWithPerm", r.permMiddleware.CheckDatasetView(), r.datasetHandler.PreviewWithPermission)
+			datasetGroup.POST("/previewWithPerm", r.permMiddleware.CheckDatasetView(), middleware.RowPermissionMiddleware(), r.datasetHandler.PreviewWithPermission)
 		} else {
 			datasetGroup.POST("/previewWithPerm", r.datasetHandler.PreviewWithPermission)
 		}

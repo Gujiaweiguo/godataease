@@ -17,6 +17,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // RegisterCompatibilityBridgeRoutes registers Java-era API compatibility routes.
@@ -520,9 +521,18 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				if !ok {
 					return
 				}
+				userID := int64(middleware.GetUserID(c))
 				result := make([]gin.H, 0, len(ids))
 				for _, id := range ids {
-					detail, err := buildDatasetDetail(datasetHandler, id)
+					var (
+						detail gin.H
+						err    error
+					)
+					if userID > 0 {
+						detail, err = buildDatasetDetailWithPermission(datasetHandler, id, userID)
+					} else {
+						detail, err = buildDatasetDetail(datasetHandler, id)
+					}
 					if err != nil {
 						continue
 					}
@@ -531,7 +541,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, result)
 			}
 			if permMiddleware != nil {
-				datasetTreeGroup.POST("/detailWithPerm", permMiddleware.CheckDatasetView(), detailWithPermHandler)
+				datasetTreeGroup.POST("/detailWithPerm", permMiddleware.CheckDatasetBatchView(), middleware.RowPermissionMiddleware(), detailWithPermHandler)
 			} else {
 				datasetTreeGroup.POST("/detailWithPerm", detailWithPermHandler)
 			}
@@ -1387,9 +1397,55 @@ func buildDatasetDetail(h *DatasetHandler, datasetGroupID int64) (gin.H, error) 
 	}, nil
 }
 
+func buildDatasetDetailWithPermission(h *DatasetHandler, datasetGroupID int64, userID int64) (gin.H, error) {
+	fields, err := h.service.FieldsWithPermission(datasetGroupID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	previewData := make([]map[string]interface{}, 0)
+	total := int64(0)
+	preview, err := h.service.PreviewWithPermission(&dataset.PreviewRequest{DatasetGroupID: datasetGroupID, Limit: 100}, userID)
+	if err == nil {
+		previewData = preview.Rows
+		total = preview.Total
+	}
+
+	allFields := flattenChartFieldList(fields)
+
+	return gin.H{
+		"id":            datasetGroupID,
+		"allFields":     allFields,
+		"dimensionList": fields.DimensionList,
+		"quotaList":     fields.QuotaList,
+		"fields": gin.H{
+			"dimensionList": fields.DimensionList,
+			"quotaList":     fields.QuotaList,
+		},
+		"data": gin.H{
+			"fields": allFields,
+			"data":   previewData,
+		},
+		"total":   total,
+		"union":   []gin.H{},
+		"isCross": false,
+	}, nil
+}
+
 func parseDatasetIDs(c *gin.Context) ([]int64, bool) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	err := c.ShouldBindBodyWith(&body, binding.JSON)
+	if err != nil && !errors.Is(err, io.EOF) {
+		var bodyList []interface{}
+		if listErr := c.ShouldBindBodyWith(&bodyList, binding.JSON); listErr == nil {
+			ids := make([]int64, 0, len(bodyList))
+			for _, item := range bodyList {
+				if id, ok := parseInt64Value(item); ok {
+					ids = append(ids, id)
+				}
+			}
+			return dedupeDatasetIDs(ids), true
+		}
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return nil, false
 	}
@@ -1412,9 +1468,16 @@ func parseDatasetIDs(c *gin.Context) ([]int64, bool) {
 		return []int64{}, true
 	}
 
+	return dedupeDatasetIDs(ids), true
+}
+
+func dedupeDatasetIDs(ids []int64) []int64 {
 	uniq := make(map[int64]struct{}, len(ids))
 	result := make([]int64, 0, len(ids))
 	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
 		if _, ok := uniq[id]; ok {
 			continue
 		}
@@ -1422,7 +1485,7 @@ func parseDatasetIDs(c *gin.Context) ([]int64, bool) {
 		result = append(result, id)
 	}
 
-	return result, true
+	return result
 }
 
 func parseEnumValueRequest(c *gin.Context) (*dataset.EnumValueRequest, bool) {

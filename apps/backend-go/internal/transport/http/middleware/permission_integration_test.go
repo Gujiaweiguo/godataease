@@ -3,6 +3,7 @@ package middleware
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -211,6 +212,176 @@ func TestDatasetPreviewWithPerm_200_AdminBypass(t *testing.T) {
 
 	if w.Code != 200 {
 		t.Errorf("expected 200 for admin bypass, got %d", w.Code)
+	}
+}
+
+func TestDatasetPreviewWithPerm_RowPermissionContextEstablished(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataset/previewWithPerm", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}, permMiddleware.CheckDatasetView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"datasetId":  GetRowPermissionDatasetID(c),
+			"datasetIds": GetRowPermissionDatasetIDs(c),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataset/previewWithPerm", strings.NewReader(`{"datasetGroupId":789}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized row-permission request, got %d", w.Code)
+	}
+
+	var resp struct {
+		DatasetID  int64   `json:"datasetId"`
+		DatasetIDs []int64 `json:"datasetIds"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.DatasetID != 789 {
+		t.Fatalf("expected row-permission dataset id 789, got %d", resp.DatasetID)
+	}
+	if !reflect.DeepEqual(resp.DatasetIDs, []int64{789}) {
+		t.Fatalf("expected row-permission dataset ids [789], got %#v", resp.DatasetIDs)
+	}
+}
+
+func TestDatasetPreviewWithPerm_RowPermissionMiddlewareFailsClosedWithoutDatasetID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataset/previewWithPerm", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckDatasetView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataset/previewWithPerm", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing row-permission context, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["code"] != "10001" {
+		t.Fatalf("expected business code 10001 for missing row-permission context, got %#v", resp["code"])
+	}
+}
+
+func TestDatasetTreeDetailWithPerm_RowPermissionMiddlewareSupportsBatchIDs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/datasetTree/detailWithPerm", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckDatasetView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"datasetId":  GetRowPermissionDatasetID(c),
+			"datasetIds": GetRowPermissionDatasetIDs(c),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/datasetTree/detailWithPerm", strings.NewReader(`{"ids":[321,322,321]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for batch row-permission context, got %d", w.Code)
+	}
+
+	var resp struct {
+		DatasetID  int64   `json:"datasetId"`
+		DatasetIDs []int64 `json:"datasetIds"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.DatasetID != 321 {
+		t.Fatalf("expected first row-permission dataset id 321, got %d", resp.DatasetID)
+	}
+	if !reflect.DeepEqual(resp.DatasetIDs, []int64{321, 322}) {
+		t.Fatalf("expected row-permission dataset ids [321 322], got %#v", resp.DatasetIDs)
+	}
+}
+
+func TestDatasetTreeDetailWithPerm_RowPermissionMiddlewareSupportsRawArrayBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/datasetTree/detailWithPerm", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckDatasetView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"datasetId":  GetRowPermissionDatasetID(c),
+			"datasetIds": GetRowPermissionDatasetIDs(c),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/datasetTree/detailWithPerm", strings.NewReader(`[901,902,901]`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for raw-array row-permission context, got %d", w.Code)
+	}
+
+	var resp struct {
+		DatasetID  int64   `json:"datasetId"`
+		DatasetIDs []int64 `json:"datasetIds"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.DatasetID != 901 {
+		t.Fatalf("expected first row-permission dataset id 901, got %d", resp.DatasetID)
+	}
+	if !reflect.DeepEqual(resp.DatasetIDs, []int64{901, 902}) {
+		t.Fatalf("expected row-permission dataset ids [901 902], got %#v", resp.DatasetIDs)
 	}
 }
 

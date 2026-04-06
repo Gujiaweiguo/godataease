@@ -19,6 +19,7 @@ const (
 	UserIDKey        = "user_id"
 	ResourceTypeKey  = "resource_type"
 	ResourceIDKey    = "resource_id"
+	ResourceIDsKey   = "resource_ids"
 	PermissionKeyKey = "permission_key"
 	DatasetIDKey     = "dataset_id"
 )
@@ -91,6 +92,10 @@ func (m *PermissionMiddleware) CheckDatasetView() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDataset, permission.PermKeyView)
 }
 
+func (m *PermissionMiddleware) CheckDatasetBatchView() gin.HandlerFunc {
+	return m.CheckBatchResourcePermission(permission.ResourceTypeDataset, permission.PermKeyView)
+}
+
 func (m *PermissionMiddleware) CheckDatasetEdit() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDataset, permission.PermKeyEdit)
 }
@@ -129,6 +134,51 @@ func (m *PermissionMiddleware) CheckDatasourceView() gin.HandlerFunc {
 
 func (m *PermissionMiddleware) CheckDatasourceEdit() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDatasource, permission.PermKeyEdit)
+}
+
+func (m *PermissionMiddleware) CheckBatchResourcePermission(resourceType, permKey string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			response.Unauthorized(c, "authentication required")
+			c.Abort()
+			return
+		}
+
+		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+			c.Next()
+			return
+		}
+
+		resourceIDs, err := extractResourceIDs(c)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			c.Abort()
+			return
+		}
+
+		for _, resourceID := range resourceIDs {
+			result := m.resourcePermSvc.CheckPermission(int64(userID), resourceType, resourceID, permKey)
+			if !result.HasPermission {
+				logger.Warn("Batch permission denied",
+					zap.Uint64("user_id", userID),
+					zap.String("resource_type", resourceType),
+					zap.Int64("resource_id", resourceID),
+					zap.String("perm_key", permKey),
+					zap.String("reason", result.Reason),
+				)
+				response.Forbidden(c, "insufficient permissions")
+				c.Abort()
+				return
+			}
+		}
+
+		c.Set(ResourceTypeKey, resourceType)
+		c.Set(ResourceIDKey, resourceIDs[0])
+		c.Set(ResourceIDsKey, resourceIDs)
+		c.Set(PermissionKeyKey, permKey)
+		c.Next()
+	}
 }
 
 func (m *PermissionMiddleware) CheckExportPermission(resourceType string) gin.HandlerFunc {
@@ -184,28 +234,118 @@ func (m *PermissionMiddleware) CheckExportPermission(resourceType string) gin.Ha
 }
 
 func extractResourceID(c *gin.Context) (int64, error) {
-	if id := c.Param("id"); id != "" {
-		return parseResourceID(id)
+	resourceIDs, err := extractResourceIDs(c)
+	if err != nil {
+		return 0, err
+	}
+	return resourceIDs[0], nil
+}
+
+func extractResourceIDs(c *gin.Context) ([]int64, error) {
+	if resourceIDs, ok, err := extractResourceIDsFromRequestLine(c); ok || err != nil {
+		return resourceIDs, err
 	}
 
-	if id := c.Query("resourceId"); id != "" {
-		return parseResourceID(id)
+	resourceIDs, err := extractResourceIDsFromBody(c)
+	if err != nil {
+		return nil, err
+	}
+	resourceIDs = uniqueInt64(resourceIDs)
+	if len(resourceIDs) == 0 {
+		return nil, fmt.Errorf("resource id is required")
 	}
 
-	if id := c.Query("id"); id != "" {
-		return parseResourceID(id)
+	return resourceIDs, nil
+}
+
+func extractResourceIDsFromRequestLine(c *gin.Context) ([]int64, bool, error) {
+	for _, rawID := range []string{c.Param("id"), c.Query("resourceId"), c.Query("id")} {
+		if rawID == "" {
+			continue
+		}
+		resourceID, err := parseResourceID(rawID)
+		if err != nil {
+			return nil, true, err
+		}
+		return []int64{resourceID}, true, nil
 	}
+	return nil, false, nil
+}
+
+func extractResourceIDsFromBody(c *gin.Context) ([]int64, error) {
+	resourceIDs := make([]int64, 0, 4)
 
 	var payload map[string]interface{}
 	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err == nil {
-		for _, key := range []string{"id", "resourceId", "datasetGroupId", "datasetId"} {
-			if v, ok := payload[key]; ok {
-				return parseResourceIDFromAny(v)
+		ids, parseErr := collectResourceIDsFromObject(payload)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		resourceIDs = append(resourceIDs, ids...)
+	}
+
+	var payloadList []interface{}
+	if err := c.ShouldBindBodyWith(&payloadList, binding.JSON); err == nil {
+		ids, parseErr := collectResourceIDsFromList(payloadList)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		resourceIDs = append(resourceIDs, ids...)
+	}
+
+	return resourceIDs, nil
+}
+
+func collectResourceIDsFromObject(payload map[string]interface{}) ([]int64, error) {
+	resourceIDs := make([]int64, 0, 4)
+	for _, key := range []string{"id", "resourceId", "datasetGroupId", "datasetId"} {
+		if value, ok := payload[key]; ok {
+			resourceID, err := parseResourceIDFromAny(value)
+			if err != nil {
+				return nil, err
 			}
+			resourceIDs = append(resourceIDs, resourceID)
 		}
 	}
 
-	return 0, fmt.Errorf("resource id is required")
+	values, ok := payload["ids"].([]interface{})
+	if !ok {
+		return resourceIDs, nil
+	}
+
+	ids, err := collectResourceIDsFromList(values)
+	if err != nil {
+		return nil, err
+	}
+	return append(resourceIDs, ids...), nil
+}
+
+func collectResourceIDsFromList(values []interface{}) ([]int64, error) {
+	resourceIDs := make([]int64, 0, len(values))
+	for _, value := range values {
+		resourceID, err := parseResourceIDFromAny(value)
+		if err != nil {
+			return nil, err
+		}
+		resourceIDs = append(resourceIDs, resourceID)
+	}
+	return resourceIDs, nil
+}
+
+func uniqueInt64(ids []int64) []int64 {
+	seen := make(map[int64]struct{}, len(ids))
+	result := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
 }
 
 func parseResourceIDFromAny(v interface{}) (int64, error) {
