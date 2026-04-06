@@ -1,11 +1,13 @@
 package middleware
 
 import (
-	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/response"
+	"errors"
+	"fmt"
+	"io"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
+	"github.com/gin-gonic/gin/binding"
 )
 
 func Permission(requiredRole string) gin.HandlerFunc {
@@ -30,17 +32,114 @@ func AdminOnly() gin.HandlerFunc {
 }
 
 const (
-	RowPermissionDatasetIDKey = "row_permission_dataset_id"
-	RowPermissionFilterKey    = "row_permission_filter"
+	RowPermissionDatasetIDKey  = "row_permission_dataset_id"
+	RowPermissionDatasetIDsKey = "row_permission_dataset_ids"
+	RowPermissionFilterKey     = "row_permission_filter"
 )
 
 func RowPermissionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		logger.Warn("RowPermissionMiddleware applied - framework in place, needs real implementation",
-			zap.String("path", c.Request.URL.Path),
-			zap.String("method", c.Request.Method),
-		)
+		userID := GetUserID(c)
+		if userID == 0 {
+			response.Unauthorized(c, "authentication required")
+			c.Abort()
+			return
+		}
 
+		datasetIDs, err := extractRowPermissionDatasetIDs(c)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			c.Abort()
+			return
+		}
+
+		c.Set(RowPermissionDatasetIDKey, datasetIDs[0])
+		c.Set(RowPermissionDatasetIDsKey, datasetIDs)
 		c.Next()
 	}
+}
+
+func extractRowPermissionDatasetIDs(c *gin.Context) ([]int64, error) {
+	ids := make([]int64, 0, 4)
+
+	if datasetID := GetDatasetID(c); datasetID > 0 {
+		ids = append(ids, datasetID)
+	}
+	if resourceID := GetResourceID(c); resourceID > 0 {
+		ids = append(ids, resourceID)
+	}
+
+	var payload map[string]interface{}
+	err := c.ShouldBindBodyWith(&payload, binding.JSON)
+	if err == nil {
+		for _, key := range []string{"id", "datasetGroupId", "datasetId"} {
+			if value, ok := payload[key]; ok {
+				id, parseErr := parseResourceIDFromAny(value)
+				if parseErr != nil {
+					return nil, fmt.Errorf("invalid dataset id")
+				}
+				ids = append(ids, id)
+			}
+		}
+
+		if values, ok := payload["ids"].([]interface{}); ok {
+			for _, value := range values {
+				id, parseErr := parseResourceIDFromAny(value)
+				if parseErr != nil {
+					return nil, fmt.Errorf("invalid dataset id")
+				}
+				ids = append(ids, id)
+			}
+		}
+	} else if !errors.Is(err, io.EOF) {
+		var payloadList []interface{}
+		if listErr := c.ShouldBindBodyWith(&payloadList, binding.JSON); listErr == nil {
+			for _, value := range payloadList {
+				id, parseErr := parseResourceIDFromAny(value)
+				if parseErr != nil {
+					return nil, fmt.Errorf("invalid dataset id")
+				}
+				ids = append(ids, id)
+			}
+		} else {
+			return nil, fmt.Errorf("invalid request: %w", err)
+		}
+	}
+
+	ids = uniquePositiveIDs(ids)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("dataset id is required")
+	}
+
+	return ids, nil
+}
+
+func uniquePositiveIDs(ids []int64) []int64 {
+	seen := make(map[int64]struct{}, len(ids))
+	result := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
+}
+
+func GetRowPermissionDatasetID(c *gin.Context) int64 {
+	if datasetID, exists := c.Get(RowPermissionDatasetIDKey); exists {
+		return datasetID.(int64)
+	}
+	return 0
+}
+
+func GetRowPermissionDatasetIDs(c *gin.Context) []int64 {
+	if datasetIDs, exists := c.Get(RowPermissionDatasetIDsKey); exists {
+		return datasetIDs.([]int64)
+	}
+	return nil
 }
