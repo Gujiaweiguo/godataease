@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	calciteintegration "dataease/backend/internal/integration/calcite"
@@ -138,6 +139,53 @@ func (s *DatasetService) GetGroupByID(id int64) (*dataset.CoreDatasetGroup, erro
 
 func (s *DatasetService) Fields(req *dataset.FieldsRequest) ([]*dataset.CoreDatasetTableField, error) {
 	return s.repo.ListFields(req.DatasetGroupID)
+}
+
+func (s *DatasetService) FieldsWithPermission(datasetGroupID int64, userID int64) (*chart.ChartFieldListResponse, error) {
+	fields, err := s.repo.ListFields(datasetGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	dimensionList := make([]chart.ChartField, 0, len(fields))
+	quotaList := make([]chart.ChartField, 0, len(fields)+1)
+	for _, field := range fields {
+		converted := convertToChartField(field)
+		if strings.EqualFold(converted.GroupType, "d") {
+			dimensionList = append(dimensionList, converted)
+			continue
+		}
+		quotaList = append(quotaList, converted)
+	}
+	quotaList = append(quotaList, countChartField(datasetGroupID))
+
+	resp := &chart.ChartFieldListResponse{
+		DimensionList: dimensionList,
+		QuotaList:     quotaList,
+	}
+
+	if s.rowPermissionService == nil || s.rowPermissionService.columnPermRepo == nil || userID <= 0 {
+		return resp, nil
+	}
+	if s.rowPermissionService.IsAdmin(userID) {
+		return resp, nil
+	}
+
+	columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+	disabledColumns, err := columnSvc.GetDisabledColumns(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
+	}
+	maskRules, err := columnSvc.GetMaskRules(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mask rules: %w", err)
+	}
+
+	chartSvc := &ChartService{}
+	return &chart.ChartFieldListResponse{
+		DimensionList: chartSvc.filterChartFields(resp.DimensionList, disabledColumns, maskRules),
+		QuotaList:     chartSvc.filterChartFields(resp.QuotaList, disabledColumns, maskRules),
+	}, nil
 }
 
 func (s *DatasetService) Preview(req *dataset.PreviewRequest) (*dataset.PreviewResponse, error) {
