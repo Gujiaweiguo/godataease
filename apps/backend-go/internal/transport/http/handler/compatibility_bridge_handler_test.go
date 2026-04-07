@@ -195,11 +195,28 @@ func startMockBridgeCalciteServer(t *testing.T, srv calcitev1.CalciteServiceServ
 }
 
 type fakeBridgeChartRepo struct {
-	charts        map[int64]*chart.CoreChartView
-	dsFields      map[int64][]*dataset.CoreDatasetTableField
-	chartFields   map[int64][]*dataset.CoreDatasetTableField
-	nextFieldID   int64
-	fieldRegistry map[int64]*dataset.CoreDatasetTableField
+	charts             map[int64]*chart.CoreChartView
+	dsFields           map[int64][]*dataset.CoreDatasetTableField
+	chartFields        map[int64][]*dataset.CoreDatasetTableField
+	nextFieldID        int64
+	fieldRegistry      map[int64]*dataset.CoreDatasetTableField
+	chartDatasetGroups map[int64]int64
+}
+
+type mockBridgeChartDatasetResolver struct {
+	datasetGroupIDs map[int64]int64
+	err             error
+}
+
+func (m *mockBridgeChartDatasetResolver) GetDatasetGroupIDByChartID(chartID int64) (int64, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+	datasetGroupID, ok := m.datasetGroupIDs[chartID]
+	if !ok {
+		return 0, gorm.ErrRecordNotFound
+	}
+	return datasetGroupID, nil
 }
 
 func (r *fakeBridgeChartRepo) GetByID(id int64) (*chart.CoreChartView, error) {
@@ -225,6 +242,21 @@ func (r *fakeBridgeChartRepo) Update(view *chart.CoreChartView) error {
 
 func (r *fakeBridgeChartRepo) QueryRows(chartID int64, limit int) ([]map[string]interface{}, int64, error) {
 	return []map[string]interface{}{}, 0, nil
+}
+
+func (r *fakeBridgeChartRepo) QueryRowsWithFilter(chartID int64, selectColumns string, whereClause string, whereArgs []interface{}, limit int) ([]map[string]interface{}, int64, error) {
+	return r.QueryRows(chartID, limit)
+}
+
+func (r *fakeBridgeChartRepo) GetDatasetGroupIDByChartID(chartID int64) (int64, error) {
+	if r.chartDatasetGroups == nil {
+		return 0, gorm.ErrRecordNotFound
+	}
+	datasetGroupID, ok := r.chartDatasetGroups[chartID]
+	if !ok {
+		return 0, gorm.ErrRecordNotFound
+	}
+	return datasetGroupID, nil
 }
 
 func (r *fakeBridgeChartRepo) ListDatasetFieldsByGroup(datasetGroupID int64) ([]*dataset.CoreDatasetTableField, error) {
@@ -1313,6 +1345,209 @@ func TestCompatibilityBridge_DatasetDetailWithPerm_UsesPermissionAwareFieldsAndP
 	}
 
 	assertPermissionAwareDatasetDetailResponse(t, w.Body.Bytes())
+}
+
+func TestCompatibilityBridge_ChartDataGetData_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockBridgeChartDatasetResolver{datasetGroupIDs: map[int64]int64{101: 11}})
+
+	repo := &fakeBridgeChartRepo{chartDatasetGroups: map[int64]int64{101: 11}}
+	chartHandler := NewChartHandler(service.NewChartService(repo))
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/chartData/getData", strings.NewReader(`{"id":101}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated chartData/getData, got %d", w.Code)
+	}
+}
+
+func TestCompatibilityBridge_ChartGetData_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: false}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockBridgeChartDatasetResolver{datasetGroupIDs: map[int64]int64{101: 11}})
+
+	repo := &fakeBridgeChartRepo{chartDatasetGroups: map[int64]int64{101: 11}}
+	chartHandler := NewChartHandler(service.NewChartService(repo))
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/chart/getData", strings.NewReader(`{"id":101}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden chart/getData, got %d", w.Code)
+	}
+}
+
+func TestCompatibilityBridge_ChartDataGetData_400_WhenDatasetFieldPretendsToBeChartID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockBridgeChartDatasetResolver{datasetGroupIDs: map[int64]int64{101: 11}})
+
+	repo := &fakeBridgeChartRepo{chartDatasetGroups: map[int64]int64{101: 11}}
+	chartHandler := NewChartHandler(service.NewChartService(repo))
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/chartData/getData", strings.NewReader(`{"datasetGroupId":11}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing chart id, got %d", w.Code)
+	}
+
+	var resp bridgeCodeResp
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "10001" {
+		t.Fatalf("expected code 10001 when dataset field pretends to be chart id, got %s", resp.Code)
+	}
+}
+
+func TestCompatibilityBridge_ChartListByDQ_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	repo := &fakeBridgeChartRepo{}
+	chartHandler := NewChartHandler(service.NewChartService(repo))
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/chart/listByDQ/11/9", strings.NewReader(`{"type":"bar"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated chart/listByDQ, got %d", w.Code)
+	}
+}
+
+func TestCompatibilityBridge_ChartListByDQ_UsesPermissionAwareFieldsWhenGoverned(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	checked := true
+	groupD := "d"
+	groupQ := "q"
+	varcharType := "VARCHAR"
+	intType := "INT"
+	region := "region"
+	amount := "amount"
+	deTypeD := 0
+	deTypeQ := 2
+
+	repo := &fakeBridgeChartRepo{
+		dsFields: map[int64][]*dataset.CoreDatasetTableField{11: {
+			{ID: 1, DatasetGroupID: 11, Name: &region, OriginName: &region, DataeaseName: &region, GroupType: &groupD, Type: &varcharType, DeType: &deTypeD, Checked: &checked},
+			{ID: 2, DatasetGroupID: 11, Name: &amount, OriginName: &amount, DataeaseName: &amount, GroupType: &groupQ, Type: &intType, DeType: &deTypeQ, Checked: &checked},
+		}},
+	}
+	chartService := service.NewChartService(repo)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err = db.AutoMigrate(&permission.DataPermColumn{}); err != nil {
+		t.Fatalf("migrate permission columns failed: %v", err)
+	}
+	columnRepo := repository.NewColumnPermissionRepository(db)
+	if err = columnRepo.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "amount", PermType: permission.PermTypeDisable, Status: 1}); err != nil {
+		t.Fatalf("create disable permission failed: %v", err)
+	}
+	if err = columnRepo.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}); err != nil {
+		t.Fatalf("create mask permission failed: %v", err)
+	}
+	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo))
+	chartHandler := NewChartHandler(chartService)
+
+	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
+	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	api := r.Group("/api")
+	api.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(42))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, nil, chartHandler, permMiddleware)
+
+	req := httptest.NewRequest("POST", "/api/chart/listByDQ/11/9", strings.NewReader(`{"type":"bar"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	resp := bridgeFieldListResp{}
+	if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "000000" {
+		t.Fatalf("expected code 000000, got %s", resp.Code)
+	}
+	if len(resp.Data.DimensionList) != 1 {
+		t.Fatalf("expected masked dimension field to remain, got %d", len(resp.Data.DimensionList))
+	}
+	if resp.Data.DimensionList[0]["originName"] != "region" {
+		t.Fatalf("expected region field to remain, got %#v", resp.Data.DimensionList[0])
+	}
+	if desensitized, ok := resp.Data.DimensionList[0]["desensitized"].(bool); !ok || !desensitized {
+		t.Fatalf("expected region field to be marked desensitized, got %#v", resp.Data.DimensionList[0]["desensitized"])
+	}
+	if len(resp.Data.QuotaList) != 1 || int(resp.Data.QuotaList[0]["id"].(float64)) != -1 {
+		t.Fatalf("expected only count pseudo field in quota list, got %#v", resp.Data.QuotaList)
+	}
 }
 
 func TestCompatibilityBridge_DatasetDetailWithPerm_403_WhenBatchContainsForbiddenDataset(t *testing.T) {
