@@ -776,7 +776,11 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 	if chartHandler != nil {
 		chartDataGroup := r.Group("/chartData")
 		{
-			chartDataGroup.POST("/getData", chartHandler.Data)
+			if permMiddleware != nil {
+				chartDataGroup.POST("/getData", permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), chartHandler.Data)
+			} else {
+				chartDataGroup.POST("/getData", chartHandler.Data)
+			}
 			chartDataGroup.POST("/getFieldData/:fieldId/:fieldType", func(c *gin.Context) {
 				fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
 				if err != nil {
@@ -855,7 +859,11 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 
 		chartGroup := r.Group("/chart")
 		{
-			chartGroup.POST("/getData", chartHandler.Data)
+			if permMiddleware != nil {
+				chartGroup.POST("/getData", permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), chartHandler.Data)
+			} else {
+				chartGroup.POST("/getData", chartHandler.Data)
+			}
 			chartGroup.POST("/getChart/:id", func(c *gin.Context) {
 				idStr := c.Param("id")
 				id, err := strconv.ParseInt(idStr, 10, 64)
@@ -928,7 +936,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				response.Success(c, result)
 			})
-			chartGroup.POST("/listByDQ/:id/:chartId", func(c *gin.Context) {
+			listByDQHandler := func(c *gin.Context) {
 				datasetGroupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 				if err != nil {
 					response.Error(c, "500000", "Invalid dataset ID")
@@ -941,7 +949,9 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				userID := int64(middleware.GetUserID(c))
 				var result *chart.ChartFieldListResponse
-				if userID > 0 {
+				if permMiddleware != nil {
+					result, err = chartHandler.service.ListByDQWithPermission(datasetGroupID, chartID, userID)
+				} else if userID > 0 {
 					result, err = chartHandler.service.ListByDQWithPermission(datasetGroupID, chartID, userID)
 				} else {
 					result, err = chartHandler.service.ListByDQ(datasetGroupID, chartID)
@@ -951,7 +961,12 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					return
 				}
 				response.Success(c, result)
-			})
+			}
+			if permMiddleware != nil {
+				chartGroup.POST("/listByDQ/:id/:chartId", permMiddleware.CheckDatasetView(), listByDQHandler)
+			} else {
+				chartGroup.POST("/listByDQ/:id/:chartId", listByDQHandler)
+			}
 			chartGroup.POST("/copyField/:id/:chartId", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 				if err != nil {

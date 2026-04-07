@@ -493,6 +493,143 @@ func TestRegisterRoutes_DatasetAliasesReturnExplicitErrorAfterAuthenticationWhen
 	}
 }
 
+func TestRegisterRoutes_ChartCanonicalContracts(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		wantStatus int
+		wantCode   string
+		msgPart    string
+	}{
+		{name: "chart query remains handler-owned", path: "/api/chart/query", body: "{", wantStatus: 200, wantCode: "500000", msgPart: "Invalid request"},
+		{name: "chart data now requires governed auth", path: "/api/chart/data", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected status %d for %s, got %d with body %s", tt.wantStatus, tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+			if resp.Code != tt.wantCode {
+				t.Fatalf("expected code %s for %s, got %s", tt.wantCode, tt.path, resp.Code)
+			}
+			if !strings.Contains(resp.Msg, tt.msgPart) {
+				t.Fatalf("expected message containing %q for %s, got %q", tt.msgPart, tt.path, resp.Msg)
+			}
+		})
+	}
+}
+
+func TestRegisterRoutes_ChartCompatibilityContracts(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		wantStatus int
+		wantCode   string
+		msgPart    string
+	}{
+		{name: "compat chartData getData now requires governed auth", path: "/api/chartData/getData", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "compat chart getData now requires governed auth", path: "/api/chart/getData", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "compat chart listByDQ now requires governed auth", path: "/api/chart/listByDQ/11/9", body: `{"type":"bar"}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected status %d for %s, got %d with body %s", tt.wantStatus, tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+			if resp.Code != tt.wantCode {
+				t.Fatalf("expected code %s for %s, got %s", tt.wantCode, tt.path, resp.Code)
+			}
+			if !strings.Contains(resp.Msg, tt.msgPart) {
+				t.Fatalf("expected message containing %q for %s, got %q", tt.msgPart, tt.path, resp.Msg)
+			}
+		})
+	}
+}
+
+func TestRegisterRoutes_RootChartCompatibilityContracts(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		wantStatus int
+		wantCode   string
+		msgPart    string
+	}{
+		{name: "root chartData getData now requires governed auth", path: "/chartData/getData", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "root chart getData now requires governed auth", path: "/chart/getData", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "root chart listByDQ now requires governed auth", path: "/chart/listByDQ/11/9", body: `{"type":"bar"}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected status %d for %s, got %d with body %s", tt.wantStatus, tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+			if resp.Code != tt.wantCode {
+				t.Fatalf("expected code %s for %s, got %s", tt.wantCode, tt.path, resp.Code)
+			}
+			if !strings.Contains(resp.Msg, tt.msgPart) {
+				t.Fatalf("expected message containing %q for %s, got %q", tt.msgPart, tt.path, resp.Msg)
+			}
+		})
+	}
+}
+
 func TestRegisterRoutes_VisualizationCanonicalAndCompatibilityContracts(t *testing.T) {
 	router := NewRouter(nil, nil)
 	router.RegisterRoutes()

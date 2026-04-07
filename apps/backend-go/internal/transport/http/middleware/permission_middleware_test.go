@@ -413,3 +413,65 @@ func TestCheckResourcePermission_AdminBypass(t *testing.T) {
 		t.Errorf("expected status 200 for admin bypass, got %d", w.Code)
 	}
 }
+
+func TestExtractChartID_FromJSONBody_ID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		id, err := extractChartID(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"id": id})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":12345}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if id, ok := resp["id"].(float64); !ok || int64(id) != 12345 {
+		t.Fatalf("expected id 12345, got %v", resp["id"])
+	}
+}
+
+func TestExtractChartID_RejectsDatasetFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		id, err := extractChartID(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"id": id})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"datasetGroupId":67890}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected status 400 for missing chart id, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp["error"] != "chart id is required" {
+		t.Fatalf("expected chart id error, got %v", resp["error"])
+	}
+}
