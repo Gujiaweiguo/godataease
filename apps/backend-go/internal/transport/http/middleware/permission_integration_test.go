@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"reflect"
 	"strings"
@@ -15,6 +16,22 @@ import (
 
 type mockResourcePermRepo struct {
 	hasPermission bool
+}
+
+type mockChartDatasetResolver struct {
+	datasetGroupIDs map[int64]int64
+	err             error
+}
+
+func (m *mockChartDatasetResolver) GetDatasetGroupIDByChartID(chartID int64) (int64, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+	datasetGroupID, ok := m.datasetGroupIDs[chartID]
+	if !ok {
+		return 0, errors.New("chart dataset mapping not found")
+	}
+	return datasetGroupID, nil
 }
 
 func (m *mockResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, error) {
@@ -382,6 +399,263 @@ func TestDatasetTreeDetailWithPerm_RowPermissionMiddlewareSupportsRawArrayBody(t
 	}
 	if !reflect.DeepEqual(resp.DatasetIDs, []int64{901, 902}) {
 		t.Fatalf("expected row-permission dataset ids [901 902], got %#v", resp.DatasetIDs)
+	}
+}
+
+func TestChartData_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{datasetGroupIDs: map[int64]int64{123: 789}})
+
+	r := gin.New()
+	r.POST("/chart/data", permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated chart request, got %d", w.Code)
+	}
+}
+
+func TestChartData_403_Forbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{datasetGroupIDs: map[int64]int64{123: 789}})
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}, permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden chart request, got %d", w.Code)
+	}
+}
+
+func TestChartData_200_SuccessWithRowPermissionContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{datasetGroupIDs: map[int64]int64{123: 789}})
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}, permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"datasetId":  GetRowPermissionDatasetID(c),
+			"datasetIds": GetRowPermissionDatasetIDs(c),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized chart request, got %d", w.Code)
+	}
+
+	var resp struct {
+		DatasetID  int64   `json:"datasetId"`
+		DatasetIDs []int64 `json:"datasetIds"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.DatasetID != 789 {
+		t.Fatalf("expected row-permission dataset id 789, got %d", resp.DatasetID)
+	}
+	if !reflect.DeepEqual(resp.DatasetIDs, []int64{789}) {
+		t.Fatalf("expected row-permission dataset ids [789], got %#v", resp.DatasetIDs)
+	}
+}
+
+func TestChartData_200_AdminBypassStillSeedsDatasetContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{datasetGroupIDs: map[int64]int64{123: 789}})
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"datasetId":  GetRowPermissionDatasetID(c),
+			"datasetIds": GetRowPermissionDatasetIDs(c),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for admin chart request, got %d", w.Code)
+	}
+
+	var resp struct {
+		DatasetID  int64   `json:"datasetId"`
+		DatasetIDs []int64 `json:"datasetIds"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.DatasetID != 789 || !reflect.DeepEqual(resp.DatasetIDs, []int64{789}) {
+		t.Fatalf("expected admin flow to seed dataset context [789], got id=%d ids=%#v", resp.DatasetID, resp.DatasetIDs)
+	}
+}
+
+func TestChartData_FailsClosedWithoutChartID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{datasetGroupIDs: map[int64]int64{123: 789}})
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}, permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing chart id, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["code"] != "10001" {
+		t.Fatalf("expected business code 10001 for missing chart id, got %#v", resp["code"])
+	}
+}
+
+func TestChartData_FailsClosedWhenDatasetFieldPretendsToBeChartID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{datasetGroupIDs: map[int64]int64{123: 789}})
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}, permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"datasetGroupId":789}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing chart id, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["code"] != "10001" {
+		t.Fatalf("expected business code 10001 when dataset field is used instead of chart id, got %#v", resp["code"])
+	}
+	if !strings.Contains(resp["msg"].(string), "chart id is required") {
+		t.Fatalf("expected chart id required message, got %#v", resp["msg"])
+	}
+}
+
+func TestChartData_FailsClosedWhenChartDatasetResolutionFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetChartDatasetResolver(&mockChartDatasetResolver{err: errors.New("chart lookup failed")})
+
+	r := gin.New()
+	r.POST("/chart/data", func(c *gin.Context) {
+		c.Set("user_id", uint64(100))
+		c.Next()
+	}, permMiddleware.CheckChartDataView(), RowPermissionMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for chart resolution failure, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected business code 500000 for chart resolution failure, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "chart lookup failed") {
+		t.Fatalf("expected failure message to mention chart lookup failure, got %q", resp.Msg)
 	}
 }
 

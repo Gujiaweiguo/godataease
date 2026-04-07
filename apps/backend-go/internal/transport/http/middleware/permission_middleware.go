@@ -25,13 +25,18 @@ const (
 )
 
 type PermissionMiddleware struct {
-	resourcePermSvc *service.ResourcePermissionService
-	exportPermSvc   *service.ExportPermissionService
-	adminChecker    AdminChecker
+	resourcePermSvc      *service.ResourcePermissionService
+	exportPermSvc        *service.ExportPermissionService
+	adminChecker         AdminChecker
+	chartDatasetResolver ChartDatasetGroupResolver
 }
 
 type AdminChecker interface {
 	IsAdmin(userID int64) bool
+}
+
+type ChartDatasetGroupResolver interface {
+	GetDatasetGroupIDByChartID(chartID int64) (int64, error)
 }
 
 func NewPermissionMiddleware(
@@ -44,6 +49,10 @@ func NewPermissionMiddleware(
 		exportPermSvc:   exportPermSvc,
 		adminChecker:    adminChecker,
 	}
+}
+
+func (m *PermissionMiddleware) SetChartDatasetResolver(resolver ChartDatasetGroupResolver) {
+	m.chartDatasetResolver = resolver
 }
 
 func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey string) gin.HandlerFunc {
@@ -90,6 +99,97 @@ func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey str
 
 func (m *PermissionMiddleware) CheckDatasetView() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDataset, permission.PermKeyView)
+}
+
+func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			response.Unauthorized(c, "authentication required")
+			c.Abort()
+			return
+		}
+
+		chartID, err := extractChartID(c)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			c.Abort()
+			return
+		}
+
+		if m.chartDatasetResolver == nil {
+			response.Error(c, "500000", "Failed: chart dataset resolver is unavailable")
+			c.Abort()
+			return
+		}
+
+		datasetID, err := m.chartDatasetResolver.GetDatasetGroupIDByChartID(chartID)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			c.Abort()
+			return
+		}
+		if datasetID <= 0 {
+			response.Error(c, "500000", "Failed: resolved dataset group id is invalid")
+			c.Abort()
+			return
+		}
+
+		c.Set(DatasetIDKey, datasetID)
+		c.Set(ResourceTypeKey, permission.ResourceTypeDataset)
+		c.Set(ResourceIDKey, datasetID)
+		c.Set(PermissionKeyKey, permission.PermKeyView)
+		c.Set(RowPermissionDatasetIDKey, datasetID)
+		c.Set(RowPermissionDatasetIDsKey, []int64{datasetID})
+
+		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+			c.Next()
+			return
+		}
+		if m.resourcePermSvc == nil {
+			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			c.Abort()
+			return
+		}
+
+		result := m.resourcePermSvc.CheckPermission(int64(userID), permission.ResourceTypeDataset, datasetID, permission.PermKeyView)
+		if !result.HasPermission {
+			logger.Warn("Chart permission denied",
+				zap.Uint64("user_id", userID),
+				zap.Int64("chart_id", chartID),
+				zap.Int64("dataset_id", datasetID),
+				zap.String("perm_key", permission.PermKeyView),
+				zap.String("reason", result.Reason),
+			)
+			response.Forbidden(c, "insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func extractChartID(c *gin.Context) (int64, error) {
+	for _, rawID := range []string{c.Param("id"), c.Query("id")} {
+		if rawID == "" {
+			continue
+		}
+		chartID, err := parseResourceID(rawID)
+		if err != nil {
+			return 0, err
+		}
+		return chartID, nil
+	}
+
+	var payload struct {
+		ID int64 `json:"id"`
+	}
+	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err == nil && payload.ID > 0 {
+		return payload.ID, nil
+	}
+
+	return 0, fmt.Errorf("chart id is required")
 }
 
 func (m *PermissionMiddleware) CheckDatasetBatchView() gin.HandlerFunc {

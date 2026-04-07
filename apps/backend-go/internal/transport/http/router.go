@@ -305,6 +305,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	resourceGovernanceAdminService := service.NewResourceGovernanceAdminService(datasourceService, datasetService, visualService)
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
+	permMiddleware.SetChartDatasetResolver(chartRepo)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
 	permissionCompatHandler.SetRoleService(roleService)
 	resourceGovernanceHandler := handler.NewResourceGovernanceHandler(resourceGovernanceAdminService, adminChecker)
@@ -442,7 +443,8 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterMsgCenterRoutes(r.engine, r.msgCenterHandler)
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
 	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler)
-	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, r.chartHandler, nil)
+	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, nil, nil)
+	handler.RegisterCompatibilityBridgeRoutes(r.engine, nil, nil, nil, nil, r.chartHandler, r.permMiddleware)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
 }
 
@@ -538,7 +540,7 @@ func (r *Router) registerAPIRoutes() {
 		r.registerDatasetRoutes(datasetAPI)
 		handler.RegisterCompatibilityBridgeRoutes(datasetAPI, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
 		handler.RegisterCompatibilityBridgeRoutes(datasetDe2API, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
-		handler.RegisterChartRoutes(api, r.chartHandler)
+		r.registerChartRoutes(api)
 		r.registerVisualizationRoutes(api)
 		r.registerVisualizationDe2DetailRoute(visualizationDe2API)
 		handler.RegisterWatermarkRoutes(api, r.watermarkHandler)
@@ -555,7 +557,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
-		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, r.chartHandler, nil)
+		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, r.chartHandler, r.permMiddleware)
 	}
 }
 
@@ -665,6 +667,18 @@ func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
 			datasetGroup.POST("/previewWithPerm", r.permMiddleware.CheckDatasetView(), middleware.RowPermissionMiddleware(), r.datasetHandler.PreviewWithPermission)
 		} else {
 			datasetGroup.POST("/previewWithPerm", r.datasetHandler.PreviewWithPermission)
+		}
+	}
+}
+
+func (r *Router) registerChartRoutes(api *gin.RouterGroup) {
+	chartGroup := api.Group("/chart")
+	{
+		chartGroup.POST("/query", r.chartHandler.Query)
+		if r.permMiddleware != nil {
+			chartGroup.POST("/data", r.permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), r.chartHandler.Data)
+		} else {
+			chartGroup.POST("/data", r.chartHandler.Data)
 		}
 	}
 }

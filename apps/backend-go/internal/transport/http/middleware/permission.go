@@ -60,6 +60,10 @@ func RowPermissionMiddleware() gin.HandlerFunc {
 }
 
 func extractRowPermissionDatasetIDs(c *gin.Context) ([]int64, error) {
+	if datasetIDs := GetRowPermissionDatasetIDs(c); len(datasetIDs) > 0 {
+		return uniquePositiveIDs(datasetIDs), nil
+	}
+
 	ids := make([]int64, 0, 4)
 
 	if datasetID := GetDatasetID(c); datasetID > 0 {
