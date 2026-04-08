@@ -1086,11 +1086,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			userGroup.POST("/update", user.UpdateUser)
 			userGroup.POST("/delete/:id", user.DeleteUser)
 			userGroup.GET("/options", user.GetUserOptions)
-			if org != nil {
-				userGroup.GET("/org/option", org.ListOrgs)
-			} else {
-				userGroup.GET("/org/option", user.GetUserOptions)
-			}
+			userGroup.GET("/org/option", user.GetUserOptions)
 			userGroup.POST("/byCurOrg", user.ListUsers)
 			userGroup.POST("/excelTemplate", user.DownloadExcelTemplate)
 			userGroup.POST("/batchImport", user.BatchImportUsers)
