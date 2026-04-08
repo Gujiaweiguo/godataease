@@ -10,9 +10,9 @@
 
 ## 3. Parent-scoped create rollout and copy scope decision
 
-- [ ] 3.1 Add parent-scoped authorization support for `saveCanvas` and its legacy-compatible `save` alias when a positive governed `pid` is present, and fail closed when the route cannot establish a safe governed parent target.
-- [ ] 3.2 Add backend tests covering authorized parent-scoped creation, denied parent-scoped creation, and unresolved-parent failure semantics for dashboard and `dataV` request shapes.
-- [ ] 3.3 Resolve the governed authorization contract for `copy`: either implement a safe dual-target rule with focused tests, or explicitly narrow the change scope by updating the artifacts before implementation proceeds past this point.
+- [x] 3.1 Add parent-scoped authorization support for `saveCanvas` and its legacy-compatible `save` alias when a positive governed `pid` is present, and fail closed when the route cannot establish a safe governed parent target.
+- [x] 3.2 Add backend tests covering authorized parent-scoped creation, denied parent-scoped creation, and unresolved-parent failure semantics for dashboard and `dataV` request shapes.
+- [x] 3.3 Resolve the governed authorization contract for `copy`: either implement a safe dual-target rule with focused tests, or explicitly narrow the change scope by updating the artifacts before implementation proceeds past this point.
 
 ## 4. Verification and scope control
 
