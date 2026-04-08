@@ -34,7 +34,7 @@ This change needs to strengthen visualization write-route authorization without 
 
 **Rationale:** The codebase already encodes visualization governance this way. `normalizeVisualizationResourceType()` maps `dashboard` to `ResourceTypeDashboard` and `dataV` to `ResourceTypeScreen`, and parent-permission inheritance on create already depends on that distinction. Reusing the current resource model keeps route enforcement aligned with the service and repository layer.
 
-**Alternative considered:** Treat all visualization writes as dashboard-only permission checks. Rejected because it would silently mis-govern big-screen (`dataV`) resources and drift from the service-layer resource model already present in tests and backfill logic.
+**Alternative considered:** Treat all visualization writes as dashboard-only permission checks. Rejected because it would silently apply the wrong governed resource to big-screen (`dataV`) requests and drift from the service-layer resource model already present in tests and backfill logic.
 
 ### 2. Add a visualization-aware write gate instead of relying on generic request ID extraction
 
