@@ -23,6 +23,11 @@ type mockChartDatasetResolver struct {
 	err             error
 }
 
+type mockVisualizationTypeResolver struct {
+	types map[int64]string
+	err   error
+}
+
 func (m *mockChartDatasetResolver) GetDatasetGroupIDByChartID(chartID int64) (int64, error) {
 	if m.err != nil {
 		return 0, m.err
@@ -32,6 +37,17 @@ func (m *mockChartDatasetResolver) GetDatasetGroupIDByChartID(chartID int64) (in
 		return 0, errors.New("chart dataset mapping not found")
 	}
 	return datasetGroupID, nil
+}
+
+func (m *mockVisualizationTypeResolver) FindDvType(id int64) (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	visualizationType, ok := m.types[id]
+	if !ok {
+		return "", errors.New("visualization type not found")
+	}
+	return visualizationType, nil
 }
 
 func (m *mockResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, error) {
@@ -1119,6 +1135,193 @@ func TestDatasourceListAliases_403_Forbidden(t *testing.T) {
 		if resp["code"] != "70001" {
 			t.Fatalf("expected code 70001 for %s, got %#v", path, resp["code"])
 		}
+	}
+}
+
+func TestVisualizationView_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{123: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/findById", permMiddleware.CheckVisualizationView(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/findById", strings.NewReader(`{"id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated visualization view, got %d", w.Code)
+	}
+}
+
+func TestVisualizationEdit_403_ForbiddenDashboard(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{456: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/updateCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(300))
+		c.Next()
+	}, permMiddleware.CheckVisualizationEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/updateCanvas", strings.NewReader(`{"id":456}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden visualization edit, got %d", w.Code)
+	}
+}
+
+func TestVisualizationEdit_200_ScreenSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{789: "dataV"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/updateCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(301))
+		c.Next()
+	}, permMiddleware.CheckVisualizationEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"resourceType":  c.GetString(ResourceTypeKey),
+			"resourceID":    c.MustGet(ResourceIDKey),
+			"permissionKey": c.GetString(PermissionKeyKey),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/updateCanvas", strings.NewReader(`{"id":789}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized screen visualization edit, got %d", w.Code)
+	}
+
+	var resp struct {
+		ResourceType  string `json:"resourceType"`
+		ResourceID    int64  `json:"resourceID"`
+		PermissionKey string `json:"permissionKey"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.ResourceType != permission.ResourceTypeScreen {
+		t.Fatalf("expected resource type %s, got %s", permission.ResourceTypeScreen, resp.ResourceType)
+	}
+	if resp.ResourceID != 789 {
+		t.Fatalf("expected resource id 789, got %d", resp.ResourceID)
+	}
+	if resp.PermissionKey != permission.PermKeyEdit {
+		t.Fatalf("expected permission key %s, got %s", permission.PermKeyEdit, resp.PermissionKey)
+	}
+}
+
+func TestVisualizationView_FailsClosedWhenResolverErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{err: errors.New("visualization lookup failed")})
+
+	r := gin.New()
+	r.POST("/dataVisualization/findById", func(c *gin.Context) {
+		c.Set("user_id", uint64(302))
+		c.Next()
+	}, permMiddleware.CheckVisualizationView(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/findById", strings.NewReader(`{"id":999}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for resolver failure, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "visualization lookup failed") {
+		t.Fatalf("expected resolver failure message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationView_FailsClosedWhenVisualizationTypeUnsupported(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{1001: ""}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/findById", func(c *gin.Context) {
+		c.Set("user_id", uint64(303))
+		c.Next()
+	}, permMiddleware.CheckVisualizationView(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/findById", strings.NewReader(`{"id":1001}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for unsupported visualization type, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, `unsupported visualization type: ""`) {
+		t.Fatalf("expected unsupported type message, got %q", resp.Msg)
 	}
 }
 

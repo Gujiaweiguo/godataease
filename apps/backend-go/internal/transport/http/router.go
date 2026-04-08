@@ -306,6 +306,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 	permMiddleware.SetChartDatasetResolver(chartRepo)
+	permMiddleware.SetVisualizationTypeResolver(visualService)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
 	permissionCompatHandler.SetRoleService(roleService)
 	resourceGovernanceHandler := handler.NewResourceGovernanceHandler(resourceGovernanceAdminService, adminChecker)
@@ -442,7 +443,7 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterLicenseRoutes(r.engine, r.licenseHandler)
 	handler.RegisterMsgCenterRoutes(r.engine, r.msgCenterHandler)
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
-	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler)
+	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler, r.permMiddleware)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, nil, nil)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, nil, nil, nil, nil, r.chartHandler, r.permMiddleware)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
@@ -651,7 +652,7 @@ func serveFrontendAsset(c *gin.Context, path, frontendDir string) {
 func (r *Router) registerVisualizationDe2DetailRoute(api *gin.RouterGroup) {
 	visualGroup := api.Group("/dataVisualization")
 	if r.permMiddleware != nil {
-		visualGroup.POST("/findById", r.permMiddleware.CheckDashboardView(), r.visualHandler.FindByID)
+		visualGroup.POST("/findById", r.permMiddleware.CheckVisualizationView(), r.visualHandler.FindByID)
 		return
 	}
 	visualGroup.POST("/findById", r.visualHandler.FindByID)
@@ -688,9 +689,9 @@ func (r *Router) registerVisualizationRoutes(api *gin.RouterGroup) {
 	{
 		visualGroup.POST("/tree", r.visualHandler.Tree)
 		if r.permMiddleware != nil {
-			visualGroup.POST("/findById", r.permMiddleware.CheckDashboardView(), r.visualHandler.FindByID)
-			visualGroup.POST("/updateCanvas", r.permMiddleware.CheckDashboardEdit(), r.visualHandler.UpdateCanvas)
-			visualGroup.POST("/deleteLogic/:id", r.permMiddleware.CheckDashboardEdit(), r.visualHandler.DeleteLogic)
+			visualGroup.POST("/findById", r.permMiddleware.CheckVisualizationView(), r.visualHandler.FindByID)
+			visualGroup.POST("/updateCanvas", r.permMiddleware.CheckVisualizationEdit(), r.visualHandler.UpdateCanvas)
+			visualGroup.POST("/deleteLogic/:id", r.permMiddleware.CheckVisualizationEdit(), r.visualHandler.DeleteLogic)
 		} else {
 			visualGroup.POST("/findById", r.visualHandler.FindByID)
 			visualGroup.POST("/updateCanvas", r.visualHandler.UpdateCanvas)
