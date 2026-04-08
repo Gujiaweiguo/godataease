@@ -447,19 +447,28 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, pe
 		vg.POST("/nameCheck", h.NameCheck)
 		vg.POST("/checkCanvasChange", h.CheckCanvasChange)
 		vg.POST("/list", h.List)
-		vg.POST("/save", h.SaveCanvas)
-		vg.POST("/copy", h.Copy)
+		if permMiddleware != nil {
+			vg.POST("/save", permMiddleware.CheckVisualizationParentEdit(), h.SaveCanvas)
+		} else {
+			vg.POST("/save", h.SaveCanvas)
+		}
+		if permMiddleware != nil {
+			vg.POST("/copy", permMiddleware.CheckVisualizationCopy(), h.Copy)
+		} else {
+			vg.POST("/copy", h.Copy)
+		}
 		vg.POST("/updateBase", h.UpdateBase)
 		vg.POST("/move", h.Move)
 		vg.POST("/updatePublishStatus", h.UpdatePublishStatus)
 		vg.POST("/recoverToPublished", h.RecoverToPublished)
-		vg.POST("/saveCanvas", h.SaveCanvas)
 		if permMiddleware != nil {
+			vg.POST("/saveCanvas", permMiddleware.CheckVisualizationParentEdit(), h.SaveCanvas)
 			vg.POST("/findById", permMiddleware.CheckVisualizationView(), h.FindByID)
 			vg.POST("/updateCanvas", permMiddleware.CheckVisualizationEdit(), h.UpdateCanvas)
 			vg.POST("/deleteLogic/:id", permMiddleware.CheckVisualizationEdit(), h.DeleteLogic)
 			vg.POST("/deleteLogic/:id/:busiFlag", permMiddleware.CheckVisualizationEdit(), h.DeleteLogic)
 		} else {
+			vg.POST("/saveCanvas", h.SaveCanvas)
 			vg.POST("/findById", h.FindByID)
 			vg.POST("/updateCanvas", h.UpdateCanvas)
 			vg.POST("/deleteLogic/:id", h.DeleteLogic)

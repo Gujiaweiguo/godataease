@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -15,7 +16,9 @@ import (
 )
 
 type mockResourcePermRepo struct {
-	hasPermission bool
+	hasPermission         bool
+	permIDsByKey          map[string]int64
+	resourcePermissionIDs map[string][]int64
 }
 
 type mockChartDatasetResolver struct {
@@ -55,6 +58,11 @@ func (m *mockResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, e
 }
 
 func (m *mockResourcePermRepo) GetPermByKey(permKey string) (*permission.SysPerm, error) {
+	if m.permIDsByKey != nil {
+		if permID, ok := m.permIDsByKey[permKey]; ok {
+			return &permission.SysPerm{PermID: permID, PermKey: permKey}, nil
+		}
+	}
 	return &permission.SysPerm{PermID: 1, PermKey: permKey}, nil
 }
 
@@ -136,6 +144,13 @@ func (m *mockResourcePermRepo) ReplaceResourcePermissions(resourceID int64, reso
 }
 
 func (m *mockResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resourceType string) ([]int64, bool, error) {
+	if m.resourcePermissionIDs != nil {
+		key := resourceType + ":" + strconv.FormatInt(resourceID, 10)
+		permIDs, ok := m.resourcePermissionIDs[key]
+		if ok {
+			return permIDs, true, nil
+		}
+	}
 	return nil, false, nil
 }
 
@@ -1322,6 +1337,743 @@ func TestVisualizationView_FailsClosedWhenVisualizationTypeUnsupported(t *testin
 	}
 	if !strings.Contains(resp.Msg, `unsupported visualization type: ""`) {
 		t.Fatalf("expected unsupported type message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationParentEdit_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":123,"type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated visualization parent edit, got %d", w.Code)
+	}
+}
+
+func TestVisualizationParentEdit_200_DashboardSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(304))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"resourceType":  c.GetString(ResourceTypeKey),
+			"resourceID":    c.MustGet(ResourceIDKey),
+			"permissionKey": c.GetString(PermissionKeyKey),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":123,"type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized dashboard parent edit, got %d", w.Code)
+	}
+
+	var resp struct {
+		ResourceType  string `json:"resourceType"`
+		ResourceID    int64  `json:"resourceID"`
+		PermissionKey string `json:"permissionKey"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.ResourceType != permission.ResourceTypeDashboard {
+		t.Fatalf("expected resource type %s, got %s", permission.ResourceTypeDashboard, resp.ResourceType)
+	}
+	if resp.ResourceID != 123 {
+		t.Fatalf("expected resource id 123, got %d", resp.ResourceID)
+	}
+	if resp.PermissionKey != permission.PermKeyEdit {
+		t.Fatalf("expected permission key %s, got %s", permission.PermKeyEdit, resp.PermissionKey)
+	}
+}
+
+func TestVisualizationParentEdit_403_DashboardForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(305))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":456,"type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden dashboard parent edit, got %d", w.Code)
+	}
+}
+
+func TestVisualizationParentEdit_200_ScreenSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(306))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"resourceType":  c.GetString(ResourceTypeKey),
+			"resourceID":    c.MustGet(ResourceIDKey),
+			"permissionKey": c.GetString(PermissionKeyKey),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":789,"type":"dataV"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized screen parent edit, got %d", w.Code)
+	}
+
+	var resp struct {
+		ResourceType  string `json:"resourceType"`
+		ResourceID    int64  `json:"resourceID"`
+		PermissionKey string `json:"permissionKey"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.ResourceType != permission.ResourceTypeScreen {
+		t.Fatalf("expected resource type %s, got %s", permission.ResourceTypeScreen, resp.ResourceType)
+	}
+	if resp.ResourceID != 789 {
+		t.Fatalf("expected resource id 789, got %d", resp.ResourceID)
+	}
+	if resp.PermissionKey != permission.PermKeyEdit {
+		t.Fatalf("expected permission key %s, got %s", permission.PermKeyEdit, resp.PermissionKey)
+	}
+}
+
+func TestVisualizationParentEdit_403_ScreenForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(307))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":790,"type":"dataV"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden screen parent edit, got %d", w.Code)
+	}
+}
+
+func TestVisualizationParentEdit_FailsClosedWhenPIDMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(308))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing pid, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "visualization parent id is required") {
+		t.Fatalf("expected missing parent id message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationParentEdit_FailsClosedWhenPIDInvalid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(309))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":0,"type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for invalid pid, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "visualization parent id is required") {
+		t.Fatalf("expected invalid parent id message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationParentEdit_FailsClosedWhenVisualizationTypeUnsupported(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(310))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":1001,"type":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for unsupported visualization type, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, `unsupported visualization type: ""`) {
+		t.Fatalf("expected unsupported type message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationParentEdit_200_AdminBypass(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: false}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+
+	r := gin.New()
+	r.POST("/dataVisualization/saveCanvas", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckVisualizationParentEdit(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"resourceType":  c.GetString(ResourceTypeKey),
+			"resourceID":    c.MustGet(ResourceIDKey),
+			"permissionKey": c.GetString(PermissionKeyKey),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/saveCanvas", strings.NewReader(`{"pid":1002,"type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for admin bypass visualization parent edit, got %d", w.Code)
+	}
+}
+
+func TestVisualizationCopy_401_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{11: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":11,"pid":21,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected 401 for unauthenticated visualization copy, got %d", w.Code)
+	}
+}
+
+func TestVisualizationCopy_200_DashboardSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{
+		hasPermission: true,
+		permIDsByKey: map[string]int64{
+			"dashboard:view": 1,
+			"dashboard:edit": 2,
+		},
+		resourcePermissionIDs: map[string][]int64{
+			"dashboard:11": {1},
+			"dashboard:21": {2},
+		},
+	}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{11: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(311))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"resourceType":  c.GetString(ResourceTypeKey),
+			"resourceID":    c.MustGet(ResourceIDKey),
+			"permissionKey": c.GetString(PermissionKeyKey),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":11,"pid":21,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized visualization copy, got %d", w.Code)
+	}
+
+	var resp struct {
+		ResourceType  string `json:"resourceType"`
+		ResourceID    int64  `json:"resourceID"`
+		PermissionKey string `json:"permissionKey"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.ResourceType != permission.ResourceTypeDashboard {
+		t.Fatalf("expected destination resource type %s, got %s", permission.ResourceTypeDashboard, resp.ResourceType)
+	}
+	if resp.ResourceID != 21 {
+		t.Fatalf("expected destination resource id 21, got %d", resp.ResourceID)
+	}
+	if resp.PermissionKey != permission.PermKeyEdit {
+		t.Fatalf("expected permission key %s, got %s", permission.PermKeyEdit, resp.PermissionKey)
+	}
+}
+
+func TestVisualizationCopy_200_ScreenSuccessFallsBackToSourceType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{
+		hasPermission: true,
+		permIDsByKey: map[string]int64{
+			"screen:view": 1,
+			"screen:edit": 2,
+		},
+		resourcePermissionIDs: map[string][]int64{
+			"screen:12": {1},
+			"screen:22": {2},
+		},
+	}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{12: "dataV"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(312))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"resourceType":  c.GetString(ResourceTypeKey),
+			"resourceID":    c.MustGet(ResourceIDKey),
+			"permissionKey": c.GetString(PermissionKeyKey),
+		})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":12,"pid":22,"name":"copy"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for authorized screen visualization copy, got %d", w.Code)
+	}
+}
+
+func TestVisualizationCopy_403_SourceForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{
+		hasPermission: true,
+		permIDsByKey: map[string]int64{
+			"dashboard:view": 1,
+			"dashboard:edit": 2,
+		},
+		resourcePermissionIDs: map[string][]int64{
+			"dashboard:13": {},
+			"dashboard:23": {2},
+		},
+	}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{13: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(313))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":13,"pid":23,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden visualization copy source, got %d", w.Code)
+	}
+}
+
+func TestVisualizationCopy_403_DestinationForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{
+		permIDsByKey: map[string]int64{
+			"dashboard:view": 1,
+			"dashboard:edit": 2,
+		},
+		resourcePermissionIDs: map[string][]int64{
+			"dashboard:14": {1},
+			"dashboard:24": {},
+		},
+	}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{14: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(314))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":14,"pid":24,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403 for forbidden visualization copy destination, got %d", w.Code)
+	}
+}
+
+func TestVisualizationCopy_FailsClosedWhenSourceIDMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{15: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(315))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"pid":25,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing source id, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "copy source id is required") {
+		t.Fatalf("expected missing source id message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationCopy_FailsClosedWhenDestinationPIDMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{16: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(316))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":16,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for missing destination pid, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "copy destination parent id is required") {
+		t.Fatalf("expected missing destination parent id message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationCopy_FailsClosedWhenResolverErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{err: errors.New("visualization lookup failed")})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(317))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":17,"pid":27,"name":"copy"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for resolver failure, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "visualization lookup failed") {
+		t.Fatalf("expected resolver failure message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationCopy_FailsClosedWhenEffectiveTypeUnsupported(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{hasPermission: true}
+	adminChecker := NewDefaultAdminChecker([]int64{})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{18: ""}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(318))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":18,"pid":28,"name":"copy"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected HTTP 200 with business error for unsupported effective type, got %d", w.Code)
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, `unsupported visualization type: ""`) {
+		t.Fatalf("expected unsupported type message, got %q", resp.Msg)
+	}
+}
+
+func TestVisualizationCopy_200_AdminBypass(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &mockResourcePermRepo{
+		permIDsByKey: map[string]int64{
+			"dashboard:view": 1,
+			"dashboard:edit": 2,
+		},
+		resourcePermissionIDs: map[string][]int64{
+			"dashboard:19": {},
+			"dashboard:29": {},
+		},
+	}
+	adminChecker := NewDefaultAdminChecker([]int64{1})
+	resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+	exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+	permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+	permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{19: "dashboard"}})
+
+	r := gin.New()
+	r.POST("/dataVisualization/copy", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Next()
+	}, permMiddleware.CheckVisualizationCopy(), func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": true})
+	})
+
+	req := httptest.NewRequest("POST", "/dataVisualization/copy", strings.NewReader(`{"id":19,"pid":29,"name":"copy","type":"dashboard"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for admin bypass visualization copy, got %d", w.Code)
 	}
 }
 

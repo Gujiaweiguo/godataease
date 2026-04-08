@@ -229,6 +229,116 @@ func (m *PermissionMiddleware) CheckVisualizationEdit() gin.HandlerFunc {
 	return m.checkVisualizationPermission(permission.PermKeyEdit)
 }
 
+func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			response.Unauthorized(c, "authentication required")
+			c.Abort()
+			return
+		}
+
+		resourceType, resourceID, err := m.resolveVisualizationParentResource(c)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			c.Abort()
+			return
+		}
+
+		c.Set(ResourceTypeKey, resourceType)
+		c.Set(ResourceIDKey, resourceID)
+		c.Set(PermissionKeyKey, permission.PermKeyEdit)
+
+		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+			c.Next()
+			return
+		}
+		if m.resourcePermSvc == nil {
+			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			c.Abort()
+			return
+		}
+
+		result := m.resourcePermSvc.CheckPermission(int64(userID), resourceType, resourceID, permission.PermKeyEdit)
+		if !result.HasPermission {
+			logger.Warn("Visualization parent permission denied",
+				zap.Uint64("user_id", userID),
+				zap.String("resource_type", resourceType),
+				zap.Int64("resource_id", resourceID),
+				zap.String("perm_key", permission.PermKeyEdit),
+				zap.String("reason", result.Reason),
+			)
+			response.Forbidden(c, "insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			response.Unauthorized(c, "authentication required")
+			c.Abort()
+			return
+		}
+
+		sourceType, sourceID, destinationType, destinationID, err := m.resolveVisualizationCopyResources(c)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			c.Abort()
+			return
+		}
+
+		c.Set(ResourceTypeKey, destinationType)
+		c.Set(ResourceIDKey, destinationID)
+		c.Set(PermissionKeyKey, permission.PermKeyEdit)
+
+		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+			c.Next()
+			return
+		}
+		if m.resourcePermSvc == nil {
+			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			c.Abort()
+			return
+		}
+
+		sourceResult := m.resourcePermSvc.CheckPermission(int64(userID), sourceType, sourceID, permission.PermKeyView)
+		if !sourceResult.HasPermission {
+			logger.Warn("Visualization copy source permission denied",
+				zap.Uint64("user_id", userID),
+				zap.String("resource_type", sourceType),
+				zap.Int64("resource_id", sourceID),
+				zap.String("perm_key", permission.PermKeyView),
+				zap.String("reason", sourceResult.Reason),
+			)
+			response.Forbidden(c, "insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		destinationResult := m.resourcePermSvc.CheckPermission(int64(userID), destinationType, destinationID, permission.PermKeyEdit)
+		if !destinationResult.HasPermission {
+			logger.Warn("Visualization copy destination permission denied",
+				zap.Uint64("user_id", userID),
+				zap.String("resource_type", destinationType),
+				zap.Int64("resource_id", destinationID),
+				zap.String("perm_key", permission.PermKeyEdit),
+				zap.String("reason", destinationResult.Reason),
+			)
+			response.Forbidden(c, "insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func (m *PermissionMiddleware) CheckDashboardExport() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDashboard, permission.PermKeyExport)
 }
@@ -321,6 +431,72 @@ func (m *PermissionMiddleware) resolveVisualizationResource(c *gin.Context) (str
 	}
 
 	return resourceType, resourceID, nil
+}
+
+func (m *PermissionMiddleware) resolveVisualizationParentResource(c *gin.Context) (string, int64, error) {
+	var payload struct {
+		PID  *int64  `json:"pid"`
+		Type *string `json:"type"`
+	}
+	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err != nil {
+		return "", 0, fmt.Errorf("visualization parent payload is required")
+	}
+	if payload.PID == nil || *payload.PID <= 0 {
+		return "", 0, fmt.Errorf("visualization parent id is required")
+	}
+
+	visualizationType := ""
+	if payload.Type != nil {
+		visualizationType = *payload.Type
+	}
+
+	resourceType, err := normalizeVisualizationResourceType(visualizationType)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return resourceType, *payload.PID, nil
+}
+
+func (m *PermissionMiddleware) resolveVisualizationCopyResources(c *gin.Context) (string, int64, string, int64, error) {
+	var payload struct {
+		ID   int64   `json:"id"`
+		PID  *int64  `json:"pid"`
+		Type *string `json:"type"`
+	}
+	if err := c.ShouldBindBodyWith(&payload, binding.JSON); err != nil {
+		return "", 0, "", 0, fmt.Errorf("visualization copy payload is required")
+	}
+	if payload.ID <= 0 {
+		return "", 0, "", 0, fmt.Errorf("copy source id is required")
+	}
+	if m.visualizationResolver == nil {
+		return "", 0, "", 0, fmt.Errorf("visualization type resolver is unavailable")
+	}
+
+	sourceVisualizationType, err := m.visualizationResolver.FindDvType(payload.ID)
+	if err != nil {
+		return "", 0, "", 0, err
+	}
+	sourceResourceType, err := normalizeVisualizationResourceType(sourceVisualizationType)
+	if err != nil {
+		return "", 0, "", 0, err
+	}
+
+	if payload.PID == nil || *payload.PID <= 0 {
+		return "", 0, "", 0, fmt.Errorf("copy destination parent id is required")
+	}
+
+	effectiveVisualizationType := sourceVisualizationType
+	if payload.Type != nil && *payload.Type != "" {
+		effectiveVisualizationType = *payload.Type
+	}
+	destinationResourceType, err := normalizeVisualizationResourceType(effectiveVisualizationType)
+	if err != nil {
+		return "", 0, "", 0, err
+	}
+
+	return sourceResourceType, payload.ID, destinationResourceType, *payload.PID, nil
 }
 
 func normalizeVisualizationResourceType(visualizationType string) (string, error) {
