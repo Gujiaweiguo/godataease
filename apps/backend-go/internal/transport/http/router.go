@@ -692,13 +692,14 @@ func (r *Router) registerVisualizationRoutes(api *gin.RouterGroup) {
 			visualGroup.POST("/findById", r.permMiddleware.CheckVisualizationView(), r.visualHandler.FindByID)
 			visualGroup.POST("/updateCanvas", r.permMiddleware.CheckVisualizationEdit(), r.visualHandler.UpdateCanvas)
 			visualGroup.POST("/deleteLogic/:id", r.permMiddleware.CheckVisualizationEdit(), r.visualHandler.DeleteLogic)
+			visualGroup.POST("/saveCanvas", r.permMiddleware.CheckVisualizationParentEdit(), r.visualHandler.SaveCanvas)
 		} else {
 			visualGroup.POST("/findById", r.visualHandler.FindByID)
 			visualGroup.POST("/updateCanvas", r.visualHandler.UpdateCanvas)
 			visualGroup.POST("/deleteLogic/:id", r.visualHandler.DeleteLogic)
+			visualGroup.POST("/saveCanvas", r.visualHandler.SaveCanvas)
 		}
 		visualGroup.POST("/list", r.visualHandler.List)
-		visualGroup.POST("/saveCanvas", r.visualHandler.SaveCanvas)
 	}
 }
 
