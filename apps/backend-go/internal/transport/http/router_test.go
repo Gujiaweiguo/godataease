@@ -637,19 +637,27 @@ func TestRegisterRoutes_VisualizationCanonicalAndCompatibilityContracts(t *testi
 	tests := []struct {
 		name       string
 		path       string
+		body       string
 		wantStatus int
 		wantCode   string
 		msgPart    string
 	}{
-		{name: "api visualization tree", path: "/api/dataVisualization/tree", wantStatus: 200, wantCode: "500000", msgPart: "Invalid request"},
-		{name: "api visualization detail", path: "/api/dataVisualization/findById", wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
-		{name: "de2api visualization tree", path: "/de2api/dataVisualization/tree", wantStatus: 200, wantCode: "500000", msgPart: "Invalid request"},
-		{name: "de2api visualization detail", path: "/de2api/dataVisualization/findById", wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "api visualization tree", path: "/api/dataVisualization/tree", body: "{", wantStatus: 200, wantCode: "500000", msgPart: "Invalid request"},
+		{name: "api visualization detail", path: "/api/dataVisualization/findById", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "api visualization updateCanvas", path: "/api/dataVisualization/updateCanvas", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "api visualization deleteLogic", path: "/api/dataVisualization/deleteLogic/123", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "de2api visualization tree", path: "/de2api/dataVisualization/tree", body: "{", wantStatus: 200, wantCode: "500000", msgPart: "Invalid request"},
+		{name: "de2api visualization detail", path: "/de2api/dataVisualization/findById", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "root visualization tree remains ungated", path: "/dataVisualization/tree", body: "{", wantStatus: 200, wantCode: "500000", msgPart: "Invalid request"},
+		{name: "root visualization detail now governed", path: "/dataVisualization/findById", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "root visualization updateCanvas now governed", path: "/dataVisualization/updateCanvas", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "root visualization deleteLogic now governed", path: "/dataVisualization/deleteLogic/123", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
+		{name: "root visualization deleteLogic with busiFlag now governed", path: "/dataVisualization/deleteLogic/123/dashboard", body: `{"id":123}`, wantStatus: 401, wantCode: "20001", msgPart: "authentication required"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", tt.path, strings.NewReader("{"))
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 

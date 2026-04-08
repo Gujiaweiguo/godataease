@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -437,7 +438,7 @@ func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
 	return "system"
 }
 
-func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler) {
+func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, permMiddleware *middleware.PermissionMiddleware) {
 	vg := r.Group("/dataVisualization")
 	{
 		vg.GET("/findDvType/:id", h.FindDvType)
@@ -445,7 +446,6 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler) {
 		vg.POST("/tree", h.Tree)
 		vg.POST("/nameCheck", h.NameCheck)
 		vg.POST("/checkCanvasChange", h.CheckCanvasChange)
-		vg.POST("/findById", h.FindByID)
 		vg.POST("/list", h.List)
 		vg.POST("/save", h.SaveCanvas)
 		vg.POST("/copy", h.Copy)
@@ -454,8 +454,16 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler) {
 		vg.POST("/updatePublishStatus", h.UpdatePublishStatus)
 		vg.POST("/recoverToPublished", h.RecoverToPublished)
 		vg.POST("/saveCanvas", h.SaveCanvas)
-		vg.POST("/updateCanvas", h.UpdateCanvas)
-		vg.POST("/deleteLogic/:id", h.DeleteLogic)
-		vg.POST("/deleteLogic/:id/:busiFlag", h.DeleteLogic)
+		if permMiddleware != nil {
+			vg.POST("/findById", permMiddleware.CheckVisualizationView(), h.FindByID)
+			vg.POST("/updateCanvas", permMiddleware.CheckVisualizationEdit(), h.UpdateCanvas)
+			vg.POST("/deleteLogic/:id", permMiddleware.CheckVisualizationEdit(), h.DeleteLogic)
+			vg.POST("/deleteLogic/:id/:busiFlag", permMiddleware.CheckVisualizationEdit(), h.DeleteLogic)
+		} else {
+			vg.POST("/findById", h.FindByID)
+			vg.POST("/updateCanvas", h.UpdateCanvas)
+			vg.POST("/deleteLogic/:id", h.DeleteLogic)
+			vg.POST("/deleteLogic/:id/:busiFlag", h.DeleteLogic)
+		}
 	}
 }

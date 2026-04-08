@@ -25,10 +25,11 @@ const (
 )
 
 type PermissionMiddleware struct {
-	resourcePermSvc      *service.ResourcePermissionService
-	exportPermSvc        *service.ExportPermissionService
-	adminChecker         AdminChecker
-	chartDatasetResolver ChartDatasetGroupResolver
+	resourcePermSvc       *service.ResourcePermissionService
+	exportPermSvc         *service.ExportPermissionService
+	adminChecker          AdminChecker
+	chartDatasetResolver  ChartDatasetGroupResolver
+	visualizationResolver VisualizationTypeResolver
 }
 
 type AdminChecker interface {
@@ -37,6 +38,10 @@ type AdminChecker interface {
 
 type ChartDatasetGroupResolver interface {
 	GetDatasetGroupIDByChartID(chartID int64) (int64, error)
+}
+
+type VisualizationTypeResolver interface {
+	FindDvType(id int64) (string, error)
 }
 
 func NewPermissionMiddleware(
@@ -53,6 +58,10 @@ func NewPermissionMiddleware(
 
 func (m *PermissionMiddleware) SetChartDatasetResolver(resolver ChartDatasetGroupResolver) {
 	m.chartDatasetResolver = resolver
+}
+
+func (m *PermissionMiddleware) SetVisualizationTypeResolver(resolver VisualizationTypeResolver) {
+	m.visualizationResolver = resolver
 }
 
 func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey string) gin.HandlerFunc {
@@ -208,8 +217,16 @@ func (m *PermissionMiddleware) CheckDashboardView() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDashboard, permission.PermKeyView)
 }
 
+func (m *PermissionMiddleware) CheckVisualizationView() gin.HandlerFunc {
+	return m.checkVisualizationPermission(permission.PermKeyView)
+}
+
 func (m *PermissionMiddleware) CheckDashboardEdit() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDashboard, permission.PermKeyEdit)
+}
+
+func (m *PermissionMiddleware) CheckVisualizationEdit() gin.HandlerFunc {
+	return m.checkVisualizationPermission(permission.PermKeyEdit)
 }
 
 func (m *PermissionMiddleware) CheckDashboardExport() gin.HandlerFunc {
@@ -234,6 +251,87 @@ func (m *PermissionMiddleware) CheckDatasourceView() gin.HandlerFunc {
 
 func (m *PermissionMiddleware) CheckDatasourceEdit() gin.HandlerFunc {
 	return m.CheckResourcePermission(permission.ResourceTypeDatasource, permission.PermKeyEdit)
+}
+
+func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			response.Unauthorized(c, "authentication required")
+			c.Abort()
+			return
+		}
+
+		resourceType, resourceID, err := m.resolveVisualizationResource(c)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			c.Abort()
+			return
+		}
+
+		c.Set(ResourceTypeKey, resourceType)
+		c.Set(ResourceIDKey, resourceID)
+		c.Set(PermissionKeyKey, permKey)
+
+		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+			c.Next()
+			return
+		}
+		if m.resourcePermSvc == nil {
+			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			c.Abort()
+			return
+		}
+
+		result := m.resourcePermSvc.CheckPermission(int64(userID), resourceType, resourceID, permKey)
+		if !result.HasPermission {
+			logger.Warn("Visualization permission denied",
+				zap.Uint64("user_id", userID),
+				zap.String("resource_type", resourceType),
+				zap.Int64("resource_id", resourceID),
+				zap.String("perm_key", permKey),
+				zap.String("reason", result.Reason),
+			)
+			response.Forbidden(c, "insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func (m *PermissionMiddleware) resolveVisualizationResource(c *gin.Context) (string, int64, error) {
+	resourceID, err := extractResourceID(c)
+	if err != nil {
+		return "", 0, err
+	}
+	if m.visualizationResolver == nil {
+		return "", 0, fmt.Errorf("visualization type resolver is unavailable")
+	}
+
+	visualizationType, err := m.visualizationResolver.FindDvType(resourceID)
+	if err != nil {
+		return "", 0, err
+	}
+
+	resourceType, err := normalizeVisualizationResourceType(visualizationType)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return resourceType, resourceID, nil
+}
+
+func normalizeVisualizationResourceType(visualizationType string) (string, error) {
+	switch visualizationType {
+	case permission.ResourceTypeDashboard:
+		return permission.ResourceTypeDashboard, nil
+	case "dataV", permission.ResourceTypeScreen:
+		return permission.ResourceTypeScreen, nil
+	default:
+		return "", fmt.Errorf("unsupported visualization type: %q", visualizationType)
+	}
 }
 
 func (m *PermissionMiddleware) CheckBatchResourcePermission(resourceType, permKey string) gin.HandlerFunc {
