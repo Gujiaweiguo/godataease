@@ -1256,6 +1256,177 @@ func TestVisualizationEdit_200_ScreenSuccess(t *testing.T) {
 	}
 }
 
+func TestVisualizationEdit_401_RemainingRootRoutesUnauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	routes := []string{
+		"/dataVisualization/updateBase",
+		"/dataVisualization/move",
+		"/dataVisualization/updatePublishStatus",
+		"/dataVisualization/recoverToPublished",
+	}
+
+	for _, route := range routes {
+		t.Run(route, func(t *testing.T) {
+			mockRepo := &mockResourcePermRepo{hasPermission: true}
+			adminChecker := NewDefaultAdminChecker([]int64{})
+			resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+			exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+			permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+			permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{123: "dashboard"}})
+
+			r := gin.New()
+			r.POST(route, permMiddleware.CheckVisualizationEdit(), func(c *gin.Context) {
+				c.JSON(200, gin.H{"success": true})
+			})
+
+			req := httptest.NewRequest("POST", route, strings.NewReader(`{"id":123}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != 401 {
+				t.Fatalf("expected 401 for unauthenticated visualization edit on %s, got %d", route, w.Code)
+			}
+		})
+	}
+}
+
+func TestVisualizationEdit_200_RemainingRootRoutesDashboardSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	routes := []string{
+		"/dataVisualization/updateBase",
+		"/dataVisualization/move",
+		"/dataVisualization/updatePublishStatus",
+		"/dataVisualization/recoverToPublished",
+	}
+
+	for _, route := range routes {
+		t.Run(route, func(t *testing.T) {
+			mockRepo := &mockResourcePermRepo{hasPermission: true}
+			adminChecker := NewDefaultAdminChecker([]int64{})
+			resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+			exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+			permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+			permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{123: "dashboard"}})
+
+			r := gin.New()
+			r.POST(route, func(c *gin.Context) {
+				c.Set("user_id", uint64(401))
+				c.Next()
+			}, permMiddleware.CheckVisualizationEdit(), func(c *gin.Context) {
+				c.JSON(200, gin.H{
+					"resourceType":  c.GetString(ResourceTypeKey),
+					"resourceID":    c.MustGet(ResourceIDKey),
+					"permissionKey": c.GetString(PermissionKeyKey),
+				})
+			})
+
+			req := httptest.NewRequest("POST", route, strings.NewReader(`{"id":123}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected 200 for authorized visualization edit on %s, got %d", route, w.Code)
+			}
+		})
+	}
+}
+
+func TestVisualizationEdit_403_RemainingRootRoutesForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	routes := []string{
+		"/dataVisualization/updateBase",
+		"/dataVisualization/move",
+		"/dataVisualization/updatePublishStatus",
+		"/dataVisualization/recoverToPublished",
+	}
+
+	for _, route := range routes {
+		t.Run(route, func(t *testing.T) {
+			mockRepo := &mockResourcePermRepo{hasPermission: false}
+			adminChecker := NewDefaultAdminChecker([]int64{})
+			resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+			exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+			permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+			permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{types: map[int64]string{456: "dashboard"}})
+
+			r := gin.New()
+			r.POST(route, func(c *gin.Context) {
+				c.Set("user_id", uint64(402))
+				c.Next()
+			}, permMiddleware.CheckVisualizationEdit(), func(c *gin.Context) {
+				c.JSON(200, gin.H{"success": true})
+			})
+
+			req := httptest.NewRequest("POST", route, strings.NewReader(`{"id":456}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != 403 {
+				t.Fatalf("expected 403 for forbidden visualization edit on %s, got %d", route, w.Code)
+			}
+		})
+	}
+}
+
+func TestVisualizationEdit_FailsClosedOnResolverErrorsForRemainingRootRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	routes := []string{
+		"/dataVisualization/updateBase",
+		"/dataVisualization/move",
+		"/dataVisualization/updatePublishStatus",
+		"/dataVisualization/recoverToPublished",
+	}
+
+	for _, route := range routes {
+		t.Run(route, func(t *testing.T) {
+			mockRepo := &mockResourcePermRepo{hasPermission: true}
+			adminChecker := NewDefaultAdminChecker([]int64{})
+			resourcePermSvc := service.NewResourcePermissionService(mockRepo, adminChecker)
+			exportPermSvc := service.NewExportPermissionService(resourcePermSvc, nil)
+			permMiddleware := NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
+			permMiddleware.SetVisualizationTypeResolver(&mockVisualizationTypeResolver{err: errors.New("visualization lookup failed")})
+
+			r := gin.New()
+			r.POST(route, func(c *gin.Context) {
+				c.Set("user_id", uint64(403))
+				c.Next()
+			}, permMiddleware.CheckVisualizationEdit(), func(c *gin.Context) {
+				c.JSON(200, gin.H{"success": true})
+			})
+
+			req := httptest.NewRequest("POST", route, strings.NewReader(`{"id":999}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected HTTP 200 with business error for resolver failure on %s, got %d", route, w.Code)
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response failed: %v", err)
+			}
+			if resp.Code != "500000" {
+				t.Fatalf("expected code 500000 for %s, got %s", route, resp.Code)
+			}
+			if !strings.Contains(resp.Msg, "visualization lookup failed") {
+				t.Fatalf("expected resolver failure message for %s, got %q", route, resp.Msg)
+			}
+		})
+	}
+}
+
 func TestVisualizationView_FailsClosedWhenResolverErrors(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -457,10 +457,17 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, pe
 		} else {
 			vg.POST("/copy", h.Copy)
 		}
-		vg.POST("/updateBase", h.UpdateBase)
-		vg.POST("/move", h.Move)
-		vg.POST("/updatePublishStatus", h.UpdatePublishStatus)
-		vg.POST("/recoverToPublished", h.RecoverToPublished)
+		if permMiddleware != nil {
+			vg.POST("/updateBase", permMiddleware.CheckVisualizationEdit(), h.UpdateBase)
+			vg.POST("/move", permMiddleware.CheckVisualizationEdit(), h.Move)
+			vg.POST("/updatePublishStatus", permMiddleware.CheckVisualizationEdit(), h.UpdatePublishStatus)
+			vg.POST("/recoverToPublished", permMiddleware.CheckVisualizationEdit(), h.RecoverToPublished)
+		} else {
+			vg.POST("/updateBase", h.UpdateBase)
+			vg.POST("/move", h.Move)
+			vg.POST("/updatePublishStatus", h.UpdatePublishStatus)
+			vg.POST("/recoverToPublished", h.RecoverToPublished)
+		}
 		if permMiddleware != nil {
 			vg.POST("/saveCanvas", permMiddleware.CheckVisualizationParentEdit(), h.SaveCanvas)
 			vg.POST("/findById", permMiddleware.CheckVisualizationView(), h.FindByID)
