@@ -84,6 +84,11 @@ The system MUST enforce governed resource-level permission checks on in-scope vi
 - **THEN** both entry points MUST enforce equivalent governed authorization semantics
 - **AND** the system MUST NOT leave the legacy-compatible write path behind Auth-only protection once the canonical route is governed
 
+#### Scenario: Remaining root visualization mutation routes do not stay behind Auth-only protection
+- **WHEN** one of the remaining in-scope root visualization mutation routes is reachable through the root legacy path only (`/dataVisualization/updateBase`, `/dataVisualization/move`, `/dataVisualization/updatePublishStatus`, `/dataVisualization/recoverToPublished`)
+- **THEN** that route MUST still enforce governed authorization semantics rather than treating successful authentication as sufficient
+- **AND** adjacent visualization list, tree, and helper routes MUST NOT be implicitly broadened by this rollout
+
 ### Requirement: Column Permission Control
 
 系统 SHALL 在 Go 实现中保持与 Java 版本完全一致的列级权限控制。
