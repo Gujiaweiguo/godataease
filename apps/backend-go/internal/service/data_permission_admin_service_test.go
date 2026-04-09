@@ -590,6 +590,7 @@ func TestDataPermissionAdminService_ColumnPermissionStoreErrorPaths(t *testing.T
 func TestDataPermissionAdminService_ColumnPermissionPage(t *testing.T) {
 	t.Run("maps custom and disable rules", testColumnPermissionPageBase)
 	t.Run("maps keep ends mask rule", testColumnPermissionPageKeepEnds)
+	t.Run("maps keep middle mask rule", testColumnPermissionPageKeepMiddle)
 }
 
 func testColumnPermissionPageBase(t *testing.T) {
@@ -671,6 +672,29 @@ func testColumnPermissionPageKeepEnds(t *testing.T) {
 	}
 }
 
+func testColumnPermissionPageKeepMiddle(t *testing.T) {
+	keepMiddleBytes, err := json.Marshal(permission.DesensitizationRule{BuiltInRule: permission.BuiltInRuleKeepMiddleThree})
+	if err != nil {
+		t.Fatalf("marshal keep middle rule failed: %v", err)
+	}
+
+	columnStore := &fakeColumnPermissionStore{items: []*permission.DataPermColumn{{ID: 4, DatasetID: 10, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: string(keepMiddleBytes)}}}
+	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 21, OriginName: "mobile", Type: "string"}}}}
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+
+	page, err := svc.ColumnPermissionPage(10, 1, 10)
+	if err != nil {
+		t.Fatalf("ColumnPermissionPage failed: %v", err)
+	}
+	list, ok := page.List.([]ColumnPermissionForm)
+	if !ok || len(list) != 1 {
+		t.Fatalf("unexpected column list: %#v", page.List)
+	}
+	if list[0].MaskRule != maskRuleKeepMiddle {
+		t.Fatalf("expected keep_middle mask mapping, got %#v", list[0])
+	}
+}
+
 func TestDataPermissionAdminService_HelperBranches(t *testing.T) {
 	t.Run("decode and encode mask helpers", testDataPermissionMaskHelpers)
 	t.Run("apply mask helpers", testDataPermissionApplyMaskHelpers)
@@ -701,6 +725,14 @@ func testDataPermissionMaskHelpers(t *testing.T) {
 		t.Fatalf("expected keep_ends rule, got %s", maskKeepEnds)
 	}
 
+	maskKeepMiddle, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: maskRuleKeepMiddle})
+	if err != nil {
+		t.Fatalf("encodeMaskRule keep_middle failed: %v", err)
+	}
+	if !strings.Contains(maskKeepMiddle, string(permission.BuiltInRuleKeepMiddleThree)) {
+		t.Fatalf("expected keep_middle rule, got %s", maskKeepMiddle)
+	}
+
 	maskEmpty, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeDisable})
 	if err != nil {
 		t.Fatalf("encodeMaskRule non-mask failed: %v", err)
@@ -720,6 +752,16 @@ func testDataPermissionApplyMaskHelpers(t *testing.T) {
 	applyMaskRuleToForm(keepEndsForm, maskKeepEnds)
 	if keepEndsForm.MaskRule != maskRuleKeepEnds {
 		t.Fatalf("expected keep_ends mapping, got %#v", keepEndsForm)
+	}
+
+	maskKeepMiddle, err := encodeMaskRule(&ColumnPermissionForm{RuleType: permission.PermTypeMask, MaskRule: maskRuleKeepMiddle})
+	if err != nil {
+		t.Fatalf("encodeMaskRule keep_middle failed: %v", err)
+	}
+	keepMiddleForm := &ColumnPermissionForm{}
+	applyMaskRuleToForm(keepMiddleForm, maskKeepMiddle)
+	if keepMiddleForm.MaskRule != maskRuleKeepMiddle {
+		t.Fatalf("expected keep_middle mapping, got %#v", keepMiddleForm)
 	}
 
 	invalidForm := &ColumnPermissionForm{}

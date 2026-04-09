@@ -37,9 +37,10 @@ type DataPermissionAdminService struct {
 }
 
 const (
-	maskRuleAll      = "all"
-	maskRuleCustom   = "custom"
-	maskRuleKeepEnds = "keep_ends"
+	maskRuleAll        = "all"
+	maskRuleCustom     = "custom"
+	maskRuleKeepEnds   = "keep_ends"
+	maskRuleKeepMiddle = "keep_middle"
 )
 
 type DataPermissionPage struct {
@@ -364,6 +365,8 @@ func encodeMaskRule(req *ColumnPermissionForm) (string, error) {
 	switch req.MaskRule {
 	case "keep_ends":
 		rule.BuiltInRule = permission.BuiltInRuleKeepFirstAndLastThree
+	case maskRuleKeepMiddle:
+		rule.BuiltInRule = permission.BuiltInRuleKeepMiddleThree
 	case maskRuleCustom:
 		rule.BuiltInRule = permission.BuiltInRuleCustom
 		rule.CustomBuiltInRule = permission.CustomRuleRetainBeforeMAndAfterN
@@ -395,6 +398,8 @@ func applyMaskRuleToForm(item *ColumnPermissionForm, raw string) {
 	switch rule.BuiltInRule {
 	case permission.BuiltInRuleKeepFirstAndLastThree:
 		item.MaskRule = maskRuleKeepEnds
+	case permission.BuiltInRuleKeepMiddleThree:
+		item.MaskRule = maskRuleKeepMiddle
 	case permission.BuiltInRuleCustom:
 		item.MaskRule = maskRuleCustom
 		item.MaskStart = rule.M
