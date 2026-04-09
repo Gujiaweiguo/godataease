@@ -7,10 +7,10 @@ export const switchOrg = (id: number | string) => request.post({ url: `/user/swi
 
 export const userInfo = () => request.get({ url: '/user/info' })
 
-export const userOptionForRoleApi = data => request.post({ url: '/user/role/option', data })
+export const userOptionForRoleApi = data => request.post({ url: '/role/user/option', data })
 
 export const userSelectedForRoleApi = (page: number, limit: number, data) =>
-  request.post({ url: `/user/role/selected/${page}/${limit}`, data })
+  request.post({ url: '/role/user/selected', data: { ...data, page, limit } })
 
 export const personInfoApi = () => request.get({ url: `/user/personInfo` })
 
