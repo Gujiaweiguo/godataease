@@ -62,3 +62,11 @@ Define Go audit logging requirements for authentication events and operation tra
 #### Scenario: Automatic request logging
 - **WHEN** 请求经过审计中间件
 - **THEN** 系统 SHALL 自动提取并记录 user_id、ip_address、user_agent 等信息
+
+### Requirement: UserService audit dependency is wired at startup
+The UserService MUST have its audit service dependency injected during application initialization.
+
+#### Scenario: UserService audit dependency is wired at startup
+- **WHEN** the application starts and initializes the UserService
+- **THEN** the UserService MUST have its audit service dependency injected via SetAuditService
+- **AND** password reset operations MUST produce audit log entries in de_audit_log
