@@ -160,6 +160,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		return userRoleRepo.GetRoleIDsByUserID(int64(userID))
 	})
 	userService := service.NewUserService(userRepo, userRoleRepo, userPermRepo)
+	userService.SetAuditService(auditService)
 	userImportService := service.NewUserImportService(userService)
 	userHandler := handler.NewUserHandler(userService, userImportService)
 	// Role module initialization (must be before OrgService as it depends on roleRepo)
