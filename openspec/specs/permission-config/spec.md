@@ -101,6 +101,11 @@ The system MUST enforce governed resource-level permission checks on in-scope vi
 - **WHEN** a user queries a dataset with a masked column
 - **THEN** Go 实现 SHALL 以与 Java 版本相同的方式进行脱敏处理
 
+#### Scenario: Permission center exposes keep-middle column desensitization
+- **WHEN** an administrator configures column permission masking from the unified permission center
+- **THEN** the UI MUST expose the existing keep-middle desensitization rule supported by backend masking
+- **AND** saving and reloading that rule MUST preserve the selected keep-middle semantics without degrading to another mask rule
+
 ### Requirement: Export Permission Control
 The system SHALL provide granular export permission control including:
 - Resource export permission: control export of images, PDFs, templates
