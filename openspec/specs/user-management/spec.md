@@ -85,6 +85,11 @@ The system SHALL support bulk operations for efficient user management including
 - **THEN** 响应中的 `language` 字段 SHALL 返回受支持的规范化 locale 值
 - **AND** Go 实现 SHALL NOT 为所有用户返回固定的硬编码默认语言
 
+#### Scenario: Legacy `/user/org/option` endpoint returns user-option payload semantics
+- **WHEN** a client invokes compatibility endpoint `/user/org/option`
+- **THEN** the response MUST preserve user-option payload semantics expected by legacy consumers
+- **AND** the endpoint MUST remain aligned with user-option behavior instead of returning organization-list payload semantics
+
 ### Requirement: User Repository Pattern
 
 系统 SHALL 使用 Repository 模式实现数据访问层。
