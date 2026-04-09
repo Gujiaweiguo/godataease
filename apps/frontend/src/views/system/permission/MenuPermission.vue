@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus-secondary'
-import { queryRoleApi, menuPerApi, menuPerSaveApi } from '@/api/auth'
+import { menuTreeApi, queryRoleApi, roleMenuAuthApi, roleMenuAuthSaveApi } from '@/api/auth'
 
 const treeProps = {
   label: (data: any) => data.meta?.title || data.name || data.path,
@@ -60,7 +60,16 @@ const loadRoleList = async () => {
 
 const loadMenuPermission = async (roleId: number | null) => {
   try {
-    const res = await menuPerApi({ roleId: roleId || 0 })
+    if (!roleId) {
+      const treeRes = await menuTreeApi()
+      if (treeRes.code === '000000') {
+        menuTree.value = treeRes.data || []
+        selectedMenuIds.value = []
+      }
+      return
+    }
+
+    const res = await roleMenuAuthApi(roleId)
     if (res.code === '000000') {
       menuTree.value = res.data?.menuTree || []
       selectedMenuIds.value = res.data?.menuIds || []
@@ -90,7 +99,7 @@ const handleSave = async () => {
   }
 
   try {
-    const res = await menuPerSaveApi({
+    const res = await roleMenuAuthSaveApi({
       roleId: selectedRoleId.value,
       menuIds: selectedMenuIds.value
     })
