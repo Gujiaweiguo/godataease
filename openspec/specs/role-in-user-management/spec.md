@@ -28,3 +28,11 @@ The system SHALL remove the standalone role-management menu from the governed sy
 - **WHEN** a user browses the system-management menu structure after this change
 - **THEN** the standalone role-management menu entry MUST be hidden from the governed navigation
 - **AND** role workflows MUST instead remain reachable through the Role tab inside user management
+
+### Requirement: Role member management APIs use correct canonical paths
+The frontend MUST call role-user endpoints with path segments matching the backend canonical route registration order.
+
+#### Scenario: Role member management APIs use correct canonical paths
+- **WHEN** the RoleTab member management dialog queries available roles or selected roles for a user
+- **THEN** the frontend MUST call `/role/user/option` and `/role/user/selected` respectively
+- **AND** the path segments MUST match the backend canonical route registration order (`/role/user/...` not `/user/role/...`)
