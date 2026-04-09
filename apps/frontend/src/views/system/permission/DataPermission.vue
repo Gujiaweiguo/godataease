@@ -142,6 +142,7 @@
           <el-select v-model="columnRuleForm.maskRule" placeholder="请选择脱敏规则">
             <el-option label="全部隐藏" value="all" />
             <el-option label="保留首尾" value="keep_ends" />
+            <el-option label="保留中间" value="keep_middle" />
             <el-option label="自定义位置" value="custom" />
           </el-select>
         </el-form-item>
