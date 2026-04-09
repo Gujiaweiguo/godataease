@@ -104,13 +104,6 @@ func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string, callerOrgI
 	if rle.RoleType != nil && *rle.RoleType == role.RoleTypeSystem {
 		return fmt.Errorf("cannot edit built-in system role")
 	}
-	if err != nil {
-		return fmt.Errorf("role not found: %w", err)
-	}
-
-	if rle.RoleType != nil && *rle.RoleType == role.RoleTypeSystem {
-		return fmt.Errorf("cannot edit built-in system role")
-	}
 
 	roleName := req.RoleName
 	if roleName == "" {
