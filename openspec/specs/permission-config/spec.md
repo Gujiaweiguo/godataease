@@ -186,6 +186,11 @@ The system SHALL let administrators manage menu authorization for roles from the
 - **THEN** the system MUST persist those changes through the governed permission workflow
 - **AND** the resulting menu visibility MUST remain consistent with the saved role authorization state
 
+#### Scenario: Menu permission tab uses canonical role-menu authorization APIs for role-scoped load/save
+- **WHEN** an administrator selects a role and queries or saves menu authorization from the menu permission tab
+- **THEN** the workflow MUST use canonical role-menu authorization APIs
+- **AND** the role-scoped menu authorization result MUST remain consistent with previously saved state
+
 ### Requirement: Resource permission supports governed assignment views
 The system SHALL provide a unified resource-permission workflow that supports the governed assignment perspectives in this change scope.
 
