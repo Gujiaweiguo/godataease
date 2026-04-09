@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
@@ -543,4 +544,52 @@ func TestUserImportServiceIntegration_ImportUsersPartialSuccess(t *testing.T) {
 	assert.Equal(t, createdOrg.OrgID, memberships[0].OrgID)
 	err = bcrypt.CompareHashAndPassword([]byte(created.Password), []byte(svc.ResolveDefaultPassword()))
 	assert.NoError(t, err)
+}
+
+func TestUserServiceIntegration_ResetPassword_WithAuditLog(t *testing.T) {
+	cleanupTables(&user.SysUser{}, &user.SysUserRole{}, &user.SysUserPerm{}, &audit.AuditLog{}, &audit.AuditLogDetail{})
+
+	userRepo := repository.NewUserRepository(testDB)
+	svc := NewUserService(userRepo, repository.NewUserRoleRepository(testDB), repository.NewUserPermRepository(testDB))
+
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
+	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
+	auditSvc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+	svc.SetAuditService(auditSvc)
+
+	// Create user
+	id, err := svc.CreateUser(&user.UserCreateRequest{
+		Username: "auditresetuser",
+		Password: "oldpassword",
+	})
+	require.NoError(t, err)
+
+	// Reset password with audit
+	err = svc.ResetPasswordWithAudit(id, "newpass", 1, "tester", "127.0.0.1")
+	require.NoError(t, err)
+
+	// Verify password changed
+	updated, err := userRepo.GetByID(id)
+	require.NoError(t, err)
+	err = bcrypt.CompareHashAndPassword([]byte(updated.Password), []byte("newpass"))
+	assert.NoError(t, err)
+
+	// Verify audit log was created
+	logs, total, err := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, total, int64(1))
+	require.NotEmpty(t, logs)
+
+	log := logs[0]
+	assert.Equal(t, audit.OperationUpdate, log.Operation)
+	assert.Equal(t, audit.StatusSuccess, log.Status)
+	assert.NotNil(t, log.UserID)
+	assert.Equal(t, int64(1), *log.UserID)
+	if log.Username != nil {
+		assert.Equal(t, "tester", *log.Username)
+	}
+	if log.IPAddress != nil {
+		assert.Equal(t, "127.0.0.1", *log.IPAddress)
+	}
 }
