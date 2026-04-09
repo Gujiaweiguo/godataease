@@ -13,7 +13,9 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
@@ -1763,5 +1765,105 @@ func assertPermissionAwareDatasetPreview(t *testing.T, detail map[string]interfa
 	}
 	if row["region"] == "north" {
 		t.Fatalf("expected masked region value in preview row, got %#v", row)
+	}
+}
+
+func TestCompatibilityBridge_UserOrgOption_UsesUserOptions_WhenOrgHandlerPresent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	userHandler, orgHandler := setupBridgeUserOrgHandlers(t)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("org_id", int64(1))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(r, userHandler, orgHandler, nil, nil, nil, nil)
+
+	req := httptest.NewRequest("GET", "/user/org/option", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	assertUserOrgOptionReturnsUserShape(t, w.Body.Bytes())
+}
+
+func TestCompatibilityBridge_UserOrgOption_UsesUserOptions_WhenOrgHandlerMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	userHandler, _ := setupBridgeUserOrgHandlers(t)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("org_id", int64(1))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(r, userHandler, nil, nil, nil, nil, nil)
+
+	req := httptest.NewRequest("GET", "/user/org/option", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	assertUserOrgOptionReturnsUserShape(t, w.Body.Bytes())
+}
+
+func setupBridgeUserOrgHandlers(t *testing.T) (*UserHandler, *OrgHandler) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err = db.AutoMigrate(&user.SysUser{}, &user.SysUserRole{}, &org.SysOrg{}); err != nil {
+		t.Fatalf("migrate bridge user-org tables failed: %v", err)
+	}
+
+	if err = db.Create(&org.SysOrg{OrgID: 1, OrgName: "Org A", ParentID: 0, Level: 1, Status: 1, DelFlag: 0}).Error; err != nil {
+		t.Fatalf("seed org failed: %v", err)
+	}
+	alice := "Alice"
+	if err = db.Create(&user.SysUser{UserID: 101, Username: "alice", NickName: alice, Status: 1, DelFlag: 0}).Error; err != nil {
+		t.Fatalf("seed user failed: %v", err)
+	}
+	if err = db.Create(&user.SysUserRole{UserID: 101, RoleID: 1, OrgID: 1}).Error; err != nil {
+		t.Fatalf("seed user-org relation failed: %v", err)
+	}
+
+	userRepo := repository.NewUserRepository(db)
+	userRoleRepo := repository.NewUserRoleRepository(db)
+	userSvc := service.NewUserService(userRepo, userRoleRepo, nil)
+	userHandler := NewUserHandler(userSvc, service.NewUserImportService(userSvc))
+
+	orgRepo := repository.NewOrgRepository(db)
+	orgSvc := service.NewOrgService(orgRepo, nil, userRepo, nil)
+	orgHandler := NewOrgHandler(orgSvc)
+
+	return userHandler, orgHandler
+}
+
+func assertUserOrgOptionReturnsUserShape(t *testing.T, body []byte) {
+	t.Helper()
+
+	var resp struct {
+		Code string                   `json:"code"`
+		Data []map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("unmarshal /user/org/option response failed: %v", err)
+	}
+	if resp.Code != "000000" {
+		t.Fatalf("expected success code 000000, got %s", resp.Code)
+	}
+	if len(resp.Data) == 0 {
+		t.Fatalf("expected non-empty user option list, got %#v", resp.Data)
+	}
+	if _, ok := resp.Data[0]["username"]; !ok {
+		t.Fatalf("expected user option payload to include username, got %#v", resp.Data[0])
+	}
+	if _, exists := resp.Data[0]["orgId"]; exists {
+		t.Fatalf("expected /user/org/option to avoid org-list payload shape, got %#v", resp.Data[0])
 	}
 }
