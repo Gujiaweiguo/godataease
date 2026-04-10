@@ -1093,6 +1093,8 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			userGroup.GET("/errorRecord/:key", user.DownloadErrorRecord)
 			userGroup.GET("/clearErrorRecord/:key", user.ClearErrorRecord)
 			userGroup.GET("/defaultPwd", user.GetDefaultPassword)
+			userGroup.GET("/personInfo", user.PersonInfo)
+			userGroup.GET("/ipInfo", user.IPInfo)
 			userGroup.POST("/enable", user.SwitchEnable)
 			userGroup.POST("/resetPwd/:uid", middleware.AuditLog(middleware.AuditConfig{
 				ActionType:   audit.ActionTypeUserAction,

@@ -73,6 +73,68 @@ func TestUserHandler_ResetPasswordCompat_InvalidID(t *testing.T) {
 	assert.Equal(t, "500000", resp["code"])
 }
 
+func TestUserHandler_PersonInfo_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	h := &UserHandler{
+		loadUserByID: func(userID int64) (*user.SysUser, error) {
+			return &user.SysUser{UserID: userID, Username: "admin", NickName: "管理员"}, nil
+		},
+	}
+	r := gin.New()
+	r.GET("/user/personInfo", func(c *gin.Context) {
+		c.Set("user_id", uint64(1))
+		c.Set("username", "admin")
+		h.PersonInfo(c)
+	})
+
+	req := httptest.NewRequest("GET", "/user/personInfo", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+
+	data, ok := resp["data"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, float64(1), data["id"])
+	assert.Equal(t, "admin", data["account"])
+	assert.Equal(t, "管理员", data["name"])
+	assert.Equal(t, "de", data["model"])
+	assert.NotEmpty(t, data["ip"])
+}
+
+func TestUserHandler_IPInfo_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	h := &UserHandler{}
+	r := gin.New()
+	r.GET("/user/ipInfo", func(c *gin.Context) {
+		c.Set("user_id", uint64(2))
+		c.Set("username", "operator")
+		h.IPInfo(c)
+	})
+
+	req := httptest.NewRequest("GET", "/user/ipInfo", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+
+	data, ok := resp["data"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "operator", data["account"])
+	assert.Equal(t, "operator", data["name"])
+	assert.NotEmpty(t, data["ip"])
+}
+
 func TestRegisterUserRoutes_DefaultPassword_CanonicalPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv(service.DefaultPasswordEnvName, "canonical-default-pwd")
