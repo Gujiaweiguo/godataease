@@ -54,3 +54,13 @@ The system SHALL use an upsert pattern for watermark persistence, creating or up
 - **WHEN** user saves watermark settings multiple times
 - **THEN** only one watermark record exists with the latest settings
 
+### Requirement: Watermark identity compatibility endpoints remain available
+The system SHALL provide compatibility user identity endpoints used by watermark preview and runtime rendering.
+
+#### Scenario: Watermark settings page loads user person info
+- **WHEN** watermark settings page requests user identity fields for watermark preview
+- **THEN** backend MUST provide `/user/personInfo` with `id`, `account`, `name`, and `ip` fields
+
+#### Scenario: Runtime watermark resolver loads current IP info
+- **WHEN** runtime watermark logic requests current user/ip identity
+- **THEN** backend MUST provide `/user/ipInfo` with `account`, `name`, and `ip` fields

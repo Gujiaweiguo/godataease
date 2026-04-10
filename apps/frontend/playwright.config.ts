@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const defaultLocalBaseURL = 'http://localhost:5173'
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -11,7 +13,7 @@ export default defineConfig({
     ['json', { outputFile: 'playwright-report/results.json' }],
   ],
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:8080',
+    baseURL: process.env.E2E_BASE_URL || defaultLocalBaseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -22,11 +24,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
   ],
-  webServer: process.env.CI
+  webServer: process.env.CI || process.env.E2E_BASE_URL
     ? undefined
     : {
         command: 'npm run dev',
-        url: 'http://localhost:8080',
+        url: defaultLocalBaseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120000,
       },

@@ -19,6 +19,7 @@
 
 ## System Smoke 执行入口
 
+- PR：`Frontend CI` 在 `pull_request` 事件会触发 `system_smoke`（缺少 `E2E_BASE_URL` / `E2E_PASSWORD` 时会在前置检查后跳过）
 - 手动：GitHub Actions -> `Frontend CI` -> `Run workflow`，设置 `run_system_smoke=true`
 - 定时：`Frontend CI` 内置 nightly 调度自动执行 `system_smoke`（非阻断）
 - 本地：`apps/frontend` 下执行 `npm run e2e:system-smoke`
