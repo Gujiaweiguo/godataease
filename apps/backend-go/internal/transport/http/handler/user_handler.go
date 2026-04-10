@@ -190,6 +190,65 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 	response.Success(c, bootstrap)
 }
 
+func (h *UserHandler) PersonInfo(c *gin.Context) {
+	userID := int64(middleware.GetUserID(c))
+	if userID <= 0 {
+		response.Unauthorized(c, "invalid user context")
+		return
+	}
+
+	account, name := h.resolveWatermarkIdentity(userID, middleware.GetUsername(c))
+	response.Success(c, gin.H{
+		"id":      userID,
+		"account": account,
+		"name":    name,
+		"ip":      c.ClientIP(),
+		"model":   "de",
+	})
+}
+
+func (h *UserHandler) IPInfo(c *gin.Context) {
+	userID := int64(middleware.GetUserID(c))
+	if userID <= 0 {
+		response.Unauthorized(c, "invalid user context")
+		return
+	}
+
+	account, name := h.resolveWatermarkIdentity(userID, middleware.GetUsername(c))
+	response.Success(c, gin.H{
+		"account": account,
+		"name":    name,
+		"ip":      c.ClientIP(),
+	})
+}
+
+func (h *UserHandler) resolveWatermarkIdentity(userID int64, fallbackUsername string) (string, string) {
+	account := fallbackUsername
+	name := fallbackUsername
+
+	if h.loadUserByID != nil {
+		if u, err := h.loadUserByID(userID); err == nil && u != nil {
+			if u.Username != "" {
+				account = u.Username
+			}
+			if u.NickName != "" {
+				name = u.NickName
+			} else if u.Username != "" {
+				name = u.Username
+			}
+		}
+	}
+
+	if account == "" {
+		account = "admin"
+	}
+	if name == "" {
+		name = account
+	}
+
+	return account, name
+}
+
 func (h *UserHandler) SwitchOrg(c *gin.Context) {
 	if h.switchOrg == nil {
 		response.Error(c, "500000", "org switcher is not configured")
