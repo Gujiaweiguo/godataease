@@ -24,6 +24,20 @@
 - 定时：`Frontend CI` 内置 nightly 调度自动执行 `system_smoke`（非阻断）
 - 本地：`apps/frontend` 下执行 `npm run e2e:system-smoke`
 
+> 若暂无公网可访问的 `E2E_BASE_URL`，`system_smoke` 在 CI 中允许快速跳过；此时周基线应改为记录本地替代验证结果（见下节）。
+
+## 无公网 E2E 环境的本地替代验证
+
+涉及登录/数据源关键链路的变更，PR 前至少执行：
+
+```bash
+npm run lint
+npm run ts:check
+npm run e2e -- -g 'SYS-SMK-004|SYS-SMK-005|SYS-SMK-006'
+```
+
+并在 PR 描述附执行结果摘要，作为当周质量基线补充证据。
+
 ## 固定字段
 
 - Date (UTC)

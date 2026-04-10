@@ -125,6 +125,8 @@ For detailed test account setup and required permissions, and required permissio
 - `E2E_BASE_URL` 对 GitHub runner 可访问，且目标环境稳定可登录。
 - 测试账号可用，并具备当前 smoke 用例所需权限；至少覆盖 `SYS-SMK-004/005/006`。
 
+> 当前执行策略（无公网可访问 E2E 环境）：若暂时无法提供 GitHub runner 可访问的 `E2E_BASE_URL`，则保持 `system_smoke` 在 CI 中快速跳过，不进入 required check 升级流程。
+
 ### 11.2 运行质量门槛
 
 - 在最近 10 次相关 PR 运行中，`system_smoke` 的真实执行率应 ≥ 80%。
@@ -209,3 +211,18 @@ For detailed test account setup and required permissions, and required permissio
 - 当周若大多数运行仍是 `missing secrets` 跳过，不进入 required check 评估。
 - 当周若失败主要来自环境不可达或账号权限错误，优先修环境，不要先修测试。
 - 只有当 `SYS-SMK-004/005/006` 连续多次稳定，且失败多数代表真实回归时，才进入升级讨论。
+
+## 13. 无公网 E2E 环境时的替代验证策略（必执行）
+
+当仓库暂时没有可供 GitHub runner 访问的 E2E 环境时，所有涉及登录/数据源关键链路的改动，在发起 PR 前至少执行并记录以下本地验证：
+
+```bash
+npm run lint
+npm run ts:check
+npm run e2e -- -g 'SYS-SMK-004|SYS-SMK-005|SYS-SMK-006'
+```
+
+### PR 要求
+
+- 在 PR 描述中附上上述三条命令的执行结果（成功/失败、关键日志或截图）。
+- 若未执行，需明确说明原因与风险，不得以“CI 已跳过 system_smoke”替代本地验证。
