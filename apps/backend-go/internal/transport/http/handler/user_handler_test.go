@@ -73,6 +73,49 @@ func TestUserHandler_ResetPasswordCompat_InvalidID(t *testing.T) {
 	assert.Equal(t, "500000", resp["code"])
 }
 
+func TestRegisterUserRoutes_DefaultPassword_CanonicalPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv(service.DefaultPasswordEnvName, "canonical-default-pwd")
+
+	h := NewUserHandler(&service.UserService{}, service.NewUserImportService(&service.UserService{}))
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterUserRoutes(api, h)
+
+	req := httptest.NewRequest("GET", "/api/system/user/defaultPwd", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+
+	data, ok := resp["data"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "canonical-default-pwd", data["defaultPwd"])
+}
+
+func TestRegisterUserRoutes_ResetPassword_CanonicalPath_InvalidID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	h := NewUserHandler(&service.UserService{}, service.NewUserImportService(&service.UserService{}))
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterUserRoutes(api, h)
+
+	req := httptest.NewRequest("POST", "/api/system/user/resetPwd/invalid", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp["code"])
+}
+
 func TestUserHandler_DownloadExcelTemplate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

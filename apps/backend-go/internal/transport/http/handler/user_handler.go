@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"dataease/backend/internal/domain/audit"
 	domainauth "dataease/backend/internal/domain/auth"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/response"
@@ -426,6 +427,12 @@ func RegisterUserRoutes(r *gin.RouterGroup, h *UserHandler) {
 		userGroup.POST("/delete/:id", h.DeleteUser)
 		userGroup.POST("/enable", h.SwitchEnable)
 		userGroup.GET("/options", h.GetUserOptions)
+		userGroup.GET("/defaultPwd", h.GetDefaultPassword)
+		userGroup.POST("/resetPwd/:id", middleware.AuditLog(middleware.AuditConfig{
+			ActionType:   audit.ActionTypeUserAction,
+			ActionName:   "RESET_USER_PASSWORD",
+			ResourceType: audit.ResourceTypeUser,
+		}), h.ResetPasswordCompat)
 	}
 
 	r.GET("/user/info", h.GetUserInfo)

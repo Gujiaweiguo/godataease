@@ -29,8 +29,8 @@ export const mountExternalUserApi = data => request.post({ url: '/role/mountExte
 
 export const switchLangApi = data => request.post({ url: '/user/switchLanguage', data })
 
-export const defaultPwdApi = () => request.get({ url: '/user/defaultPwd' })
+export const defaultPwdApi = () => request.get({ url: '/system/user/defaultPwd' })
 
-export const resetPwdApi = uid => request.post({ url: `/user/resetPwd/${uid}` })
+export const resetPwdApi = uid => request.post({ url: `/system/user/resetPwd/${uid}` })
 
 export const switchEnableApi = data => request.post({ url: '/system/user/enable', data })
