@@ -201,6 +201,11 @@ The system SHALL allow authorized administrators to reset a user's password to t
 - **THEN** the system MUST deny the request
 - **AND** the system MUST not mutate credential data
 
+#### Scenario: Canonical user-management password endpoints are primary
+- **WHEN** frontend user-management flows request default password or trigger reset password
+- **THEN** the system MUST provide canonical endpoints `/system/user/defaultPwd` and `/system/user/resetPwd/:id`
+- **AND** canonical endpoint behavior MUST remain compatible with existing reset-password response semantics
+
 ### Requirement: User Lifecycle Must Be Organization-Scoped by Default
 The system MUST treat organization selection as a first-class prerequisite for governed user administration.
 
