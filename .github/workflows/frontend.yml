@@ -191,7 +191,7 @@ jobs:
           retention-days: 7
 
   system_smoke:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
+    if: github.event_name == 'schedule' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_system_smoke == 'true')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -199,19 +199,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: apps/frontend/package.json
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
 
       - name: Check smoke test prerequisites
         id: smoke_prereq
@@ -226,6 +213,22 @@ jobs:
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Setup Node.js
+        if: steps.smoke_prereq.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package.json
+
+      - name: Install dependencies
+        if: steps.smoke_prereq.outputs.run == 'true'
+        run: npm install
+
+      - name: Install Playwright browsers
+        if: steps.smoke_prereq.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
 
       - name: Run system smoke tests
         if: steps.smoke_prereq.outputs.run == 'true'
