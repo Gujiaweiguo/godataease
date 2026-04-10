@@ -68,7 +68,7 @@
 
 ## 7. 建议执行方式
 
-- PR 阶段：`Frontend CI` 会自动运行 `system_smoke`；若 secrets 缺失则按当前逻辑跳过
+- PR 阶段：`Frontend CI` 会自动运行 `system_smoke`；若缺少必需 secrets（`E2E_BASE_URL`、`E2E_PASSWORD`）会快速跳过，并在 Summary 标注 `skipped (missing secrets)`
 - Nightly 阶段：已接入 `frontend.yml` 的 `system_smoke` job，默认每日自动执行
 - 周复盘：记录“通过率、失败原因、修复时长、是否误报”
 
@@ -76,13 +76,14 @@
 
 - 手动触发：GitHub Actions -> `Frontend CI` -> `Run workflow`，勾选 `run_system_smoke=true`
 - 定时触发：`Frontend CI` 每日按 cron 自动运行 `system_smoke`
-- PR 触发：`Frontend CI` 在 PR 中自动运行 `system_smoke`（需要 `E2E_BASE_URL`、`E2E_PASSWORD` secrets 可用）
+- PR 触发：`Frontend CI` 在 PR 中自动运行 `system_smoke`（仅当 `E2E_BASE_URL`、`E2E_PASSWORD` secrets 可用时才会真实执行）
 - 本地命令：`npm run e2e:system-smoke`
 
 ### 必需 Secrets
 
 - `E2E_BASE_URL`：可访问的测试环境地址（例如 `http://localhost:18080`）
 - `E2E_PASSWORD`：测试账号密码
+- `E2E_USERNAME`：测试账号（可选，默认 `admin`）
 
 ### 可选 Secrets（失败告警）
 

@@ -8,7 +8,9 @@ This document describes the E2E test account configuration for DataEase frontend
 
 - **Username**: `admin`
 - **User ID**: 1
-- **Default Password**: `DataEase123456`
+- **Password Source of Truth**: `E2E_PASSWORD`（GitHub Actions secret / 本地环境变量）
+
+> 说明：为避免口径漂移，不在此文档中维护固定默认密码；请始终以运行环境注入的 `E2E_PASSWORD` 为准。
 
 ## Required Permissions
 
@@ -83,7 +85,7 @@ ON DUPLICATE KEY UPDATE update_time = NOW();
 cd apps/frontend
 E2E_BASE_URL=http://localhost:18080 \
 E2E_USERNAME=admin \
-E2E_PASSWORD=DataEase123456 \
+E2E_PASSWORD='<your-e2e-password>' \
 npm run e2e:system-smoke
 ```
 
@@ -122,6 +124,9 @@ If login fails:
 docker exec mysql8 mysql -uroot -pAdmin168 dataease_dev -e "
 SELECT user_id, username, enabled FROM sys_user WHERE username = 'admin';
 "
+
+# Confirm E2E_PASSWORD is set in current shell/session
+echo "$E2E_PASSWORD" | wc -c
 ```
 
 ## Maintenance
