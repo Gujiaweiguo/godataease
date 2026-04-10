@@ -16,6 +16,11 @@ The Go backend SHALL provide compatibility route mappings for Java-era API prefi
 - **THEN** the endpoint MUST resolve to user-option behavior compatible with `user.GetUserOptions`
 - **AND** it MUST NOT switch to organization-list semantics based on whether an org handler instance is injected
 
+#### Scenario: Compatibility bridge exposes watermark identity endpoints
+- **WHEN** compatibility bridge registers Java-era `/user/*` routes
+- **THEN** it MUST include `GET /user/personInfo` and `GET /user/ipInfo`
+- **AND** these endpoints MUST resolve through Go user handler implementations
+
 ### Requirement: Response Contract Parity
 The Go backend SHALL keep response contracts compatible with Java client expectations for migrated endpoints.
 
