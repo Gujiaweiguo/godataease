@@ -29,7 +29,7 @@ jobs:
         working-directory: apps/frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Detect changed areas
         id: changes
@@ -57,7 +57,7 @@ jobs:
               - 'apps/frontend/src/utils/**'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -159,10 +159,10 @@ jobs:
         working-directory: apps/frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -198,7 +198,7 @@ jobs:
         working-directory: apps/frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check smoke test prerequisites
         id: smoke_prereq
@@ -216,7 +216,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.smoke_prereq.outputs.run == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
