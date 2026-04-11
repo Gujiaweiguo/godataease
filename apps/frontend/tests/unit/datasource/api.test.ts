@@ -23,6 +23,7 @@ import {
   deleteById,
   getById,
   getHidePwById,
+  getTableStatus,
   getSimpleDs,
   uploadFile,
   save,
@@ -127,6 +128,22 @@ describe('Datasource API wrappers', () => {
       data: { datasourceId: '123' }
     })
     expect(result).toEqual({ data: { tables: [] } })
+  })
+
+  it('queries datasource table status through the stage2 compatibility endpoint', async () => {
+    requestMock.post.mockResolvedValueOnce({
+      data: [{ tableName: 'orders', status: 'Pending', lastUpdateTime: 1710000000000 }]
+    })
+
+    const result = await getTableStatus({ datasourceId: '123' })
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasource/getTableStatus',
+      data: { datasourceId: '123' }
+    })
+    expect(result).toEqual({
+      data: [{ tableName: 'orders', status: 'Pending', lastUpdateTime: 1710000000000 }]
+    })
   })
 
   it('uses withDatasourceError decorator for checkApiItem method', async () => {

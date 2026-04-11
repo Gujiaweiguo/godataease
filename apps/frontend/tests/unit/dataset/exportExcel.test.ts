@@ -128,13 +128,13 @@ describe('ExportExcel page init', () => {
           dvPreviewDownload: true,
           deDelete: true,
           icon_fileExcel_colorful: true,
-	          icon_refresh_outlined: true,
-	          'el-drawer': true,
-	          'el-dialog': true,
-	          'el-table-column': true,
-	          'el-icon': true,
-	          'el-progress': true,
-	          'el-tooltip': true
+          icon_refresh_outlined: true,
+          'el-drawer': true,
+          'el-dialog': true,
+          'el-table-column': true,
+          'el-icon': true,
+          'el-progress': true,
+          'el-tooltip': true
         },
         mocks: {
           $t: (value: string) => value
@@ -153,6 +153,41 @@ describe('ExportExcel page init', () => {
     expect(hoisted.exportTasks).toHaveBeenCalledWith(1, 10, 'FAILED')
   })
 
+  it('supports pending export-center queries for newly created dataset tasks', async () => {
+    const wrapper = mount(ExportExcel, {
+      global: {
+        directives: {
+          loading: () => undefined
+        },
+        stubs: {
+          EmptyBackground: true,
+          Icon: true,
+          GridTable: true,
+          dvPreviewDownload: true,
+          deDelete: true,
+          icon_fileExcel_colorful: true,
+          icon_refresh_outlined: true,
+          'el-drawer': true,
+          'el-dialog': true,
+          'el-table-column': true,
+          'el-icon': true,
+          'el-progress': true,
+          'el-tooltip': true
+        },
+        mocks: {
+          $t: (value: string) => value
+        }
+      }
+    })
+
+    const exposed = wrapper.vm.$.exposed as ExportExcelExposed
+
+    await exposed.init({ activeName: 'PENDING' })
+    await flushPromises()
+
+    expect(hoisted.exportTasks).toHaveBeenCalledWith(1, 10, 'PENDING')
+  })
+
   it('polls records and tasks again for the IN_PROGRESS tab', async () => {
     const wrapper = mount(ExportExcel, {
       global: {
@@ -166,13 +201,13 @@ describe('ExportExcel page init', () => {
           dvPreviewDownload: true,
           deDelete: true,
           icon_fileExcel_colorful: true,
-	          icon_refresh_outlined: true,
-	          'el-drawer': true,
-	          'el-dialog': true,
-	          'el-table-column': true,
-	          'el-icon': true,
-	          'el-progress': true,
-	          'el-tooltip': true
+          icon_refresh_outlined: true,
+          'el-drawer': true,
+          'el-dialog': true,
+          'el-table-column': true,
+          'el-icon': true,
+          'el-progress': true,
+          'el-tooltip': true
         },
         mocks: {
           $t: (value: string) => value

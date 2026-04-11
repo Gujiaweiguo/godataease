@@ -11,7 +11,15 @@ vi.mock('@/config/axios', () => ({
   default: requestMock
 }))
 
-import { exportRetry, exportTasks, exportTasksRecords, getDatasetTree } from '@/api/dataset'
+import {
+  deleteField,
+  deleteFieldByChartId,
+  exportDatasetData,
+  exportRetry,
+  exportTasks,
+  exportTasksRecords,
+  getDatasetTree
+} from '@/api/dataset'
 
 describe('Dataset API wrappers', () => {
   beforeEach(() => {
@@ -74,5 +82,59 @@ describe('Dataset API wrappers', () => {
       data: {}
     })
     expect(result).toEqual({ code: '000000' })
+  })
+
+  it('keeps non-blob dataset export requests on the export-center lifecycle contract', async () => {
+    requestMock.post.mockResolvedValueOnce({
+      code: '000000',
+      data: { taskId: 'task-7', status: 'PENDING' }
+    })
+
+    const payload = { id: '12', filename: 'Orders' }
+    const result = await exportDatasetData(payload)
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasetTree/exportDataset',
+      method: 'post',
+      data: payload,
+      loading: true
+    })
+    expect(result).toEqual({ code: '000000', data: { taskId: 'task-7', status: 'PENDING' } })
+  })
+
+  it('uses blob response for inline dataset export downloads', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: 'blob-data' })
+
+    await exportDatasetData({ id: '12', dataEaseBi: true })
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasetTree/exportDataset',
+      method: 'post',
+      data: { id: '12', dataEaseBi: true },
+      loading: true,
+      responseType: 'blob'
+    })
+  })
+
+  it('posts dataset field deletion through the compatibility endpoint', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: null })
+
+    await deleteField(705)
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasetField/delete/705',
+      data: {}
+    })
+  })
+
+  it('posts dataset field bulk chart deletion through the compatibility endpoint', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: null })
+
+    await deleteFieldByChartId(446)
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasetField/deleteByChartId/446',
+      data: {}
+    })
   })
 })
