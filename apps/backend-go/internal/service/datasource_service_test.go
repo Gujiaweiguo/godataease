@@ -329,6 +329,9 @@ func TestDatasourceService_TableMetadataHelpers(t *testing.T) {
 	svc, db := setupDatasourceServiceRepoTest(t)
 	tableType := "db"
 	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 10, Name: "Orders", PhysicalTableName: "orders", DatasourceID: 7, DatasetGroupID: 1, Type: tableType}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 11, Name: "Users", PhysicalTableName: "users", DatasourceID: 7, DatasetGroupID: 1, Type: tableType}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{DsID: 7, TaskID: 501, StartTime: 11, EndTime: 12, TaskStatus: "failed", PhysicalTableName: "orders", CreateTime: 10, TriggerType: "table"}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{DsID: 7, TaskID: 502, StartTime: 21, EndTime: 0, TaskStatus: "running", PhysicalTableName: "orders", CreateTime: 20, TriggerType: "table"}).Error)
 
 	list, err := svc.GetTables(&datasource.TableRequest{DatasourceID: 0})
 	require.NoError(t, err)
@@ -336,16 +339,27 @@ func TestDatasourceService_TableMetadataHelpers(t *testing.T) {
 
 	list, err = svc.GetTables(&datasource.TableRequest{DatasourceID: 7})
 	require.NoError(t, err)
-	require.Len(t, list, 1)
-	assert.Equal(t, "Orders", list[0].Name)
-	assert.Equal(t, "orders", list[0].TableName)
-	assert.Equal(t, "db", list[0].Type)
+	require.Len(t, list, 2)
+	tableByName := make(map[string]datasource.TableInfo, len(list))
+	for _, item := range list {
+		tableByName[item.TableName] = item
+	}
+	assert.Equal(t, "Orders", tableByName["orders"].Name)
+	assert.Equal(t, "db", tableByName["orders"].Type)
+	assert.Equal(t, "Users", tableByName["users"].Name)
+	assert.Equal(t, "db", tableByName["users"].Type)
 
 	statusList, err := svc.GetTableStatus(&datasource.TableRequest{DatasourceID: 7})
 	require.NoError(t, err)
-	require.Len(t, statusList, 1)
-	assert.Equal(t, datasource.StatusSuccess, statusList[0].Status)
-	assert.Zero(t, statusList[0].LastUpdate)
+	require.Len(t, statusList, 2)
+	statusByTable := make(map[string]datasource.TableInfo, len(statusList))
+	for _, item := range statusList {
+		statusByTable[item.TableName] = item
+	}
+	assert.Equal(t, "UnderExecution", statusByTable["orders"].Status)
+	assert.Equal(t, int64(21), statusByTable["orders"].LastUpdate)
+	assert.Equal(t, "Warning", statusByTable["users"].Status)
+	assert.Zero(t, statusByTable["users"].LastUpdate)
 }
 
 func TestDatasourceService_GetSchemaAndPreviewGuards(t *testing.T) {

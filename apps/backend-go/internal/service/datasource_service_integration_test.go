@@ -1158,8 +1158,26 @@ func TestDatasourceService_TableMetadataAndPreview_Success(t *testing.T) {
 	statusList, err := svc.GetTableStatus(&datasource.TableRequest{DatasourceID: dsID})
 	require.NoError(t, err)
 	require.Len(t, statusList, 1)
-	assert.Equal(t, datasource.StatusSuccess, statusList[0].Status)
+	assert.Equal(t, "Warning", statusList[0].Status)
 	assert.Equal(t, int64(0), statusList[0].LastUpdate)
+
+	err = repo.CreateSyncTaskLog(&datasource.SyncRecord{
+		DsID:        dsID,
+		TaskID:      9001,
+		StartTime:   100,
+		EndTime:     120,
+		TaskStatus:  "success",
+		TableName:   tableName,
+		CreateTime:  100,
+		TriggerType: "table",
+	})
+	require.NoError(t, err)
+
+	statusList, err = svc.GetTableStatus(&datasource.TableRequest{DatasourceID: dsID})
+	require.NoError(t, err)
+	require.Len(t, statusList, 1)
+	assert.Equal(t, "Completed", statusList[0].Status)
+	assert.Equal(t, int64(120), statusList[0].LastUpdate)
 
 	fields, err := svc.GetTableField(&datasource.TableRequest{TableName: tableName})
 	require.NoError(t, err)

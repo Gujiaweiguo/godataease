@@ -145,11 +145,74 @@ func (s *DatasourceService) GetTableStatus(req *datasource.TableRequest) ([]data
 	if err != nil {
 		return nil, err
 	}
+	if len(list) == 0 {
+		return list, nil
+	}
+
+	records, _, err := s.repo.ListSyncTaskLogs(req.DatasourceID, 1, 200)
+	if err != nil {
+		return nil, err
+	}
+	latestByTable := latestSyncRecordByTable(records)
+	targetTable := strings.TrimSpace(req.TableName)
 	for i := range list {
-		list[i].Status = datasource.StatusSuccess
-		list[i].LastUpdate = 0
+		if targetTable != "" && !strings.EqualFold(list[i].TableName, targetTable) {
+			continue
+		}
+		record := latestByTable[strings.ToLower(strings.TrimSpace(list[i].TableName))]
+		list[i].Status = mapTableSyncStatus(record)
+		list[i].LastUpdate = tableSyncLastUpdate(record)
 	}
 	return list, nil
+}
+
+func latestSyncRecordByTable(records []datasource.SyncRecord) map[string]*datasource.SyncRecord {
+	result := make(map[string]*datasource.SyncRecord)
+	for i := range records {
+		record := records[i]
+		key := strings.ToLower(strings.TrimSpace(record.TableName))
+		if key == "" {
+			continue
+		}
+		existing, ok := result[key]
+		if !ok || tableSyncLastUpdate(&record) > tableSyncLastUpdate(existing) {
+			copied := record
+			result[key] = &copied
+		}
+	}
+	return result
+}
+
+func mapTableSyncStatus(record *datasource.SyncRecord) string {
+	if record == nil {
+		return "Warning"
+	}
+	switch seatunnel.NormalizeStatus(record.TaskStatus) {
+	case seatunnel.StatusSuccess:
+		return "Completed"
+	case seatunnel.StatusRunning:
+		return "UnderExecution"
+	case seatunnel.StatusFailed, seatunnel.StatusCancelled:
+		return "Error"
+	default:
+		return "Warning"
+	}
+}
+
+func tableSyncLastUpdate(record *datasource.SyncRecord) int64 {
+	if record == nil {
+		return 0
+	}
+	if record.EndTime > 0 {
+		return record.EndTime
+	}
+	if record.StartTime > 0 {
+		return record.StartTime
+	}
+	if record.CreateTime > 0 {
+		return record.CreateTime
+	}
+	return 0
 }
 
 func (s *DatasourceService) GetSchema() ([]string, error) {
