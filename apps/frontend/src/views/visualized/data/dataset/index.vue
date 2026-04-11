@@ -123,6 +123,13 @@ interface ExportTableState {
   expressionTree: string
 }
 
+type ExportTaskLifecycleStatus = 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED'
+
+interface ExportTaskLifecycleResponse {
+  taskId?: string
+  status?: ExportTaskLifecycleStatus
+}
+
 const exportForm = ref<ExportFormState>({
   name: '',
   expressionTree: ''
@@ -416,6 +423,24 @@ const closeExport = () => {
   showExport.value = false
 }
 
+const resolveExportCenterTab = (status?: string): ExportTaskLifecycleStatus => {
+  switch (status) {
+    case 'FAILED':
+    case 'SUCCESS':
+    case 'IN_PROGRESS':
+    case 'PENDING':
+      return status
+    default:
+      return 'PENDING'
+  }
+}
+
+const openExportCenter = (activeName: ExportTaskLifecycleStatus = 'PENDING') => {
+  useEmitt().emitter.emit('data-export-center', { activeName })
+}
+
+const exportLifecycleFailureMessage = () => `${t('dataset.export_dataset')} ${t('dataset.error')}`
+
 const saveExport = ({ logic, items, errorMessage }) => {
   table.value.id = nodeInfo.id
   table.value.row = 100000
@@ -438,9 +463,18 @@ const saveExport = ({ logic, items, errorMessage }) => {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-      } else if (res?.data?.taskId || res?.code === 0 || res?.code === '000000') {
-        openMessageLoading(exportData)
+        return
       }
+
+      const lifecycle = (res?.data ?? {}) as ExportTaskLifecycleResponse
+      if (!lifecycle.taskId) {
+        ElMessage.error(exportLifecycleFailureMessage())
+        return
+      }
+
+      openMessageLoading(() => {
+        openExportCenter(resolveExportCenterTab(lifecycle.status))
+      })
     })
     .finally(() => {
       exportDatasetLoading.value = false
@@ -456,10 +490,6 @@ const exportDatasetRequest = () => {
       return false
     }
   })
-}
-
-const exportData = () => {
-  useEmitt().emitter.emit('data-export-center', { activeName: 'IN_PROGRESS' })
 }
 
 const rowClick = (_, __, event) => {

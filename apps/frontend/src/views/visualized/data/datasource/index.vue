@@ -112,6 +112,22 @@ interface Field {
   originName: string
   deType: number
 }
+
+type StableDatasourceTableStatus =
+  | 'Pending'
+  | 'UnderExecution'
+  | 'Completed'
+  | 'Cancelled'
+  | 'Error'
+  | 'Warning'
+
+interface DatasourceStatusRow {
+  tableName: string
+  lastUpdateTime?: number
+  status?: string
+  info?: string
+}
+
 const { wsCache } = useCache()
 const { t } = useI18n()
 const router = useRouter()
@@ -418,6 +434,75 @@ const handleTabClick = tab => {
 
 const tabList = shallowRef([])
 
+const resolveStableDatasourceTableStatus = (status?: string): StableDatasourceTableStatus | '' => {
+  switch (status) {
+    case 'Pending':
+    case 'UnderExecution':
+    case 'Completed':
+    case 'Cancelled':
+    case 'Error':
+    case 'Warning':
+      return status
+    default:
+      return ''
+  }
+}
+
+const getDatasourceStatusLabel = (status?: string) => {
+  switch (resolveStableDatasourceTableStatus(status)) {
+    case 'Pending':
+      return t('data_set.waiting')
+    case 'UnderExecution':
+      return t('dataset.underway')
+    case 'Completed':
+      return t('dataset.completed')
+    case 'Cancelled':
+      return t('common.cancel')
+    case 'Warning':
+      return t('data_source.warning')
+    case 'Error':
+      return t('dataset.error')
+    default:
+      return '-'
+  }
+}
+
+const getDatasourceStatusClass = (status?: string) => {
+  switch (resolveStableDatasourceTableStatus(status)) {
+    case 'Pending':
+      return 'status-text-pending'
+    case 'UnderExecution':
+      return 'status-text-running'
+    case 'Completed':
+      return 'status-text-success'
+    case 'Cancelled':
+      return 'status-text-cancelled'
+    case 'Warning':
+      return 'status-text-warning'
+    case 'Error':
+      return 'status-text-error'
+    default:
+      return ''
+  }
+}
+
+const showDatasourceStatusDetails = (status?: string, info?: string) => {
+  return !!info && ['Warning', 'Error'].includes(resolveStableDatasourceTableStatus(status))
+}
+
+const applyDatasourceStatuses = (rows: DatasourceStatusRow[], statusRows: DatasourceStatusRow[]) => {
+  const statusMap = new Map(statusRows.map(item => [item.tableName, item]))
+  rows.forEach(row => {
+    const statusRow = statusMap.get(row.tableName)
+    if (!statusRow) {
+      return
+    }
+    row.lastUpdateTime = statusRow.lastUpdateTime
+    row.status = statusRow.status
+    row.info = statusRow.info
+  })
+}
+
 const initSearch = () => {
   handleCurrentChange(1)
   state.filterTable = tableData.value.filter(ele =>
@@ -451,6 +536,9 @@ const defaultInfo = {
   extraFlag: 0
 }
 const nodeInfo = reactive<Node>(cloneDeep(defaultInfo))
+const showDatasourceTableStatus = computed(
+  () => nodeInfo.type.startsWith('API') || nodeInfo.type === 'ExcelRemote'
+)
 const infoList = computed(() => {
   return {
     creator: nodeInfo.creator,
@@ -1034,24 +1122,11 @@ const handleClick = (tabName: TabPaneName) => {
       listDatasourceTables({ datasourceId: nodeInfo.id }).then(res => {
         tableData.value = res.data
         initSearch()
-        if (nodeInfo.type.startsWith('API') || nodeInfo.type === 'ExcelRemote') {
+        if (showDatasourceTableStatus.value) {
           getTableStatus({ datasourceId: nodeInfo.id }).then(res => {
-            for (let i = 0; i < state.filterTable.length; i++) {
-              for (let j = 0; j < res.data.length; j++) {
-                if (state.filterTable[i].tableName === res.data[j].tableName) {
-                  state.filterTable[i].lastUpdateTime = res.data[j].lastUpdateTime
-                  state.filterTable[i].status = res.data[j].status
-                }
-              }
-            }
-            for (let i = 0; i < tableData.value.length; i++) {
-              for (let j = 0; j < res.data.length; j++) {
-                if (tableData.value[i].tableName === res.data[j].tableName) {
-                  tableData.value[i].lastUpdateTime = res.data[j].lastUpdateTime
-                  tableData.value[i].status = res.data[j].status
-                }
-              }
-            }
+            const statusRows = (res.data || []) as DatasourceStatusRow[]
+            applyDatasourceStatuses(state.filterTable as DatasourceStatusRow[], statusRows)
+            applyDatasourceStatuses(tableData.value as DatasourceStatusRow[], statusRows)
           })
         }
       })
@@ -1486,30 +1561,35 @@ const getMenuList = (val: boolean) => {
               <el-table-column
                 key="status"
                 prop="status"
-                v-if="nodeInfo.type.startsWith('API')"
+                v-if="showDatasourceTableStatus"
                 :label="t('data_source.latest_update_status')"
               >
                 <template #default="scope">
                   <div class="flex-align-center">
-                    <template v-if="scope.row.status === 'Completed'">
+                    <template v-if="resolveStableDatasourceTableStatus(scope.row.status) === 'Completed'">
                       <el-icon style="margin-right: 8px">
                         <icon name="icon_succeed_filled"
                           ><icon_succeed_filled class="svg-icon"
                         /></icon>
                       </el-icon>
-                      {{ t('dataset.completed') }}
                     </template>
-                    <template v-if="scope.row.status === 'UnderExecution'">
-                      {{ t('dataset.underway') }}
+                    <template v-else-if="resolveStableDatasourceTableStatus(scope.row.status) === 'Warning'">
+                      <el-icon style="margin-right: 8px">
+                        <Icon name="icon_warning_colorful_red"
+                          ><icon_warning_colorful_red class="svg-icon"
+                        /></Icon>
+                      </el-icon>
                     </template>
-                    <template v-if="scope.row.status === 'Error' || scope.row.status === 'Warning'">
+                    <template v-else-if="resolveStableDatasourceTableStatus(scope.row.status) === 'Error'">
                       <el-icon style="margin-right: 8px">
                         <icon class="field-icon-red" name="icon_close_filled"
                           ><icon_close_filled class="svg-icon field-icon-red"
                         /></icon>
                       </el-icon>
-                      {{ t('dataset.error') }}
                     </template>
+                    <span :class="getDatasourceStatusClass(scope.row.status)">
+                      {{ getDatasourceStatusLabel(scope.row.status) }}
+                    </span>
                   </div>
                 </template>
               </el-table-column>
@@ -1997,25 +2077,29 @@ const getMenuList = (val: boolean) => {
         <el-table-column prop="taskStatus" :label="t('data_source.update_result')">
           <template #default="scope">
             <div class="flex-align-center">
-              <template v-if="scope.row.taskStatus === 'Completed'">
+              <template v-if="resolveStableDatasourceTableStatus(scope.row.taskStatus) === 'Completed'">
                 <el-icon style="margin-right: 8px">
                   <icon name="icon_succeed_filled"><icon_succeed_filled class="svg-icon" /></icon>
                 </el-icon>
-                {{ t('dataset.completed') }}
               </template>
-              <template v-if="scope.row.taskStatus === 'UnderExecution'">
-                {{ t('dataset.underway') }}
+              <template v-else-if="resolveStableDatasourceTableStatus(scope.row.taskStatus) === 'Warning'">
+                <el-icon style="margin-right: 8px">
+                  <Icon name="icon_warning_colorful_red"
+                    ><icon_warning_colorful_red class="svg-icon"
+                  /></Icon>
+                </el-icon>
               </template>
-
-              <template
-                v-if="scope.row.taskStatus === 'Error' || scope.row.taskStatus === 'Warning'"
-              >
+              <template v-else-if="resolveStableDatasourceTableStatus(scope.row.taskStatus) === 'Error'">
                 <el-icon style="margin-right: 8px">
                   <icon class="field-icon-red" name="icon_close_filled"
                     ><icon_close_filled class="svg-icon field-icon-red"
                   /></icon>
                 </el-icon>
-                {{ t('dataset.error') }}
+              </template>
+              <span :class="getDatasourceStatusClass(scope.row.taskStatus)">
+                {{ getDatasourceStatusLabel(scope.row.taskStatus) }}
+              </span>
+              <template v-if="showDatasourceStatusDetails(scope.row.taskStatus, scope.row.info)">
                 <el-icon @click="showErrorInfo(scope.row.info)" class="error-info">
                   <icon name="icon-maybe_outlined"><iconMaybe_outlined class="svg-icon" /></icon>
                 </el-icon>
@@ -2257,6 +2341,27 @@ const getMenuList = (val: boolean) => {
     .success-color {
       color: green;
       background-color: rgba(52, 199, 36, 20%);
+    }
+
+    .status-text-pending,
+    .status-text-cancelled {
+      color: #8f959e;
+    }
+
+    .status-text-running {
+      color: var(--ed-color-primary);
+    }
+
+    .status-text-success {
+      color: #34c724;
+    }
+
+    .status-text-warning {
+      color: #d46b08;
+    }
+
+    .status-text-error {
+      color: var(--deDanger, #f54a45);
     }
   }
 
