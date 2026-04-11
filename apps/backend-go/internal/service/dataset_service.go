@@ -732,7 +732,25 @@ func (s *DatasetService) collectFieldDeleteDependencies(field *dataset.CoreDatas
 		return nil, nil
 	}
 	deps := make([]string, 0)
+	var err error
 
+	deps, err = s.appendFieldLevelDependencies(deps, field)
+	if err != nil {
+		return nil, err
+	}
+	deps, err = s.appendDatasetScopedDependencies(deps, field)
+	if err != nil {
+		return nil, err
+	}
+	deps, err = s.appendVisualizationDependencies(deps, field)
+	if err != nil {
+		return nil, err
+	}
+
+	return deps, nil
+}
+
+func (s *DatasetService) appendFieldLevelDependencies(deps []string, field *dataset.CoreDatasetTableField) ([]string, error) {
 	derivedCount, err := s.repo.CountDerivedFieldReferences(field.ID)
 	if err != nil {
 		return nil, err
@@ -740,7 +758,10 @@ func (s *DatasetService) collectFieldDeleteDependencies(field *dataset.CoreDatas
 	if derivedCount > 0 {
 		deps = append(deps, "derived fields")
 	}
+	return deps, nil
+}
 
+func (s *DatasetService) appendDatasetScopedDependencies(deps []string, field *dataset.CoreDatasetTableField) ([]string, error) {
 	chartViews, err := s.repo.ListChartViewsByDatasetGroupID(field.DatasetGroupID)
 	if err != nil {
 		return nil, err
@@ -765,30 +786,33 @@ func (s *DatasetService) collectFieldDeleteDependencies(field *dataset.CoreDatas
 		deps = append(deps, "column permissions")
 	}
 
-	linkageCount, err := s.repo.CountVisualizationLinkageFieldReferences(field.ID)
+	return deps, nil
+}
+
+func (s *DatasetService) appendVisualizationDependencies(deps []string, field *dataset.CoreDatasetTableField) ([]string, error) {
+	deps, err := s.appendCountedDependency(deps, field.ID, "visualization linkage", s.repo.CountVisualizationLinkageFieldReferences)
 	if err != nil {
 		return nil, err
 	}
-	if linkageCount > 0 {
-		deps = append(deps, "visualization linkage")
-	}
-
-	jumpCount, err := s.repo.CountVisualizationLinkJumpReferences(field.ID)
+	deps, err = s.appendCountedDependency(deps, field.ID, "visualization jumps", s.repo.CountVisualizationLinkJumpReferences)
 	if err != nil {
 		return nil, err
 	}
-	if jumpCount > 0 {
-		deps = append(deps, "visualization jumps")
-	}
-
-	outerParamsCount, err := s.repo.CountVisualizationOuterParamReferences(field.ID)
+	deps, err = s.appendCountedDependency(deps, field.ID, "outer parameter bindings", s.repo.CountVisualizationOuterParamReferences)
 	if err != nil {
 		return nil, err
 	}
-	if outerParamsCount > 0 {
-		deps = append(deps, "outer parameter bindings")
-	}
+	return deps, nil
+}
 
+func (s *DatasetService) appendCountedDependency(deps []string, fieldID int64, label string, counter func(int64) (int64, error)) ([]string, error) {
+	count, err := counter(fieldID)
+	if err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		deps = append(deps, label)
+	}
 	return deps, nil
 }
 
