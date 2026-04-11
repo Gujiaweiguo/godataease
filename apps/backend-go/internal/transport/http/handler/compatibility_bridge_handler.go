@@ -1081,6 +1081,25 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				response.Success(c, result)
 			})
+			datasetFieldGroup.POST("/getFunction", func(c *gin.Context) {
+				result := datasetHandler.service.GetFieldFunctions()
+				response.Success(c, result)
+			})
+			datasetFieldGroup.POST("/listByDsIds", func(c *gin.Context) {
+				var req struct {
+					DsIds []int64 `json:"dsIds"`
+				}
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+				result, err := datasetHandler.service.ListFieldsByDsIds(req.DsIds)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, result)
+			})
 		}
 	}
 

@@ -575,6 +575,12 @@ func quoteIdentifier(name string) (string, error) {
 	return "`" + strings.ReplaceAll(trimmed, "`", "``") + "`", nil
 }
 
+func (r *DatasetRepository) ListFieldsByDsIds(dsIds []int64) ([]dataset.CoreDatasetTableField, error) {
+	var fields []dataset.CoreDatasetTableField
+	err := r.db.Where("datasource_id IN ?", dsIds).Find(&fields).Error
+	return fields, err
+}
+
 func (r *DatasetRepository) CreateDatasetField(field *dataset.CoreDatasetTableField) error {
 	return r.db.Create(field).Error
 }
