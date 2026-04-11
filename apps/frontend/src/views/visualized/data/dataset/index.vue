@@ -396,6 +396,8 @@ const handleNodeClick = (data: BusiTreeNode) => {
     dataPreview = []
     activeName.value = 'dataPreview'
     handleClick(activeName.value)
+  }).catch(() => {
+    ElMessage.error(t('dataset.error'))
   })
 }
 
@@ -436,7 +438,7 @@ const saveExport = ({ logic, items, errorMessage }) => {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-      } else {
+      } else if (res?.data?.taskId || res?.code === 0 || res?.code === '000000') {
         openMessageLoading(exportData)
       }
     })

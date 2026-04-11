@@ -42,9 +42,24 @@ describe('Datasource API wrappers', () => {
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/validate/${id}` })
   })
 
-  it('keeps string id for delete endpoint', () => {
+  it('prefers post delete endpoint for datasource removal', async () => {
     const id = 9851884
-    deleteById(id)
+    requestMock.post.mockResolvedValueOnce({ code: '000000' })
+
+    await deleteById(id)
+
+    expect(requestMock.post).toHaveBeenCalledWith({ url: `/datasource/delete/${id}`, data: {} })
+    expect(requestMock.get).not.toHaveBeenCalled()
+  })
+
+  it('falls back to get delete endpoint when post delete fails', async () => {
+    const id = 9851884
+    requestMock.post.mockRejectedValueOnce(new Error('post failed'))
+    requestMock.get.mockResolvedValueOnce({ code: '000000' })
+
+    await deleteById(id)
+
+    expect(requestMock.post).toHaveBeenCalledWith({ url: `/datasource/delete/${id}`, data: {} })
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/delete/${id}` })
   })
 

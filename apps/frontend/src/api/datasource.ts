@@ -157,7 +157,13 @@ export const getDsTree = async (data = {}): Promise<IResponse> => {
     })
 }
 
-export const deleteById = (id: number) => request.get({ url: '/datasource/delete/' + id })
+export const deleteById = async (id: number) => {
+  try {
+    return await request.post({ url: '/datasource/delete/' + id, data: {} })
+  } catch (error) {
+    return request.get({ url: '/datasource/delete/' + id })
+  }
+}
 
 export const getById = (id: number) => request.get({ url: '/datasource/get/' + id })
 

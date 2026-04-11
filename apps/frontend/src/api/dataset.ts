@@ -159,13 +159,24 @@ export const delDatasetTree = async (id): Promise<IResponse> => {
   })
 }
 
-export const exportDatasetData = (data = {}) => {
-  return request.post({
+export const exportDatasetData = (data: Record<string, unknown> = {}) => {
+  const config: {
+    url: string
+    method: 'post'
+    data: Record<string, unknown>
+    loading: boolean
+    responseType?: 'blob'
+  } = {
     url: '/datasetTree/exportDataset',
     method: 'post',
     data: data,
-    loading: true,
-    responseType: 'blob'
+    loading: true
+  }
+  if ('dataEaseBi' in data && data.dataEaseBi === true) {
+    config.responseType = 'blob'
+  }
+  return request.post({
+    ...config
   })
 }
 

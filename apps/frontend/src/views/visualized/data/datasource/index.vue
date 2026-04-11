@@ -494,6 +494,24 @@ const mounted = ref(false)
 const isSupportSetKey = ref(false)
 const symmetricKey = ref('')
 
+const parseMaybeEncryptedJSON = value => {
+  if (!value) {
+    return value
+  }
+  try {
+    return JSON.parse(symmetricDecrypt(value, symmetricKey.value))
+  } catch (_) {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value)
+      } catch (__) {
+        return value
+      }
+    }
+    return value
+  }
+}
+
 const listDs = () => {
   rawDatasourceList.value = []
   dsLoading.value = true
@@ -623,13 +641,13 @@ const handleNodeClick = data => {
       enableDataFill
     } = res.data
     if (configuration) {
-      configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
+      configuration = parseMaybeEncryptedJSON(configuration)
     }
     if (paramsStr) {
-      paramsStr = JSON.parse(symmetricDecrypt(paramsStr, symmetricKey.value))
+      paramsStr = parseMaybeEncryptedJSON(paramsStr)
     }
     if (apiConfigurationStr) {
-      apiConfigurationStr = JSON.parse(symmetricDecrypt(apiConfigurationStr, symmetricKey.value))
+      apiConfigurationStr = parseMaybeEncryptedJSON(apiConfigurationStr)
     }
     Object.assign(nodeInfo, {
       name,
@@ -780,13 +798,13 @@ const editDatasource = (editType?: number) => {
       enableDataFill
     } = res.data
     if (configuration) {
-      configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
+      configuration = parseMaybeEncryptedJSON(configuration)
     }
     if (paramsStr) {
-      paramsStr = JSON.parse(symmetricDecrypt(paramsStr, symmetricKey.value))
+      paramsStr = parseMaybeEncryptedJSON(paramsStr)
     }
     if (apiConfigurationStr) {
-      apiConfigurationStr = JSON.parse(symmetricDecrypt(apiConfigurationStr, symmetricKey.value))
+      apiConfigurationStr = parseMaybeEncryptedJSON(apiConfigurationStr)
     }
     let datasource = reactive<Node>(cloneDeep(defaultInfo))
     Object.assign(datasource, {
@@ -850,13 +868,13 @@ const handleCopy = async data => {
       return ele.type === res.data.type
     })
     if (configuration) {
-      configuration = JSON.parse(symmetricDecrypt(configuration, symmetricKey.value))
+      configuration = parseMaybeEncryptedJSON(configuration)
     }
     if (paramsStr) {
-      paramsStr = JSON.parse(symmetricDecrypt(paramsStr, symmetricKey.value))
+      paramsStr = parseMaybeEncryptedJSON(paramsStr)
     }
     if (apiConfigurationStr) {
-      apiConfigurationStr = JSON.parse(symmetricDecrypt(apiConfigurationStr, symmetricKey.value))
+      apiConfigurationStr = parseMaybeEncryptedJSON(apiConfigurationStr)
     }
     let datasource = reactive<Node>(cloneDeep(defaultInfo))
     Object.assign(datasource, {
@@ -1097,21 +1115,24 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
   ElMessage.warning(t('free.save_error'))
   return false
 }, 300)
-onMounted(() => {
+onMounted(async () => {
   const dsId = wsCache.get('ds-info-id') || route.params.id
   nodeInfo.id = (dsId as string) || (route.query.id as string) || ''
   wsCache.delete('ds-info-id')
   loadInit()
   restoreExpandedKeys()
+  try {
+    const res = await querySymmetricKey()
+    symmetricKey.value = res.data
+  } catch (_) {
+    symmetricKey.value = ''
+  }
   listDs()
   setSupportSetKey()
   const { opt } = router?.currentRoute?.value?.query || {}
   if (opt && opt === 'create') {
     datasourceEditor.value.init(null, null, null, isSupportSetKey.value)
   }
-  querySymmetricKey().then(res => {
-    symmetricKey.value = res.data
-  })
 })
 
 const sideTreeStatus = ref(true)
