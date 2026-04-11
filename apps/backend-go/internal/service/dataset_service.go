@@ -15,15 +15,18 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	exportdomain "dataease/backend/internal/domain/export"
 	"dataease/backend/internal/domain/permission"
 	calciteintegration "dataease/backend/internal/integration/calcite"
 	"dataease/backend/internal/repository"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type DatasetService struct {
 	repo                 *repository.DatasetRepository
+	exportRepo           repository.ExportRepositoryInterface
 	rowPermissionService *RowPermissionService
 	resourcePermService  *ResourcePermissionService
 	calciteAddress       string
@@ -62,6 +65,10 @@ func NewDatasetServiceWithPermission(repo *repository.DatasetRepository, rowPerm
 
 func (s *DatasetService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
 	s.resourcePermService = resourcePermSvc
+}
+
+func (s *DatasetService) SetExportRepository(exportRepo repository.ExportRepositoryInterface) {
+	s.exportRepo = exportRepo
 }
 
 func (s *DatasetService) SetCalciteConfig(address string, timeout time.Duration, retries int) {
@@ -134,7 +141,35 @@ func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, err
 }
 
 func (s *DatasetService) GetGroupByID(id int64) (*dataset.CoreDatasetGroup, error) {
-	return s.repo.GetGroupByID(id)
+	fixedID, err := s.compatDatasetGroupID(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetGroupByID(fixedID)
+}
+
+func (s *DatasetService) compatDatasetGroupID(id int64) (int64, error) {
+	if id <= 0 {
+		return id, nil
+	}
+	if _, err := s.repo.GetGroupByID(id); err == nil {
+		return id, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return id, err
+	}
+
+	if id%100 != 0 {
+		return id, gorm.ErrRecordNotFound
+	}
+
+	nearestID, err := s.repo.FindNearestGroupIDInWindow(id, 100)
+	if err != nil {
+		return id, err
+	}
+	if nearestID == nil {
+		return id, gorm.ErrRecordNotFound
+	}
+	return *nearestID, nil
 }
 
 func (s *DatasetService) Fields(req *dataset.FieldsRequest) ([]*dataset.CoreDatasetTableField, error) {
@@ -633,6 +668,96 @@ func (s *DatasetService) PerDelete(id int64) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func (s *DatasetService) DeleteField(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("field id is required")
+	}
+	field, err := s.repo.GetFieldByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("dataset field not found")
+		}
+		return err
+	}
+	if field.ChartID == nil || *field.ChartID <= 0 {
+		return fmt.Errorf("dataset field is not chart-scoped")
+	}
+
+	deleted, err := s.repo.DeleteFieldByIDAndChartID(id, *field.ChartID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return fmt.Errorf("dataset field not found")
+	}
+	return nil
+}
+
+func (s *DatasetService) DeleteFieldByChart(chartID int64) error {
+	if chartID <= 0 {
+		return fmt.Errorf("chart id is required")
+	}
+	_, err := s.repo.DeleteFieldsByChartID(chartID)
+	return err
+}
+
+func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID int64) (*dataset.ExportDatasetResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("export request is required")
+	}
+	if req.ID <= 0 {
+		return nil, fmt.Errorf("dataset id is required")
+	}
+	if s.repo == nil {
+		return nil, fmt.Errorf("dataset repository not initialized")
+	}
+	if s.exportRepo == nil {
+		return nil, fmt.Errorf("export repository not initialized")
+	}
+
+	group, err := s.repo.GetGroupByID(req.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("dataset not found")
+		}
+		return nil, err
+	}
+
+	viewName := strings.TrimSpace(req.ViewName)
+	if viewName == "" {
+		viewName = strings.TrimSpace(group.Name)
+	}
+	if viewName == "" {
+		viewName = fmt.Sprintf("dataset_%d", req.ID)
+	}
+
+	taskID := strings.ReplaceAll(uuid.NewString(), "-", "")
+	task := &exportdomain.ExportTask{
+		ID:             taskID,
+		UserID:         userID,
+		FileName:       GenerateExcelFilename(viewName),
+		FileSize:       0,
+		FileSizeUnit:   "B",
+		ExportFrom:     req.ID,
+		ExportStatus:   "PENDING",
+		ExportFromType: permission.ResourceTypeDataset,
+		ExportTime:     time.Now().UnixMilli(),
+		ExportProgress: "0",
+		ExportFromName: viewName,
+	}
+	if err = s.exportRepo.Create(task); err != nil {
+		return nil, err
+	}
+
+	return &dataset.ExportDatasetResponse{
+		TaskID:         taskID,
+		Status:         "PENDING",
+		ExportFrom:     req.ID,
+		ExportFromType: permission.ResourceTypeDataset,
+		ExportFromName: viewName,
+	}, nil
 }
 
 func (s *DatasetService) resolveEnumFieldTarget(fieldID int64) (*dataset.CoreDatasetTableField, string, string, error) {

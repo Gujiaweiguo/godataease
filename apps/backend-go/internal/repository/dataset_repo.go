@@ -67,6 +67,32 @@ func (r *DatasetRepository) GetGroupByID(id int64) (*dataset.CoreDatasetGroup, e
 	return &group, nil
 }
 
+func (r *DatasetRepository) FindNearestGroupIDInWindow(id int64, window int64) (*int64, error) {
+	if id <= 0 || window <= 0 {
+		return nil, nil
+	}
+	minID := id - window
+	if minID < 1 {
+		minID = 1
+	}
+	maxID := id + window
+
+	var candidateID int64
+	err := r.db.Raw(
+		"SELECT id FROM core_dataset_group WHERE COALESCE(del_flag, 0) = 0 AND id BETWEEN ? AND ? ORDER BY ABS(id - ?) ASC, id ASC LIMIT 1",
+		minID,
+		maxID,
+		id,
+	).Scan(&candidateID).Error
+	if err != nil {
+		return nil, err
+	}
+	if candidateID == 0 {
+		return nil, nil
+	}
+	return &candidateID, nil
+}
+
 func (r *DatasetRepository) CreateGroup(group *dataset.CoreDatasetGroup) error {
 	return r.db.Create(group).Error
 }
@@ -151,6 +177,28 @@ func (r *DatasetRepository) GetFieldByID(id int64) (*dataset.CoreDatasetTableFie
 		return nil, err
 	}
 	return &field, nil
+}
+
+func (r *DatasetRepository) DeleteFieldByIDAndChartID(id int64, chartID int64) (bool, error) {
+	if id <= 0 || chartID <= 0 {
+		return false, fmt.Errorf("field id and chart id are required")
+	}
+	result := r.db.Where("id = ? AND chart_id = ?", id, chartID).Delete(&dataset.CoreDatasetTableField{})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
+func (r *DatasetRepository) DeleteFieldsByChartID(chartID int64) (int64, error) {
+	if chartID <= 0 {
+		return 0, fmt.Errorf("chart id is required")
+	}
+	result := r.db.Where("chart_id = ?", chartID).Delete(&dataset.CoreDatasetTableField{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
 }
 
 func (r *DatasetRepository) GetTableByID(id int64) (*dataset.CoreDatasetTable, error) {

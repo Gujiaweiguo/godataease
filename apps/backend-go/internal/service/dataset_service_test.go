@@ -1167,6 +1167,152 @@ func TestDatasetService_DeleteRecursiveErrorAndBackfillExecution(t *testing.T) {
 	})
 }
 
+func TestDatasetService_ExportDataset(t *testing.T) {
+	t.Run("success creates export task", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		repoStub := &exportRepoStub{}
+		svc.SetExportRepository(repoStub)
+
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 11, Name: "Sales Dataset", PID: &rootPID, NodeType: &nodeType}).Error)
+
+		resp, err := svc.ExportDataset(&dataset.ExportDatasetRequest{ID: 11, ViewName: "Sales Export"}, 77)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.NotEmpty(t, resp.TaskID)
+		assert.Equal(t, "PENDING", resp.Status)
+		assert.Equal(t, int64(11), resp.ExportFrom)
+		assert.Equal(t, permission.ResourceTypeDataset, resp.ExportFromType)
+		assert.Equal(t, "Sales Export", resp.ExportFromName)
+
+		require.NotNil(t, repoStub.createTask)
+		assert.Equal(t, resp.TaskID, repoStub.createTask.ID)
+		assert.Equal(t, int64(77), repoStub.createTask.UserID)
+		assert.Equal(t, int64(11), repoStub.createTask.ExportFrom)
+		assert.Equal(t, "PENDING", repoStub.createTask.ExportStatus)
+		assert.Equal(t, permission.ResourceTypeDataset, repoStub.createTask.ExportFromType)
+		assert.Equal(t, "Sales Export", repoStub.createTask.ExportFromName)
+		assert.Contains(t, repoStub.createTask.FileName, "Sales_Export")
+	})
+
+	t.Run("validates request and dependencies", func(t *testing.T) {
+		svc, _ := setupDatasetServiceRepoTest(t)
+
+		_, err := svc.ExportDataset(nil, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "export request is required")
+
+		_, err = svc.ExportDataset(&dataset.ExportDatasetRequest{ID: 0}, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset id is required")
+
+		_, err = svc.ExportDataset(&dataset.ExportDatasetRequest{ID: 1}, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "export repository not initialized")
+	})
+
+	t.Run("returns dataset not found and create failure", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+
+		notFoundStub := &exportRepoStub{}
+		svc.SetExportRepository(notFoundStub)
+		_, err := svc.ExportDataset(&dataset.ExportDatasetRequest{ID: 999}, 2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset not found")
+
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 22, Name: "Fail Dataset", PID: &rootPID, NodeType: &nodeType}).Error)
+
+		createErrStub := &exportRepoStub{createErr: assert.AnError}
+		svc.SetExportRepository(createErrStub)
+		_, err = svc.ExportDataset(&dataset.ExportDatasetRequest{ID: 22, ViewName: "Fail Export"}, 2)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestDatasetService_DeleteFieldOperations(t *testing.T) {
+	t.Run("delete field validates and succeeds for chart-scoped field", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		chartID := int64(333)
+		name := "calc_field"
+		origin := "calc_field"
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 701, DatasetGroupID: 10, ChartID: &chartID, Name: &name, OriginName: &origin}).Error)
+
+		err := svc.DeleteField(701)
+		require.NoError(t, err)
+
+		_, err = svc.repo.GetFieldByID(701)
+		require.Error(t, err)
+	})
+
+	t.Run("delete field rejects invalid states", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+
+		err := svc.DeleteField(0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field id is required")
+
+		err = svc.DeleteField(999)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset field not found")
+
+		name := "plain_field"
+		origin := "plain_field"
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 702, DatasetGroupID: 10, Name: &name, OriginName: &origin}).Error)
+		err = svc.DeleteField(702)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataset field is not chart-scoped")
+	})
+
+	t.Run("delete fields by chart validates and scopes", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		chartID := int64(444)
+		otherChartID := int64(445)
+		name := "field"
+		origin := "field"
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 703, DatasetGroupID: 10, ChartID: &chartID, Name: &name, OriginName: &origin}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 704, DatasetGroupID: 10, ChartID: &otherChartID, Name: &name, OriginName: &origin}).Error)
+
+		err := svc.DeleteFieldByChart(0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "chart id is required")
+
+		err = svc.DeleteFieldByChart(chartID)
+		require.NoError(t, err)
+
+		_, err = svc.repo.GetFieldByID(703)
+		require.Error(t, err)
+		field, err := svc.repo.GetFieldByID(704)
+		require.NoError(t, err)
+		require.NotNil(t, field)
+		assert.Equal(t, int64(704), field.ID)
+	})
+}
+
+func TestDatasetService_GetGroupByID_CompatFallback(t *testing.T) {
+	t.Run("falls back to nearest id for legacy compatibility ids", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 101, Name: "CompatTarget", PID: &rootPID, NodeType: &nodeType}).Error)
+
+		group, err := svc.GetGroupByID(200)
+		require.NoError(t, err)
+		require.NotNil(t, group)
+		assert.Equal(t, int64(101), group.ID)
+	})
+
+	t.Run("keeps not found semantics for non-compat ids", func(t *testing.T) {
+		svc, _ := setupDatasetServiceRepoTest(t)
+		_, err := svc.GetGroupByID(199)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+}
+
 func int64PtrDataset(v int64) *int64 { return &v }
 
 func intPtrDataset(v int) *int { return &v }

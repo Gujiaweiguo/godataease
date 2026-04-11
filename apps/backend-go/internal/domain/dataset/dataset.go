@@ -82,6 +82,25 @@ type PreviewResponse struct {
 	Total   int64                    `json:"total"`
 }
 
+type ExportDatasetRequest struct {
+	ID             int64           `json:"id"`
+	ViewName       string          `json:"viewName"`
+	Header         []string        `json:"header"`
+	Details        [][]interface{} `json:"details"`
+	Filename       string          `json:"filename"`
+	ExpressionTree string          `json:"expressionTree"`
+	Row            int64           `json:"row"`
+	DataEaseBi     bool            `json:"dataEaseBi"`
+}
+
+type ExportDatasetResponse struct {
+	TaskID         string `json:"taskId"`
+	Status         string `json:"status"`
+	ExportFrom     int64  `json:"exportFrom"`
+	ExportFromType string `json:"exportFromType"`
+	ExportFromName string `json:"exportFromName"`
+}
+
 type WriteRequest struct {
 	ID       int64   `json:"id"`
 	PID      *int64  `json:"pid"`

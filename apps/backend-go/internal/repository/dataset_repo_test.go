@@ -219,6 +219,57 @@ func TestDatasetRepository_TableAndFieldLookups(t *testing.T) {
 	assert.Equal(t, "City", *foundField.Name)
 }
 
+func TestDatasetRepository_DeleteFieldOperations(t *testing.T) {
+	repo, db := setupDatasetRepositoryTest(t)
+	chartID := int64(900)
+	otherChartID := int64(901)
+	nameA := "field_a"
+	originA := "field_a"
+	nameB := "field_b"
+	originB := "field_b"
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 801, DatasetGroupID: 77, ChartID: &chartID, Name: &nameA, OriginName: &originA}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 802, DatasetGroupID: 77, ChartID: &chartID, Name: &nameB, OriginName: &originB}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 803, DatasetGroupID: 77, ChartID: &otherChartID, Name: &nameB, OriginName: &originB}).Error)
+
+	deleted, err := repo.DeleteFieldByIDAndChartID(801, chartID)
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	_, err = repo.GetFieldByID(801)
+	require.Error(t, err)
+
+	deleted, err = repo.DeleteFieldByIDAndChartID(802, otherChartID)
+	require.NoError(t, err)
+	assert.False(t, deleted)
+
+	rows, err := repo.DeleteFieldsByChartID(chartID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	_, err = repo.GetFieldByID(802)
+	require.Error(t, err)
+	found, err := repo.GetFieldByID(803)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, int64(803), found.ID)
+}
+
+func TestDatasetRepository_FindNearestGroupIDInWindow(t *testing.T) {
+	repo, db := setupDatasetRepositoryTest(t)
+	level := 1
+	nodeType := "dataset"
+	require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 101, Name: "G101", Level: &level, NodeType: &nodeType}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 240, Name: "G240", Level: &level, NodeType: &nodeType}).Error)
+
+	id, err := repo.FindNearestGroupIDInWindow(200, 100)
+	require.NoError(t, err)
+	require.NotNil(t, id)
+	assert.Equal(t, int64(240), *id)
+
+	id, err = repo.FindNearestGroupIDInWindow(10000, 50)
+	require.NoError(t, err)
+	assert.Nil(t, id)
+}
+
 func TestDatasetRepository_PreviewRowsAndCountRows_Success(t *testing.T) {
 	repo, _ := setupDatasetRepositoryTest(t)
 

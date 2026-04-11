@@ -1064,6 +1064,39 @@ func TestDatasetServiceIntegration_PerDelete_InvalidID(t *testing.T) {
 	assert.Contains(t, err.Error(), "id is required")
 }
 
+func TestDatasetServiceIntegration_DeleteFieldOperations(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetTableField{}, &dataset.CoreDatasetGroup{})
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	group := &dataset.CoreDatasetGroup{Name: "Delete Field Group", PID: &rootPID, NodeType: &nodeType}
+	require.NoError(t, repo.CreateGroup(group))
+
+	chartID := int64(8801)
+	otherChartID := int64(8802)
+	name := "metric"
+	origin := "metric"
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetTableField{ID: 9901, DatasetGroupID: group.ID, ChartID: &chartID, Name: &name, OriginName: &origin}).Error)
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetTableField{ID: 9902, DatasetGroupID: group.ID, ChartID: &chartID, Name: &name, OriginName: &origin}).Error)
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetTableField{ID: 9903, DatasetGroupID: group.ID, ChartID: &otherChartID, Name: &name, OriginName: &origin}).Error)
+
+	err := svc.DeleteField(9901)
+	require.NoError(t, err)
+	_, err = repo.GetFieldByID(9901)
+	assert.Error(t, err)
+
+	err = svc.DeleteFieldByChart(chartID)
+	require.NoError(t, err)
+	_, err = repo.GetFieldByID(9902)
+	assert.Error(t, err)
+	found, err := repo.GetFieldByID(9903)
+	require.NoError(t, err)
+	assert.Equal(t, int64(9903), found.ID)
+}
+
 func TestDatasetServiceIntegration_PreviewSQL_NilRequest(t *testing.T) {
 	repo := repository.NewDatasetRepository(testDB)
 	svc := NewDatasetService(repo)
