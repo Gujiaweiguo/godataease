@@ -1160,6 +1160,38 @@ func TestDatasetTreeExportDatasetRoute(t *testing.T) {
 		assert.Equal(t, int64(0), exportRepo.created.UserID)
 	})
 
+	t.Run("resolves compat dataset ids before creating export task", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
+
+		repo := repository.NewDatasetRepository(db)
+		datasetSvc := service.NewDatasetService(repo)
+		exportRepo := &mockBridgeExportRepo{}
+		datasetSvc.SetExportRepository(exportRepo)
+		datasetHandler := NewDatasetHandler(datasetSvc)
+
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 101, Name: "Compat Target", PID: &rootPID, NodeType: &nodeType}).Error)
+
+		r := gin.New()
+		RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+
+		req := httptest.NewRequest("POST", "/datasetTree/exportDataset", strings.NewReader(`{"id":200,"viewName":"Compat Target Export"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, 200, w.Code)
+		resp := bridgeAnyResp{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Equal(t, float64(101), resp.Data["exportFrom"])
+		require.NotNil(t, exportRepo.created)
+		assert.Equal(t, int64(101), exportRepo.created.ExportFrom)
+	})
+
 	t.Run("keeps inline download behavior when dataEaseBi is true", func(t *testing.T) {
 		datasetHandler := NewDatasetHandler(service.NewDatasetService(nil))
 		chartHandler := NewChartHandler(nil)

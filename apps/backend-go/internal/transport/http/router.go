@@ -561,6 +561,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, r.chartHandler, r.permMiddleware)
+		handler.RegisterDatasetFieldDeleteRoutes(api.Group("/datasetField"), r.datasetHandler, r.chartHandler)
 	}
 }
 

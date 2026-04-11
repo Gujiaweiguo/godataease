@@ -1061,40 +1061,9 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				response.Success(c, flattenChartFieldList(result))
 			})
-			datasetFieldGroup.POST("/delete/:id", func(c *gin.Context) {
-				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-				if err != nil {
-					response.Error(c, "500000", "Invalid field ID")
-					return
-				}
-				if datasetHandler != nil {
-					err = datasetHandler.service.DeleteField(id)
-				} else {
-					err = chartHandler.service.DeleteField(id)
-				}
-				if err != nil {
-					response.Error(c, "500000", "Failed: "+err.Error())
-					return
-				}
-				response.Success(c, nil)
-			})
-			datasetFieldGroup.POST("/deleteByChartId/:id", func(c *gin.Context) {
-				chartID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-				if err != nil {
-					response.Error(c, "500000", "Invalid chart ID")
-					return
-				}
-				if datasetHandler != nil {
-					err = datasetHandler.service.DeleteFieldByChart(chartID)
-				} else {
-					err = chartHandler.service.DeleteFieldByChart(chartID)
-				}
-				if err != nil {
-					response.Error(c, "500000", "Failed: "+err.Error())
-					return
-				}
-				response.Success(c, nil)
-			})
+			if datasetHandler != nil {
+				RegisterDatasetFieldDeleteRoutes(datasetFieldGroup, datasetHandler, chartHandler)
+			}
 		}
 	}
 
@@ -1147,6 +1116,44 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			})
 		}
 	}
+}
+
+func RegisterDatasetFieldDeleteRoutes(r gin.IRouter, datasetHandler *DatasetHandler, chartHandler *ChartHandler) {
+	r.POST("/delete/:id", func(c *gin.Context) {
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			response.Error(c, "500000", "Invalid field ID")
+			return
+		}
+		if datasetHandler != nil {
+			err = datasetHandler.service.DeleteField(id)
+		} else {
+			err = chartHandler.service.DeleteField(id)
+		}
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+		response.Success(c, nil)
+	})
+
+	r.POST("/deleteByChartId/:id", func(c *gin.Context) {
+		chartID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			response.Error(c, "500000", "Invalid chart ID")
+			return
+		}
+		if datasetHandler != nil {
+			err = datasetHandler.service.DeleteFieldByChart(chartID)
+		} else {
+			err = chartHandler.service.DeleteFieldByChart(chartID)
+		}
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+		response.Success(c, nil)
+	})
 }
 
 func flattenChartFieldList(result *chart.ChartFieldListResponse) []chart.ChartField {
