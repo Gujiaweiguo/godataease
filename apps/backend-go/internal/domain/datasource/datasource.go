@@ -4,6 +4,13 @@ const (
 	StatusSuccess = "Success"
 	StatusError   = "Error"
 
+	TableStatusPending        = "Pending"
+	TableStatusUnderExecution = "UnderExecution"
+	TableStatusCompleted      = "Completed"
+	TableStatusError          = "Error"
+	TableStatusWarning        = "Warning"
+	TableStatusCancelled      = "Cancelled"
+
 	TypeFolder = "folder"
 	TypeExcel  = "Excel"
 )

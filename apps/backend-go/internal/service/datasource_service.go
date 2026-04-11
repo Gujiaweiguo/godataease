@@ -185,17 +185,21 @@ func latestSyncRecordByTable(records []datasource.SyncRecord) map[string]*dataso
 
 func mapTableSyncStatus(record *datasource.SyncRecord) string {
 	if record == nil {
-		return "Warning"
+		return datasource.TableStatusWarning
 	}
 	switch seatunnel.NormalizeStatus(record.TaskStatus) {
+	case seatunnel.StatusPending:
+		return datasource.TableStatusPending
 	case seatunnel.StatusSuccess:
-		return "Completed"
+		return datasource.TableStatusCompleted
 	case seatunnel.StatusRunning:
-		return "UnderExecution"
-	case seatunnel.StatusFailed, seatunnel.StatusCancelled:
-		return "Error"
+		return datasource.TableStatusUnderExecution
+	case seatunnel.StatusFailed:
+		return datasource.TableStatusError
+	case seatunnel.StatusCancelled:
+		return datasource.TableStatusCancelled
 	default:
-		return "Warning"
+		return datasource.TableStatusWarning
 	}
 }
 
@@ -203,14 +207,37 @@ func tableSyncLastUpdate(record *datasource.SyncRecord) int64 {
 	if record == nil {
 		return 0
 	}
-	if record.EndTime > 0 {
-		return record.EndTime
-	}
-	if record.StartTime > 0 {
-		return record.StartTime
-	}
-	if record.CreateTime > 0 {
-		return record.CreateTime
+	switch seatunnel.NormalizeStatus(record.TaskStatus) {
+	case seatunnel.StatusSuccess, seatunnel.StatusFailed, seatunnel.StatusCancelled:
+		if record.EndTime > 0 {
+			return record.EndTime
+		}
+		if record.StartTime > 0 {
+			return record.StartTime
+		}
+		if record.CreateTime > 0 {
+			return record.CreateTime
+		}
+	case seatunnel.StatusRunning:
+		if record.StartTime > 0 {
+			return record.StartTime
+		}
+		if record.CreateTime > 0 {
+			return record.CreateTime
+		}
+		if record.EndTime > 0 {
+			return record.EndTime
+		}
+	default:
+		if record.CreateTime > 0 {
+			return record.CreateTime
+		}
+		if record.StartTime > 0 {
+			return record.StartTime
+		}
+		if record.EndTime > 0 {
+			return record.EndTime
+		}
 	}
 	return 0
 }

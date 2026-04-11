@@ -330,8 +330,12 @@ func TestDatasourceService_TableMetadataHelpers(t *testing.T) {
 	tableType := "db"
 	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 10, Name: "Orders", PhysicalTableName: "orders", DatasourceID: 7, DatasetGroupID: 1, Type: tableType}).Error)
 	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 11, Name: "Users", PhysicalTableName: "users", DatasourceID: 7, DatasetGroupID: 1, Type: tableType}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 12, Name: "Payments", PhysicalTableName: "payments", DatasourceID: 7, DatasetGroupID: 1, Type: tableType}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 13, Name: "Shipments", PhysicalTableName: "shipments", DatasourceID: 7, DatasetGroupID: 1, Type: tableType}).Error)
 	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{DsID: 7, TaskID: 501, StartTime: 11, EndTime: 12, TaskStatus: "failed", PhysicalTableName: "orders", CreateTime: 10, TriggerType: "table"}).Error)
 	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{DsID: 7, TaskID: 502, StartTime: 21, EndTime: 0, TaskStatus: "running", PhysicalTableName: "orders", CreateTime: 20, TriggerType: "table"}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{DsID: 7, TaskID: 503, StartTime: 0, EndTime: 0, TaskStatus: "queued", PhysicalTableName: "payments", CreateTime: 31, TriggerType: "table"}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{DsID: 7, TaskID: 504, StartTime: 41, EndTime: 45, TaskStatus: "cancelled", PhysicalTableName: "shipments", CreateTime: 40, TriggerType: "table"}).Error)
 
 	list, err := svc.GetTables(&datasource.TableRequest{DatasourceID: 0})
 	require.NoError(t, err)
@@ -339,7 +343,7 @@ func TestDatasourceService_TableMetadataHelpers(t *testing.T) {
 
 	list, err = svc.GetTables(&datasource.TableRequest{DatasourceID: 7})
 	require.NoError(t, err)
-	require.Len(t, list, 2)
+	require.Len(t, list, 4)
 	tableByName := make(map[string]datasource.TableInfo, len(list))
 	for _, item := range list {
 		tableByName[item.TableName] = item
@@ -348,18 +352,24 @@ func TestDatasourceService_TableMetadataHelpers(t *testing.T) {
 	assert.Equal(t, "db", tableByName["orders"].Type)
 	assert.Equal(t, "Users", tableByName["users"].Name)
 	assert.Equal(t, "db", tableByName["users"].Type)
+	assert.Equal(t, "Payments", tableByName["payments"].Name)
+	assert.Equal(t, "Shipments", tableByName["shipments"].Name)
 
 	statusList, err := svc.GetTableStatus(&datasource.TableRequest{DatasourceID: 7})
 	require.NoError(t, err)
-	require.Len(t, statusList, 2)
+	require.Len(t, statusList, 4)
 	statusByTable := make(map[string]datasource.TableInfo, len(statusList))
 	for _, item := range statusList {
 		statusByTable[item.TableName] = item
 	}
-	assert.Equal(t, "UnderExecution", statusByTable["orders"].Status)
+	assert.Equal(t, datasource.TableStatusUnderExecution, statusByTable["orders"].Status)
 	assert.Equal(t, int64(21), statusByTable["orders"].LastUpdate)
-	assert.Equal(t, "Warning", statusByTable["users"].Status)
+	assert.Equal(t, datasource.TableStatusWarning, statusByTable["users"].Status)
 	assert.Zero(t, statusByTable["users"].LastUpdate)
+	assert.Equal(t, datasource.TableStatusPending, statusByTable["payments"].Status)
+	assert.Equal(t, int64(31), statusByTable["payments"].LastUpdate)
+	assert.Equal(t, datasource.TableStatusCancelled, statusByTable["shipments"].Status)
+	assert.Equal(t, int64(45), statusByTable["shipments"].LastUpdate)
 }
 
 func TestDatasourceService_GetSchemaAndPreviewGuards(t *testing.T) {
