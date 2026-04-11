@@ -11,6 +11,8 @@ import (
 )
 
 type exportRepoStub struct {
+	createTask        *export.ExportTask
+	createErr         error
 	countResp         map[string]int64
 	countErr          error
 	listResp          []export.ExportTask
@@ -34,7 +36,8 @@ type exportRepoStub struct {
 }
 
 func (s *exportRepoStub) Create(task *export.ExportTask) error {
-	return nil
+	s.createTask = task
+	return s.createErr
 }
 
 func (s *exportRepoStub) GetByID(id string) (*export.ExportTask, error) {
