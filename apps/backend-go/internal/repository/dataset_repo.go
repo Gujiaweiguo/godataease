@@ -3,9 +3,12 @@ package repository
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
 
 	"gorm.io/gorm"
 )
@@ -179,6 +182,15 @@ func (r *DatasetRepository) GetFieldByID(id int64) (*dataset.CoreDatasetTableFie
 	return &field, nil
 }
 
+func (r *DatasetRepository) ListFieldsByChartID(chartID int64) ([]*dataset.CoreDatasetTableField, error) {
+	if chartID <= 0 {
+		return []*dataset.CoreDatasetTableField{}, nil
+	}
+	var fields []*dataset.CoreDatasetTableField
+	err := r.db.Model(&dataset.CoreDatasetTableField{}).Where("chart_id = ?", chartID).Find(&fields).Error
+	return fields, err
+}
+
 func (r *DatasetRepository) DeleteFieldByIDAndChartID(id int64, chartID int64) (bool, error) {
 	if id <= 0 || chartID <= 0 {
 		return false, fmt.Errorf("field id and chart id are required")
@@ -199,6 +211,108 @@ func (r *DatasetRepository) DeleteFieldsByChartID(chartID int64) (int64, error) 
 		return 0, result.Error
 	}
 	return result.RowsAffected, nil
+}
+
+func (r *DatasetRepository) CountDerivedFieldReferences(fieldID int64) (int64, error) {
+	if fieldID <= 0 {
+		return 0, nil
+	}
+	var count int64
+	origin := fmt.Sprintf("[%d]", fieldID)
+	err := r.db.Model(&dataset.CoreDatasetTableField{}).
+		Where("ext_field = ? AND origin_name = ?", 2, origin).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *DatasetRepository) ListChartViewsByDatasetGroupID(datasetGroupID int64) ([]auto.CoreChartView, error) {
+	if datasetGroupID <= 0 {
+		return []auto.CoreChartView{}, nil
+	}
+	var views []auto.CoreChartView
+	err := r.db.Table(auto.TableNameCoreChartView+" AS cv").
+		Select("cv.*").
+		Joins("JOIN core_dataset_table AS dt ON dt.id = cv.table_id").
+		Where("dt.dataset_group_id = ?", datasetGroupID).
+		Find(&views).Error
+	if isMissingTableErr(err) {
+		return []auto.CoreChartView{}, nil
+	}
+	return views, err
+}
+
+func (r *DatasetRepository) ListRowPermissionsByDatasetGroupID(datasetGroupID int64) ([]permission.DataPermRow, error) {
+	if datasetGroupID <= 0 {
+		return []permission.DataPermRow{}, nil
+	}
+	var rows []permission.DataPermRow
+	err := r.db.Model(&permission.DataPermRow{}).Where("dataset_group_id = ?", datasetGroupID).Find(&rows).Error
+	if isMissingTableErr(err) {
+		return []permission.DataPermRow{}, nil
+	}
+	return rows, err
+}
+
+func (r *DatasetRepository) ListColumnPermissionsByDatasetGroupID(datasetGroupID int64) ([]permission.DataPermColumn, error) {
+	if datasetGroupID <= 0 {
+		return []permission.DataPermColumn{}, nil
+	}
+	var rows []permission.DataPermColumn
+	err := r.db.Model(&permission.DataPermColumn{}).Where("dataset_group_id = ?", datasetGroupID).Find(&rows).Error
+	if isMissingTableErr(err) {
+		return []permission.DataPermColumn{}, nil
+	}
+	return rows, err
+}
+
+func (r *DatasetRepository) CountVisualizationLinkageFieldReferences(fieldID int64) (int64, error) {
+	if fieldID <= 0 {
+		return 0, nil
+	}
+	var count int64
+	err := r.db.Model(&auto.VisualizationLinkageField{}).
+		Where("source_field = ? OR target_field = ?", fieldID, fieldID).
+		Count(&count).Error
+	if isMissingTableErr(err) {
+		return 0, nil
+	}
+	return count, err
+}
+
+func (r *DatasetRepository) CountVisualizationLinkJumpReferences(fieldID int64) (int64, error) {
+	if fieldID <= 0 {
+		return 0, nil
+	}
+	var count int64
+	err := r.db.Model(&auto.VisualizationLinkJumpInfo{}).
+		Where("source_field_id = ?", fieldID).
+		Count(&count).Error
+	if isMissingTableErr(err) {
+		return 0, nil
+	}
+	return count, err
+}
+
+func (r *DatasetRepository) CountVisualizationOuterParamReferences(fieldID int64) (int64, error) {
+	if fieldID <= 0 {
+		return 0, nil
+	}
+	var count int64
+	err := r.db.Model(&auto.VisualizationOuterParamsTargetViewInfo{}).
+		Where("target_field_id = ?", strconv.FormatInt(fieldID, 10)).
+		Count(&count).Error
+	if isMissingTableErr(err) {
+		return 0, nil
+	}
+	return count, err
+}
+
+func isMissingTableErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "no such table") || strings.Contains(message, "doesn't exist")
 }
 
 func (r *DatasetRepository) GetTableByID(id int64) (*dataset.CoreDatasetTable, error) {

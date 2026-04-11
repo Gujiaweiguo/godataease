@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
@@ -1095,6 +1096,64 @@ func TestDatasetServiceIntegration_DeleteFieldOperations(t *testing.T) {
 	found, err := repo.GetFieldByID(9903)
 	require.NoError(t, err)
 	assert.Equal(t, int64(9903), found.ID)
+}
+
+func TestDatasetServiceIntegration_DeleteFieldDependencyBlocking(t *testing.T) {
+	cleanupTables(
+		&auto.CoreChartView{},
+		&permission.DataPermRow{},
+		&permission.DataPermColumn{},
+		&auto.VisualizationLinkageField{},
+		&auto.VisualizationLinkJumpInfo{},
+		&auto.VisualizationOuterParamsTargetViewInfo{},
+		&dataset.CoreDatasetTable{},
+		&dataset.CoreDatasetTableField{},
+		&dataset.CoreDatasetGroup{},
+	)
+	require.NoError(t, testDB.AutoMigrate(
+		&auto.CoreChartView{},
+		&permission.DataPermRow{},
+		&permission.DataPermColumn{},
+		&auto.VisualizationLinkageField{},
+		&auto.VisualizationLinkJumpInfo{},
+		&auto.VisualizationOuterParamsTargetViewInfo{},
+	))
+
+	repo := repository.NewDatasetRepository(testDB)
+	svc := NewDatasetService(repo)
+
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	group := &dataset.CoreDatasetGroup{Name: "Blocked Field Group", PID: &rootPID, NodeType: &nodeType}
+	require.NoError(t, repo.CreateGroup(group))
+
+	tableName := "orders"
+	tableType := "db"
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetTable{ID: 9801, DatasetGroupID: group.ID, Name: &tableName, PhysicalTable: &tableName, Type: &tableType}).Error)
+
+	chartID := int64(8803)
+	fieldName := "sales"
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetTableField{ID: 9904, DatasetGroupID: group.ID, ChartID: &chartID, Name: &fieldName, OriginName: &fieldName, DataeaseName: &fieldName}).Error)
+	require.NoError(t, testDB.Create(&auto.CoreChartView{ID: 4001, TableID: 9801, XAxis: `[{"id":9904,"name":"sales"}]`}).Error)
+	require.NoError(t, testDB.Create(&permission.DataPermRow{DatasetID: group.ID, DatasetGroupID: group.ID, ExpressionTree: `{"logic":"and","items":[{"fieldId":9904}]}`}).Error)
+
+	err := svc.DeleteField(9904)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrDatasetFieldDependencyBlocked)
+	assert.Contains(t, err.Error(), "chart views")
+	assert.Contains(t, err.Error(), "row permissions")
+
+	cleanChartID := int64(8804)
+	cleanFieldName := "margin"
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetTableField{ID: 9905, DatasetGroupID: group.ID, ChartID: &cleanChartID, Name: &cleanFieldName, OriginName: &cleanFieldName}).Error)
+	err = svc.DeleteField(9905)
+	require.NoError(t, err)
+	_, err = repo.GetFieldByID(9905)
+	assert.Error(t, err)
+
+	err = svc.DeleteField(999999)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dataset field not found")
 }
 
 func TestDatasetServiceIntegration_PreviewSQL_NilRequest(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	exportdomain "dataease/backend/internal/domain/export"
@@ -36,7 +37,10 @@ type DatasetService struct {
 	calciteMu            sync.Mutex
 }
 
-var ErrDatasetDatasourcePermissionDenied = errors.New("insufficient datasource permissions")
+var (
+	ErrDatasetDatasourcePermissionDenied = errors.New("insufficient datasource permissions")
+	ErrDatasetFieldDependencyBlocked     = errors.New("dataset field dependency blocked")
+)
 
 type sqlVariableDetailRaw struct {
 	VariableName string        `json:"variableName"`
@@ -684,6 +688,13 @@ func (s *DatasetService) DeleteField(id int64) error {
 	if field.ChartID == nil || *field.ChartID <= 0 {
 		return fmt.Errorf("dataset field is not chart-scoped")
 	}
+	deps, err := s.collectFieldDeleteDependencies(field)
+	if err != nil {
+		return err
+	}
+	if len(deps) > 0 {
+		return fmt.Errorf("%w: %s", ErrDatasetFieldDependencyBlocked, strings.Join(deps, ", "))
+	}
 
 	deleted, err := s.repo.DeleteFieldByIDAndChartID(id, *field.ChartID)
 	if err != nil {
@@ -699,8 +710,159 @@ func (s *DatasetService) DeleteFieldByChart(chartID int64) error {
 	if chartID <= 0 {
 		return fmt.Errorf("chart id is required")
 	}
-	_, err := s.repo.DeleteFieldsByChartID(chartID)
+	fields, err := s.repo.ListFieldsByChartID(chartID)
+	if err != nil {
+		return err
+	}
+	for _, field := range fields {
+		deps, depErr := s.collectFieldDeleteDependencies(field)
+		if depErr != nil {
+			return depErr
+		}
+		if len(deps) > 0 {
+			return fmt.Errorf("%w: %s", ErrDatasetFieldDependencyBlocked, strings.Join(deps, ", "))
+		}
+	}
+	_, err = s.repo.DeleteFieldsByChartID(chartID)
 	return err
+}
+
+func (s *DatasetService) collectFieldDeleteDependencies(field *dataset.CoreDatasetTableField) ([]string, error) {
+	if field == nil {
+		return nil, nil
+	}
+	deps := make([]string, 0)
+
+	derivedCount, err := s.repo.CountDerivedFieldReferences(field.ID)
+	if err != nil {
+		return nil, err
+	}
+	if derivedCount > 0 {
+		deps = append(deps, "derived fields")
+	}
+
+	chartViews, err := s.repo.ListChartViewsByDatasetGroupID(field.DatasetGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if fieldReferencedInChartViews(field.ID, chartViews) {
+		deps = append(deps, "chart views")
+	}
+
+	rowPerms, err := s.repo.ListRowPermissionsByDatasetGroupID(field.DatasetGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if fieldReferencedInRowPermissions(field.ID, rowPerms) {
+		deps = append(deps, "row permissions")
+	}
+
+	columnPerms, err := s.repo.ListColumnPermissionsByDatasetGroupID(field.DatasetGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if fieldReferencedInColumnPermissions(field, columnPerms) {
+		deps = append(deps, "column permissions")
+	}
+
+	linkageCount, err := s.repo.CountVisualizationLinkageFieldReferences(field.ID)
+	if err != nil {
+		return nil, err
+	}
+	if linkageCount > 0 {
+		deps = append(deps, "visualization linkage")
+	}
+
+	jumpCount, err := s.repo.CountVisualizationLinkJumpReferences(field.ID)
+	if err != nil {
+		return nil, err
+	}
+	if jumpCount > 0 {
+		deps = append(deps, "visualization jumps")
+	}
+
+	outerParamsCount, err := s.repo.CountVisualizationOuterParamReferences(field.ID)
+	if err != nil {
+		return nil, err
+	}
+	if outerParamsCount > 0 {
+		deps = append(deps, "outer parameter bindings")
+	}
+
+	return deps, nil
+}
+
+func fieldReferencedInChartViews(fieldID int64, views []auto.CoreChartView) bool {
+	patterns := []string{
+		fmt.Sprintf(`"id":%d,`, fieldID),
+		fmt.Sprintf(`"id":%d}`, fieldID),
+		fmt.Sprintf(`"id": %d,`, fieldID),
+		fmt.Sprintf(`"id": %d}`, fieldID),
+	}
+	for _, view := range views {
+		payloads := []string{
+			view.XAxis,
+			view.XAxisExt,
+			view.YAxis,
+			view.YAxisExt,
+			view.ExtStack,
+			view.ExtBubble,
+			view.ExtLabel,
+			view.ExtTooltip,
+			view.CustomFilter,
+			view.DrillFields,
+			view.ViewFields,
+			view.FlowMapStartName,
+			view.FlowMapEndName,
+			view.ExtColor,
+			view.Senior,
+		}
+		for _, payload := range payloads {
+			for _, pattern := range patterns {
+				if strings.Contains(payload, pattern) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func fieldReferencedInRowPermissions(fieldID int64, rows []permission.DataPermRow) bool {
+	patterns := []string{
+		fmt.Sprintf(`"fieldId":%d`, fieldID),
+		fmt.Sprintf(`"fieldId": %d`, fieldID),
+	}
+	for _, row := range rows {
+		for _, pattern := range patterns {
+			if strings.Contains(row.ExpressionTree, pattern) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func fieldReferencedInColumnPermissions(field *dataset.CoreDatasetTableField, rows []permission.DataPermColumn) bool {
+	if field == nil {
+		return false
+	}
+	names := make(map[string]struct{})
+	for _, candidate := range []*string{field.Name, field.OriginName, field.DataeaseName, field.FieldShortName} {
+		if candidate == nil {
+			continue
+		}
+		name := strings.TrimSpace(*candidate)
+		if name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	for _, row := range rows {
+		if _, ok := names[strings.TrimSpace(row.FieldName)]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID int64) (*dataset.ExportDatasetResponse, error) {
@@ -717,13 +879,14 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 		return nil, fmt.Errorf("export repository not initialized")
 	}
 
-	group, err := s.repo.GetGroupByID(req.ID)
+	group, err := s.GetGroupByID(req.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("dataset not found")
 		}
 		return nil, err
 	}
+	resolvedDatasetID := group.ID
 
 	viewName := strings.TrimSpace(req.ViewName)
 	if viewName == "" {
@@ -740,7 +903,7 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 		FileName:       GenerateExcelFilename(viewName),
 		FileSize:       0,
 		FileSizeUnit:   "B",
-		ExportFrom:     req.ID,
+		ExportFrom:     resolvedDatasetID,
 		ExportStatus:   "PENDING",
 		ExportFromType: permission.ResourceTypeDataset,
 		ExportTime:     time.Now().UnixMilli(),
@@ -754,7 +917,7 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 	return &dataset.ExportDatasetResponse{
 		TaskID:         taskID,
 		Status:         "PENDING",
-		ExportFrom:     req.ID,
+		ExportFrom:     resolvedDatasetID,
 		ExportFromType: permission.ResourceTypeDataset,
 		ExportFromName: viewName,
 	}, nil

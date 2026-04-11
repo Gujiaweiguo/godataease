@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/repository"
@@ -1196,6 +1198,24 @@ func TestDatasetService_ExportDataset(t *testing.T) {
 		assert.Contains(t, repoStub.createTask.FileName, "Sales_Export")
 	})
 
+	t.Run("compat dataset id resolves to canonical export source", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		repoStub := &exportRepoStub{}
+		svc.SetExportRepository(repoStub)
+
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 101, Name: "Compat Dataset", PID: &rootPID, NodeType: &nodeType}).Error)
+
+		resp, err := svc.ExportDataset(&dataset.ExportDatasetRequest{ID: 200, ViewName: "Compat Export"}, 88)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, int64(101), resp.ExportFrom)
+		require.NotNil(t, repoStub.createTask)
+		assert.Equal(t, int64(101), repoStub.createTask.ExportFrom)
+		assert.Equal(t, permission.ResourceTypeDataset, repoStub.createTask.ExportFromType)
+	})
+
 	t.Run("validates request and dependencies", func(t *testing.T) {
 		svc, _ := setupDatasetServiceRepoTest(t)
 
@@ -1267,6 +1287,51 @@ func TestDatasetService_DeleteFieldOperations(t *testing.T) {
 		assert.Contains(t, err.Error(), "dataset field is not chart-scoped")
 	})
 
+	t.Run("delete field blocks chart and row permission dependencies", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.AutoMigrate(&auto.CoreChartView{}, &permission.DataPermRow{}, &dataset.CoreDatasetTable{}))
+
+		chartID := int64(446)
+		tableName := "orders"
+		tableType := "db"
+		fieldName := "sales"
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 900, DatasetGroupID: 10, Name: &tableName, PhysicalTable: &tableName, Type: &tableType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 705, DatasetGroupID: 10, ChartID: &chartID, Name: &fieldName, OriginName: &fieldName, DataeaseName: &fieldName}).Error)
+		require.NoError(t, db.Create(&auto.CoreChartView{ID: 3001, TableID: 900, XAxis: `[{"id":705,"name":"sales"}]`}).Error)
+		require.NoError(t, db.Create(&permission.DataPermRow{DatasetID: 10, DatasetGroupID: 10, ExpressionTree: `{"logic":"and","items":[{"fieldId":705}]}`}).Error)
+
+		err := svc.DeleteField(705)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrDatasetFieldDependencyBlocked)
+		assert.Contains(t, err.Error(), "chart views")
+		assert.Contains(t, err.Error(), "row permissions")
+	})
+
+	t.Run("delete field blocks derived and configuration dependencies", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.AutoMigrate(&permission.DataPermColumn{}, &auto.VisualizationLinkageField{}, &auto.VisualizationLinkJumpInfo{}, &auto.VisualizationOuterParamsTargetViewInfo{}))
+
+		chartID := int64(447)
+		extField := 2
+		fieldName := "profit"
+		origin := fmt.Sprintf("[%d]", 706)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 706, DatasetGroupID: 10, ChartID: &chartID, Name: &fieldName, OriginName: &fieldName, DataeaseName: &fieldName, FieldShortName: &fieldName}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 707, DatasetGroupID: 10, ChartID: &chartID, Name: &fieldName, OriginName: &origin, ExtField: &extField}).Error)
+		require.NoError(t, db.Create(&permission.DataPermColumn{DatasetID: 10, DatasetGroupID: 10, FieldName: fieldName, PermType: permission.PermTypeDisable, Status: 1}).Error)
+		require.NoError(t, db.Create(&auto.VisualizationLinkageField{ID: 1, SourceField: 706, TargetField: 999}).Error)
+		require.NoError(t, db.Create(&auto.VisualizationLinkJumpInfo{ID: 1, SourceFieldID: 706}).Error)
+		require.NoError(t, db.Create(&auto.VisualizationOuterParamsTargetViewInfo{TargetID: "1", TargetFieldID: "706"}).Error)
+
+		err := svc.DeleteField(706)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrDatasetFieldDependencyBlocked)
+		assert.Contains(t, err.Error(), "derived fields")
+		assert.Contains(t, err.Error(), "column permissions")
+		assert.Contains(t, err.Error(), "visualization linkage")
+		assert.Contains(t, err.Error(), "visualization jumps")
+		assert.Contains(t, err.Error(), "outer parameter bindings")
+	})
+
 	t.Run("delete fields by chart validates and scopes", func(t *testing.T) {
 		svc, db := setupDatasetServiceRepoTest(t)
 		chartID := int64(444)
@@ -1289,6 +1354,25 @@ func TestDatasetService_DeleteFieldOperations(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, field)
 		assert.Equal(t, int64(704), field.ID)
+	})
+
+	t.Run("delete by chart blocks when any field has dependencies", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.AutoMigrate(&auto.VisualizationLinkJumpInfo{}))
+
+		chartID := int64(448)
+		name := "field"
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 708, DatasetGroupID: 10, ChartID: &chartID, Name: &name, OriginName: &name}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 709, DatasetGroupID: 10, ChartID: &chartID, Name: &name, OriginName: &name}).Error)
+		require.NoError(t, db.Create(&auto.VisualizationLinkJumpInfo{ID: 2, SourceFieldID: 708}).Error)
+
+		err := svc.DeleteFieldByChart(chartID)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrDatasetFieldDependencyBlocked)
+
+		field, getErr := svc.repo.GetFieldByID(708)
+		require.NoError(t, getErr)
+		require.NotNil(t, field)
 	})
 }
 

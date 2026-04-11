@@ -2,6 +2,7 @@ package repository
 
 import (
 	"dataease/backend/internal/domain/export"
+	"strconv"
 
 	"gorm.io/gorm"
 )
@@ -12,15 +13,14 @@ type coreExportTask struct {
 	FileName          string `gorm:"column:file_name;size:255"`
 	FileSize          float64
 	FileSizeUnit      string `gorm:"column:file_size_unit;size:20"`
-	ExportFrom        int64  `gorm:"column:export_from"`
+	ExportFrom        string `gorm:"column:export_from;size:255"`
 	ExportStatus      string `gorm:"column:export_status;size:50"`
 	Msg               string `gorm:"column:msg;size:500"`
 	ExportFromType    string `gorm:"column:export_from_type;size:50"`
 	ExportTime        int64  `gorm:"column:export_time"`
 	ExportProgress    string `gorm:"column:export_progress;size:20"`
 	ExportMachineName string `gorm:"column:export_machine_name;size:100"`
-	ExportFromName    string `gorm:"column:export_from_name;size:255"`
-	OrgName           string `gorm:"column:org_name;size:255"`
+	Params            string `gorm:"column:params;type:text"`
 }
 
 func (coreExportTask) TableName() string {
@@ -140,33 +140,31 @@ func (r *ExportRepository) toRecord(task *export.ExportTask) *coreExportTask {
 		FileName:          task.FileName,
 		FileSize:          task.FileSize,
 		FileSizeUnit:      task.FileSizeUnit,
-		ExportFrom:        task.ExportFrom,
+		ExportFrom:        strconv.FormatInt(task.ExportFrom, 10),
 		ExportStatus:      task.ExportStatus,
 		Msg:               task.Msg,
 		ExportFromType:    task.ExportFromType,
 		ExportTime:        task.ExportTime,
 		ExportProgress:    task.ExportProgress,
 		ExportMachineName: task.ExportMachineName,
-		ExportFromName:    task.ExportFromName,
-		OrgName:           task.OrgName,
+		Params:            "{}",
 	}
 }
 
 func (r *ExportRepository) toDomain(record *coreExportTask) *export.ExportTask {
+	exportFrom, _ := strconv.ParseInt(record.ExportFrom, 10, 64)
 	return &export.ExportTask{
 		ID:                record.ID,
 		UserID:            record.UserID,
 		FileName:          record.FileName,
 		FileSize:          record.FileSize,
 		FileSizeUnit:      record.FileSizeUnit,
-		ExportFrom:        record.ExportFrom,
+		ExportFrom:        exportFrom,
 		ExportStatus:      record.ExportStatus,
 		Msg:               record.Msg,
 		ExportFromType:    record.ExportFromType,
 		ExportTime:        record.ExportTime,
 		ExportProgress:    record.ExportProgress,
 		ExportMachineName: record.ExportMachineName,
-		ExportFromName:    record.ExportFromName,
-		OrgName:           record.OrgName,
 	}
 }
