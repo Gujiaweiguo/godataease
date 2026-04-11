@@ -186,7 +186,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, sanitizeDatasourceResponse(result))
+				response.Success(c, sanitizeDatasourceResponse(result, datasourceHandler.service))
 			})
 			datasourceGroup.GET("/hidePw/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -199,7 +199,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, sanitizeDatasourceResponse(result))
+				response.Success(c, sanitizeDatasourceResponse(result, datasourceHandler.service))
 			})
 			datasourceGroup.GET("/getSimpleDs/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -1248,13 +1248,22 @@ func toInt64ID(id interface{}) int64 {
 	}
 }
 
-func sanitizeDatasourceResponse(ds *datasource.CoreDatasource) gin.H {
+func sanitizeDatasourceResponse(ds *datasource.CoreDatasource, dsService *service.DatasourceService) gin.H {
 	if ds == nil {
 		return gin.H{}
 	}
 	pid := "0"
 	if ds.PID != nil {
 		pid = strconv.FormatInt(*ds.PID, 10)
+	}
+
+	creator := ""
+	if ds.CreateBy != nil {
+		creator = dsService.ResolveUserName(*ds.CreateBy)
+	}
+	updater := ""
+	if ds.UpdateBy != nil {
+		updater = dsService.ResolveUserName(strconv.FormatInt(*ds.UpdateBy, 10))
 	}
 
 	return gin.H{
@@ -1269,6 +1278,8 @@ func sanitizeDatasourceResponse(ds *datasource.CoreDatasource) gin.H {
 		"updateTime":     ds.UpdateTime,
 		"updateBy":       ds.UpdateBy,
 		"createBy":       ds.CreateBy,
+		"creator":        creator,
+		"updater":        updater,
 		"status":         ds.Status,
 		"qrtzInstance":   ds.QrtzInstance,
 		"taskStatus":     ds.TaskStatus,

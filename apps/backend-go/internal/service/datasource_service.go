@@ -38,6 +38,7 @@ type DatasourceService struct {
 	repo                *repository.DatasourceRepository
 	excelService        *ExcelService
 	resourcePermService *ResourcePermissionService
+	userRepo            *repository.UserRepository
 	seatunnelAddress    string
 	seatunnelTimeout    time.Duration
 	seatunnelRetries    int
@@ -59,6 +60,30 @@ func NewDatasourceService(repo *repository.DatasourceRepository) *DatasourceServ
 
 func (s *DatasourceService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
 	s.resourcePermService = resourcePermSvc
+}
+
+func (s *DatasourceService) SetUserRepository(userRepo *repository.UserRepository) {
+	s.userRepo = userRepo
+}
+
+// ResolveUserName resolves a user ID string to a displayable user name.
+// Falls back to the raw userID if the user cannot be found.
+func (s *DatasourceService) ResolveUserName(userID string) string {
+	if s.userRepo == nil || userID == "" {
+		return userID
+	}
+	id, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		return userID
+	}
+	u, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return userID
+	}
+	if u.NickName != "" {
+		return u.NickName
+	}
+	return u.Username
 }
 
 func (s *DatasourceService) SetSeatunnelConfig(address string, timeout time.Duration, retries int) {
