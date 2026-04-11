@@ -574,3 +574,25 @@ func quoteIdentifier(name string) (string, error) {
 	}
 	return "`" + strings.ReplaceAll(trimmed, "`", "``") + "`", nil
 }
+
+func (r *DatasetRepository) CreateDatasetField(field *dataset.CoreDatasetTableField) error {
+	return r.db.Create(field).Error
+}
+
+func (r *DatasetRepository) UpdateDatasetField(field *dataset.CoreDatasetTableField) error {
+	return r.db.Model(&dataset.CoreDatasetTableField{}).
+		Where("id = ?", field.ID).
+		Updates(map[string]interface{}{
+			"origin_name":      field.OriginName,
+			"name":             field.Name,
+			"dataease_name":    field.DataeaseName,
+			"field_short_name": field.FieldShortName,
+			"group_type":       field.GroupType,
+			"type":             field.Type,
+			"de_type":          field.DeType,
+			"de_extract_type":  field.DeExtractType,
+			"ext_field":        field.ExtField,
+			"checked":          field.Checked,
+			"params":           field.Params,
+		}).Error
+}

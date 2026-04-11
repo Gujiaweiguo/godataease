@@ -1598,6 +1598,31 @@ func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type in
 	return 0
 }
 
+// SaveField creates or updates a dataset field. If field.ID == 0, creates; otherwise updates.
+func (s *DatasetService) SaveField(field *dataset.CoreDatasetTableField) (*dataset.CoreDatasetTableField, error) {
+	if field.Name == nil || *field.Name == "" {
+		return nil, fmt.Errorf("field name is required")
+	}
+	if field.DatasetGroupID == 0 {
+		return nil, fmt.Errorf("datasetGroupId is required")
+	}
+	if field.Type == nil || *field.Type == "" {
+		return nil, fmt.Errorf("field type is required")
+	}
+
+	if field.ID == 0 {
+		if err := s.repo.CreateDatasetField(field); err != nil {
+			return nil, fmt.Errorf("failed to create field: %w", err)
+		}
+		return field, nil
+	}
+
+	if err := s.repo.UpdateDatasetField(field); err != nil {
+		return nil, fmt.Errorf("failed to update field: %w", err)
+	}
+	return field, nil
+}
+
 func isDateTimeText(text string) bool {
 	layouts := []string{
 		time.RFC3339,

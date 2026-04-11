@@ -1068,6 +1068,19 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			if datasetHandler != nil {
 				RegisterDatasetFieldDeleteRoutes(datasetFieldGroup, datasetHandler, chartHandler)
 			}
+			datasetFieldGroup.POST("/save", func(c *gin.Context) {
+				var field dataset.CoreDatasetTableField
+				if err := c.ShouldBindJSON(&field); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+				result, err := datasetHandler.service.SaveField(&field)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, result)
+			})
 		}
 	}
 
