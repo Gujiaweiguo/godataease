@@ -660,13 +660,17 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				barInfo := &dataset.BarInfo{
 					ID:             group.ID,
 					Name:           group.Name,
-					CreateTime:     0,
-					LastUpdateTime: 0,
+					CreateBy:       group.CreateBy,
+					CreateTime:     group.CreateTime,
+					UpdateBy:       group.UpdateBy,
+					LastUpdateTime: group.LastUpdateTime,
 					IsCross:        false,
 				}
 				if group.NodeType != nil {
 					barInfo.NodeType = *group.NodeType
 				}
+				barInfo.Creator = datasetHandler.service.ResolveUserName(group.CreateBy)
+				barInfo.Updater = datasetHandler.service.ResolveUserName(group.UpdateBy)
 
 				response.Success(c, barInfo)
 			})

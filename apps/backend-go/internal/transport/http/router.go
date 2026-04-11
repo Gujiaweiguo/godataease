@@ -244,6 +244,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 			calciteCfg.MaxRetries,
 		)
 	}
+	datasetService.SetUserRepository(userRepo)
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 
 	chartRepo := repository.NewChartRepository(db)

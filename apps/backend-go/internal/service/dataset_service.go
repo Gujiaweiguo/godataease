@@ -35,6 +35,7 @@ type DatasetService struct {
 	calciteRetries       int
 	calciteClient        *calciteintegration.Client
 	calciteMu            sync.Mutex
+	userRepo             *repository.UserRepository
 }
 
 var (
@@ -90,6 +91,30 @@ func (s *DatasetService) SetCalciteConfig(address string, timeout time.Duration,
 		s.calciteClient = nil
 	}
 	s.calciteMu.Unlock()
+}
+
+func (s *DatasetService) SetUserRepository(userRepo *repository.UserRepository) {
+	s.userRepo = userRepo
+}
+
+// ResolveUserName resolves a user ID string to a displayable user name.
+// Falls back to the raw userID if the user cannot be found.
+func (s *DatasetService) ResolveUserName(userID string) string {
+	if s.userRepo == nil || userID == "" {
+		return userID
+	}
+	id, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		return userID
+	}
+	u, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return userID
+	}
+	if u.NickName != "" {
+		return u.NickName
+	}
+	return u.Username
 }
 
 func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, error) {

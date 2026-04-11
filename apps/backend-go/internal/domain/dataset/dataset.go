@@ -6,13 +6,17 @@ const (
 )
 
 type CoreDatasetGroup struct {
-	ID       int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Name     string  `gorm:"column:name" json:"name"`
-	PID      *int64  `gorm:"column:pid" json:"pid"`
-	Level    *int    `gorm:"column:level" json:"level"`
-	NodeType *string `gorm:"column:node_type" json:"nodeType"`
-	Type     *string `gorm:"column:type" json:"type"`
-	DelFlag  *int    `gorm:"column:del_flag" json:"delFlag"`
+	ID             int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name           string  `gorm:"column:name" json:"name"`
+	PID            *int64  `gorm:"column:pid" json:"pid"`
+	Level          *int    `gorm:"column:level" json:"level"`
+	NodeType       *string `gorm:"column:node_type" json:"nodeType"`
+	Type           *string `gorm:"column:type" json:"type"`
+	DelFlag        *int    `gorm:"column:del_flag" json:"delFlag"`
+	CreateBy       string  `gorm:"column:create_by" json:"createBy"`
+	CreateTime     int64   `gorm:"column:create_time" json:"createTime"`
+	UpdateBy       string  `gorm:"column:update_by" json:"updateBy"`
+	LastUpdateTime int64   `gorm:"column:last_update_time" json:"lastUpdateTime"`
 }
 
 func (CoreDatasetGroup) TableName() string {
