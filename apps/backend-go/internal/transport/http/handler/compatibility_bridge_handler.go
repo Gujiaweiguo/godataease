@@ -442,7 +442,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				response.Success(c, result)
 			})
-			datasourceGroup.GET("/delete/:id", func(c *gin.Context) {
+			deleteDatasourceHandler := func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 				if err != nil {
 					response.Error(c, "500000", "Invalid datasource ID")
@@ -453,7 +453,9 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					return
 				}
 				response.Success(c, nil)
-			})
+			}
+			datasourceGroup.GET("/delete/:id", deleteDatasourceHandler)
+			datasourceGroup.POST("/delete/:id", deleteDatasourceHandler)
 			datasourceGroup.POST("/perDelete/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 				if err != nil {
@@ -669,33 +671,42 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				response.Success(c, barInfo)
 			})
 			datasetTreeGroup.POST("/exportDataset", func(c *gin.Context) {
-				var req struct {
-					ID       int64           `json:"id"`
-					ViewName string          `json:"viewName"`
-					Header   []string        `json:"header"`
-					Details  [][]interface{} `json:"details"`
-				}
+				var req dataset.ExportDatasetRequest
 				if err := c.ShouldBindJSON(&req); err != nil {
 					response.Error(c, "500000", "Invalid request: "+err.Error())
 					return
 				}
 
-				buf, err := chartHandler.exportService.InnerExportDetails(&service.ExportChartRequest{
-					ViewName: req.ViewName,
-					Header:   req.Header,
-					Details:  req.Details,
-				})
+				if req.DataEaseBi {
+					if chartHandler == nil || chartHandler.exportService == nil {
+						response.Error(c, "500000", "Failed to export: chart export service unavailable")
+						return
+					}
+					buf, err := chartHandler.exportService.InnerExportDetails(&service.ExportChartRequest{
+						ViewName: req.ViewName,
+						Header:   req.Header,
+						Details:  req.Details,
+					})
+					if err != nil {
+						response.Error(c, "500000", "Failed to export: "+err.Error())
+						return
+					}
+
+					filename := service.GenerateExcelFilename(req.ViewName)
+					c.Header("Content-Description", "File Transfer")
+					c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+					c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+					c.Header("Content-Transfer-Encoding", "binary")
+					c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+					return
+				}
+
+				result, err := datasetHandler.service.ExportDataset(&req, int64(middleware.GetUserID(c)))
 				if err != nil {
 					response.Error(c, "500000", "Failed to export: "+err.Error())
 					return
 				}
-
-				filename := service.GenerateExcelFilename(req.ViewName)
-				c.Header("Content-Description", "File Transfer")
-				c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-				c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
-				c.Header("Content-Transfer-Encoding", "binary")
-				c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+				response.Success(c, result)
 			})
 		}
 
@@ -1056,7 +1067,12 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Invalid field ID")
 					return
 				}
-				if err = chartHandler.service.DeleteField(id); err != nil {
+				if datasetHandler != nil {
+					err = datasetHandler.service.DeleteField(id)
+				} else {
+					err = chartHandler.service.DeleteField(id)
+				}
+				if err != nil {
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
@@ -1068,7 +1084,12 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Invalid chart ID")
 					return
 				}
-				if err = chartHandler.service.DeleteFieldByChart(chartID); err != nil {
+				if datasetHandler != nil {
+					err = datasetHandler.service.DeleteFieldByChart(chartID)
+				} else {
+					err = chartHandler.service.DeleteFieldByChart(chartID)
+				}
+				if err != nil {
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}

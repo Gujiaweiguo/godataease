@@ -314,6 +314,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	// Export module initialization
 	exportRepo := repository.NewExportRepository(db)
+	datasetService.SetExportRepository(exportRepo)
 	exportService := service.NewExportService(exportRepo)
 	exportHandler := handler.NewExportHandler(exportService, exportPermService, adminChecker)
 

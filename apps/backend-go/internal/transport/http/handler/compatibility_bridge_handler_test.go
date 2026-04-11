@@ -13,6 +13,8 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/datasource"
+	exportdomain "dataease/backend/internal/domain/export"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/user"
@@ -23,6 +25,8 @@ import (
 	seatunnelv1 "dataease/backend/proto/seatunnel/v1"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -53,6 +57,44 @@ type bridgeFieldListResp struct {
 type mockBridgeResourcePermRepo struct {
 	hasPermission         bool
 	governedPermissionIDs map[int64][]int64
+}
+
+type mockBridgeExportRepo struct {
+	created   *exportdomain.ExportTask
+	createErr error
+}
+
+func (m *mockBridgeExportRepo) Create(task *exportdomain.ExportTask) error {
+	m.created = task
+	return m.createErr
+}
+
+func (m *mockBridgeExportRepo) GetByID(string) (*exportdomain.ExportTask, error) {
+	return nil, nil
+}
+
+func (m *mockBridgeExportRepo) List(int, int, string) ([]exportdomain.ExportTask, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockBridgeExportRepo) UpdateStatus(string, string) error {
+	return nil
+}
+
+func (m *mockBridgeExportRepo) Delete(string) error {
+	return nil
+}
+
+func (m *mockBridgeExportRepo) DeleteBatch([]string) error {
+	return nil
+}
+
+func (m *mockBridgeExportRepo) DeleteAllByType(string) error {
+	return nil
+}
+
+func (m *mockBridgeExportRepo) CountByStatus() (map[string]int64, error) {
+	return map[string]int64{}, nil
 }
 
 func (m *mockBridgeResourcePermRepo) GetPermByID(permID int64) (*permission.SysPerm, error) {
@@ -848,9 +890,16 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
 		nextFieldID:   5000,
 	}
+	datasetDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, datasetDB.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
+	datasetRepo := repository.NewDatasetRepository(datasetDB)
+	datasetService := service.NewDatasetService(datasetRepo)
+	datasetHandler := NewDatasetHandler(datasetService)
 	field := &dataset.CoreDatasetTableField{
 		ID:             21,
 		DatasetGroupID: 41,
+		ChartID:        int64PtrBridge(601),
 		Name:           &name,
 		OriginName:     &origin,
 		DataeaseName:   &dataeaseName,
@@ -861,10 +910,22 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 	}
 	repo.fieldRegistry[21] = field
 	repo.dsFields[41] = []*dataset.CoreDatasetTableField{field}
+	require.NoError(t, datasetDB.Create(&dataset.CoreDatasetTableField{
+		ID:             21,
+		DatasetGroupID: 41,
+		ChartID:        int64PtrBridge(601),
+		Name:           &name,
+		OriginName:     &origin,
+		DataeaseName:   &dataeaseName,
+		GroupType:      &groupType,
+		Type:           &typeName,
+		DeType:         &deType,
+		Checked:        &checked,
+	}).Error)
 	chartHandler := NewChartHandler(service.NewChartService(repo))
 
 	r := gin.New()
-	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
 
 	listReq := httptest.NewRequest("POST", "/datasetField/listByDatasetGroup/41", strings.NewReader("{}"))
 	listReq.Header.Set("Content-Type", "application/json")
@@ -901,7 +962,24 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 	if delResp.Code != "000000" {
 		t.Fatalf("expected delete code 000000, got %s", delResp.Code)
 	}
+
+	delByChartReq := httptest.NewRequest("POST", "/datasetField/deleteByChartId/601", strings.NewReader("{}"))
+	delByChartReq.Header.Set("Content-Type", "application/json")
+	delByChartW := httptest.NewRecorder()
+	r.ServeHTTP(delByChartW, delByChartReq)
+	if delByChartW.Code != 200 {
+		t.Fatalf("expected deleteByChart status 200, got %d", delByChartW.Code)
+	}
+	delByChartResp := bridgeCodeResp{}
+	if err := json.Unmarshal(delByChartW.Body.Bytes(), &delByChartResp); err != nil {
+		t.Fatalf("unmarshal dataset field deleteByChart failed: %v", err)
+	}
+	if delByChartResp.Code != "000000" {
+		t.Fatalf("expected deleteByChart code 000000, got %s", delByChartResp.Code)
+	}
 }
+
+func int64PtrBridge(v int64) *int64 { return &v }
 
 func TestOldPathDatasourceList(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -1045,6 +1123,62 @@ func TestApiAliasChartDataGetData(t *testing.T) {
 	}
 }
 
+func TestDatasetTreeExportDatasetRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("queues export task when dataEaseBi is false", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
+
+		repo := repository.NewDatasetRepository(db)
+		datasetSvc := service.NewDatasetService(repo)
+		exportRepo := &mockBridgeExportRepo{}
+		datasetSvc.SetExportRepository(exportRepo)
+		datasetHandler := NewDatasetHandler(datasetSvc)
+
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 501, Name: "Bridge Dataset", PID: &rootPID, NodeType: &nodeType}).Error)
+
+		r := gin.New()
+		RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+
+		req := httptest.NewRequest("POST", "/datasetTree/exportDataset", strings.NewReader(`{"id":501,"viewName":"Bridge Export"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, 200, w.Code)
+		resp := bridgeAnyResp{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Equal(t, "PENDING", resp.Data["status"])
+		assert.Equal(t, "dataset", resp.Data["exportFromType"])
+		require.NotNil(t, exportRepo.created)
+		assert.Equal(t, int64(501), exportRepo.created.ExportFrom)
+		assert.Equal(t, int64(0), exportRepo.created.UserID)
+	})
+
+	t.Run("keeps inline download behavior when dataEaseBi is true", func(t *testing.T) {
+		datasetHandler := NewDatasetHandler(service.NewDatasetService(nil))
+		chartHandler := NewChartHandler(nil)
+
+		r := gin.New()
+		RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
+
+		reqBody := `{"id":1,"viewName":"Inline Export","dataEaseBi":true,"header":["col1"],"details":[["v1"]]}`
+		req := httptest.NewRequest("POST", "/datasetTree/exportDataset", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, 200, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		assert.NotEmpty(t, w.Body.Bytes())
+	})
+}
+
 func TestDatasourceSyncRouteReturnsErrorWhenSeatunnelUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -1175,6 +1309,71 @@ func TestDatasourceListSyncRecordReturnsErrorWithoutRepository(t *testing.T) {
 	if resp.Code != "500000" {
 		t.Fatalf("expected code 500000 when repository unavailable, got %s", resp.Code)
 	}
+}
+
+func TestDatasourceDeleteRoutes_PostAndGetShareSemantics(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&datasource.CoreDatasource{}))
+
+	repo := repository.NewDatasourceRepository(db)
+	dsService := service.NewDatasourceService(repo)
+	dsHandler := NewDatasourceHandler(dsService)
+
+	rootPID := int64(0)
+	delFlag := 0
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 601, PID: &rootPID, Name: "Folder", Type: datasource.TypeFolder, DelFlag: &delFlag}).Error)
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 602, PID: int64PtrBridge(601), Name: "DS-POST", Type: "API", DelFlag: &delFlag}).Error)
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 603, PID: int64PtrBridge(601), Name: "DS-GET", Type: "API", DelFlag: &delFlag}).Error)
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, dsHandler, nil, nil, nil)
+
+	postReq := httptest.NewRequest("POST", "/datasource/delete/602", strings.NewReader("{}"))
+	postReq.Header.Set("Content-Type", "application/json")
+	postW := httptest.NewRecorder()
+	r.ServeHTTP(postW, postReq)
+	require.Equal(t, 200, postW.Code)
+	postResp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(postW.Body.Bytes(), &postResp))
+	assert.Equal(t, "000000", postResp.Code)
+
+	getReq := httptest.NewRequest("GET", "/datasource/delete/603", nil)
+	getW := httptest.NewRecorder()
+	r.ServeHTTP(getW, getReq)
+	require.Equal(t, 200, getW.Code)
+	getResp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(getW.Body.Bytes(), &getResp))
+	assert.Equal(t, "000000", getResp.Code)
+
+	var postDeleted datasource.CoreDatasource
+	require.NoError(t, db.First(&postDeleted, 602).Error)
+	require.NotNil(t, postDeleted.DelFlag)
+	assert.Equal(t, 1, *postDeleted.DelFlag)
+
+	var getDeleted datasource.CoreDatasource
+	require.NoError(t, db.First(&getDeleted, 603).Error)
+	require.NotNil(t, getDeleted.DelFlag)
+	assert.Equal(t, 1, *getDeleted.DelFlag)
+
+	invalidPostReq := httptest.NewRequest("POST", "/datasource/delete/not-a-number", strings.NewReader("{}"))
+	invalidPostReq.Header.Set("Content-Type", "application/json")
+	invalidPostW := httptest.NewRecorder()
+	r.ServeHTTP(invalidPostW, invalidPostReq)
+	require.Equal(t, 200, invalidPostW.Code)
+	invalidPostResp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(invalidPostW.Body.Bytes(), &invalidPostResp))
+	assert.Equal(t, "500000", invalidPostResp.Code)
+
+	invalidGetReq := httptest.NewRequest("GET", "/datasource/delete/not-a-number", nil)
+	invalidGetW := httptest.NewRecorder()
+	r.ServeHTTP(invalidGetW, invalidGetReq)
+	require.Equal(t, 200, invalidGetW.Code)
+	invalidGetResp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(invalidGetW.Body.Bytes(), &invalidGetResp))
+	assert.Equal(t, "500000", invalidGetResp.Code)
 }
 
 func TestDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
