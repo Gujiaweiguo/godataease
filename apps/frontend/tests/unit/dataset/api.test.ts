@@ -18,7 +18,9 @@ import {
   exportRetry,
   exportTasks,
   exportTasksRecords,
-  getDatasetTree
+  getDatasetTree,
+  getPreviewData,
+  getTableField
 } from '@/api/dataset'
 
 describe('Dataset API wrappers', () => {
@@ -41,11 +43,49 @@ describe('Dataset API wrappers', () => {
     const result = await getDatasetTree({})
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasetTree/tree',
+      url: '/dataset/tree',
       data: { busiFlag: 'dataset' }
     })
     expect(result[0].leaf).toBe(false)
     expect(result[0].children[0].leaf).toBe(true)
+  })
+
+  it('requests dataset fields through the canonical dataset route', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: [{ id: 'field-1', originName: 'orders.amount' }] })
+
+    const payload = { datasourceId: 7, tableName: 'orders' }
+    const result = await getTableField(payload)
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/dataset/fields',
+      data: payload
+    })
+    expect(result).toEqual([{ id: 'field-1', originName: 'orders.amount' }])
+  })
+
+  it('requests dataset preview through the canonical dataset route and preserves field post-processing', async () => {
+    const response = {
+      data: {
+        allFields: [{ originName: 'orders.amount', name: 'Amount' }],
+        data: {
+          fields: [{ originName: 'orders.amount', name: 'Amount' }],
+          data: [{ amount: 12 }]
+        }
+      }
+    }
+    requestMock.post.mockResolvedValueOnce(response)
+
+    const payload = { allFields: [{ originName: '[orders.amount]', name: 'Amount' }] }
+    const result = await getPreviewData(payload)
+
+    expect(requestMock.post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/dataset/preview',
+        data: expect.any(Object)
+      })
+    )
+    expect(result).toEqual(response.data)
+    expect(payload.allFields[0].originName).toBe('[orders.amount]')
   })
 
   it('requests export-center task counters through the records alias', async () => {
