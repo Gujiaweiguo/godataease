@@ -6,7 +6,7 @@
 
 ## 2. Direct preview execution foundation
 
-- [ ] 2.1 Introduce the minimal backend execution abstraction for datasource-aware direct preview without expanding `DatasetRepository` into a multi-driver execution layer.
+- [x] 2.1 Introduce the minimal backend execution abstraction for datasource-aware direct preview without expanding `DatasetRepository` into a multi-driver execution layer.
 - [ ] 2.2 Implement datasource eligibility, authorization, timeout, and result-size enforcement for supported direct preview paths.
 - [ ] 2.3 Add backend unit/integration coverage for supported, unsupported, forbidden, and execution-failure direct preview scenarios.
 
