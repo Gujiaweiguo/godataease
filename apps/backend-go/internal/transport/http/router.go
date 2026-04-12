@@ -246,6 +246,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		)
 	}
 	datasetService.SetUserRepository(userRepo)
+	datasetService.SetDatasourceRepository(datasourceRepo)
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 
 	chartRepo := repository.NewChartRepository(db)

@@ -250,6 +250,22 @@ type fakeBridgeChartRepo struct {
 	chartDatasetGroups map[int64]int64
 }
 
+type bridgeStubPreviewExecutor struct {
+	rows []map[string]interface{}
+	err  error
+}
+
+func (s *bridgeStubPreviewExecutor) PreviewSQL(string, int) ([]map[string]interface{}, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.rows, nil
+}
+
+func (s *bridgeStubPreviewExecutor) Close() error {
+	return nil
+}
+
 type mockBridgeChartDatasetResolver struct {
 	datasetGroupIDs map[int64]int64
 	err             error
@@ -1764,6 +1780,47 @@ func TestApiAliasDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalData
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "500000", resp.Code)
 	assert.Contains(t, resp.Msg, "external datasource SQL preview is not supported yet")
+}
+
+func TestDatasetPreviewSQLRouteRoutesMySQLDatasourcePreview(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &datasource.CoreDatasource{}))
+
+	datasetService := service.NewDatasetService(repository.NewDatasetRepository(db))
+	datasetService.SetDatasourceRepository(repository.NewDatasourceRepository(db))
+	configBytes := base64.StdEncoding.EncodeToString([]byte(`{"host":"mysql.local","port":3306,"dataBase":"analytics","username":"root","password":"secret"}`))
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 66, Name: "mysql-ds", Type: "mysql", Configuration: &configBytes}).Error)
+	datasetService.SetPreviewExecutorFactory(func(ds *datasource.CoreDatasource, cfg *datasource.ConnectionConfig) (service.PreviewExecutor, error) {
+		assert.Equal(t, int64(66), ds.ID)
+		assert.Equal(t, "root", cfg.Username)
+		return &bridgeStubPreviewExecutor{rows: []map[string]interface{}{{"name": "alice"}}}, nil
+	})
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+
+	sql := base64.StdEncoding.EncodeToString([]byte("SELECT name FROM orders"))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":66}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, 200, w.Code)
+	var resp struct {
+		Code string `json:"code"`
+		Data struct {
+			Data dataset.SQLPreviewData `json:"data"`
+			SQL  string                 `json:"sql"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	require.Len(t, resp.Data.Data.Data, 1)
+	assert.Equal(t, "alice", resp.Data.Data.Data[0]["name"])
+	assert.NotEmpty(t, resp.Data.SQL)
 }
 
 func TestCompatibilityBridge_DatasetDetailWithPerm_401_Unauthenticated(t *testing.T) {
