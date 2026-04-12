@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -1720,6 +1721,49 @@ func TestApiAliasDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 	if atomic.LoadInt32(&calciteMock.validateCalls) == 0 {
 		t.Fatal("expected calcite validate to be called")
 	}
+}
+
+func TestDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	datasetService := service.NewDatasetService(nil)
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+
+	sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":99}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, 200, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "external datasource SQL preview is not supported yet")
+}
+
+func TestApiAliasDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	datasetService := service.NewDatasetService(nil)
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, datasetHandler, nil, nil)
+
+	sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
+	req := httptest.NewRequest("POST", "/api/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":99}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, 200, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "external datasource SQL preview is not supported yet")
 }
 
 func TestCompatibilityBridge_DatasetDetailWithPerm_401_Unauthenticated(t *testing.T) {
