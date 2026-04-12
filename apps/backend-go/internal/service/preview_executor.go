@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 )
 
 type PreviewExecutor interface {
-	PreviewSQL(rawSQL string, limit int) ([]map[string]interface{}, error)
+	PreviewSQL(ctx context.Context, rawSQL string, limit int) ([]map[string]interface{}, error)
 	Close() error
 }
 
@@ -23,11 +24,32 @@ type localPreviewExecutor struct {
 	repo *repository.DatasetRepository
 }
 
-func (e *localPreviewExecutor) PreviewSQL(rawSQL string, limit int) ([]map[string]interface{}, error) {
+func (e *localPreviewExecutor) PreviewSQL(ctx context.Context, rawSQL string, limit int) ([]map[string]interface{}, error) {
 	if e == nil || e.repo == nil {
 		return nil, fmt.Errorf("dataset repository is unavailable")
 	}
-	return e.repo.PreviewSQL(rawSQL, limit)
+	select {
+	case <-ctx.Done():
+		return nil, ErrPreviewSQLTimeout
+	default:
+	}
+	if limit < 1 {
+		limit = previewDefaultRowLimit
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	rows, err := e.repo.PreviewSQL(rawSQL, limit)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ErrPreviewSQLTimeout
+		}
+		return nil, err
+	}
+	if previewCellCount(rows) > previewResultMaxCells {
+		return nil, ErrPreviewSQLResultTooLarge
+	}
+	return rows, nil
 }
 
 func (e *localPreviewExecutor) Close() error {
@@ -38,7 +60,7 @@ type mysqlPreviewExecutor struct {
 	db *gorm.DB
 }
 
-func (e *mysqlPreviewExecutor) PreviewSQL(rawSQL string, limit int) ([]map[string]interface{}, error) {
+func (e *mysqlPreviewExecutor) PreviewSQL(ctx context.Context, rawSQL string, limit int) ([]map[string]interface{}, error) {
 	if e == nil || e.db == nil {
 		return nil, fmt.Errorf("mysql preview executor is unavailable")
 	}
@@ -50,8 +72,14 @@ func (e *mysqlPreviewExecutor) PreviewSQL(rawSQL string, limit int) ([]map[strin
 	}
 	rows := make([]map[string]interface{}, 0)
 	query := fmt.Sprintf("SELECT * FROM (%s) AS de_preview LIMIT ?", rawSQL)
-	if err := e.db.Raw(query, limit).Scan(&rows).Error; err != nil {
+	if err := e.db.WithContext(ctx).Raw(query, limit).Scan(&rows).Error; err != nil {
+		if ctx != nil && ctx.Err() != nil {
+			return nil, ErrPreviewSQLTimeout
+		}
 		return nil, err
+	}
+	if previewCellCount(rows) > previewResultMaxCells {
+		return nil, ErrPreviewSQLResultTooLarge
 	}
 	return rows, nil
 }
@@ -140,4 +168,12 @@ func defaultPreviewExecutorFactory(ds *datasource.CoreDatasource, cfg *datasourc
 		return nil, fmt.Errorf("failed to connect datasource preview")
 	}
 	return &mysqlPreviewExecutor{db: db}, nil
+}
+
+func previewCellCount(rows []map[string]interface{}) int {
+	total := 0
+	for _, row := range rows {
+		total += len(row)
+	}
+	return total
 }

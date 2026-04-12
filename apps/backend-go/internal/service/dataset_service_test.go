@@ -48,7 +48,7 @@ type stubPreviewExecutor struct {
 	closed bool
 }
 
-func (s *stubPreviewExecutor) PreviewSQL(rawSQL string, limit int) ([]map[string]interface{}, error) {
+func (s *stubPreviewExecutor) PreviewSQL(_ context.Context, rawSQL string, limit int) ([]map[string]interface{}, error) {
 	s.called = true
 	s.rawSQL = rawSQL
 	s.limit = limit
@@ -106,6 +106,10 @@ func TestValidatePreviewSQL(t *testing.T) {
 
 	if err := validatePreviewSQL("SELECT 1; SELECT 2"); err == nil {
 		t.Fatal("expected multi statement sql to be rejected")
+	}
+
+	if err := validatePreviewSQL("SELECT 1 UNION SELECT 2"); err == nil {
+		t.Fatal("expected union sql to be rejected")
 	}
 }
 
@@ -384,10 +388,10 @@ func TestPreviewSQL_ExternalDatasourceUnsupported(t *testing.T) {
 	config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "db.local", Port: 5432, Database: "analytics", Username: "pg", Password: "secret"})
 	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 42, Name: "pg-ds", Type: "pg", Configuration: &config}).Error)
 
-	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
+	_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{
 		SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
 		DatasourceID: 42,
-	})
+	}, 9)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
 }
@@ -1210,10 +1214,10 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "db.local", Port: 5432, Database: "analytics", Username: "pg", Password: "secret"})
 		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 88, Name: "pg-ds", Type: "pg", Configuration: &config}).Error)
 
-		_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
+		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{
 			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
 			DatasourceID: 88,
-		})
+		}, 9)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
 	})
@@ -1234,10 +1238,10 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 			return executor, nil
 		})
 
-		result, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
+		result, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{
 			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT amount, name FROM orders")),
 			DatasourceID: 99,
-		})
+		}, 9)
 		require.NoError(t, err)
 		assert.True(t, executor.called)
 		assert.True(t, executor.closed)
@@ -1249,6 +1253,67 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 		require.Len(t, previewData.Fields, 2)
 		require.Len(t, previewData.Data, 1)
 		assert.Equal(t, "alice", previewData.Data[0]["name"])
+	})
+
+	t.Run("preview sql denies direct preview without datasource view permission", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		datasourceRepo := repository.NewDatasourceRepository(db)
+		svc.SetDatasourceRepository(datasourceRepo)
+		svc.resourcePermService = &ResourcePermissionService{}
+		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "mysql.local", Port: 3306, Database: "analytics", Username: "root", Password: "secret"})
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 109, Name: "mysql-ds", Type: "mysql", Configuration: &config}).Error)
+
+		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte("SELECT 1")), DatasourceID: 109}, 9)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrDatasetDatasourcePermissionDenied)
+	})
+
+	t.Run("preview sql returns timeout from executor", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		datasourceRepo := repository.NewDatasourceRepository(db)
+		svc.SetDatasourceRepository(datasourceRepo)
+		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "mysql.local", Port: 3306, Database: "analytics", Username: "root", Password: "secret"})
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 110, Name: "mysql-ds", Type: "mysql", Configuration: &config}).Error)
+
+		executor := &stubPreviewExecutor{err: ErrPreviewSQLTimeout}
+		svc.SetPreviewExecutorFactory(func(ds *datasource.CoreDatasource, cfg *datasource.ConnectionConfig) (PreviewExecutor, error) {
+			return executor, nil
+		})
+
+		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte("SELECT 1")), DatasourceID: 110}, 9)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrPreviewSQLTimeout)
+		assert.True(t, executor.closed)
+	})
+
+	t.Run("preview sql returns result too large from executor", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		datasourceRepo := repository.NewDatasourceRepository(db)
+		svc.SetDatasourceRepository(datasourceRepo)
+		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "mysql.local", Port: 3306, Database: "analytics", Username: "root", Password: "secret"})
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 111, Name: "mysql-ds", Type: "mysql", Configuration: &config}).Error)
+
+		executor := &stubPreviewExecutor{err: ErrPreviewSQLResultTooLarge}
+		svc.SetPreviewExecutorFactory(func(ds *datasource.CoreDatasource, cfg *datasource.ConnectionConfig) (PreviewExecutor, error) {
+			return executor, nil
+		})
+
+		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte("SELECT 1")), DatasourceID: 111}, 9)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrPreviewSQLResultTooLarge)
+		assert.True(t, executor.closed)
+	})
+
+	t.Run("local preview sql applies result too large guard", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TABLE preview_sql_large_guard (c1 TEXT, c2 TEXT, c3 TEXT, c4 TEXT, c5 TEXT, c6 TEXT, c7 TEXT, c8 TEXT, c9 TEXT, c10 TEXT, c11 TEXT, c12 TEXT, c13 TEXT, c14 TEXT, c15 TEXT, c16 TEXT, c17 TEXT, c18 TEXT, c19 TEXT, c20 TEXT, c21 TEXT, c22 TEXT, c23 TEXT, c24 TEXT, c25 TEXT, c26 TEXT, c27 TEXT, c28 TEXT, c29 TEXT, c30 TEXT, c31 TEXT, c32 TEXT, c33 TEXT, c34 TEXT, c35 TEXT, c36 TEXT, c37 TEXT, c38 TEXT, c39 TEXT, c40 TEXT, c41 TEXT, c42 TEXT, c43 TEXT, c44 TEXT, c45 TEXT, c46 TEXT, c47 TEXT, c48 TEXT, c49 TEXT, c50 TEXT, c51 TEXT)").Error)
+		for i := 0; i < 500; i++ {
+			require.NoError(t, db.Exec("INSERT INTO preview_sql_large_guard (c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,c20,c21,c22,c23,c24,c25,c26,c27,c28,c29,c30,c31,c32,c33,c34,c35,c36,c37,c38,c39,c40,c41,c42,c43,c44,c45,c46,c47,c48,c49,c50,c51) VALUES ('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51')").Error)
+		}
+
+		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte("SELECT * FROM preview_sql_large_guard"))}, 0)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrPreviewSQLResultTooLarge)
 	})
 }
 
