@@ -44,6 +44,14 @@ var (
 	ErrDatasetDatasourcePermissionDenied       = errors.New("insufficient datasource permissions")
 	ErrDatasetFieldDependencyBlocked           = errors.New("dataset field dependency blocked")
 	ErrPreviewSQLExternalDatasourceUnsupported = errors.New("external datasource SQL preview is not supported yet; please use synchronized dataset preview")
+	ErrPreviewSQLTimeout                       = errors.New("preview query timed out")
+	ErrPreviewSQLResultTooLarge                = errors.New("preview result is too large")
+)
+
+const (
+	previewSQLTimeout      = 5 * time.Second
+	previewResultMaxCells  = 5000
+	previewDefaultRowLimit = 100
 )
 
 type sqlVariableDetailRaw struct {
@@ -406,6 +414,10 @@ func (s *DatasetService) ensureDatasourceDependenciesViewable(datasetGroupID, us
 }
 
 func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]interface{}, error) {
+	return s.PreviewSQLWithUser(req, 0)
+}
+
+func (s *DatasetService) PreviewSQLWithUser(req *dataset.SQLPreviewRequest, userID int64) (map[string]interface{}, error) {
 	empty := map[string]interface{}{
 		"data": dataset.SQLPreviewData{
 			Fields: []dataset.SQLPreviewField{},
@@ -438,15 +450,17 @@ func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]
 		return nil, err
 	}
 
-	executor, err := s.resolvePreviewExecutor(req)
+	executor, err := s.resolvePreviewExecutor(req, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		_ = executor.Close()
 	}()
+	ctx, cancel := context.WithTimeout(context.Background(), previewSQLTimeout)
+	defer cancel()
 
-	rows, err := executor.PreviewSQL(rawSQL, 100)
+	rows, err := executor.PreviewSQL(ctx, rawSQL, previewDefaultRowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -471,9 +485,12 @@ func isDirectPreviewRequest(req *dataset.SQLPreviewRequest) bool {
 	return req.DatasourceID > 0
 }
 
-func (s *DatasetService) resolvePreviewExecutor(req *dataset.SQLPreviewRequest) (PreviewExecutor, error) {
+func (s *DatasetService) resolvePreviewExecutor(req *dataset.SQLPreviewRequest, userID int64) (PreviewExecutor, error) {
 	if !isDirectPreviewRequest(req) {
 		return &localPreviewExecutor{repo: s.repo}, nil
+	}
+	if err := s.ensurePreviewDatasourceViewable(req.DatasourceID, userID); err != nil {
+		return nil, err
 	}
 	if s.datasourceRepo == nil {
 		return nil, ErrPreviewSQLExternalDatasourceUnsupported
@@ -494,6 +511,22 @@ func (s *DatasetService) resolvePreviewExecutor(req *dataset.SQLPreviewRequest) 
 		factory = defaultPreviewExecutorFactory
 	}
 	return factory(ds, cfg)
+}
+
+func (s *DatasetService) ensurePreviewDatasourceViewable(datasourceID, userID int64) error {
+	if datasourceID <= 0 {
+		return nil
+	}
+	if userID <= 0 {
+		return ErrDatasetDatasourcePermissionDenied
+	}
+	if s.resourcePermService == nil {
+		return nil
+	}
+	if !s.resourcePermService.CheckViewPermission(userID, permission.ResourceTypeDatasource, datasourceID) {
+		return ErrDatasetDatasourcePermissionDenied
+	}
+	return nil
 }
 
 func (s *DatasetService) GetSQLParams(ids []int64) ([]dataset.SQLVariableDetails, error) {
@@ -1503,7 +1536,7 @@ func validatePreviewSQL(rawSQL string) error {
 	if strings.Contains(text, ";") {
 		return fmt.Errorf("only single select statement is supported")
 	}
-	blocked := []string{" insert ", " update ", " delete ", " drop ", " alter ", " truncate ", " create "}
+	blocked := []string{" insert ", " update ", " delete ", " drop ", " alter ", " truncate ", " create ", " union "}
 	padded := " " + lower + " "
 	for _, token := range blocked {
 		if strings.Contains(padded, token) {
