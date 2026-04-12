@@ -482,6 +482,10 @@ func isDirectPreviewRequest(req *dataset.SQLPreviewRequest) bool {
 	if req == nil {
 		return false
 	}
+	// Stage4 previewSql keeps routing semantics bound to datasource context only.
+	// Compatibility metadata such as sqlVariableDetails is accepted but does not
+	// change executor selection until variable execution semantics are explicitly
+	// specified in a later step.
 	return req.DatasourceID > 0
 }
 

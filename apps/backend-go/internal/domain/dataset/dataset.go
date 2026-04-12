@@ -115,9 +115,10 @@ type WriteRequest struct {
 }
 
 type SQLPreviewRequest struct {
-	DatasourceID int64  `json:"datasourceId"`
-	SQL          string `json:"sql"`
-	IsCross      bool   `json:"isCross"`
+	DatasourceID       int64  `json:"datasourceId"`
+	SQL                string `json:"sql"`
+	IsCross            bool   `json:"isCross"`
+	SQLVariableDetails string `json:"sqlVariableDetails"`
 }
 
 type SQLPreviewField struct {

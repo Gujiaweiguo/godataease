@@ -1215,11 +1215,28 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 88, Name: "pg-ds", Type: "pg", Configuration: &config}).Error)
 
 		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{
-			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
-			DatasourceID: 88,
+			SQL:                base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
+			DatasourceID:       88,
+			SQLVariableDetails: `[{"variableName":"region"}]`,
 		}, 9)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
+	})
+
+	t.Run("preview sql accepts sqlVariableDetails without changing local routing", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TABLE preview_sql_variables (name TEXT, amount INTEGER)").Error)
+		require.NoError(t, db.Exec("INSERT INTO preview_sql_variables (name, amount) VALUES ('alice', 10)").Error)
+
+		result, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{
+			SQL:                base64.StdEncoding.EncodeToString([]byte("SELECT name, amount FROM preview_sql_variables")),
+			SQLVariableDetails: `[{"variableName":"city","defaultValue":"shanghai"}]`,
+		}, 0)
+		require.NoError(t, err)
+		previewData, ok := result["data"].(dataset.SQLPreviewData)
+		require.True(t, ok)
+		require.Len(t, previewData.Data, 1)
+		assert.Equal(t, "alice", previewData.Data[0]["name"])
 	})
 
 	t.Run("preview sql routes mysql datasource to executor factory", func(t *testing.T) {
@@ -1239,8 +1256,9 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 		})
 
 		result, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{
-			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT amount, name FROM orders")),
-			DatasourceID: 99,
+			SQL:                base64.StdEncoding.EncodeToString([]byte("SELECT amount, name FROM orders")),
+			DatasourceID:       99,
+			SQLVariableDetails: `[{"variableName":"limit"}]`,
 		}, 9)
 		require.NoError(t, err)
 		assert.True(t, executor.called)
@@ -1263,7 +1281,7 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "mysql.local", Port: 3306, Database: "analytics", Username: "root", Password: "secret"})
 		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 109, Name: "mysql-ds", Type: "mysql", Configuration: &config}).Error)
 
-		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte("SELECT 1")), DatasourceID: 109}, 9)
+		_, err := svc.PreviewSQLWithUser(&dataset.SQLPreviewRequest{SQL: base64.StdEncoding.EncodeToString([]byte("SELECT 1")), DatasourceID: 109, SQLVariableDetails: `[{"variableName":"tenant"}]`}, 9)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrDatasetDatasourcePermissionDenied)
 	})
