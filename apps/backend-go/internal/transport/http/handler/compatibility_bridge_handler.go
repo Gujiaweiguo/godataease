@@ -742,7 +742,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Invalid request: "+err.Error())
 					return
 				}
-				result, err := datasetHandler.service.PreviewSQL(&req)
+				result, err := datasetHandler.service.PreviewSQLWithUser(&req, int64(middleware.GetUserID(c)))
 				if err != nil {
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return

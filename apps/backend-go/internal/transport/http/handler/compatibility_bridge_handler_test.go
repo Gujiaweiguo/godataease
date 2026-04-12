@@ -255,7 +255,7 @@ type bridgeStubPreviewExecutor struct {
 	err  error
 }
 
-func (s *bridgeStubPreviewExecutor) PreviewSQL(string, int) ([]map[string]interface{}, error) {
+func (s *bridgeStubPreviewExecutor) PreviewSQL(context.Context, string, int) ([]map[string]interface{}, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -1745,6 +1745,10 @@ func TestDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t
 	datasetHandler := NewDatasetHandler(datasetService)
 
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(9))
+		c.Next()
+	})
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
 
 	sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
@@ -1766,6 +1770,10 @@ func TestApiAliasDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalData
 	datasetHandler := NewDatasetHandler(datasetService)
 
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(9))
+		c.Next()
+	})
 	api := r.Group("/api")
 	RegisterCompatibilityBridgeRoutes(api, nil, nil, nil, datasetHandler, nil, nil)
 
@@ -1800,6 +1808,10 @@ func TestDatasetPreviewSQLRouteRoutesMySQLDatasourcePreview(t *testing.T) {
 	datasetHandler := NewDatasetHandler(datasetService)
 
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(9))
+		c.Next()
+	})
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
 
 	sql := base64.StdEncoding.EncodeToString([]byte("SELECT name FROM orders"))
@@ -1821,6 +1833,92 @@ func TestDatasetPreviewSQLRouteRoutesMySQLDatasourcePreview(t *testing.T) {
 	require.Len(t, resp.Data.Data.Data, 1)
 	assert.Equal(t, "alice", resp.Data.Data.Data[0]["name"])
 	assert.NotEmpty(t, resp.Data.SQL)
+}
+
+func TestDatasetPreviewSQLRouteReturnsPermissionDeniedForDirectPreview(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &datasource.CoreDatasource{}))
+
+	datasetService := service.NewDatasetService(repository.NewDatasetRepository(db))
+	datasetService.SetDatasourceRepository(repository.NewDatasourceRepository(db))
+	datasetService.SetResourcePermissionService(service.NewResourcePermissionService(&mockBridgeResourcePermRepo{hasPermission: false}, nil))
+	configBytes := base64.StdEncoding.EncodeToString([]byte(`{"host":"mysql.local","port":3306,"dataBase":"analytics","username":"root","password":"secret"}`))
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 67, Name: "mysql-ds", Type: "mysql", Configuration: &configBytes}).Error)
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint64(9))
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+
+	sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":67}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, 200, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "insufficient datasource permissions")
+}
+
+func TestDatasetPreviewSQLRouteReturnsTimeoutAndTooLargeErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setup := func(t *testing.T, execErr error, datasourceID int64) *gin.Engine {
+		t.Helper()
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &datasource.CoreDatasource{}))
+
+		datasetService := service.NewDatasetService(repository.NewDatasetRepository(db))
+		datasetService.SetDatasourceRepository(repository.NewDatasourceRepository(db))
+		configBytes := base64.StdEncoding.EncodeToString([]byte(`{"host":"mysql.local","port":3306,"dataBase":"analytics","username":"root","password":"secret"}`))
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: datasourceID, Name: "mysql-ds", Type: "mysql", Configuration: &configBytes}).Error)
+		datasetService.SetPreviewExecutorFactory(func(ds *datasource.CoreDatasource, cfg *datasource.ConnectionConfig) (service.PreviewExecutor, error) {
+			return &bridgeStubPreviewExecutor{err: execErr}, nil
+		})
+		datasetHandler := NewDatasetHandler(datasetService)
+
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			c.Set("user_id", uint64(9))
+			c.Next()
+		})
+		RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+		return r
+	}
+
+	t.Run("timeout", func(t *testing.T) {
+		r := setup(t, service.ErrPreviewSQLTimeout, 68)
+		sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
+		req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":68}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := bridgeCodeResp{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "500000", resp.Code)
+		assert.Contains(t, resp.Msg, "preview query timed out")
+	})
+
+	t.Run("result too large", func(t *testing.T) {
+		r := setup(t, service.ErrPreviewSQLResultTooLarge, 69)
+		sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
+		req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":69}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := bridgeCodeResp{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "500000", resp.Code)
+		assert.Contains(t, resp.Msg, "preview result is too large")
+	})
 }
 
 func TestCompatibilityBridge_DatasetDetailWithPerm_401_Unauthenticated(t *testing.T) {
