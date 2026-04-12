@@ -1752,7 +1752,7 @@ func TestDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
 
 	sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
-	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":99}`))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":99,"sqlVariableDetails":"[{\"variableName\":\"region\"}]"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -1815,7 +1815,7 @@ func TestDatasetPreviewSQLRouteRoutesMySQLDatasourcePreview(t *testing.T) {
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
 
 	sql := base64.StdEncoding.EncodeToString([]byte("SELECT name FROM orders"))
-	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":66}`))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":66,"sqlVariableDetails":"[{\"variableName\":\"region\"}]"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -1856,7 +1856,7 @@ func TestDatasetPreviewSQLRouteReturnsPermissionDeniedForDirectPreview(t *testin
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
 
 	sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
-	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":67}`))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":67,"sqlVariableDetails":"[{\"variableName\":\"tenant\"}]"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -1897,7 +1897,7 @@ func TestDatasetPreviewSQLRouteReturnsTimeoutAndTooLargeErrors(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		r := setup(t, service.ErrPreviewSQLTimeout, 68)
 		sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
-		req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":68}`))
+		req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":68,"sqlVariableDetails":"[{\"variableName\":\"timeout\"}]"}`))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -1910,7 +1910,7 @@ func TestDatasetPreviewSQLRouteReturnsTimeoutAndTooLargeErrors(t *testing.T) {
 	t.Run("result too large", func(t *testing.T) {
 		r := setup(t, service.ErrPreviewSQLResultTooLarge, 69)
 		sql := base64.StdEncoding.EncodeToString([]byte("SELECT 1"))
-		req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":69}`))
+		req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","datasourceId":69,"sqlVariableDetails":"[{\"variableName\":\"size\"}]"}`))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -1919,6 +1919,39 @@ func TestDatasetPreviewSQLRouteReturnsTimeoutAndTooLargeErrors(t *testing.T) {
 		assert.Equal(t, "500000", resp.Code)
 		assert.Contains(t, resp.Msg, "preview result is too large")
 	})
+}
+
+func TestDatasetPreviewSQLRouteAcceptsSQLVariableDetailsForLocalPreview(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &datasource.CoreDatasource{}))
+	require.NoError(t, db.Exec("CREATE TABLE preview_sql_local_variables (name TEXT)").Error)
+	require.NoError(t, db.Exec("INSERT INTO preview_sql_local_variables (name) VALUES ('alice')").Error)
+
+	datasetService := service.NewDatasetService(repository.NewDatasetRepository(db))
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
+
+	sql := base64.StdEncoding.EncodeToString([]byte("SELECT name FROM preview_sql_local_variables"))
+	req := httptest.NewRequest("POST", "/datasetData/previewSql", strings.NewReader(`{"sql":"`+sql+`","sqlVariableDetails":"[{\"variableName\":\"city\",\"defaultValue\":\"shanghai\"}]"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, 200, w.Code)
+	var resp struct {
+		Code string `json:"code"`
+		Data struct {
+			Data dataset.SQLPreviewData `json:"data"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	require.Len(t, resp.Data.Data.Data, 1)
+	assert.Equal(t, "alice", resp.Data.Data.Data[0]["name"])
 }
 
 func TestCompatibilityBridge_DatasetDetailWithPerm_401_Unauthenticated(t *testing.T) {

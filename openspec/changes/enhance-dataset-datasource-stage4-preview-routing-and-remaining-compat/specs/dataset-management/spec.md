@@ -13,6 +13,11 @@ The system SHALL preserve Java-compatible preview entry points while making data
 - **THEN** the system MUST preserve deterministic preview semantics for rows, fields, SQL validation, and timeout handling
 - **AND** stage4 routing work MUST NOT regress the established local preview baseline
 
+#### Scenario: Preview request accepts compatibility metadata without changing routing
+- **WHEN** a client calls `POST /datasetData/previewSql` with compatibility metadata such as `sqlVariableDetails`
+- **THEN** the system MUST accept the request shape without silently dropping the compatibility field at the handler boundary
+- **AND** preview routing MUST continue to be determined by datasource context rather than compatibility metadata alone
+
 ### Requirement: Permission-Aware Field Enum Compatibility Must Be Executable
 The system SHALL provide executable compatibility semantics for permission-aware multi-field value enumeration.
 
