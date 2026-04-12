@@ -116,9 +116,11 @@ stage4 的目标不是马上承诺“所有 SQL preview 都能跨外部数据源
 1. 在 specs 中分别定义 `dataset-preview-routing` 新能力，以及 `dataset-management` / `datasource-management` 的 delta requirement。
 2. 先收敛 `previewSql` 的契约：明确哪些请求走本地同步库、哪些请求允许外部直连、哪些请求必须显式失败。
 3. 如需支持外部直连 preview，先在后端实现最小 preview executor 与 datasource 类型支持矩阵，再将 compatibility route 接到该能力。
-4. 在字段侧复用现有字段枚举与权限过滤逻辑，补齐 `multFieldValuesForPermissions` 和 `copilotFields` 的 handler / service 语义。
-5. 补齐 backend unit/integration、frontend 受影响调用点回归和兼容语义验证。
-6. 若 stage4 引发回归，优先关闭外部直连 preview 接线并保留 stage3 本地同步库 preview 基线，同时让不支持语义继续显式返回。
+4. 在扩展 datasource 侧更大范围迁移之前，先切换前端中已有 canonical Go 支撑的三个 dataset wrapper：tree、preview、table-field。
+5. 验证该 canonical 切换不会改变现有前端归一化与后处理行为，重点覆盖 dataset tree 节点归一化，以及 preview / table-field 的字段名处理逻辑。
+6. 在字段侧复用现有字段枚举与权限过滤逻辑，补齐 `multFieldValuesForPermissions` 和 `copilotFields` 的 handler / service 语义。
+7. 补齐 backend unit/integration、frontend 受影响调用点回归和兼容语义验证。
+8. 若 stage4 引发回归，优先关闭外部直连 preview 接线并保留 stage3 本地同步库 preview 基线，同时让不支持语义继续显式返回。
 
 ## Open Questions
 

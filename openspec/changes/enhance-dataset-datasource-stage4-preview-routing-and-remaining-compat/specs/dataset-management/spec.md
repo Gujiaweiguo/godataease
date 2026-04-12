@@ -38,3 +38,21 @@ The system SHALL provide `copilotFields` compatibility behavior using governed d
 - **WHEN** a copilot field query targets a missing dataset, unauthorized context, or unsupported request shape
 - **THEN** the system MUST return explicit non-success semantics
 - **AND** the failure MUST remain distinguishable from a successful empty field set
+
+### Requirement: Dataset Canonical Read Wrappers Can Replace Compatibility Read Paths Incrementally
+The system SHALL allow selected frontend dataset read wrappers to switch from compatibility paths to already-available canonical Go routes without changing existing frontend data-shaping behavior.
+
+#### Scenario: Dataset tree wrapper uses canonical route without changing tree semantics
+- **WHEN** the frontend dataset tree wrapper requests dataset discovery data
+- **THEN** it MAY call `POST /dataset/tree` instead of `POST /datasetTree/tree`
+- **AND** the returned node structure MUST remain compatible with the existing frontend tree normalization logic
+
+#### Scenario: Dataset preview wrapper uses canonical route without changing preview shaping
+- **WHEN** the frontend dataset preview wrapper requests dataset preview data
+- **THEN** it MAY call `POST /dataset/preview` instead of `POST /datasetData/previewData`
+- **AND** the response MUST continue to support the existing frontend field-name post-processing and preview table rendering behavior
+
+#### Scenario: Dataset table-field wrapper uses canonical route without changing field consumption
+- **WHEN** the frontend dataset table-field wrapper requests table field metadata
+- **THEN** it MAY call `POST /dataset/fields` instead of `POST /datasetData/tableField`
+- **AND** the returned field metadata MUST remain compatible with the existing SQL editor, union editor, and dataset field-loading flows

@@ -810,7 +810,7 @@ const addComplete = () => {
     columns.value = []
     tableData.value = []
   }
-  cancelMap['/datasetData/previewData']?.()
+  cancelMap['/dataset/preview']?.()
   datasetPreviewLoading.value = false
   reGetName()
 }
@@ -1337,11 +1337,19 @@ const saveAndBack = () => {
   pushDataset()
 }
 
-let p = null
-const XpackLoaded = () => p(true)
+let resolveXpackLoaded: ((value: boolean) => void) | null = null
+let isXpackLoaded = false
+const XpackLoaded = () => {
+  isXpackLoaded = true
+  resolveXpackLoaded?.(true)
+}
 onMounted(async () => {
   isEdit.value = false
-  await new Promise(r => (p = r))
+  if (!isXpackLoaded) {
+    await new Promise<boolean>(resolve => {
+      resolveXpackLoaded = resolve
+    })
+  }
   await initEdite()
   getDatasource(isEdit.value ? 0 : 2)
   window.addEventListener('resize', handleResize)
@@ -1350,6 +1358,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  resolveXpackLoaded = null
   window.removeEventListener('resize', handleResize)
 })
 const getSqlResultHeight = () => {

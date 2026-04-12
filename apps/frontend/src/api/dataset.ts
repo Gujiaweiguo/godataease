@@ -142,7 +142,7 @@ export const moveDatasetTree = async (data: DatasetOrFolder): Promise<IResponse>
 
 export const getDatasetTree = async (data: BusiTreeRequest): Promise<IResponse> => {
   data.busiFlag = 'dataset'
-  return request.post({ url: '/datasetTree/tree', data }).then(res => {
+  return request.post({ url: '/dataset/tree', data }).then(res => {
     return normalizeDatasetTree(res?.data || [])
   })
 }
@@ -209,7 +209,7 @@ export const getTables = async (data): Promise<Table[]> => {
 }
 
 export const getTableField = async (data): Promise<IResponse> => {
-  return request.post({ url: '/datasetData/tableField', data }).then(res => {
+  return request.post({ url: '/dataset/fields', data }).then(res => {
     return res?.data
   })
 }
@@ -217,7 +217,7 @@ export const getTableField = async (data): Promise<IResponse> => {
 export const getPreviewData = async (data): Promise<IResponse> => {
   const copyData = cloneDeep(data)
   originNameHandle(copyData.allFields)
-  return request.post({ url: '/datasetData/previewData', data: copyData }).then(res => {
+  return request.post({ url: '/dataset/preview', data: copyData }).then(res => {
     if (res?.data?.allFields?.length) {
       originNameHandleBack(res?.data?.allFields)
     }
