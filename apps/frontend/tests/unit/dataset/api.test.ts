@@ -19,6 +19,7 @@ import {
   exportTasks,
   exportTasksRecords,
   getDatasetTree,
+  getPreviewSql,
   getPreviewData,
   getTableField
 } from '@/api/dataset'
@@ -86,6 +87,25 @@ describe('Dataset API wrappers', () => {
     )
     expect(result).toEqual(response.data)
     expect(payload.allFields[0].originName).toBe('[orders.amount]')
+  })
+
+  it('passes sqlVariableDetails through the previewSql compatibility wrapper', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { data: { fields: [], data: [] }, sql: 'U0VMRUNUIDE=' } })
+
+    const payload = {
+      sql: 'U0VMRUNUIDE=',
+      datasourceId: 66,
+      isCross: false,
+      sqlVariableDetails: JSON.stringify([{ variableName: 'region', defaultValue: '华东' }])
+    }
+
+    const result = await getPreviewSql(payload)
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/datasetData/previewSql',
+      data: payload
+    })
+    expect(result).toEqual({ data: { fields: [], data: [] }, sql: 'U0VMRUNUIDE=' })
   })
 
   it('requests export-center task counters through the records alias', async () => {
