@@ -186,7 +186,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, sanitizeDatasourceResponse(result))
+				response.Success(c, sanitizeDatasourceResponse(result, datasourceHandler.service))
 			})
 			datasourceGroup.GET("/hidePw/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -199,7 +199,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
-				response.Success(c, sanitizeDatasourceResponse(result))
+				response.Success(c, sanitizeDatasourceResponse(result, datasourceHandler.service))
 			})
 			datasourceGroup.GET("/getSimpleDs/:id", func(c *gin.Context) {
 				id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -660,13 +660,17 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				barInfo := &dataset.BarInfo{
 					ID:             group.ID,
 					Name:           group.Name,
-					CreateTime:     0,
-					LastUpdateTime: 0,
+					CreateBy:       group.CreateBy,
+					CreateTime:     group.CreateTime,
+					UpdateBy:       group.UpdateBy,
+					LastUpdateTime: group.LastUpdateTime,
 					IsCross:        false,
 				}
 				if group.NodeType != nil {
 					barInfo.NodeType = *group.NodeType
 				}
+				barInfo.Creator = datasetHandler.service.ResolveUserName(group.CreateBy)
+				barInfo.Updater = datasetHandler.service.ResolveUserName(group.UpdateBy)
 
 				response.Success(c, barInfo)
 			})
@@ -1064,6 +1068,38 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			if datasetHandler != nil {
 				RegisterDatasetFieldDeleteRoutes(datasetFieldGroup, datasetHandler, chartHandler)
 			}
+			datasetFieldGroup.POST("/save", func(c *gin.Context) {
+				var field dataset.CoreDatasetTableField
+				if err := c.ShouldBindJSON(&field); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+				result, err := datasetHandler.service.SaveField(&field)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, result)
+			})
+			datasetFieldGroup.POST("/getFunction", func(c *gin.Context) {
+				result := datasetHandler.service.GetFieldFunctions()
+				response.Success(c, result)
+			})
+			datasetFieldGroup.POST("/listByDsIds", func(c *gin.Context) {
+				var req struct {
+					DsIds []int64 `json:"dsIds"`
+				}
+				if err := c.ShouldBindJSON(&req); err != nil {
+					response.Error(c, "500000", "Invalid request: "+err.Error())
+					return
+				}
+				result, err := datasetHandler.service.ListFieldsByDsIds(req.DsIds)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, result)
+			})
 		}
 	}
 
@@ -1244,13 +1280,22 @@ func toInt64ID(id interface{}) int64 {
 	}
 }
 
-func sanitizeDatasourceResponse(ds *datasource.CoreDatasource) gin.H {
+func sanitizeDatasourceResponse(ds *datasource.CoreDatasource, dsService *service.DatasourceService) gin.H {
 	if ds == nil {
 		return gin.H{}
 	}
 	pid := "0"
 	if ds.PID != nil {
 		pid = strconv.FormatInt(*ds.PID, 10)
+	}
+
+	creator := ""
+	if ds.CreateBy != nil {
+		creator = dsService.ResolveUserName(*ds.CreateBy)
+	}
+	updater := ""
+	if ds.UpdateBy != nil {
+		updater = dsService.ResolveUserName(strconv.FormatInt(*ds.UpdateBy, 10))
 	}
 
 	return gin.H{
@@ -1265,6 +1310,8 @@ func sanitizeDatasourceResponse(ds *datasource.CoreDatasource) gin.H {
 		"updateTime":     ds.UpdateTime,
 		"updateBy":       ds.UpdateBy,
 		"createBy":       ds.CreateBy,
+		"creator":        creator,
+		"updater":        updater,
 		"status":         ds.Status,
 		"qrtzInstance":   ds.QrtzInstance,
 		"taskStatus":     ds.TaskStatus,

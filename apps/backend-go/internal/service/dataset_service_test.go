@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	calcitev1 "dataease/backend/proto/calcite/v1"
 
@@ -1395,6 +1396,170 @@ func TestDatasetService_GetGroupByID_CompatFallback(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
+}
+
+func TestDatasetService_SaveFieldOperations(t *testing.T) {
+	t.Run("creates field when id is zero", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		field := &dataset.CoreDatasetTableField{
+			DatasetGroupID: 41,
+			Name:           strPtrDataset("order_amount"),
+			Type:           strPtrDataset("int"),
+			OriginName:     strPtrDataset("amount"),
+		}
+
+		result, err := svc.SaveField(field)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.NotZero(t, result.ID)
+
+		stored, err := svc.repo.GetFieldByID(result.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.Name)
+		require.NotNil(t, stored.Type)
+		assert.Equal(t, "order_amount", *stored.Name)
+		assert.Equal(t, "int", *stored.Type)
+		assert.Equal(t, int64(41), stored.DatasetGroupID)
+
+		var count int64
+		require.NoError(t, db.Model(&dataset.CoreDatasetTableField{}).Where("id = ?", result.ID).Count(&count).Error)
+		assert.Equal(t, int64(1), count)
+	})
+
+	t.Run("updates field when id exists", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{
+			ID:             901,
+			DatasetGroupID: 52,
+			Name:           strPtrDataset("profit"),
+			Type:           strPtrDataset("decimal"),
+			OriginName:     strPtrDataset("profit"),
+		}).Error)
+
+		updated := &dataset.CoreDatasetTableField{
+			ID:             901,
+			DatasetGroupID: 52,
+			Name:           strPtrDataset("profit_v2"),
+			Type:           strPtrDataset("string"),
+			OriginName:     strPtrDataset("profit_name"),
+		}
+
+		result, err := svc.SaveField(updated)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		stored, err := svc.repo.GetFieldByID(901)
+		require.NoError(t, err)
+		require.NotNil(t, stored.Name)
+		require.NotNil(t, stored.Type)
+		require.NotNil(t, stored.OriginName)
+		assert.Equal(t, "profit_v2", *stored.Name)
+		assert.Equal(t, "string", *stored.Type)
+		assert.Equal(t, "profit_name", *stored.OriginName)
+		assert.Equal(t, int64(52), stored.DatasetGroupID)
+	})
+
+	t.Run("update of missing field id is a no-op but returns payload", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		missing := &dataset.CoreDatasetTableField{
+			ID:             999,
+			DatasetGroupID: 77,
+			Name:           strPtrDataset("ghost_field"),
+			Type:           strPtrDataset("string"),
+		}
+
+		result, err := svc.SaveField(missing)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, int64(999), result.ID)
+
+		var count int64
+		require.NoError(t, db.Model(&dataset.CoreDatasetTableField{}).Where("id = ?", 999).Count(&count).Error)
+		assert.Equal(t, int64(0), count)
+	})
+
+	t.Run("validates required fields", func(t *testing.T) {
+		svc, _ := setupDatasetServiceRepoTest(t)
+		tests := []struct {
+			name    string
+			field   *dataset.CoreDatasetTableField
+			wantErr string
+		}{
+			{name: "missing name", field: &dataset.CoreDatasetTableField{DatasetGroupID: 1, Type: strPtrDataset("int")}, wantErr: "field name is required"},
+			{name: "missing dataset group", field: &dataset.CoreDatasetTableField{Name: strPtrDataset("field1"), Type: strPtrDataset("int")}, wantErr: "datasetGroupId is required"},
+			{name: "missing type", field: &dataset.CoreDatasetTableField{DatasetGroupID: 1, Name: strPtrDataset("field1")}, wantErr: "field type is required"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, err := svc.SaveField(tt.field)
+				require.Error(t, err)
+				assert.Nil(t, result)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			})
+		}
+	})
+}
+
+func TestDatasetService_ResolveUserName(t *testing.T) {
+	t.Run("falls back for nil repo and invalid ids", func(t *testing.T) {
+		svc := NewDatasetService(nil)
+		assert.Equal(t, "", svc.ResolveUserName(""))
+		assert.Equal(t, "101", svc.ResolveUserName("101"))
+		assert.Equal(t, "not-a-number", svc.ResolveUserName("not-a-number"))
+	})
+
+	t.Run("returns nickname then username then raw id", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.AutoMigrate(&user.SysUser{}))
+		require.NoError(t, db.Create(&user.SysUser{UserID: 101, Username: "alice_login", NickName: "Alice", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+		require.NoError(t, db.Create(&user.SysUser{UserID: 102, Username: "bob", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+		svc.SetUserRepository(repository.NewUserRepository(db))
+
+		assert.Equal(t, "Alice", svc.ResolveUserName("101"))
+		assert.Equal(t, "bob", svc.ResolveUserName("102"))
+		assert.Equal(t, "999", svc.ResolveUserName("999"))
+	})
+}
+
+func TestDatasetService_GetFieldFunctions(t *testing.T) {
+	svc := NewDatasetService(nil)
+	functions := svc.GetFieldFunctions()
+	require.Len(t, functions, 5)
+	assert.Equal(t, "聚合函数", functions[0].Name)
+	assert.Equal(t, "日期函数", functions[1].Name)
+	assert.Equal(t, "字符串函数", functions[2].Name)
+	assert.Equal(t, "数学函数", functions[3].Name)
+	assert.Equal(t, "条件函数", functions[4].Name)
+
+	assert.Contains(t, functions[0].Functions, FunctionDef{Name: "SUM", Hint: "SUM(field)"})
+	assert.Contains(t, functions[1].Functions, FunctionDef{Name: "DATE_FORMAT", Hint: "DATE_FORMAT(date, format)"})
+	assert.Contains(t, functions[2].Functions, FunctionDef{Name: "CONCAT", Hint: "CONCAT(str1, str2, ...)"})
+	assert.Contains(t, functions[3].Functions, FunctionDef{Name: "ABS", Hint: "ABS(x)"})
+	assert.Contains(t, functions[4].Functions, FunctionDef{Name: "IF", Hint: "IF(cond, true_val, false_val)"})
+}
+
+func TestDatasetService_ListFieldsByDsIds(t *testing.T) {
+	svc, db := setupDatasetServiceRepoTest(t)
+	dsAID := int64(11)
+	dsBID := int64(22)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 1001, DatasourceID: &dsAID, DatasetGroupID: 81, Name: strPtrDataset("field_a1"), Type: strPtrDataset("string")}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 1002, DatasourceID: &dsAID, DatasetGroupID: 81, Name: strPtrDataset("field_a2"), Type: strPtrDataset("int")}).Error)
+	require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 1003, DatasourceID: &dsBID, DatasetGroupID: 82, Name: strPtrDataset("field_b1"), Type: strPtrDataset("string")}).Error)
+
+	fields, err := svc.ListFieldsByDsIds([]int64{11})
+	require.NoError(t, err)
+	require.Len(t, fields, 2)
+	assert.Equal(t, int64(11), *fields[0].DatasourceID)
+	assert.Equal(t, int64(11), *fields[1].DatasourceID)
+
+	empty, err := svc.ListFieldsByDsIds([]int64{})
+	require.NoError(t, err)
+	assert.Len(t, empty, 0)
+
+	nilFields, err := svc.ListFieldsByDsIds(nil)
+	require.NoError(t, err)
+	assert.Len(t, nilFields, 0)
 }
 
 func int64PtrDataset(v int64) *int64 { return &v }

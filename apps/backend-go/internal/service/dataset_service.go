@@ -35,6 +35,7 @@ type DatasetService struct {
 	calciteRetries       int
 	calciteClient        *calciteintegration.Client
 	calciteMu            sync.Mutex
+	userRepo             *repository.UserRepository
 }
 
 var (
@@ -90,6 +91,30 @@ func (s *DatasetService) SetCalciteConfig(address string, timeout time.Duration,
 		s.calciteClient = nil
 	}
 	s.calciteMu.Unlock()
+}
+
+func (s *DatasetService) SetUserRepository(userRepo *repository.UserRepository) {
+	s.userRepo = userRepo
+}
+
+// ResolveUserName resolves a user ID string to a displayable user name.
+// Falls back to the raw userID if the user cannot be found.
+func (s *DatasetService) ResolveUserName(userID string) string {
+	if s.userRepo == nil || userID == "" {
+		return userID
+	}
+	id, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		return userID
+	}
+	u, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return userID
+	}
+	if u.NickName != "" {
+		return u.NickName
+	}
+	return u.Username
 }
 
 func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, error) {
@@ -1571,6 +1596,106 @@ func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type in
 		return 4
 	}
 	return 0
+}
+
+// SaveField creates or updates a dataset field. If field.ID == 0, creates; otherwise updates.
+func (s *DatasetService) SaveField(field *dataset.CoreDatasetTableField) (*dataset.CoreDatasetTableField, error) {
+	if field.Name == nil || *field.Name == "" {
+		return nil, fmt.Errorf("field name is required")
+	}
+	if field.DatasetGroupID == 0 {
+		return nil, fmt.Errorf("datasetGroupId is required")
+	}
+	if field.Type == nil || *field.Type == "" {
+		return nil, fmt.Errorf("field type is required")
+	}
+
+	if field.ID == 0 {
+		if err := s.repo.CreateDatasetField(field); err != nil {
+			return nil, fmt.Errorf("failed to create field: %w", err)
+		}
+		return field, nil
+	}
+
+	if err := s.repo.UpdateDatasetField(field); err != nil {
+		return nil, fmt.Errorf("failed to update field: %w", err)
+	}
+	return field, nil
+}
+
+// FunctionCategory represents a category of SQL functions for the calculated field editor.
+type FunctionCategory struct {
+	Name      string        `json:"name"`
+	Functions []FunctionDef `json:"functions"`
+}
+
+// FunctionDef represents a single SQL function definition.
+type FunctionDef struct {
+	Name string `json:"name"`
+	Hint string `json:"hint"`
+}
+
+// GetFieldFunctions returns static SQL function categories for the calculated field editor.
+func (s *DatasetService) GetFieldFunctions() []FunctionCategory {
+	return []FunctionCategory{
+		{
+			Name: "聚合函数",
+			Functions: []FunctionDef{
+				{Name: "SUM", Hint: "SUM(field)"},
+				{Name: "AVG", Hint: "AVG(field)"},
+				{Name: "MAX", Hint: "MAX(field)"},
+				{Name: "MIN", Hint: "MIN(field)"},
+				{Name: "COUNT", Hint: "COUNT(field)"},
+			},
+		},
+		{
+			Name: "日期函数",
+			Functions: []FunctionDef{
+				{Name: "DATE_FORMAT", Hint: "DATE_FORMAT(date, format)"},
+				{Name: "YEAR", Hint: "YEAR(date)"},
+				{Name: "MONTH", Hint: "MONTH(date)"},
+				{Name: "DAY", Hint: "DAY(date)"},
+				{Name: "HOUR", Hint: "HOUR(date)"},
+				{Name: "NOW", Hint: "NOW()"},
+			},
+		},
+		{
+			Name: "字符串函数",
+			Functions: []FunctionDef{
+				{Name: "CONCAT", Hint: "CONCAT(str1, str2, ...)"},
+				{Name: "SUBSTRING", Hint: "SUBSTRING(str, pos, len)"},
+				{Name: "LENGTH", Hint: "LENGTH(str)"},
+				{Name: "LOWER", Hint: "LOWER(str)"},
+				{Name: "UPPER", Hint: "UPPER(str)"},
+				{Name: "TRIM", Hint: "TRIM(str)"},
+				{Name: "REPLACE", Hint: "REPLACE(str, from, to)"},
+			},
+		},
+		{
+			Name: "数学函数",
+			Functions: []FunctionDef{
+				{Name: "ABS", Hint: "ABS(x)"},
+				{Name: "ROUND", Hint: "ROUND(x, d)"},
+				{Name: "CEIL", Hint: "CEIL(x)"},
+				{Name: "FLOOR", Hint: "FLOOR(x)"},
+				{Name: "MOD", Hint: "MOD(x, y)"},
+			},
+		},
+		{
+			Name: "条件函数",
+			Functions: []FunctionDef{
+				{Name: "IF", Hint: "IF(cond, true_val, false_val)"},
+				{Name: "CASE", Hint: "CASE WHEN ... THEN ... END"},
+				{Name: "COALESCE", Hint: "COALESCE(val1, val2, ...)"},
+				{Name: "IFNULL", Hint: "IFNULL(expr, alt)"},
+			},
+		},
+	}
+}
+
+// ListFieldsByDsIds returns dataset fields filtered by datasource IDs.
+func (s *DatasetService) ListFieldsByDsIds(dsIds []int64) ([]dataset.CoreDatasetTableField, error) {
+	return s.repo.ListFieldsByDsIds(dsIds)
 }
 
 func isDateTimeText(text string) bool {

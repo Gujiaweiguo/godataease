@@ -216,6 +216,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	datasourceRepo := repository.NewDatasourceRepository(db)
 	syncRepo := repository.NewSyncRepository(db)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
+	datasourceService.SetUserRepository(userRepo)
 	if application != nil && application.Config != nil {
 		seatunnelCfg := application.Config.Integration.Seatunnel
 		datasourceService.SetSeatunnelConfig(
@@ -244,6 +245,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 			calciteCfg.MaxRetries,
 		)
 	}
+	datasetService.SetUserRepository(userRepo)
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 
 	chartRepo := repository.NewChartRepository(db)

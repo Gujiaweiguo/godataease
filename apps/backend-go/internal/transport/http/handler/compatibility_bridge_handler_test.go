@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
@@ -44,6 +45,7 @@ type bridgeAnyResp struct {
 
 type bridgeCodeResp struct {
 	Code string `json:"code"`
+	Msg  string `json:"msg"`
 }
 
 type bridgeFieldListResp struct {
@@ -981,6 +983,50 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 
 func int64PtrBridge(v int64) *int64 { return &v }
 
+func strPtrBridge(v string) *string { return &v }
+
+func setupStage3DatasetFieldRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &user.SysUser{}))
+
+	datasetRepo := repository.NewDatasetRepository(db)
+	datasetService := service.NewDatasetService(datasetRepo)
+	datasetService.SetUserRepository(repository.NewUserRepository(db))
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	chartRepo := &fakeBridgeChartRepo{
+		charts:        map[int64]*chart.CoreChartView{},
+		dsFields:      map[int64][]*dataset.CoreDatasetTableField{},
+		chartFields:   map[int64][]*dataset.CoreDatasetTableField{},
+		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
+		nextFieldID:   9000,
+	}
+	chartHandler := NewChartHandler(service.NewChartService(chartRepo))
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
+	return r, db
+}
+
+func seedBridgeUser(t *testing.T, db *gorm.DB, id int64, username string, nickname string) {
+	t.Helper()
+	require.NoError(t, db.Create(&user.SysUser{UserID: id, Username: username, NickName: nickname, Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+}
+
+func seedBridgeDatasetGroup(t *testing.T, db *gorm.DB, group *dataset.CoreDatasetGroup) {
+	t.Helper()
+	require.NoError(t, db.Create(group).Error)
+}
+
+func seedBridgeDatasetField(t *testing.T, db *gorm.DB, field *dataset.CoreDatasetTableField) {
+	t.Helper()
+	require.NoError(t, db.Create(field).Error)
+}
+
 func TestOldPathDatasourceList(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -1208,6 +1254,205 @@ func TestDatasetTreeExportDatasetRoute(t *testing.T) {
 		require.Equal(t, 200, w.Code)
 		assert.Contains(t, w.Header().Get("Content-Type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 		assert.NotEmpty(t, w.Body.Bytes())
+	})
+}
+
+func TestDatasetTreeBarInfoRoute_ReturnsAuditFields(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouter(t)
+	seedBridgeUser(t, db, 101, "alice_login", "Alice")
+	seedBridgeUser(t, db, 102, "bob", "")
+
+	nodeType := dataset.NodeTypeDataset
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{
+		ID:             1001,
+		Name:           "orders",
+		NodeType:       &nodeType,
+		CreateBy:       "101",
+		CreateTime:     1711111111,
+		UpdateBy:       "102",
+		LastUpdateTime: 1712222222,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/datasetTree/barInfo/1001", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string          `json:"code"`
+		Data dataset.BarInfo `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, int64(1001), resp.Data.ID)
+	assert.Equal(t, "orders", resp.Data.Name)
+	assert.Equal(t, dataset.NodeTypeDataset, resp.Data.NodeType)
+	assert.Equal(t, "101", resp.Data.CreateBy)
+	assert.Equal(t, "102", resp.Data.UpdateBy)
+	assert.Equal(t, int64(1711111111), resp.Data.CreateTime)
+	assert.Equal(t, int64(1712222222), resp.Data.LastUpdateTime)
+	assert.Equal(t, "Alice", resp.Data.Creator)
+	assert.Equal(t, "bob", resp.Data.Updater)
+	assert.False(t, resp.Data.IsCross)
+}
+
+func TestDatasetTreeBarInfoRoute_InvalidID(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouter(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/datasetTree/barInfo/abc", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "Invalid dataset ID")
+}
+
+func TestDatasetTreeBarInfoRoute_NotFound(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouter(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/datasetTree/barInfo/99999", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "Failed to get dataset")
+}
+
+func TestDatasetFieldSaveRoute_CreateAndValidation(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouter(t)
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{ID: 2001, Name: "dataset-save"})
+
+	t.Run("create field", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/save", strings.NewReader(`{"name":"order_amount","datasetGroupId":2001,"type":"int","originName":"amount"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string                        `json:"code"`
+			Data dataset.CoreDatasetTableField `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		require.NotNil(t, resp.Data.Name)
+		require.NotNil(t, resp.Data.Type)
+		assert.Equal(t, "order_amount", *resp.Data.Name)
+		assert.Equal(t, "int", *resp.Data.Type)
+		assert.Equal(t, int64(2001), resp.Data.DatasetGroupID)
+
+		var stored []dataset.CoreDatasetTableField
+		require.NoError(t, db.Where("dataset_group_id = ?", 2001).Find(&stored).Error)
+		require.Len(t, stored, 1)
+		require.NotNil(t, stored[0].Name)
+		assert.Equal(t, "order_amount", *stored[0].Name)
+	})
+
+	t.Run("validation errors", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			body       string
+			wantSubstr string
+		}{
+			{name: "missing name", body: `{"datasetGroupId":2001,"type":"int"}`, wantSubstr: "field name is required"},
+			{name: "missing dataset group", body: `{"name":"field1","type":"int"}`, wantSubstr: "datasetGroupId is required"},
+			{name: "missing type", body: `{"name":"field1","datasetGroupId":2001}`, wantSubstr: "field type is required"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := httptest.NewRequest(http.MethodPost, "/datasetField/save", strings.NewReader(tt.body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, req)
+
+				require.Equal(t, http.StatusOK, w.Code)
+				resp := bridgeCodeResp{}
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, "500000", resp.Code)
+				assert.Contains(t, resp.Msg, tt.wantSubstr)
+			})
+		}
+	})
+}
+
+func TestDatasetFieldGetFunctionRoute_ReturnsFunctionCategories(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/getFunction", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string                     `json:"code"`
+		Data []service.FunctionCategory `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	require.Len(t, resp.Data, 5)
+	assert.Equal(t, "聚合函数", resp.Data[0].Name)
+	assert.Equal(t, "日期函数", resp.Data[1].Name)
+	assert.Equal(t, "字符串函数", resp.Data[2].Name)
+	assert.Equal(t, "数学函数", resp.Data[3].Name)
+	assert.Equal(t, "条件函数", resp.Data[4].Name)
+	for _, category := range resp.Data {
+		assert.NotEmpty(t, category.Functions)
+	}
+}
+
+func TestDatasetFieldListByDsIdsRoute_ReturnsMatchedFields(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouter(t)
+	dsAID := int64(11)
+	dsBID := int64(22)
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4001, DatasourceID: &dsAID, DatasetGroupID: 1001, Name: strPtrBridge("field_a1"), Type: strPtrBridge("string")})
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4002, DatasourceID: &dsAID, DatasetGroupID: 1001, Name: strPtrBridge("field_a2"), Type: strPtrBridge("int")})
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4003, DatasourceID: &dsBID, DatasetGroupID: 1002, Name: strPtrBridge("field_b1"), Type: strPtrBridge("string")})
+
+	t.Run("matched datasource ids", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/listByDsIds", strings.NewReader(`{"dsIds":[11]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string                          `json:"code"`
+			Data []dataset.CoreDatasetTableField `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		names := make([]string, 0, len(resp.Data))
+		for _, field := range resp.Data {
+			if field.Name != nil {
+				names = append(names, *field.Name)
+			}
+		}
+		assert.ElementsMatch(t, []string{"field_a1", "field_a2"}, names)
+		assert.NotContains(t, names, "field_b1")
+	})
+
+	t.Run("empty input returns empty list", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/listByDsIds", strings.NewReader(`{"dsIds":[]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string                          `json:"code"`
+			Data []dataset.CoreDatasetTableField `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Len(t, resp.Data, 0)
 	})
 }
 
