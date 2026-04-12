@@ -104,11 +104,15 @@ type WriteRequest struct {
 }
 
 type ConnectionConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	JDBCUrl  string `json:"jdbcUrl"`
-	Database string `json:"dataBase"`
-	Schema   string `json:"schema"`
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	JDBCUrl     string `json:"jdbcUrl"`
+	Database    string `json:"dataBase"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	URLType     string `json:"urlType"`
+	ExtraParams string `json:"extraParams"`
+	Schema      string `json:"schema"`
 }
 
 type SyncRecord struct {

@@ -12,6 +12,7 @@ import (
 
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
@@ -31,10 +32,35 @@ func setupDatasetServiceRepoTest(t *testing.T) (*DatasetService, *gorm.DB) {
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &datasource.CoreDatasource{}))
 
 	repo := repository.NewDatasetRepository(db)
 	return NewDatasetService(repo), db
+}
+
+type stubPreviewExecutor struct {
+	rows []map[string]interface{}
+	err  error
+
+	called bool
+	rawSQL string
+	limit  int
+	closed bool
+}
+
+func (s *stubPreviewExecutor) PreviewSQL(rawSQL string, limit int) ([]map[string]interface{}, error) {
+	s.called = true
+	s.rawSQL = rawSQL
+	s.limit = limit
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.rows, nil
+}
+
+func (s *stubPreviewExecutor) Close() error {
+	s.closed = true
+	return nil
 }
 
 type datasetAdminChecker struct{ isAdmin bool }
@@ -352,7 +378,11 @@ func TestPreviewSQL_Base64DecodedEmpty(t *testing.T) {
 }
 
 func TestPreviewSQL_ExternalDatasourceUnsupported(t *testing.T) {
-	svc := NewDatasetService(nil)
+	svc, db := setupDatasetServiceRepoTest(t)
+	datasourceRepo := repository.NewDatasourceRepository(db)
+	svc.SetDatasourceRepository(datasourceRepo)
+	config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "db.local", Port: 5432, Database: "analytics", Username: "pg", Password: "secret"})
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 42, Name: "pg-ds", Type: "pg", Configuration: &config}).Error)
 
 	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
 		SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
@@ -360,6 +390,31 @@ func TestPreviewSQL_ExternalDatasourceUnsupported(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
+}
+
+func TestBuildMySQLPreviewConfig(t *testing.T) {
+	cfg, err := buildMySQLPreviewConfig(&datasource.ConnectionConfig{
+		Host:        "db.local",
+		Port:        3306,
+		Database:    "analytics",
+		Username:    "root",
+		Password:    "secret",
+		ExtraParams: "useSSL=false",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "root", cfg.User)
+	assert.Equal(t, "secret", cfg.Passwd)
+	assert.Equal(t, "tcp", cfg.Net)
+	assert.Equal(t, "db.local:3306", cfg.Addr)
+	assert.Equal(t, "analytics", cfg.DBName)
+	assert.Equal(t, "utf8mb4", cfg.Params["charset"])
+	assert.Equal(t, "True", cfg.Params["parseTime"])
+	assert.Equal(t, "false", cfg.Params["useSSL"])
+
+	_, err = buildMySQLPreviewConfig(&datasource.ConnectionConfig{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "datasource host is required")
 }
 
 func TestIsDirectPreviewRequest(t *testing.T) {
@@ -1150,19 +1205,50 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 
 	t.Run("preview sql rejects datasource-aware direct preview explicitly", func(t *testing.T) {
 		svc, db := setupDatasetServiceRepoTest(t)
-		require.NoError(t, db.Exec("CREATE TABLE preview_sql_direct_guard (name TEXT)").Error)
-		require.NoError(t, db.Exec("INSERT INTO preview_sql_direct_guard (name) VALUES ('alice')").Error)
+		datasourceRepo := repository.NewDatasourceRepository(db)
+		svc.SetDatasourceRepository(datasourceRepo)
+		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "db.local", Port: 5432, Database: "analytics", Username: "pg", Password: "secret"})
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 88, Name: "pg-ds", Type: "pg", Configuration: &config}).Error)
 
 		_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
-			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT name FROM preview_sql_direct_guard")),
+			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
 			DatasourceID: 88,
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
+	})
 
-		var count int64
-		require.NoError(t, db.Raw("SELECT COUNT(*) FROM preview_sql_direct_guard").Scan(&count).Error)
-		assert.Equal(t, int64(1), count)
+	t.Run("preview sql routes mysql datasource to executor factory", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		datasourceRepo := repository.NewDatasourceRepository(db)
+		svc.SetDatasourceRepository(datasourceRepo)
+		config := encodeDatasourceConfig(t, &datasource.ConnectionConfig{Host: "mysql.local", Port: 3306, Database: "analytics", Username: "root", Password: "secret"})
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 99, Name: "mysql-ds", Type: "mysql", Configuration: &config}).Error)
+
+		executor := &stubPreviewExecutor{rows: []map[string]interface{}{{"name": "alice", "amount": int64(10)}}}
+		svc.SetPreviewExecutorFactory(func(ds *datasource.CoreDatasource, cfg *datasource.ConnectionConfig) (PreviewExecutor, error) {
+			require.Equal(t, int64(99), ds.ID)
+			require.Equal(t, "mysql", ds.Type)
+			require.Equal(t, "root", cfg.Username)
+			require.Equal(t, "secret", cfg.Password)
+			return executor, nil
+		})
+
+		result, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
+			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT amount, name FROM orders")),
+			DatasourceID: 99,
+		})
+		require.NoError(t, err)
+		assert.True(t, executor.called)
+		assert.True(t, executor.closed)
+		assert.Equal(t, "SELECT amount, name FROM orders", executor.rawSQL)
+		assert.Equal(t, 100, executor.limit)
+
+		previewData, ok := result["data"].(dataset.SQLPreviewData)
+		require.True(t, ok)
+		require.Len(t, previewData.Fields, 2)
+		require.Len(t, previewData.Data, 1)
+		assert.Equal(t, "alice", previewData.Data[0]["name"])
 	})
 }
 

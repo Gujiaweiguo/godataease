@@ -26,16 +26,18 @@ import (
 )
 
 type DatasetService struct {
-	repo                 *repository.DatasetRepository
-	exportRepo           repository.ExportRepositoryInterface
-	rowPermissionService *RowPermissionService
-	resourcePermService  *ResourcePermissionService
-	calciteAddress       string
-	calciteTimeout       time.Duration
-	calciteRetries       int
-	calciteClient        *calciteintegration.Client
-	calciteMu            sync.Mutex
-	userRepo             *repository.UserRepository
+	repo                   *repository.DatasetRepository
+	datasourceRepo         *repository.DatasourceRepository
+	exportRepo             repository.ExportRepositoryInterface
+	rowPermissionService   *RowPermissionService
+	resourcePermService    *ResourcePermissionService
+	calciteAddress         string
+	calciteTimeout         time.Duration
+	calciteRetries         int
+	calciteClient          *calciteintegration.Client
+	calciteMu              sync.Mutex
+	userRepo               *repository.UserRepository
+	previewExecutorFactory PreviewExecutorFactory
 }
 
 var (
@@ -52,21 +54,35 @@ type sqlVariableDetailRaw struct {
 
 func NewDatasetService(repo *repository.DatasetRepository) *DatasetService {
 	return &DatasetService{
-		repo:           repo,
-		calciteAddress: "",
-		calciteTimeout: 10 * time.Second,
-		calciteRetries: 1,
+		repo:                   repo,
+		calciteAddress:         "",
+		calciteTimeout:         10 * time.Second,
+		calciteRetries:         1,
+		previewExecutorFactory: defaultPreviewExecutorFactory,
 	}
 }
 
 func NewDatasetServiceWithPermission(repo *repository.DatasetRepository, rowPermSvc *RowPermissionService) *DatasetService {
 	return &DatasetService{
-		repo:                 repo,
-		rowPermissionService: rowPermSvc,
-		calciteAddress:       "",
-		calciteTimeout:       10 * time.Second,
-		calciteRetries:       1,
+		repo:                   repo,
+		rowPermissionService:   rowPermSvc,
+		calciteAddress:         "",
+		calciteTimeout:         10 * time.Second,
+		calciteRetries:         1,
+		previewExecutorFactory: defaultPreviewExecutorFactory,
 	}
+}
+
+func (s *DatasetService) SetDatasourceRepository(datasourceRepo *repository.DatasourceRepository) {
+	s.datasourceRepo = datasourceRepo
+}
+
+func (s *DatasetService) SetPreviewExecutorFactory(factory PreviewExecutorFactory) {
+	if factory == nil {
+		s.previewExecutorFactory = defaultPreviewExecutorFactory
+		return
+	}
+	s.previewExecutorFactory = factory
 }
 
 func (s *DatasetService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
@@ -422,11 +438,15 @@ func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]
 		return nil, err
 	}
 
-	if isDirectPreviewRequest(req) {
-		return nil, ErrPreviewSQLExternalDatasourceUnsupported
+	executor, err := s.resolvePreviewExecutor(req)
+	if err != nil {
+		return nil, err
 	}
+	defer func() {
+		_ = executor.Close()
+	}()
 
-	rows, err := s.repo.PreviewSQL(rawSQL, 100)
+	rows, err := executor.PreviewSQL(rawSQL, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -449,6 +469,31 @@ func isDirectPreviewRequest(req *dataset.SQLPreviewRequest) bool {
 		return false
 	}
 	return req.DatasourceID > 0
+}
+
+func (s *DatasetService) resolvePreviewExecutor(req *dataset.SQLPreviewRequest) (PreviewExecutor, error) {
+	if !isDirectPreviewRequest(req) {
+		return &localPreviewExecutor{repo: s.repo}, nil
+	}
+	if s.datasourceRepo == nil {
+		return nil, ErrPreviewSQLExternalDatasourceUnsupported
+	}
+	ds, err := s.datasourceRepo.GetByID(req.DatasourceID)
+	if err != nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+	if ds.Configuration == nil || strings.TrimSpace(*ds.Configuration) == "" {
+		return nil, fmt.Errorf("datasource configuration is empty")
+	}
+	cfg, err := decodeConfig(*ds.Configuration)
+	if err != nil {
+		return nil, fmt.Errorf("invalid datasource configuration: %w", err)
+	}
+	factory := s.previewExecutorFactory
+	if factory == nil {
+		factory = defaultPreviewExecutorFactory
+	}
+	return factory(ds, cfg)
 }
 
 func (s *DatasetService) GetSQLParams(ids []int64) ([]dataset.SQLVariableDetails, error) {

@@ -53,6 +53,24 @@ func TestDatasourceServiceHelpers_DecodeMaybeBase64JSONMap(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestDatasourceServiceHelpers_DecodeConfig(t *testing.T) {
+	raw := base64.StdEncoding.EncodeToString([]byte(`{"host":"db.local","port":3306,"dataBase":"analytics","username":"root","password":"secret","extraParams":"useSSL=false"}`))
+	cfg, err := decodeConfig(raw)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "db.local", cfg.Host)
+	assert.Equal(t, 3306, cfg.Port)
+	assert.Equal(t, "analytics", cfg.Database)
+	assert.Equal(t, "root", cfg.Username)
+	assert.Equal(t, "secret", cfg.Password)
+	assert.Equal(t, "useSSL=false", cfg.ExtraParams)
+
+	cfg, err = decodeConfig(`{"host":"db.local","port":3307,"dataBase":"demo","username":"app","password":"pwd"}`)
+	require.NoError(t, err)
+	assert.Equal(t, "app", cfg.Username)
+	assert.Equal(t, "pwd", cfg.Password)
+}
+
 func TestDatasourceServiceHelpers_ParseIDs(t *testing.T) {
 	id, err := parseDatasourceID(map[string]string{"datasourceId": "12"})
 	require.NoError(t, err)
