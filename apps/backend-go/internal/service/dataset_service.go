@@ -39,8 +39,9 @@ type DatasetService struct {
 }
 
 var (
-	ErrDatasetDatasourcePermissionDenied = errors.New("insufficient datasource permissions")
-	ErrDatasetFieldDependencyBlocked     = errors.New("dataset field dependency blocked")
+	ErrDatasetDatasourcePermissionDenied       = errors.New("insufficient datasource permissions")
+	ErrDatasetFieldDependencyBlocked           = errors.New("dataset field dependency blocked")
+	ErrPreviewSQLExternalDatasourceUnsupported = errors.New("external datasource SQL preview is not supported yet; please use synchronized dataset preview")
 )
 
 type sqlVariableDetailRaw struct {
@@ -421,6 +422,10 @@ func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]
 		return nil, err
 	}
 
+	if isDirectPreviewRequest(req) {
+		return nil, ErrPreviewSQLExternalDatasourceUnsupported
+	}
+
 	rows, err := s.repo.PreviewSQL(rawSQL, 100)
 	if err != nil {
 		return nil, err
@@ -437,6 +442,13 @@ func (s *DatasetService) PreviewSQL(req *dataset.SQLPreviewRequest) (map[string]
 		},
 		"sql": base64.StdEncoding.EncodeToString([]byte(rawSQL)),
 	}, nil
+}
+
+func isDirectPreviewRequest(req *dataset.SQLPreviewRequest) bool {
+	if req == nil {
+		return false
+	}
+	return req.DatasourceID > 0
 }
 
 func (s *DatasetService) GetSQLParams(ids []int64) ([]dataset.SQLVariableDetails, error) {

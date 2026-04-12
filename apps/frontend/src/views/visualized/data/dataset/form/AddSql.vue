@@ -429,15 +429,20 @@ const dataPreviewLoading = ref(false)
 const getSQLPreview = () => {
   parseVariable()
   dataPreviewLoading.value = true
+  const datasourceId = Number(sqlNode.value.datasourceId) || 0
   getPreviewSql({
     isCross: isCross.value,
     sql: Base64.encode(setNameIdTrans('name', 'id', codeCom.value.state.doc.toString())),
-    datasourceId: sqlNode.value.datasourceId,
+    datasourceId,
     sqlVariableDetails: JSON.stringify(state.variables)
   })
     .then(res => {
       state.plxTableData = res.data.data
       state.fields = generateColumns(res.data.fields)
+    })
+    .catch(() => {
+      state.plxTableData = []
+      state.fields = []
     })
     .finally(() => {
       dataPreviewLoading.value = false

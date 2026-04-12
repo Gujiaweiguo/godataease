@@ -351,6 +351,37 @@ func TestPreviewSQL_Base64DecodedEmpty(t *testing.T) {
 	assert.Empty(t, result["sql"])
 }
 
+func TestPreviewSQL_ExternalDatasourceUnsupported(t *testing.T) {
+	svc := NewDatasetService(nil)
+
+	_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
+		SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT 1")),
+		DatasourceID: 42,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
+}
+
+func TestIsDirectPreviewRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		req  *dataset.SQLPreviewRequest
+		want bool
+	}{
+		{name: "nil request", req: nil, want: false},
+		{name: "empty request", req: &dataset.SQLPreviewRequest{}, want: false},
+		{name: "zero datasource id", req: &dataset.SQLPreviewRequest{DatasourceID: 0}, want: false},
+		{name: "negative datasource id", req: &dataset.SQLPreviewRequest{DatasourceID: -1}, want: false},
+		{name: "positive datasource id", req: &dataset.SQLPreviewRequest{DatasourceID: 1}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isDirectPreviewRequest(tt.req))
+		})
+	}
+}
+
 func TestSetCalciteConfig_DefaultPreserve(t *testing.T) {
 	svc := NewDatasetService(nil)
 	defaultTimeout := svc.calciteTimeout
@@ -1115,6 +1146,23 @@ func TestDatasetService_SaveDelegationAndPreviewSQLExecution(t *testing.T) {
 		assert.Equal(t, "bob", previewData.Data[0]["name"])
 		assert.Equal(t, int64(20), previewData.Data[0]["amount"])
 		assert.Equal(t, "alice", previewData.Data[1]["name"])
+	})
+
+	t.Run("preview sql rejects datasource-aware direct preview explicitly", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		require.NoError(t, db.Exec("CREATE TABLE preview_sql_direct_guard (name TEXT)").Error)
+		require.NoError(t, db.Exec("INSERT INTO preview_sql_direct_guard (name) VALUES ('alice')").Error)
+
+		_, err := svc.PreviewSQL(&dataset.SQLPreviewRequest{
+			SQL:          base64.StdEncoding.EncodeToString([]byte("SELECT name FROM preview_sql_direct_guard")),
+			DatasourceID: 88,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrPreviewSQLExternalDatasourceUnsupported)
+
+		var count int64
+		require.NoError(t, db.Raw("SELECT COUNT(*) FROM preview_sql_direct_guard").Scan(&count).Error)
+		assert.Equal(t, int64(1), count)
 	})
 }
 
