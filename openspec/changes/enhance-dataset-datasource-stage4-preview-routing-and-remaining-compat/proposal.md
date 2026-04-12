@@ -9,6 +9,8 @@ stage3 已经补齐了数据集 barInfo、字段保存和辅助字段查询能�
 - 补齐 `/datasetField/multFieldValuesForPermissions` 的兼容语义，明确其与现有字段枚举查询、行权限/列权限过滤之间的关系。
 - 补齐 `/datasetField/copilotFields` 的兼容语义，明确字段筛选范围、返回结构、鉴权与降级行为。
 - 为上述能力补充设计、规格和回归验证要求，确保 stage4 是一条“能力与语义收口”变更，而不是零散接口补丁。
+- 作为 stage4 中一项受控的前端对齐步骤，将 dataset 树、预览、表字段加载这三类已有 Go canonical 支撑的调用，从 compatibility 路径切换到 `/dataset/tree`、`/dataset/preview`、`/dataset/fields`。
+- 该切换仅用于降低 dataset 基础读路径对 compatibility wrapper 的依赖，不扩展到 datasource 全量迁移或更大范围的路由清理。
 
 ## Capabilities
 
