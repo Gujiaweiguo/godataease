@@ -42,6 +42,7 @@ type DatasetService struct {
 
 var (
 	ErrDatasetDatasourcePermissionDenied       = errors.New("insufficient datasource permissions")
+	ErrDatasetViewPermissionDenied             = errors.New("insufficient dataset permissions")
 	ErrDatasetFieldDependencyBlocked           = errors.New("dataset field dependency blocked")
 	ErrPreviewSQLExternalDatasourceUnsupported = errors.New("external datasource SQL preview is not supported yet; please use synchronized dataset preview")
 	ErrPreviewSQLTimeout                       = errors.New("preview query timed out")
@@ -253,6 +254,84 @@ func (s *DatasetService) FieldsWithPermission(datasetGroupID int64, userID int64
 		QuotaList:     quotaList,
 	}
 
+	if s.rowPermissionService == nil || s.rowPermissionService.columnPermRepo == nil || userID <= 0 {
+		return resp, nil
+	}
+	if s.rowPermissionService.IsAdmin(userID) {
+		return resp, nil
+	}
+
+	columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+	disabledColumns, err := columnSvc.GetDisabledColumns(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
+	}
+	maskRules, err := columnSvc.GetMaskRules(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mask rules: %w", err)
+	}
+
+	chartSvc := &ChartService{}
+	return &chart.ChartFieldListResponse{
+		DimensionList: chartSvc.filterChartFields(resp.DimensionList, disabledColumns, maskRules),
+		QuotaList:     chartSvc.filterChartFields(resp.QuotaList, disabledColumns, maskRules),
+	}, nil
+}
+
+func (s *DatasetService) CopilotFields(datasetGroupID int64, userID int64) (*chart.ChartFieldListResponse, error) {
+	if err := s.ensureDatasetViewable(datasetGroupID, userID); err != nil {
+		return nil, err
+	}
+
+	fields, err := s.repo.ListFields(datasetGroupID)
+	if err != nil {
+		return nil, err
+	}
+	resp := buildCopilotChartFieldList(fields)
+	return s.applyDatasetColumnPermissions(datasetGroupID, userID, resp)
+}
+
+func (s *DatasetService) ensureDatasetViewable(datasetGroupID int64, userID int64) error {
+	if datasetGroupID <= 0 {
+		return gorm.ErrRecordNotFound
+	}
+	if _, err := s.repo.GetGroupByID(datasetGroupID); err != nil {
+		return err
+	}
+	if s.resourcePermService != nil && userID > 0 && !s.resourcePermService.CheckViewPermission(userID, permission.ResourceTypeDataset, datasetGroupID) {
+		return ErrDatasetViewPermissionDenied
+	}
+	return nil
+}
+
+func buildCopilotChartFieldList(fields []*dataset.CoreDatasetTableField) *chart.ChartFieldListResponse {
+	dimensionList := make([]chart.ChartField, 0, len(fields))
+	quotaList := make([]chart.ChartField, 0, len(fields))
+	for _, field := range fields {
+		if !isCopilotVisibleField(field) {
+			continue
+		}
+		converted := convertToChartField(field)
+		if strings.EqualFold(converted.GroupType, "d") {
+			dimensionList = append(dimensionList, converted)
+			continue
+		}
+		quotaList = append(quotaList, converted)
+	}
+	return &chart.ChartFieldListResponse{DimensionList: dimensionList, QuotaList: quotaList}
+}
+
+func isCopilotVisibleField(field *dataset.CoreDatasetTableField) bool {
+	if field == nil {
+		return false
+	}
+	if field.Checked == nil || !*field.Checked {
+		return false
+	}
+	return field.ExtField == nil || *field.ExtField == 0
+}
+
+func (s *DatasetService) applyDatasetColumnPermissions(datasetGroupID int64, userID int64, resp *chart.ChartFieldListResponse) (*chart.ChartFieldListResponse, error) {
 	if s.rowPermissionService == nil || s.rowPermissionService.columnPermRepo == nil || userID <= 0 {
 		return resp, nil
 	}

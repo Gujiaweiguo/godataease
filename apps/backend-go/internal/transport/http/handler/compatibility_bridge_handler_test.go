@@ -1029,6 +1029,37 @@ func setupStage3DatasetFieldRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	return r, db
 }
 
+func setupStage3DatasetFieldRouterWithUser(t *testing.T, userID uint64) (*gin.Engine, *gorm.DB) {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &user.SysUser{}))
+
+	datasetRepo := repository.NewDatasetRepository(db)
+	datasetService := service.NewDatasetService(datasetRepo)
+	datasetService.SetUserRepository(repository.NewUserRepository(db))
+	datasetHandler := NewDatasetHandler(datasetService)
+
+	chartRepo := &fakeBridgeChartRepo{
+		charts:        map[int64]*chart.CoreChartView{},
+		dsFields:      map[int64][]*dataset.CoreDatasetTableField{},
+		chartFields:   map[int64][]*dataset.CoreDatasetTableField{},
+		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
+		nextFieldID:   9000,
+	}
+	chartHandler := NewChartHandler(service.NewChartService(chartRepo))
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", userID)
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
+	return r, db
+}
+
 func seedBridgeUser(t *testing.T, db *gorm.DB, id int64, username string, nickname string) {
 	t.Helper()
 	require.NoError(t, db.Create(&user.SysUser{UserID: id, Username: username, NickName: nickname, Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
@@ -1546,6 +1577,75 @@ func TestDatasetFieldMultFieldValuesForPermissionsRoute_InvalidJSON(t *testing.T
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "500000", resp.Code)
 	assert.Contains(t, resp.Msg, "Invalid request")
+}
+
+func TestDatasetFieldCopilotFieldsRoute_ReturnsDimensionAndQuota(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouterWithUser(t, 42)
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	tableName := "bridge_copilot_fields"
+	checked := true
+	unchecked := false
+	extNormal := 0
+	extCalc := 2
+	groupTypeDim := "d"
+	groupTypeQuota := "q"
+	originRegion := "region"
+	originAmount := "amount"
+	originCalc := "calc_field"
+	originUnchecked := "unchecked_field"
+	fieldRegion := "region"
+	fieldAmount := "amount"
+	fieldCalc := "calc_field"
+	fieldUnchecked := "unchecked_field"
+
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{ID: 4101, Name: "Copilot Dataset", PID: &rootPID, NodeType: &nodeType})
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 4201, DatasetGroupID: 4101, PhysicalTable: &tableName}).Error)
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4301, DatasetTableID: int64PtrBridge(4201), DatasetGroupID: 4101, OriginName: &originRegion, Name: &fieldRegion, GroupType: &groupTypeDim, Checked: &checked, ExtField: &extNormal})
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4302, DatasetTableID: int64PtrBridge(4201), DatasetGroupID: 4101, OriginName: &originAmount, Name: &fieldAmount, GroupType: &groupTypeQuota, Checked: &checked, ExtField: &extNormal})
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4303, DatasetTableID: int64PtrBridge(4201), DatasetGroupID: 4101, OriginName: &originCalc, Name: &fieldCalc, GroupType: &groupTypeQuota, Checked: &checked, ExtField: &extCalc})
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4304, DatasetTableID: int64PtrBridge(4201), DatasetGroupID: 4101, OriginName: &originUnchecked, Name: &fieldUnchecked, GroupType: &groupTypeDim, Checked: &unchecked, ExtField: &extNormal})
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/copilotFields/4101", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string                       `json:"code"`
+		Data chart.ChartFieldListResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	require.Len(t, resp.Data.DimensionList, 1)
+	require.Len(t, resp.Data.QuotaList, 1)
+	assert.Equal(t, "region", resp.Data.DimensionList[0].OriginName)
+	assert.Equal(t, "amount", resp.Data.QuotaList[0].OriginName)
+}
+
+func TestDatasetFieldCopilotFieldsRoute_Unauthorized(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouter(t)
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/copilotFields/4101", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "20001", resp.Code)
+}
+
+func TestDatasetFieldCopilotFieldsRoute_NotFound(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouterWithUser(t, 42)
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/copilotFields/999999", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "50001", resp.Code)
+	assert.Contains(t, resp.Msg, "dataset not found")
 }
 
 func TestDatasourceSyncRouteReturnsErrorWhenSeatunnelUnavailable(t *testing.T) {
