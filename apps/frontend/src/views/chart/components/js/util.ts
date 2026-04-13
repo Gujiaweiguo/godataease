@@ -1,5 +1,5 @@
 import { isNumber } from 'lodash-es'
-import { DEFAULT_TITLE_STYLE } from '../editor/util/chart'
+import { DEFAULT_TITLE_STYLE_BASE } from '../editor/util/titleDefaults'
 import { equalsAny, includesAny } from '../editor/util/StringUtils'
 import { FeatureCollection } from '@antv/l7plot/dist/esm/plots/choropleth/types'
 import { useMapStoreWithOut } from '@/store/modules/map'
@@ -229,11 +229,11 @@ export function getRemark(chart) {
     const customStyle = JSON.parse(JSON.stringify(chart.customStyle))
     if (customStyle.text) {
       const title = JSON.parse(JSON.stringify(customStyle.text))
-      remark.show = title.remarkShow ? title.remarkShow : DEFAULT_TITLE_STYLE.remarkShow
-      remark.content = title.remark ? title.remark : DEFAULT_TITLE_STYLE.remark
+      remark.show = title.remarkShow ? title.remarkShow : DEFAULT_TITLE_STYLE_BASE.remarkShow
+      remark.content = title.remark ? title.remark : DEFAULT_TITLE_STYLE_BASE.remark
       remark.bgFill = title.remarkBackgroundColor
         ? title.remarkBackgroundColor
-        : DEFAULT_TITLE_STYLE.remarkBackgroundColor
+        : DEFAULT_TITLE_STYLE_BASE.remarkBackgroundColor
     }
   }
   return remark
