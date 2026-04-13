@@ -4,6 +4,9 @@ import (
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"errors"
+	"io"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,10 +51,92 @@ func (h *DatasourceHandler) Validate(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) Tree(c *gin.Context) {
+	var req datasource.ListRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	list, err := h.service.Tree(&req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, buildDatasourceTreeResponse(list))
+}
+
+func (h *DatasourceHandler) Get(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+
+	result, err := h.service.GetByID(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, sanitizeDatasourceResponse(result, h.service))
+}
+
+func (h *DatasourceHandler) Save(c *gin.Context) {
+	req, ok := parseDatasourceWriteRequest(c, true)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.Save(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) Update(c *gin.Context) {
+	req, ok := parseDatasourceWriteRequest(c, true)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.Update(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) Delete(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+
+	if err := h.service.Delete(id); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
 		dsGroup.POST("/list", h.List)
+		dsGroup.POST("/tree", h.Tree)
 		dsGroup.POST("/validate", h.Validate)
+		dsGroup.GET("/:id", h.Get)
+		dsGroup.POST("/save", h.Save)
+		dsGroup.POST("/update", h.Update)
+		dsGroup.POST("/delete/:id", h.Delete)
 	}
 }

@@ -1922,6 +1922,44 @@ func TestDatasourceDeleteRoutes_PostAndGetShareSemantics(t *testing.T) {
 	assert.Equal(t, "500000", invalidGetResp.Code)
 }
 
+func TestDatasourceCanonicalUpdatePreservesLargeIntegerID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&datasource.CoreDatasource{}))
+
+	pid := int64(0)
+	status := datasource.StatusSuccess
+	createBy := "1"
+	id := int64(985188400292302861)
+	now := int64(1776087180290)
+	configuration := "{}"
+	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: id, PID: &pid, Name: "qa-canonical-ds-folder-2", Type: datasource.TypeFolder, Configuration: &configuration, Status: &status, CreateTime: &now, UpdateTime: &now, CreateBy: &createBy}).Error)
+
+	h := NewDatasourceHandler(service.NewDatasourceService(repository.NewDatasourceRepository(db)))
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterDatasourceRoutes(api, h)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ds/update", strings.NewReader(`{"id":985188400292302861,"name":"qa-canonical-ds-folder-2-renamed"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string                 `json:"code"`
+		Data map[string]interface{} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, "qa-canonical-ds-folder-2-renamed", resp.Data["name"])
+
+	stored, err := repository.NewDatasourceRepository(db).GetByID(id)
+	require.NoError(t, err)
+	assert.Equal(t, "qa-canonical-ds-folder-2-renamed", stored.Name)
+}
+
 func TestDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	calciteMock := &mockBridgeCalciteValidateServer{}

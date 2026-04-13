@@ -238,3 +238,65 @@ The system SHALL provide batch field query capability by multiple datasource ide
 - **WHEN** a client calls `POST /datasetField/listByDsIds` with an array of datasource IDs
 - **THEN** the system MUST return fields associated with any of the specified datasources
 - **AND** the response MUST include field metadata compatible with the standard `Field` contract
+
+### Requirement: Dataset Preview Compatibility Must Preserve Explicit Routing Semantics
+The system SHALL preserve Java-compatible preview entry points while making datasource-aware routing behavior explicit.
+
+#### Scenario: Preview request with datasource context does not silently fall back
+- **WHEN** a client calls `POST /datasetData/previewSql` with datasource context that implies external preview routing behavior
+- **THEN** the system MUST either execute the supported datasource-aware preview path or return an explicit non-success result
+- **AND** the route MUST NOT silently ignore datasource context while reporting a normal preview success
+
+#### Scenario: Preview request without datasource direct routing remains stable
+- **WHEN** a client calls `POST /datasetData/previewSql` under the existing synchronized-local preview model
+- **THEN** the system MUST preserve deterministic preview semantics for rows, fields, SQL validation, and timeout handling
+- **AND** stage4 routing work MUST NOT regress the established local preview baseline
+
+#### Scenario: Preview request accepts compatibility metadata without changing routing
+- **WHEN** a client calls `POST /datasetData/previewSql` with compatibility metadata such as `sqlVariableDetails`
+- **THEN** the system MUST accept the request shape without silently dropping the compatibility field at the handler boundary
+- **AND** preview routing MUST continue to be determined by datasource context rather than compatibility metadata alone
+
+### Requirement: Permission-Aware Field Enum Compatibility Must Be Executable
+The system SHALL provide executable compatibility semantics for permission-aware multi-field value enumeration.
+
+#### Scenario: Query field values under permission constraints
+- **WHEN** a client calls `POST /datasetField/multFieldValuesForPermissions` for one or more dataset fields within a permission-aware context
+- **THEN** the system MUST return only field values permitted by the governing field and permission filters
+- **AND** the response MUST remain compatible with the existing field enumeration contract expected by migrated callers
+
+#### Scenario: Permission-aware field enumeration distinguishes empty result from failure
+- **WHEN** no field values are visible after applying permission-aware filtering
+- **THEN** the system MUST return an empty successful enumeration result
+- **AND** the endpoint MUST NOT misclassify the outcome as a route absence or generic execution failure
+
+### Requirement: Copilot Field Compatibility Must Use Governed Dataset Field Metadata
+The system SHALL provide `copilotFields` compatibility behavior using governed dataset field metadata rather than an isolated side-channel field model.
+
+#### Scenario: Copilot field query returns governed dataset fields
+- **WHEN** a client calls `POST /datasetField/copilotFields` for a supported dataset context
+- **THEN** the system MUST return fields derived from the governed dataset field metadata model
+- **AND** the response MUST remain consistent with field visibility and compatibility naming semantics used elsewhere in dataset management
+
+#### Scenario: Copilot field query preserves explicit failure semantics
+- **WHEN** a copilot field query targets a missing dataset, unauthorized context, or unsupported request shape
+- **THEN** the system MUST return explicit non-success semantics
+- **AND** the failure MUST remain distinguishable from a successful empty field set
+
+### Requirement: Dataset Canonical Read Wrappers Can Replace Compatibility Read Paths Incrementally
+The system SHALL allow selected frontend dataset read wrappers to switch from compatibility paths to already-available canonical Go routes without changing existing frontend data-shaping behavior.
+
+#### Scenario: Dataset tree wrapper uses canonical route without changing tree semantics
+- **WHEN** the frontend dataset tree wrapper requests dataset discovery data
+- **THEN** it MAY call `POST /dataset/tree` instead of `POST /datasetTree/tree`
+- **AND** the returned node structure MUST remain compatible with the existing frontend tree normalization logic
+
+#### Scenario: Dataset preview wrapper uses canonical route without changing preview shaping
+- **WHEN** the frontend dataset preview wrapper requests dataset preview data
+- **THEN** it MAY call `POST /dataset/preview` instead of `POST /datasetData/previewData`
+- **AND** the response MUST continue to support the existing frontend field-name post-processing and preview table rendering behavior
+
+#### Scenario: Dataset table-field wrapper uses canonical route without changing field consumption
+- **WHEN** the frontend dataset table-field wrapper requests table field metadata
+- **THEN** it MAY call `POST /dataset/fields` instead of `POST /datasetData/tableField`
+- **AND** the returned field metadata MUST remain compatible with the existing SQL editor, union editor, and dataset field-loading flows

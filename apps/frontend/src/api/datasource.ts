@@ -38,7 +38,7 @@ export interface Table {
 
 export const listDatasources = data => {
   return request
-    .post({ url: '/datasource/tree', data: { ...data, ...{ busiFlag: 'datasource' } } })
+    .post({ url: '/ds/tree', data: { ...data, ...{ busiFlag: 'datasource' } } })
     .then(res => {
       return res?.data
     })
@@ -93,7 +93,7 @@ export const validateById = (id: number) => request.get({ url: '/datasource/vali
 
 export const save = async (data = {}): Promise<Dataset> => {
   nameTrim(data)
-  return request.post({ url: '/datasource/save', data }).then(res => {
+  return request.post({ url: '/ds/save', data }).then(res => {
     return res?.data
   })
 }
@@ -106,7 +106,7 @@ export const perDeleteDatasource = async (id): Promise<boolean> => {
 
 export const update = async (data = {}): Promise<Dataset> => {
   nameTrim(data)
-  return request.post({ url: '/datasource/update', data }).then(res => {
+  return request.post({ url: '/ds/update', data }).then(res => {
     return res?.data
   })
 }
@@ -151,21 +151,17 @@ export const getDatasetTree = async (data = {}): Promise<IResponse> => {
 
 export const getDsTree = async (data = {}): Promise<IResponse> => {
   return request
-    .post({ url: '/datasource/tree', data: { ...data, ...{ busiFlag: 'datasource' } } })
+    .post({ url: '/ds/tree', data: { ...data, ...{ busiFlag: 'datasource' } } })
     .then(res => {
       return res?.data
     })
 }
 
 export const deleteById = async (id: number) => {
-  try {
-    return await request.post({ url: '/datasource/delete/' + id, data: {} })
-  } catch (error) {
-    return request.get({ url: '/datasource/delete/' + id })
-  }
+  return request.post({ url: '/ds/delete/' + id, data: {} })
 }
 
-export const getById = (id: number) => request.get({ url: '/datasource/get/' + id })
+export const getById = (id: number) => request.get({ url: '/ds/' + id })
 
 export const getHidePwById = (id: number) => request.get({ url: '/datasource/hidePw/' + id })
 

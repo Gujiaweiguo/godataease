@@ -27,6 +27,7 @@ import {
   getSimpleDs,
   uploadFile,
   save,
+  update,
   validate,
   syncApiTable,
   checkApiItem
@@ -49,19 +50,8 @@ describe('Datasource API wrappers', () => {
 
     await deleteById(id)
 
-    expect(requestMock.post).toHaveBeenCalledWith({ url: `/datasource/delete/${id}`, data: {} })
+    expect(requestMock.post).toHaveBeenCalledWith({ url: `/ds/delete/${id}`, data: {} })
     expect(requestMock.get).not.toHaveBeenCalled()
-  })
-
-  it('falls back to get delete endpoint when post delete fails', async () => {
-    const id = 9851884
-    requestMock.post.mockRejectedValueOnce(new Error('post failed'))
-    requestMock.get.mockResolvedValueOnce({ code: '000000' })
-
-    await deleteById(id)
-
-    expect(requestMock.post).toHaveBeenCalledWith({ url: `/datasource/delete/${id}`, data: {} })
-    expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/delete/${id}` })
   })
 
   it('keeps string id for get/hidePw/getSimpleDs endpoints', () => {
@@ -70,7 +60,7 @@ describe('Datasource API wrappers', () => {
     getHidePwById(id)
     getSimpleDs(id)
 
-    expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/get/${id}` })
+    expect(requestMock.get).toHaveBeenCalledWith({ url: `/ds/${id}` })
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/hidePw/${id}` })
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/getSimpleDs/${id}` })
   })
@@ -80,7 +70,7 @@ describe('Datasource API wrappers', () => {
     const result = await listDatasources({ keyWord: 'demo' })
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/tree',
+      url: '/ds/tree',
       data: { keyWord: 'demo', busiFlag: 'datasource' }
     })
     expect(result).toEqual({ list: [] })
@@ -105,8 +95,19 @@ describe('Datasource API wrappers', () => {
 
     expect(nameTrimMock).toHaveBeenCalledTimes(1)
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/save',
+      url: '/ds/save',
       data: { name: '  demo  ' }
+    })
+  })
+
+  it('trims payload before update and uses canonical route', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1' } })
+    await update({ id: '1', name: '  demo  ' })
+
+    expect(nameTrimMock).toHaveBeenCalledTimes(1)
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/ds/update',
+      data: { id: '1', name: '  demo  ' }
     })
   })
 

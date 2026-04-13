@@ -67,7 +67,11 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		path string
 	}{
 		{name: "canonical datasource list", path: "/api/ds/list"},
+		{name: "canonical datasource tree", path: "/api/ds/tree"},
 		{name: "canonical datasource validate", path: "/api/ds/validate"},
+		{name: "canonical datasource save", path: "/api/ds/save"},
+		{name: "canonical datasource update", path: "/api/ds/update"},
+		{name: "canonical datasource delete", path: "/api/ds/delete/not-a-number"},
 		{name: "api compatibility datasource list", path: "/api/datasource/list"},
 		{name: "api compatibility datasource validate", path: "/api/datasource/validate"},
 		{name: "de2api datasource list", path: "/de2api/datasource/list"},
@@ -96,6 +100,12 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 
 			if resp.Code != "500000" {
 				t.Fatalf("expected code 500000 for %s, got %s", tt.path, resp.Code)
+			}
+			if tt.path == "/api/ds/delete/not-a-number" {
+				if !strings.Contains(resp.Msg, "Invalid datasource ID") {
+					t.Fatalf("expected invalid datasource id message for %s, got %q", tt.path, resp.Msg)
+				}
+				return
 			}
 			if !strings.Contains(resp.Msg, "Invalid request") {
 				t.Fatalf("expected invalid request message for %s, got %q", tt.path, resp.Msg)
@@ -203,6 +213,10 @@ func TestRegisterRoutes_DatasourceListAliasesRequireAuthentication(t *testing.T)
 		path string
 	}{
 		{name: "canonical datasource list requires auth", path: "/api/ds/list"},
+		{name: "canonical datasource tree requires auth", path: "/api/ds/tree"},
+		{name: "canonical datasource save requires auth", path: "/api/ds/save"},
+		{name: "canonical datasource update requires auth", path: "/api/ds/update"},
+		{name: "canonical datasource delete requires auth", path: "/api/ds/delete/1"},
 		{name: "api compatibility datasource list requires auth", path: "/api/datasource/list"},
 		{name: "de2api datasource list requires auth", path: "/de2api/datasource/list"},
 	}
@@ -252,6 +266,10 @@ func TestRegisterRoutes_DatasourceListAliasesReturnExplicitErrorAfterAuthenticat
 		path string
 	}{
 		{name: "canonical datasource list explicit error envelope after auth", path: "/api/ds/list"},
+		{name: "canonical datasource tree explicit error envelope after auth", path: "/api/ds/tree"},
+		{name: "canonical datasource save explicit error envelope after auth", path: "/api/ds/save"},
+		{name: "canonical datasource update explicit error envelope after auth", path: "/api/ds/update"},
+		{name: "canonical datasource delete explicit error envelope after auth", path: "/api/ds/delete/1"},
 		{name: "api compatibility datasource list explicit error envelope after auth", path: "/api/datasource/list"},
 		{name: "de2api datasource list explicit error envelope after auth", path: "/de2api/datasource/list"},
 	}
@@ -259,6 +277,12 @@ func TestRegisterRoutes_DatasourceListAliasesReturnExplicitErrorAfterAuthenticat
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("POST", tt.path, strings.NewReader(`{}`))
+			if tt.path == "/api/ds/save" {
+				req = httptest.NewRequest("POST", tt.path, strings.NewReader(`{"name":"demo","type":"folder"}`))
+			}
+			if tt.path == "/api/ds/update" {
+				req = httptest.NewRequest("POST", tt.path, strings.NewReader(`{"id":1,"name":"demo"}`))
+			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
 			w := httptest.NewRecorder()
@@ -284,6 +308,64 @@ func TestRegisterRoutes_DatasourceListAliasesReturnExplicitErrorAfterAuthenticat
 				t.Fatalf("expected unavailable-store message for %s, got %q", tt.path, resp.Msg)
 			}
 		})
+	}
+}
+
+func TestRegisterRoutes_DatasourceCanonicalGetRouteContracts(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	t.Run("canonical datasource get invalid id returns explicit error envelope", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/ds/not-a-number", nil)
+		w := httptest.NewRecorder()
+
+		router.Engine().ServeHTTP(w, req)
+
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Code string `json:"code"`
+			Msg  string `json:"msg"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed: %v", err)
+		}
+		if resp.Code != "500000" {
+			t.Fatalf("expected code 500000, got %s", resp.Code)
+		}
+		if !strings.Contains(resp.Msg, "Invalid datasource ID") {
+			t.Fatalf("expected invalid datasource id message, got %q", resp.Msg)
+		}
+	})
+}
+
+func TestRegisterRoutes_DatasourceCanonicalGetRequiresAuthentication(t *testing.T) {
+	router := newRouterWithJWTConfig()
+	router.RegisterRoutes()
+
+	req := httptest.NewRequest("GET", "/api/ds/1", nil)
+	w := httptest.NewRecorder()
+
+	router.Engine().ServeHTTP(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("expected status 401, got %d with body %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if resp.Code != "20001" {
+		t.Fatalf("expected code 20001, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "authorization") {
+		t.Fatalf("expected authorization message, got %q", resp.Msg)
 	}
 }
 
