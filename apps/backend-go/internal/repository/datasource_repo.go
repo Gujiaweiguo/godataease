@@ -75,6 +75,9 @@ func (r *DatasourceRepository) Query(req *datasource.ListRequest) ([]*datasource
 }
 
 func (r *DatasourceRepository) GetByID(id int64) (*datasource.CoreDatasource, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("datasource repository is unavailable")
+	}
 	var ds datasource.CoreDatasource
 	if err := r.db.Where("id = ? AND COALESCE(del_flag, 0) = 0", id).First(&ds).Error; err != nil {
 		return nil, err
@@ -83,6 +86,9 @@ func (r *DatasourceRepository) GetByID(id int64) (*datasource.CoreDatasource, er
 }
 
 func (r *DatasourceRepository) FindNearestIDInWindow(id int64, window int64) (*int64, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("datasource repository is unavailable")
+	}
 	if window <= 0 {
 		window = 100
 	}
@@ -117,20 +123,32 @@ func (r *DatasourceRepository) FindNearestIDInWindow(id int64, window int64) (*i
 }
 
 func (r *DatasourceRepository) Create(ds *datasource.CoreDatasource) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("datasource repository is unavailable")
+	}
 	return r.db.Create(ds).Error
 }
 
 func (r *DatasourceRepository) Update(ds *datasource.CoreDatasource) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("datasource repository is unavailable")
+	}
 	return r.db.Save(ds).Error
 }
 
 func (r *DatasourceRepository) SoftDelete(id int64) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("datasource repository is unavailable")
+	}
 	return r.db.Model(&datasource.CoreDatasource{}).
 		Where("id = ? AND COALESCE(del_flag, 0) = 0", id).
 		Update("del_flag", 1).Error
 }
 
 func (r *DatasourceRepository) ListChildren(parentID int64) ([]*datasource.CoreDatasource, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("datasource repository is unavailable")
+	}
 	var list []*datasource.CoreDatasource
 	err := r.db.Model(&datasource.CoreDatasource{}).
 		Where("pid = ? AND COALESCE(del_flag, 0) = 0", parentID).
@@ -140,6 +158,9 @@ func (r *DatasourceRepository) ListChildren(parentID int64) ([]*datasource.CoreD
 }
 
 func (r *DatasourceRepository) CountByNameAndPID(name string, pid int64, excludeID *int64) (int64, error) {
+	if r == nil || r.db == nil {
+		return 0, fmt.Errorf("datasource repository is unavailable")
+	}
 	var count int64
 	query := r.db.Model(&datasource.CoreDatasource{}).
 		Where("name = ? AND pid = ? AND COALESCE(del_flag, 0) = 0", name, pid)
@@ -151,6 +172,9 @@ func (r *DatasourceRepository) CountByNameAndPID(name string, pid int64, exclude
 }
 
 func (r *DatasourceRepository) ListAll(keyword *string) ([]*datasource.CoreDatasource, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("datasource repository is unavailable")
+	}
 	var list []*datasource.CoreDatasource
 	query := r.db.Model(&datasource.CoreDatasource{}).Where("COALESCE(del_flag, 0) = 0")
 	if keyword != nil && *keyword != "" {

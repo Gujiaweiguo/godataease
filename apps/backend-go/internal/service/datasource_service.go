@@ -155,6 +155,9 @@ func (s *DatasourceService) Validate(req *datasource.ValidateRequest) (*datasour
 }
 
 func (s *DatasourceService) Tree(req *datasource.ListRequest) ([]*datasource.CoreDatasource, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository is unavailable")
+	}
 	return s.repo.ListAll(req.Keyword)
 }
 
@@ -308,6 +311,9 @@ func (s *DatasourceService) ValidateByID(id int64) (*datasource.ValidateResponse
 }
 
 func (s *DatasourceService) GetByID(id int64) (*datasource.CoreDatasource, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository is unavailable")
+	}
 	fixedID, err := s.compatDatasourceID(id)
 	if err != nil {
 		return nil, err
@@ -405,6 +411,9 @@ func candidateRepeatCheckConfig(item *datasource.CoreDatasource) *datasource.Con
 }
 
 func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.CoreDatasource, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository is unavailable")
+	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return nil, fmt.Errorf("datasource name is required")
@@ -459,6 +468,9 @@ func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.Core
 }
 
 func (s *DatasourceService) Update(req *datasource.WriteRequest) (*datasource.CoreDatasource, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("repository is unavailable")
+	}
 	if req.ID <= 0 {
 		return nil, fmt.Errorf("datasource id is required")
 	}
@@ -626,6 +638,9 @@ func (s *DatasourceService) Move(id int64, pid int64) (*datasource.CoreDatasourc
 }
 
 func (s *DatasourceService) Delete(id int64) error {
+	if s.repo == nil {
+		return fmt.Errorf("repository is unavailable")
+	}
 	if id <= 0 {
 		return fmt.Errorf("datasource id is required")
 	}
