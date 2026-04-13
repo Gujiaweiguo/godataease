@@ -1473,6 +1473,81 @@ func TestDatasetFieldListByDsIdsRoute_ReturnsMatchedFields(t *testing.T) {
 	})
 }
 
+func TestDatasetFieldMultFieldValuesForPermissionsRoute_ReturnsEnumValues(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouter(t)
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	tableName := "bridge_enum_values"
+	originName := "status"
+	fieldName := "status"
+	deType := 0
+
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{ID: 2001, Name: "Enum Dataset", PID: &rootPID, NodeType: &nodeType})
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 2101, DatasetGroupID: 2001, PhysicalTable: &tableName}).Error)
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 2201, DatasetTableID: int64PtrBridge(2101), DatasetGroupID: 2001, OriginName: &originName, Name: &fieldName, DeType: &deType})
+	require.NoError(t, db.Exec("CREATE TABLE bridge_enum_values (status TEXT)").Error)
+	require.NoError(t, db.Exec("INSERT INTO bridge_enum_values (status) VALUES ('A'), ('B'), ('A')").Error)
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/multFieldValuesForPermissions", strings.NewReader(`{"fieldIds":[2201]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string   `json:"code"`
+		Data []string `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, []string{"A", "B"}, resp.Data)
+}
+
+func TestDatasetFieldMultFieldValuesForPermissionsRoute_NormalizesFieldIDs(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouter(t)
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	tableName := "bridge_enum_values_normalized"
+	originName := "region"
+	fieldName := "region"
+	deType := 0
+
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{ID: 2002, Name: "Enum Dataset 2", PID: &rootPID, NodeType: &nodeType})
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 2102, DatasetGroupID: 2002, PhysicalTable: &tableName}).Error)
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 2202, DatasetTableID: int64PtrBridge(2102), DatasetGroupID: 2002, OriginName: &originName, Name: &fieldName, DeType: &deType})
+	require.NoError(t, db.Exec("CREATE TABLE bridge_enum_values_normalized (region TEXT)").Error)
+	require.NoError(t, db.Exec("INSERT INTO bridge_enum_values_normalized (region) VALUES ('North'), ('South')").Error)
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/multFieldValuesForPermissions", strings.NewReader(`{"fieldIds":[0,2202,2202,-1,999999]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string   `json:"code"`
+		Data []string `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, []string{"North", "South"}, resp.Data)
+}
+
+func TestDatasetFieldMultFieldValuesForPermissionsRoute_InvalidJSON(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/multFieldValuesForPermissions", strings.NewReader(`{"fieldIds":[`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "Invalid request")
+}
+
 func TestDatasourceSyncRouteReturnsErrorWhenSeatunnelUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

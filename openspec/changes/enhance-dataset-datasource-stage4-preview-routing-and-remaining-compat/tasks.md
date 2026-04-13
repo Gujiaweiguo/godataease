@@ -12,7 +12,7 @@
 
 ## 3. Remaining field compatibility endpoints
 
-- [ ] 3.1 Implement `/datasetField/multFieldValuesForPermissions` by reusing existing field enumeration and permission-filtering logic rather than a side-channel field model.
+- [x] 3.1 Implement `/datasetField/multFieldValuesForPermissions` by reusing existing field enumeration and permission-filtering logic rather than a side-channel field model.
 - [ ] 3.2 Implement `/datasetField/copilotFields` using governed dataset field metadata and explicit missing/unauthorized failure semantics.
 - [ ] 3.3 Add backend regression tests for both field compatibility endpoints, including empty-success and explicit-failure scenarios.
 

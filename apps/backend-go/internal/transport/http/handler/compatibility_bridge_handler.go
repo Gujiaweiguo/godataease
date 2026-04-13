@@ -1085,6 +1085,18 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				result := datasetHandler.service.GetFieldFunctions()
 				response.Success(c, result)
 			})
+			datasetFieldGroup.POST("/multFieldValuesForPermissions", func(c *gin.Context) {
+				req, ok := parseMultFieldValuesRequest(c)
+				if !ok {
+					return
+				}
+				result, err := datasetHandler.service.GetFieldEnum(req)
+				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, result)
+			})
 			datasetFieldGroup.POST("/listByDsIds", func(c *gin.Context) {
 				var req struct {
 					DsIds []int64 `json:"dsIds"`
