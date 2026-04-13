@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"gorm.io/gorm"
 )
 
 // RegisterCompatibilityBridgeRoutes registers Java-era API compatibility routes.
@@ -1092,6 +1093,32 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				result, err := datasetHandler.service.GetFieldEnum(req)
 				if err != nil {
+					response.Error(c, "500000", "Failed: "+err.Error())
+					return
+				}
+				response.Success(c, result)
+			})
+			datasetFieldGroup.POST("/copilotFields/:id", func(c *gin.Context) {
+				datasetID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+				if err != nil {
+					response.Error(c, "500000", "Invalid dataset ID")
+					return
+				}
+				userID := int64(middleware.GetUserID(c))
+				if userID <= 0 {
+					response.Unauthorized(c, "authentication required")
+					return
+				}
+				result, err := datasetHandler.service.CopilotFields(datasetID, userID)
+				if err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						response.NotFound(c, "dataset not found")
+						return
+					}
+					if errors.Is(err, service.ErrDatasetViewPermissionDenied) {
+						response.Forbidden(c, "insufficient permissions")
+						return
+					}
 					response.Error(c, "500000", "Failed: "+err.Error())
 					return
 				}
