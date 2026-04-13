@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -1381,10 +1382,19 @@ func parseTableRequest(c *gin.Context) (*datasource.TableRequest, bool) {
 }
 
 func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.WriteRequest, bool) { //nolint:gocyclo // complex request parsing with multiple field types
-	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	body := make(map[string]interface{})
+	raw, err := io.ReadAll(c.Request.Body)
+	if err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return nil, false
+	}
+	if len(bytes.TrimSpace(raw)) > 0 {
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			response.Error(c, "500000", "Invalid request: "+err.Error())
+			return nil, false
+		}
 	}
 
 	req := &datasource.WriteRequest{}
@@ -1742,6 +1752,16 @@ func parseEnumFilters(v interface{}) []dataset.EnumFilter {
 
 func parseInt64Value(v interface{}) (int64, bool) {
 	switch n := v.(type) {
+	case json.Number:
+		parsed, err := n.Int64()
+		if err == nil {
+			return parsed, true
+		}
+		fallback, fallbackErr := strconv.ParseFloat(n.String(), 64)
+		if fallbackErr != nil {
+			return 0, false
+		}
+		return int64(fallback), true
 	case float64:
 		return int64(n), true
 	case int64:
