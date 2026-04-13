@@ -1579,6 +1579,49 @@ func TestDatasetFieldMultFieldValuesForPermissionsRoute_InvalidJSON(t *testing.T
 	assert.Contains(t, resp.Msg, "Invalid request")
 }
 
+func TestDatasetFieldMultFieldValuesForPermissionsRoute_EmptySuccess(t *testing.T) {
+	r, _ := setupStage3DatasetFieldRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/multFieldValuesForPermissions", strings.NewReader(`{"fieldIds":[999999]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string   `json:"code"`
+		Data []string `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Empty(t, resp.Data)
+}
+
+func TestDatasetFieldMultFieldValuesForPermissionsRoute_ExplicitFailureOnQueryError(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouter(t)
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	tableName := "bridge_missing_enum_source"
+	originName := "status"
+	fieldName := "status"
+	deType := 0
+
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{ID: 2003, Name: "Broken Enum Dataset", PID: &rootPID, NodeType: &nodeType})
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 2103, DatasetGroupID: 2003, PhysicalTable: &tableName}).Error)
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 2203, DatasetTableID: int64PtrBridge(2103), DatasetGroupID: 2003, OriginName: &originName, Name: &fieldName, DeType: &deType})
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/multFieldValuesForPermissions", strings.NewReader(`{"fieldIds":[2203]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	resp := bridgeCodeResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp.Code)
+	assert.Contains(t, resp.Msg, "Failed:")
+}
+
 func TestDatasetFieldCopilotFieldsRoute_ReturnsDimensionAndQuota(t *testing.T) {
 	r, db := setupStage3DatasetFieldRouterWithUser(t, 42)
 	rootPID := int64(0)
@@ -1646,6 +1689,40 @@ func TestDatasetFieldCopilotFieldsRoute_NotFound(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "50001", resp.Code)
 	assert.Contains(t, resp.Msg, "dataset not found")
+}
+
+func TestDatasetFieldCopilotFieldsRoute_EmptySuccess(t *testing.T) {
+	r, db := setupStage3DatasetFieldRouterWithUser(t, 42)
+	rootPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	tableName := "bridge_copilot_empty"
+	unchecked := false
+	extCalc := 2
+	groupTypeDim := "d"
+	groupTypeQuota := "q"
+	originDim := "region"
+	originQuota := "calc_amount"
+	fieldDim := "region"
+	fieldQuota := "calc_amount"
+
+	seedBridgeDatasetGroup(t, db, &dataset.CoreDatasetGroup{ID: 4102, Name: "Empty Copilot Dataset", PID: &rootPID, NodeType: &nodeType})
+	require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 4202, DatasetGroupID: 4102, PhysicalTable: &tableName}).Error)
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4305, DatasetTableID: int64PtrBridge(4202), DatasetGroupID: 4102, OriginName: &originDim, Name: &fieldDim, GroupType: &groupTypeDim, Checked: &unchecked})
+	seedBridgeDatasetField(t, db, &dataset.CoreDatasetTableField{ID: 4306, DatasetTableID: int64PtrBridge(4202), DatasetGroupID: 4102, OriginName: &originQuota, Name: &fieldQuota, GroupType: &groupTypeQuota, ExtField: &extCalc})
+
+	req := httptest.NewRequest(http.MethodPost, "/datasetField/copilotFields/4102", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string                       `json:"code"`
+		Data chart.ChartFieldListResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Empty(t, resp.Data.DimensionList)
+	assert.Empty(t, resp.Data.QuotaList)
 }
 
 func TestDatasourceSyncRouteReturnsErrorWhenSeatunnelUnavailable(t *testing.T) {

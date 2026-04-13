@@ -14,7 +14,7 @@
 
 - [x] 3.1 Implement `/datasetField/multFieldValuesForPermissions` by reusing existing field enumeration and permission-filtering logic rather than a side-channel field model.
 - [x] 3.2 Implement `/datasetField/copilotFields` using governed dataset field metadata and explicit missing/unauthorized failure semantics.
-- [ ] 3.3 Add backend regression tests for both field compatibility endpoints, including empty-success and explicit-failure scenarios.
+- [x] 3.3 Add backend regression tests for both field compatibility endpoints, including empty-success and explicit-failure scenarios.
 
 ## 4. Frontend alignment and verification
 
@@ -27,9 +27,24 @@
 - [x] 4.2.a Update `apps/frontend/tests/unit/dataset/api.test.ts` to assert canonical dataset tree route usage.
 - [x] 4.2.b Add wrapper-level regression coverage for canonical preview and table-field route usage.
 - [x] 4.2.c Verify existing mocked consumers (`interactive`, `dataPermission`) remain green without compatibility-route assumptions.
-- [ ] 4.3 Run backend and frontend verification (`make test`, affected integration tests if preview execution changes persistence or datasource access behavior, `npm run lint`, `npm run ts:check`, and affected frontend tests) and capture any unsupported datasource limitations in the final change notes.
-- [ ] 4.3.a Manually smoke-test dataset tree loading in dashboard / data-visualization / permission entry paths.
-- [ ] 4.3.b Manually smoke-test dataset editor preview flow and SQL / union field loading flow.
+- [x] 4.3 Run backend and frontend verification (`make test`, affected integration tests if preview execution changes persistence or datasource access behavior, `npm run lint`, `npm run ts:check`, and affected frontend tests) and capture any unsupported datasource limitations in the final change notes.
+- [x] 4.3.a Manually smoke-test dataset tree loading in dashboard / data-visualization / permission entry paths. Verified `/#/module-dataset` renders the dataset tree sidebar after fixing the formatter initialization cycle, and `POST /api/dataset/tree` returns 200 during Playwright smoke.
+- [x] 4.3.b Manually smoke-test dataset editor preview flow and SQL / union field loading flow. Verified login -> `/#/dataset-form` render, datasource selection (`Demo MySQL`), and datasource table loading (`demo_tea_material`, `demo_tea_order`) via Playwright plus `POST /api/datasource/tree` and `POST /api/datasource/getTables` 200 responses.
+
+### Final verification notes
+
+- Backend verification completed:
+  - `go test ./internal/transport/http/handler -run 'MultFieldValuesForPermissions|CopilotFields'`
+  - `make test`
+- Frontend verification completed:
+  - `npm run lint`
+  - `npm run ts:check`
+  - `npm run test -- --run tests/unit/dataset/api.test.ts tests/unit/store/interactive.test.ts tests/unit/system/permission/dataPermission.test.ts`
+- Manual smoke completed:
+  - `/#/module-dataset` renders the dataset tree sidebar and issues `POST /api/dataset/tree` successfully.
+  - `/#/dataset-form` renders, accepts datasource selection (`Demo MySQL`), and loads datasource tables (`demo_tea_material`, `demo_tea_order`) through `POST /api/datasource/tree` and `POST /api/datasource/getTables`.
+- Preview SQL stage4 limitation remains explicit:
+  - direct preview support is still constrained to the currently implemented datasource matrix; unsupported datasource routing must continue returning explicit non-success semantics rather than silent fallback.
 
 ### Scope note
 
