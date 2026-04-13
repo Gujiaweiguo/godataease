@@ -818,6 +818,64 @@ func TestDatasetService_EnumQueries(t *testing.T) {
 	})
 }
 
+func TestDatasetService_CopilotFields(t *testing.T) {
+	t.Run("filters checked ext-field and splits dimension quota", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		tableName := "copilot_fields"
+		checked := true
+		unchecked := false
+		extNormal := 0
+		extCalc := 2
+		groupTypeDim := "d"
+		groupTypeQuota := "q"
+		originRegion := "region"
+		originAmount := "amount"
+		originCalc := "calc_field"
+		originUnchecked := "unchecked_field"
+		fieldRegion := "region"
+		fieldAmount := "amount"
+		fieldCalc := "calc_field"
+		fieldUnchecked := "unchecked_field"
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3101, Name: "Copilot Dataset", PID: &rootPID, NodeType: &nodeType}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: 3201, DatasetGroupID: 3101, PhysicalTable: &tableName}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 3301, DatasetTableID: int64Ptr(3201), DatasetGroupID: 3101, OriginName: &originRegion, Name: &fieldRegion, GroupType: &groupTypeDim, Checked: &checked, ExtField: &extNormal}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 3302, DatasetTableID: int64Ptr(3201), DatasetGroupID: 3101, OriginName: &originAmount, Name: &fieldAmount, GroupType: &groupTypeQuota, Checked: &checked, ExtField: &extNormal}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 3303, DatasetTableID: int64Ptr(3201), DatasetGroupID: 3101, OriginName: &originCalc, Name: &fieldCalc, GroupType: &groupTypeQuota, Checked: &checked, ExtField: &extCalc}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 3304, DatasetTableID: int64Ptr(3201), DatasetGroupID: 3101, OriginName: &originUnchecked, Name: &fieldUnchecked, GroupType: &groupTypeDim, Checked: &unchecked, ExtField: &extNormal}).Error)
+
+		result, err := svc.CopilotFields(3101, 0)
+		require.NoError(t, err)
+		require.Len(t, result.DimensionList, 1)
+		require.Len(t, result.QuotaList, 1)
+		assert.Equal(t, "region", result.DimensionList[0].OriginName)
+		assert.Equal(t, "amount", result.QuotaList[0].OriginName)
+	})
+
+	t.Run("returns record not found when dataset missing", func(t *testing.T) {
+		svc, _ := setupDatasetServiceRepoTest(t)
+		result, err := svc.CopilotFields(999999, 0)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("returns forbidden when dataset view denied", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		rootPID := int64(0)
+		nodeType := dataset.NodeTypeDataset
+		require.NoError(t, db.Create(&dataset.CoreDatasetGroup{ID: 3102, Name: "Denied Dataset", PID: &rootPID, NodeType: &nodeType}).Error)
+		svc.resourcePermService = &ResourcePermissionService{}
+
+		result, err := svc.CopilotFields(3102, 42)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, ErrDatasetViewPermissionDenied)
+	})
+}
+
 func TestDatasetService_GroupMutations(t *testing.T) {
 	t.Run("create save rename move and delete exercise sqlite-backed paths", func(t *testing.T) {
 		svc, db := setupDatasetServiceRepoTest(t)
