@@ -76,16 +76,25 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "canonical datasource tables", path: "/api/ds/tables", body: "{"},
 		{name: "canonical datasource table status", path: "/api/ds/tableStatus", body: "{"},
 		{name: "canonical datasource table field", path: "/api/ds/tableField", body: "{"},
+		{name: "canonical datasource preview data", path: "/api/ds/previewData", body: "{"},
+		{name: "canonical datasource sync api table", path: "/api/ds/syncApiTable", body: "{"},
+		{name: "canonical datasource sync api ds", path: "/api/ds/syncApiDs", body: "{"},
 		{name: "api compatibility datasource list", path: "/api/datasource/list", body: "{"},
 		{name: "api compatibility datasource validate", path: "/api/datasource/validate", body: "{"},
 		{name: "api compatibility datasource tables", path: "/api/datasource/getTables", body: "{"},
 		{name: "api compatibility datasource table status", path: "/api/datasource/getTableStatus", body: "{"},
 		{name: "api compatibility datasource table field", path: "/api/datasource/getTableField", body: "{"},
+		{name: "api compatibility datasource preview data", path: "/api/datasource/previewData", body: "{"},
+		{name: "api compatibility datasource sync api table", path: "/api/datasource/syncApiTable", body: "{"},
+		{name: "api compatibility datasource sync api ds", path: "/api/datasource/syncApiDs", body: "{"},
 		{name: "de2api datasource list", path: "/de2api/datasource/list", body: "{"},
 		{name: "de2api datasource validate", path: "/de2api/datasource/validate", body: "{"},
 		{name: "de2api datasource tables", path: "/de2api/datasource/getTables", body: "{"},
 		{name: "de2api datasource table status", path: "/de2api/datasource/getTableStatus", body: "{"},
 		{name: "de2api datasource table field", path: "/de2api/datasource/getTableField", body: "{"},
+		{name: "de2api datasource preview data", path: "/de2api/datasource/previewData", body: "{"},
+		{name: "de2api datasource sync api table", path: "/de2api/datasource/syncApiTable", body: "{"},
+		{name: "de2api datasource sync api ds", path: "/de2api/datasource/syncApiDs", body: "{"},
 	}
 
 	for _, tt := range tests {
@@ -133,14 +142,23 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 		"POST /api/ds/tableStatus":               true,
 		"POST /api/ds/tableField":                true,
 		"POST /api/ds/schema":                    true,
+		"POST /api/ds/previewData":               true,
+		"POST /api/ds/syncApiTable":              true,
+		"POST /api/ds/syncApiDs":                 true,
 		"POST /api/datasource/getTables":         true,
 		"POST /api/datasource/getTableStatus":    true,
 		"POST /api/datasource/getTableField":     true,
 		"POST /api/datasource/getSchema":         true,
+		"POST /api/datasource/previewData":       true,
+		"POST /api/datasource/syncApiTable":      true,
+		"POST /api/datasource/syncApiDs":         true,
 		"POST /de2api/datasource/getTables":      true,
 		"POST /de2api/datasource/getTableStatus": true,
 		"POST /de2api/datasource/getTableField":  true,
 		"POST /de2api/datasource/getSchema":      true,
+		"POST /de2api/datasource/previewData":    true,
+		"POST /de2api/datasource/syncApiTable":   true,
+		"POST /de2api/datasource/syncApiDs":      true,
 	}
 
 	for _, route := range router.Engine().Routes() {
@@ -260,16 +278,25 @@ func TestRegisterRoutes_DatasourceListAliasesRequireAuthentication(t *testing.T)
 		{name: "canonical datasource table status requires auth", path: "/api/ds/tableStatus"},
 		{name: "canonical datasource table field requires auth", path: "/api/ds/tableField"},
 		{name: "canonical datasource schema requires auth", path: "/api/ds/schema"},
+		{name: "canonical datasource preview data requires auth", path: "/api/ds/previewData"},
+		{name: "canonical datasource sync api table requires auth", path: "/api/ds/syncApiTable"},
+		{name: "canonical datasource sync api ds requires auth", path: "/api/ds/syncApiDs"},
 		{name: "api compatibility datasource list requires auth", path: "/api/datasource/list"},
 		{name: "api compatibility datasource tables requires auth", path: "/api/datasource/getTables"},
 		{name: "api compatibility datasource table status requires auth", path: "/api/datasource/getTableStatus"},
 		{name: "api compatibility datasource table field requires auth", path: "/api/datasource/getTableField"},
 		{name: "api compatibility datasource schema requires auth", path: "/api/datasource/getSchema"},
+		{name: "api compatibility datasource preview data requires auth", path: "/api/datasource/previewData"},
+		{name: "api compatibility datasource sync api table requires auth", path: "/api/datasource/syncApiTable"},
+		{name: "api compatibility datasource sync api ds requires auth", path: "/api/datasource/syncApiDs"},
 		{name: "de2api datasource list requires auth", path: "/de2api/datasource/list"},
 		{name: "de2api datasource tables requires auth", path: "/de2api/datasource/getTables"},
 		{name: "de2api datasource table status requires auth", path: "/de2api/datasource/getTableStatus"},
 		{name: "de2api datasource table field requires auth", path: "/de2api/datasource/getTableField"},
 		{name: "de2api datasource schema requires auth", path: "/de2api/datasource/getSchema"},
+		{name: "de2api datasource preview data requires auth", path: "/de2api/datasource/previewData"},
+		{name: "de2api datasource sync api table requires auth", path: "/de2api/datasource/syncApiTable"},
+		{name: "de2api datasource sync api ds requires auth", path: "/de2api/datasource/syncApiDs"},
 	}
 
 	for _, tt := range tests {
@@ -374,12 +401,15 @@ func TestRegisterRoutes_DatasourceTableExplorationAliasesReturnSuccessEnvelopeAf
 		{name: "canonical datasource tables success envelope after auth", path: "/api/ds/tables"},
 		{name: "canonical datasource table status success envelope after auth", path: "/api/ds/tableStatus"},
 		{name: "canonical datasource table field success envelope after auth", path: "/api/ds/tableField"},
+		{name: "canonical datasource preview data success envelope after auth", path: "/api/ds/previewData"},
 		{name: "api compatibility datasource tables success envelope after auth", path: "/api/datasource/getTables"},
 		{name: "api compatibility datasource table status success envelope after auth", path: "/api/datasource/getTableStatus"},
 		{name: "api compatibility datasource table field success envelope after auth", path: "/api/datasource/getTableField"},
+		{name: "api compatibility datasource preview data success envelope after auth", path: "/api/datasource/previewData"},
 		{name: "de2api datasource tables success envelope after auth", path: "/de2api/datasource/getTables"},
 		{name: "de2api datasource table status success envelope after auth", path: "/de2api/datasource/getTableStatus"},
 		{name: "de2api datasource table field success envelope after auth", path: "/de2api/datasource/getTableField"},
+		{name: "de2api datasource preview data success envelope after auth", path: "/de2api/datasource/previewData"},
 	}
 
 	for _, tt := range tests {
@@ -396,9 +426,9 @@ func TestRegisterRoutes_DatasourceTableExplorationAliasesReturnSuccessEnvelopeAf
 			}
 
 			var resp struct {
-				Code string            `json:"code"`
-				Msg  string            `json:"msg"`
-				Data []json.RawMessage `json:"data"`
+				Code string          `json:"code"`
+				Msg  string          `json:"msg"`
+				Data json.RawMessage `json:"data"`
 			}
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
@@ -410,8 +440,63 @@ func TestRegisterRoutes_DatasourceTableExplorationAliasesReturnSuccessEnvelopeAf
 			if resp.Msg != "success" {
 				t.Fatalf("expected success msg for %s, got %q", tt.path, resp.Msg)
 			}
-			if resp.Data == nil {
-				t.Fatalf("expected array data for %s, got nil", tt.path)
+			if len(resp.Data) == 0 {
+				t.Fatalf("expected non-empty data payload for %s, got empty", tt.path)
+			}
+		})
+	}
+}
+
+func TestRegisterRoutes_DatasourcePreviewAndSyncAliasesReturnExplicitErrorAfterAuthenticationWhenStoreUnavailable(t *testing.T) {
+	router := newRouterWithJWTConfig()
+	router.RegisterRoutes()
+
+	jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{Secret: "test-secret", Expire: 3600})
+	token, err := jwtInstance.GenerateToken(1, "admin", "admin")
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		path string
+		body string
+		msg  string
+	}{
+		{name: "canonical datasource sync api table explicit error envelope after auth", path: "/api/ds/syncApiTable", body: `{}`, msg: "Failed to sync api table: request is required"},
+		{name: "canonical datasource sync api ds explicit error envelope after auth", path: "/api/ds/syncApiDs", body: `{}`, msg: "Failed to sync api datasource: request is required"},
+		{name: "api compatibility datasource sync api table explicit error envelope after auth", path: "/api/datasource/syncApiTable", body: `{}`, msg: "Failed to sync api table: request is required"},
+		{name: "api compatibility datasource sync api ds explicit error envelope after auth", path: "/api/datasource/syncApiDs", body: `{}`, msg: "Failed to sync api datasource: request is required"},
+		{name: "de2api datasource sync api table explicit error envelope after auth", path: "/de2api/datasource/syncApiTable", body: `{}`, msg: "Failed to sync api table: request is required"},
+		{name: "de2api datasource sync api ds explicit error envelope after auth", path: "/de2api/datasource/syncApiDs", body: `{}`, msg: "Failed to sync api datasource: request is required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+
+			if resp.Code != "500000" {
+				t.Fatalf("expected code 500000 for %s, got %s", tt.path, resp.Code)
+			}
+			if resp.Msg != tt.msg {
+				t.Fatalf("expected message %q for %s, got %q", tt.msg, tt.path, resp.Msg)
 			}
 		})
 	}
