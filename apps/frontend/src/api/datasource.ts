@@ -173,7 +173,7 @@ export const getSimpleDs = (id: number) => request.get({ url: '/datasource/getSi
 export const uploadFile = async (data): Promise<IResponse> => {
   return request
     .post({
-      url: '/datasource/uploadFile',
+      url: '/ds/uploadFile',
       data,
       loading: true,
       headersType: 'multipart/form-data;'
@@ -184,7 +184,7 @@ export const uploadFile = async (data): Promise<IResponse> => {
 }
 
 export const loadRemoteFile = async (data = {}) => {
-  return request.post({ url: '/datasource/loadRemoteFile', data })
+  return request.post({ url: '/ds/loadRemoteFile', data })
 }
 
 export const listSyncRecord = (page: number, limit: number, dsId: number | string) =>
