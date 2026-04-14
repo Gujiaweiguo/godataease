@@ -65,22 +65,32 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 	tests := []struct {
 		name string
 		path string
+		body string
 	}{
-		{name: "canonical datasource list", path: "/api/ds/list"},
-		{name: "canonical datasource tree", path: "/api/ds/tree"},
-		{name: "canonical datasource validate", path: "/api/ds/validate"},
-		{name: "canonical datasource save", path: "/api/ds/save"},
-		{name: "canonical datasource update", path: "/api/ds/update"},
-		{name: "canonical datasource delete", path: "/api/ds/delete/not-a-number"},
-		{name: "api compatibility datasource list", path: "/api/datasource/list"},
-		{name: "api compatibility datasource validate", path: "/api/datasource/validate"},
-		{name: "de2api datasource list", path: "/de2api/datasource/list"},
-		{name: "de2api datasource validate", path: "/de2api/datasource/validate"},
+		{name: "canonical datasource list", path: "/api/ds/list", body: "{"},
+		{name: "canonical datasource tree", path: "/api/ds/tree", body: "{"},
+		{name: "canonical datasource validate", path: "/api/ds/validate", body: "{"},
+		{name: "canonical datasource save", path: "/api/ds/save", body: "{"},
+		{name: "canonical datasource update", path: "/api/ds/update", body: "{"},
+		{name: "canonical datasource delete", path: "/api/ds/delete/not-a-number", body: "{"},
+		{name: "canonical datasource tables", path: "/api/ds/tables", body: "{"},
+		{name: "canonical datasource table status", path: "/api/ds/tableStatus", body: "{"},
+		{name: "canonical datasource table field", path: "/api/ds/tableField", body: "{"},
+		{name: "api compatibility datasource list", path: "/api/datasource/list", body: "{"},
+		{name: "api compatibility datasource validate", path: "/api/datasource/validate", body: "{"},
+		{name: "api compatibility datasource tables", path: "/api/datasource/getTables", body: "{"},
+		{name: "api compatibility datasource table status", path: "/api/datasource/getTableStatus", body: "{"},
+		{name: "api compatibility datasource table field", path: "/api/datasource/getTableField", body: "{"},
+		{name: "de2api datasource list", path: "/de2api/datasource/list", body: "{"},
+		{name: "de2api datasource validate", path: "/de2api/datasource/validate", body: "{"},
+		{name: "de2api datasource tables", path: "/de2api/datasource/getTables", body: "{"},
+		{name: "de2api datasource table status", path: "/de2api/datasource/getTableStatus", body: "{"},
+		{name: "de2api datasource table field", path: "/de2api/datasource/getTableField", body: "{"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", tt.path, strings.NewReader("{"))
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -111,6 +121,35 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 				t.Fatalf("expected invalid request message for %s, got %q", tt.path, resp.Msg)
 			}
 		})
+	}
+}
+
+func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	wantRoutes := map[string]bool{
+		"POST /api/ds/tables":                    true,
+		"POST /api/ds/tableStatus":               true,
+		"POST /api/ds/tableField":                true,
+		"POST /api/ds/schema":                    true,
+		"POST /api/datasource/getTables":         true,
+		"POST /api/datasource/getTableStatus":    true,
+		"POST /api/datasource/getTableField":     true,
+		"POST /api/datasource/getSchema":         true,
+		"POST /de2api/datasource/getTables":      true,
+		"POST /de2api/datasource/getTableStatus": true,
+		"POST /de2api/datasource/getTableField":  true,
+		"POST /de2api/datasource/getSchema":      true,
+	}
+
+	for _, route := range router.Engine().Routes() {
+		key := route.Method + " " + route.Path
+		delete(wantRoutes, key)
+	}
+
+	if len(wantRoutes) > 0 {
+		t.Fatalf("missing datasource table exploration routes: %+v", wantRoutes)
 	}
 }
 
@@ -217,8 +256,20 @@ func TestRegisterRoutes_DatasourceListAliasesRequireAuthentication(t *testing.T)
 		{name: "canonical datasource save requires auth", path: "/api/ds/save"},
 		{name: "canonical datasource update requires auth", path: "/api/ds/update"},
 		{name: "canonical datasource delete requires auth", path: "/api/ds/delete/1"},
+		{name: "canonical datasource tables requires auth", path: "/api/ds/tables"},
+		{name: "canonical datasource table status requires auth", path: "/api/ds/tableStatus"},
+		{name: "canonical datasource table field requires auth", path: "/api/ds/tableField"},
+		{name: "canonical datasource schema requires auth", path: "/api/ds/schema"},
 		{name: "api compatibility datasource list requires auth", path: "/api/datasource/list"},
+		{name: "api compatibility datasource tables requires auth", path: "/api/datasource/getTables"},
+		{name: "api compatibility datasource table status requires auth", path: "/api/datasource/getTableStatus"},
+		{name: "api compatibility datasource table field requires auth", path: "/api/datasource/getTableField"},
+		{name: "api compatibility datasource schema requires auth", path: "/api/datasource/getSchema"},
 		{name: "de2api datasource list requires auth", path: "/de2api/datasource/list"},
+		{name: "de2api datasource tables requires auth", path: "/de2api/datasource/getTables"},
+		{name: "de2api datasource table status requires auth", path: "/de2api/datasource/getTableStatus"},
+		{name: "de2api datasource table field requires auth", path: "/de2api/datasource/getTableField"},
+		{name: "de2api datasource schema requires auth", path: "/de2api/datasource/getSchema"},
 	}
 
 	for _, tt := range tests {
@@ -264,25 +315,20 @@ func TestRegisterRoutes_DatasourceListAliasesReturnExplicitErrorAfterAuthenticat
 	tests := []struct {
 		name string
 		path string
+		body string
 	}{
-		{name: "canonical datasource list explicit error envelope after auth", path: "/api/ds/list"},
-		{name: "canonical datasource tree explicit error envelope after auth", path: "/api/ds/tree"},
-		{name: "canonical datasource save explicit error envelope after auth", path: "/api/ds/save"},
-		{name: "canonical datasource update explicit error envelope after auth", path: "/api/ds/update"},
-		{name: "canonical datasource delete explicit error envelope after auth", path: "/api/ds/delete/1"},
-		{name: "api compatibility datasource list explicit error envelope after auth", path: "/api/datasource/list"},
-		{name: "de2api datasource list explicit error envelope after auth", path: "/de2api/datasource/list"},
+		{name: "canonical datasource list explicit error envelope after auth", path: "/api/ds/list", body: `{}`},
+		{name: "canonical datasource tree explicit error envelope after auth", path: "/api/ds/tree", body: `{}`},
+		{name: "canonical datasource save explicit error envelope after auth", path: "/api/ds/save", body: `{"name":"demo","type":"folder"}`},
+		{name: "canonical datasource update explicit error envelope after auth", path: "/api/ds/update", body: `{"id":1,"name":"demo"}`},
+		{name: "canonical datasource delete explicit error envelope after auth", path: "/api/ds/delete/1", body: `{}`},
+		{name: "api compatibility datasource list explicit error envelope after auth", path: "/api/datasource/list", body: `{}`},
+		{name: "de2api datasource list explicit error envelope after auth", path: "/de2api/datasource/list", body: `{}`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", tt.path, strings.NewReader(`{}`))
-			if tt.path == "/api/ds/save" {
-				req = httptest.NewRequest("POST", tt.path, strings.NewReader(`{"name":"demo","type":"folder"}`))
-			}
-			if tt.path == "/api/ds/update" {
-				req = httptest.NewRequest("POST", tt.path, strings.NewReader(`{"id":1,"name":"demo"}`))
-			}
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
 			w := httptest.NewRecorder()
@@ -306,6 +352,66 @@ func TestRegisterRoutes_DatasourceListAliasesReturnExplicitErrorAfterAuthenticat
 			}
 			if !strings.Contains(resp.Msg, "repository is unavailable") {
 				t.Fatalf("expected unavailable-store message for %s, got %q", tt.path, resp.Msg)
+			}
+		})
+	}
+}
+
+func TestRegisterRoutes_DatasourceTableExplorationAliasesReturnSuccessEnvelopeAfterAuthentication(t *testing.T) {
+	router := newRouterWithJWTConfig()
+	router.RegisterRoutes()
+
+	jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{Secret: "test-secret", Expire: 3600})
+	token, err := jwtInstance.GenerateToken(1, "admin", "admin")
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "canonical datasource tables success envelope after auth", path: "/api/ds/tables"},
+		{name: "canonical datasource table status success envelope after auth", path: "/api/ds/tableStatus"},
+		{name: "canonical datasource table field success envelope after auth", path: "/api/ds/tableField"},
+		{name: "api compatibility datasource tables success envelope after auth", path: "/api/datasource/getTables"},
+		{name: "api compatibility datasource table status success envelope after auth", path: "/api/datasource/getTableStatus"},
+		{name: "api compatibility datasource table field success envelope after auth", path: "/api/datasource/getTableField"},
+		{name: "de2api datasource tables success envelope after auth", path: "/de2api/datasource/getTables"},
+		{name: "de2api datasource table status success envelope after auth", path: "/de2api/datasource/getTableStatus"},
+		{name: "de2api datasource table field success envelope after auth", path: "/de2api/datasource/getTableField"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(`{}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string            `json:"code"`
+				Msg  string            `json:"msg"`
+				Data []json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+
+			if resp.Code != "000000" {
+				t.Fatalf("expected code 000000 for %s, got %s", tt.path, resp.Code)
+			}
+			if resp.Msg != "success" {
+				t.Fatalf("expected success msg for %s, got %q", tt.path, resp.Msg)
+			}
+			if resp.Data == nil {
+				t.Fatalf("expected array data for %s, got nil", tt.path)
 			}
 		})
 	}

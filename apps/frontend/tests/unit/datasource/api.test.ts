@@ -18,11 +18,14 @@ vi.mock('@/utils/utils', async () => {
 })
 
 import {
+  listDatasourceTables,
   listDatasources,
   validateById,
   deleteById,
   getById,
   getHidePwById,
+  getSchema,
+  getTableField,
   getTableStatus,
   getSimpleDs,
   uploadFile,
@@ -139,11 +142,66 @@ describe('Datasource API wrappers', () => {
     const result = await getTableStatus({ datasourceId: '123' })
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/getTableStatus',
+      url: '/ds/tableStatus',
       data: { datasourceId: '123' }
     })
     expect(result).toEqual({
       data: [{ tableName: 'orders', status: 'Pending', lastUpdateTime: 1710000000000 }]
+    })
+  })
+
+  it('queries datasource tables through the canonical datasource route', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: [{ tableName: 'orders' }] })
+
+    const result = await listDatasourceTables({ datasourceId: '123' })
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/ds/tables',
+      data: { datasourceId: '123' }
+    })
+    expect(result).toEqual({ data: [{ tableName: 'orders' }] })
+  })
+
+  it('queries datasource table fields through the canonical datasource route', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: [{ fieldName: 'amount' }] })
+
+    const result = await getTableField({ datasourceId: '123', tableName: 'orders' })
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/ds/tableField',
+      data: { datasourceId: '123', tableName: 'orders' }
+    })
+    expect(result).toEqual({ data: [{ fieldName: 'amount' }] })
+  })
+
+  it('queries datasource schema through the canonical datasource route', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: ['public'] })
+
+    const result = await getSchema({ datasourceId: '123' })
+
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/ds/schema',
+      data: { datasourceId: '123' }
+    })
+    expect(result).toEqual({ data: ['public'] })
+  })
+
+  it('keeps preview and sync datasource routes on compatibility aliases', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { rows: [] } })
+    requestMock.post.mockResolvedValueOnce({ data: { tables: [] } })
+
+    const { previewData } = await import('@/api/datasource')
+
+    await previewData({ datasourceId: '123', tableName: 'orders' })
+    await syncApiTable({ datasourceId: '123' })
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, {
+      url: '/datasource/previewData',
+      data: { datasourceId: '123', tableName: 'orders' }
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, {
+      url: '/datasource/syncApiTable',
+      data: { datasourceId: '123' }
     })
   })
 

@@ -49,26 +49,29 @@ export const listDatasourceType = async (data = {}): Promise<IResponse> => {
     return res?.data
   })
 }
-export const getTableField = (data = {}) => request.post({ url: '/datasource/getTableField', data })
+
+// Canonical datasource table exploration routes migrated in
+// datasource-table-exploration-canonical-migration.
+export const getTableField = (data = {}) => request.post({ url: '/ds/tableField', data })
 
 export const syncApiTable = (data = {}) => request.post({ url: '/datasource/syncApiTable', data })
 
 export const syncApiDs = (data = {}) => request.post({ url: '/datasource/syncApiDs', data })
 
 export const listDatasourceTables = async (data = {}): Promise<IResponse> => {
-  return request.post({ url: '/datasource/getTables', data }).then(res => {
+  return request.post({ url: '/ds/tables', data }).then(res => {
     return res
   })
 }
 
 export const getTableStatus = async (data = {}): Promise<IResponse> => {
-  return request.post({ url: '/datasource/getTableStatus', data }).then(res => {
+  return request.post({ url: '/ds/tableStatus', data }).then(res => {
     return res
   })
 }
 
 export const getSchema = (data = {}) => {
-  return request.post({ url: '/datasource/getSchema', data })
+  return request.post({ url: '/ds/schema', data })
 }
 
 export const previewData = (data = {}) => {
