@@ -183,6 +183,53 @@ func (h *DatasourceHandler) TableField(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) PreviewData(c *gin.Context) {
+	req, ok := parseTableRequest(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.PreviewData(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) SyncApiTable(c *gin.Context) {
+	var req map[string]string
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.SyncAPITable(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed to sync api table: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) SyncApiDs(c *gin.Context) {
+	var req map[string]string
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.SyncAPIDs(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed to sync api datasource: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
@@ -197,5 +244,8 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/tableStatus", h.TableStatus)
 		dsGroup.POST("/tableField", h.TableField)
 		dsGroup.POST("/schema", h.Schema)
+		dsGroup.POST("/previewData", h.PreviewData)
+		dsGroup.POST("/syncApiTable", h.SyncApiTable)
+		dsGroup.POST("/syncApiDs", h.SyncApiDs)
 	}
 }

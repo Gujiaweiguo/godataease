@@ -33,6 +33,7 @@ import {
   update,
   validate,
   syncApiTable,
+  syncApiDs,
   checkApiItem
 } from '@/api/datasource'
 
@@ -128,10 +129,20 @@ describe('Datasource API wrappers', () => {
     requestMock.post.mockResolvedValueOnce({ data: { tables: [] } })
     const result = await syncApiTable({ datasourceId: '123' })
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/syncApiTable',
+      url: '/ds/syncApiTable',
       data: { datasourceId: '123' }
     })
     expect(result).toEqual({ data: { tables: [] } })
+  })
+
+  it('uses canonical route for syncApiDs method', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { datasourceId: '123' } })
+    const result = await syncApiDs({ datasourceId: '123' })
+    expect(requestMock.post).toHaveBeenCalledWith({
+      url: '/ds/syncApiDs',
+      data: { datasourceId: '123' }
+    })
+    expect(result).toEqual({ data: { datasourceId: '123' } })
   })
 
   it('queries datasource table status through the stage2 compatibility endpoint', async () => {
@@ -186,22 +197,48 @@ describe('Datasource API wrappers', () => {
     expect(result).toEqual({ data: ['public'] })
   })
 
-  it('keeps preview and sync datasource routes on compatibility aliases', async () => {
+  it('queries preview and sync datasource routes through canonical aliases', async () => {
     requestMock.post.mockResolvedValueOnce({ data: { rows: [] } })
     requestMock.post.mockResolvedValueOnce({ data: { tables: [] } })
+    requestMock.post.mockResolvedValueOnce({ data: { datasourceId: '123' } })
 
     const { previewData } = await import('@/api/datasource')
 
     await previewData({ datasourceId: '123', tableName: 'orders' })
     await syncApiTable({ datasourceId: '123' })
+    await syncApiDs({ datasourceId: '123' })
 
     expect(requestMock.post).toHaveBeenNthCalledWith(1, {
-      url: '/datasource/previewData',
+      url: '/ds/previewData',
       data: { datasourceId: '123', tableName: 'orders' }
     })
     expect(requestMock.post).toHaveBeenNthCalledWith(2, {
-      url: '/datasource/syncApiTable',
+      url: '/ds/syncApiTable',
       data: { datasourceId: '123' }
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(3, {
+      url: '/ds/syncApiDs',
+      data: { datasourceId: '123' }
+    })
+  })
+
+  it('keeps upload and remote datasource routes on compatibility aliases', async () => {
+    requestMock.post.mockResolvedValueOnce({ code: '000000' })
+    requestMock.post.mockResolvedValueOnce({ data: { loaded: true } })
+
+    await uploadFile({ file: 'mock-file' })
+    const { loadRemoteFile } = await import('@/api/datasource')
+    await loadRemoteFile({ url: 'http://example.com/demo.csv' })
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, {
+      url: '/datasource/uploadFile',
+      data: { file: 'mock-file' },
+      loading: true,
+      headersType: 'multipart/form-data;'
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, {
+      url: '/datasource/loadRemoteFile',
+      data: { url: 'http://example.com/demo.csv' }
     })
   })
 

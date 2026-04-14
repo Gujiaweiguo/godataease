@@ -54,9 +54,9 @@ export const listDatasourceType = async (data = {}): Promise<IResponse> => {
 // datasource-table-exploration-canonical-migration.
 export const getTableField = (data = {}) => request.post({ url: '/ds/tableField', data })
 
-export const syncApiTable = (data = {}) => request.post({ url: '/datasource/syncApiTable', data })
+export const syncApiTable = (data = {}) => request.post({ url: '/ds/syncApiTable', data })
 
-export const syncApiDs = (data = {}) => request.post({ url: '/datasource/syncApiDs', data })
+export const syncApiDs = (data = {}) => request.post({ url: '/ds/syncApiDs', data })
 
 export const listDatasourceTables = async (data = {}): Promise<IResponse> => {
   return request.post({ url: '/ds/tables', data }).then(res => {
@@ -75,7 +75,7 @@ export const getSchema = (data = {}) => {
 }
 
 export const previewData = (data = {}) => {
-  return request.post({ url: '/datasource/previewData', data }).then(res => {
+  return request.post({ url: '/ds/previewData', data }).then(res => {
     return res?.data
   })
 }
