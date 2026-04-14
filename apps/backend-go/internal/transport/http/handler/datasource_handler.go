@@ -128,6 +128,61 @@ func (h *DatasourceHandler) Delete(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func (h *DatasourceHandler) Tables(c *gin.Context) {
+	req, ok := parseTableRequest(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.GetTables(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) TableStatus(c *gin.Context) {
+	req, ok := parseTableRequest(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.GetTableStatus(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) Schema(c *gin.Context) {
+	result, err := h.service.GetSchema()
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) TableField(c *gin.Context) {
+	req, ok := parseTableRequest(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.GetTableField(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
@@ -138,5 +193,9 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/save", h.Save)
 		dsGroup.POST("/update", h.Update)
 		dsGroup.POST("/delete/:id", h.Delete)
+		dsGroup.POST("/tables", h.Tables)
+		dsGroup.POST("/tableStatus", h.TableStatus)
+		dsGroup.POST("/tableField", h.TableField)
+		dsGroup.POST("/schema", h.Schema)
 	}
 }
