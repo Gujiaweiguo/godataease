@@ -65,3 +65,85 @@ The system SHALL provide a canonical endpoint `POST /api/dataset/perDelete/:id` 
 #### Scenario: PerDelete with invalid ID format
 - **WHEN** client sends `POST /api/dataset/perDelete/abc` where the ID is not a valid integer
 - **THEN** the system returns an error response with code `500000` and message "Invalid dataset ID"
+
+### Requirement: Get Dataset Detail via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/get/:id` that accepts a path parameter `id` (int64) and delegates to `DatasetService.buildDatasetDetail(id)`.
+
+#### Scenario: Get dataset detail successfully
+- **WHEN** client sends `POST /api/dataset/get/123` where 123 is a valid dataset ID
+- **THEN** the system parses the `:id` path parameter as int64, calls `service.buildDatasetDetail(id)`, and returns the result in a success envelope
+
+#### Scenario: Get dataset detail with invalid ID
+- **WHEN** client sends `POST /api/dataset/get/abc` where the ID is not a valid integer
+- **THEN** the system returns an error response with code `500000` and message "Invalid dataset ID"
+
+### Requirement: Get Dataset Details via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/details/:id` that accepts a path parameter `id` (int64) and delegates to `DatasetService.buildDatasetDetail(id)`.
+
+#### Scenario: Get dataset details successfully
+- **WHEN** client sends `POST /api/dataset/details/123` where 123 is a valid dataset ID
+- **THEN** the system parses the `:id` path parameter as int64, calls `service.buildDatasetDetail(id)`, and returns the result in a success envelope
+
+#### Scenario: Get dataset details with invalid ID
+- **WHEN** client sends `POST /api/dataset/details/abc` where the ID is not a valid integer
+- **THEN** the system returns an error response with code `500000` and message "Invalid dataset ID"
+
+### Requirement: Batch Get Dataset Details via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/dsDetails` that accepts a JSON body with dataset IDs and delegates to `DatasetService.buildDatasetDetail()` for each.
+
+#### Scenario: Batch get dataset details successfully
+- **WHEN** client sends `POST /api/dataset/dsDetails` with a valid JSON body containing dataset IDs
+- **THEN** the system iterates over the IDs, calls `service.buildDatasetDetail(id)` for each, and returns the results in a success envelope
+
+### Requirement: Get SQL Params via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/getSqlParams` that delegates to `DatasetService.GetSQLParams()`.
+
+#### Scenario: Get SQL params successfully
+- **WHEN** client sends `POST /api/dataset/getSqlParams` with a valid request body
+- **THEN** the system calls `service.GetSQLParams()`, and returns the result in a success envelope
+
+### Requirement: Get Dataset Bar Info via Canonical Endpoint
+The system SHALL provide a canonical endpoint `GET /api/dataset/barInfo/:id` that accepts a path parameter `id` (int64) and delegates to `DatasetGroupService.GetGroupByID(id)`.
+
+#### Scenario: Get bar info successfully
+- **WHEN** client sends `GET /api/dataset/barInfo/123` where 123 is a valid dataset group ID
+- **THEN** the system parses the `:id` path parameter as int64, calls `service.GetGroupByID(id)`, and returns the result in a success envelope
+
+#### Scenario: Get bar info with invalid ID
+- **WHEN** client sends `GET /api/dataset/barInfo/abc` where the ID is not a valid integer
+- **THEN** the system returns an error response with code `500000` and message "Invalid dataset ID"
+
+### Requirement: Get Dataset Total via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/getDatasetTotal` that delegates to `DatasetService.Preview()` with a limit of 1 to count rows.
+
+#### Scenario: Get dataset total successfully
+- **WHEN** client sends `POST /api/dataset/getDatasetTotal` with a valid request body
+- **THEN** the system calls `service.Preview()` with limit=1, and returns the total count in a success envelope
+
+### Requirement: Preview SQL via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/previewSql` that delegates to `DatasetService.PreviewSQLWithUser()`.
+
+#### Scenario: Preview SQL successfully
+- **WHEN** client sends `POST /api/dataset/previewSql` with a valid SQL preview request body
+- **THEN** the system calls `service.PreviewSQLWithUser()`, and returns the preview results in a success envelope
+
+### Requirement: Get Field Enum Object via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/enumValueObj` that delegates to `DatasetService.GetFieldEnumObj()`.
+
+#### Scenario: Get field enum object successfully
+- **WHEN** client sends `POST /api/dataset/enumValueObj` with a valid request body
+- **THEN** the system calls `service.GetFieldEnumObj()`, and returns the enum object in a success envelope
+
+### Requirement: Get Field Enum Datasource via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/enumValueDs` that delegates to `DatasetService.GetFieldEnumDs()`.
+
+#### Scenario: Get field enum datasource successfully
+- **WHEN** client sends `POST /api/dataset/enumValueDs` with a valid request body
+- **THEN** the system calls `service.GetFieldEnumDs()`, and returns the enum values in a success envelope
+
+### Requirement: Get Multi-Field Enum via Canonical Endpoint
+The system SHALL provide a canonical endpoint `POST /api/dataset/enumValue` that delegates to `DatasetService.GetFieldEnum()`.
+
+#### Scenario: Get multi-field enum successfully
+- **WHEN** client sends `POST /api/dataset/enumValue` with a valid request body
+- **THEN** the system calls `service.GetFieldEnum()`, and returns the enum values in a success envelope
