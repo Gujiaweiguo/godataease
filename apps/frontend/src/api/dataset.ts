@@ -123,13 +123,13 @@ export const renameDatasetTree = async (data: DatasetOrFolder): Promise<IRespons
 }
 
 export const enumValueObj = async (data: EnumValue): Promise<Record<string, string>[]> => {
-  return request.post({ url: '/datasetData/enumValueObj', data }).then(res => {
+  return request.post({ url: '/dataset/enumValueObj', data }).then(res => {
     return res?.data
   })
 }
 
 export const enumValueDs = async (data: any): Promise<Record<string, string>[]> => {
-  return request.post({ url: '/datasetData/enumValueDs', data }).then(res => {
+  return request.post({ url: '/dataset/enumValueDs', data }).then(res => {
     return res?.data
   })
 }
@@ -148,7 +148,7 @@ export const getDatasetTree = async (data: BusiTreeRequest): Promise<IResponse> 
 }
 
 export const barInfoApi = async (id): Promise<IResponse> => {
-  return request.get({ url: `/datasetTree/barInfo/${id}`, data: {} }).then(res => {
+  return request.get({ url: `/dataset/barInfo/${id}`, data: {} }).then(res => {
     return res?.data
   })
 }
@@ -230,19 +230,19 @@ export const getPreviewData = async (data): Promise<IResponse> => {
 }
 
 export const getDatasetPreview = async (id): Promise<FieldData> => {
-  return request.post({ url: `/datasetTree/get/${id}`, data: {} }).then(res => {
+  return request.post({ url: `/dataset/get/${id}`, data: {} }).then(res => {
     return res?.data
   })
 }
 
 export const getDatasetTotal = async (id): Promise<FieldData> => {
-  return request.post({ url: `/datasetData/getDatasetTotal`, data: { id: id } }).then(res => {
+  return request.post({ url: `/dataset/getDatasetTotal`, data: { id: id } }).then(res => {
     return res?.data
   })
 }
 
 export const getDatasetDetails = async (id): Promise<Dataset> => {
-  return request.post({ url: `/datasetTree/details/${id}`, data: {} }).then(res => {
+  return request.post({ url: `/dataset/details/${id}`, data: {} }).then(res => {
     if (res?.data?.allFields?.length) {
       originNameHandleBack(res?.data?.allFields)
     }
@@ -257,13 +257,13 @@ export const tableUpdate = async (data): Promise<IResponse> => {
 }
 
 export const getPreviewSql = async (data): Promise<IResponse> => {
-  return request.post({ url: '/datasetData/previewSql', data }).then(res => {
+  return request.post({ url: '/dataset/previewSql', data }).then(res => {
     return res?.data
   })
 }
 
 export const getDsDetails = async (data): Promise<DatasetDetail[]> => {
-  return request.post({ url: '/datasetTree/dsDetails', data }).then(res => {
+  return request.post({ url: '/dataset/dsDetails', data }).then(res => {
     return res?.data
   })
 }
@@ -276,7 +276,7 @@ export const getDsDetailsWithPerm = async (data): Promise<DatasetDetail[]> => {
   })
 }
 export const getSqlParams = async (data): Promise<ParamsDetail[]> => {
-  return request.post({ url: '/datasetTree/getSqlParams', data }).then(res => {
+  return request.post({ url: '/dataset/getSqlParams', data }).then(res => {
     return res?.data
   })
 }
@@ -364,7 +364,7 @@ export const deleteFieldByChartId = async (id): Promise<DatasetDetail[]> => {
 }
 
 export const getEnumValue = async (data): Promise<DatasetDetail[]> => {
-  return request.post({ url: '/datasetData/enumValue', data }).then(res => {
+  return request.post({ url: '/dataset/enumValue', data }).then(res => {
     return res?.data
   })
 }

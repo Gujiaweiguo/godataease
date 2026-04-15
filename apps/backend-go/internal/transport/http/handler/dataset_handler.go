@@ -190,6 +190,169 @@ func (h *DatasetHandler) PerDelete(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasetHandler) GetDetail(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	result, err := buildDatasetDetail(h, id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) Details(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	result, err := buildDatasetDetail(h, id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) DsDetails(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	ids, ok := parseDatasetIDs(c)
+	if !ok {
+		return
+	}
+	result := make([]gin.H, 0, len(ids))
+	for _, id := range ids {
+		detail, err := buildDatasetDetail(h, id)
+		if err != nil {
+			continue
+		}
+		result = append(result, detail)
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) GetSQLParams(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	ids, ok := parseDatasetIDs(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetSQLParams(ids)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) BarInfo(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	group, err := h.service.GetGroupByID(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed to get dataset: "+err.Error())
+		return
+	}
+	barInfo := &dataset.BarInfo{
+		ID: group.ID, Name: group.Name, CreateBy: group.CreateBy,
+		CreateTime: group.CreateTime, UpdateBy: group.UpdateBy,
+		LastUpdateTime: group.LastUpdateTime, IsCross: false,
+	}
+	if group.NodeType != nil {
+		barInfo.NodeType = *group.NodeType
+	}
+	barInfo.Creator = h.service.ResolveUserName(group.CreateBy)
+	barInfo.Updater = h.service.ResolveUserName(group.UpdateBy)
+	response.Success(c, barInfo)
+}
+
+func (h *DatasetHandler) GetDatasetTotal(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	var body map[string]interface{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	id, ok := parseInt64Value(body["id"])
+	if !ok {
+		response.Success(c, int64(0))
+		return
+	}
+	preview, err := h.service.Preview(&dataset.PreviewRequest{DatasetGroupID: id, Limit: 1})
+	if err != nil {
+		response.Success(c, int64(0))
+		return
+	}
+	response.Success(c, preview.Total)
+}
+
+func (h *DatasetHandler) PreviewSQL(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	var req dataset.SQLPreviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.PreviewSQLWithUser(&req, int64(middleware.GetUserID(c)))
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) EnumValueObj(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	req, ok := parseEnumValueRequest(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetFieldEnumObj(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) EnumValueDs(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	fieldID, ok := parseEnumFieldID(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetFieldEnumDs(fieldID)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) EnumValue(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	req, ok := parseMultFieldValuesRequest(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetFieldEnum(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func recoverDatasetServicePanic(c *gin.Context) {
 	if r := recover(); r != nil {
 		response.Error(c, "500000", "Service unavailable")
@@ -209,5 +372,15 @@ func RegisterDatasetRoutes(r *gin.RouterGroup, h *DatasetHandler) {
 		datasetGroup.POST("/move", h.Move)
 		datasetGroup.POST("/delete/:id", h.Delete)
 		datasetGroup.POST("/perDelete/:id", h.PerDelete)
+		datasetGroup.POST("/get/:id", h.GetDetail)
+		datasetGroup.POST("/details/:id", h.Details)
+		datasetGroup.POST("/dsDetails", h.DsDetails)
+		datasetGroup.POST("/getSqlParams", h.GetSQLParams)
+		datasetGroup.GET("/barInfo/:id", h.BarInfo)
+		datasetGroup.POST("/getDatasetTotal", h.GetDatasetTotal)
+		datasetGroup.POST("/previewSql", h.PreviewSQL)
+		datasetGroup.POST("/enumValueObj", h.EnumValueObj)
+		datasetGroup.POST("/enumValueDs", h.EnumValueDs)
+		datasetGroup.POST("/enumValue", h.EnumValue)
 	}
 }
