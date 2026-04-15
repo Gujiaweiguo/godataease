@@ -1511,7 +1511,9 @@ func TestRegisterRoutes_DatasetTreeCRUDCanonicalRoutes(t *testing.T) {
 			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
 		}
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
 		if resp["code"] != "500000" {
 			t.Fatalf("expected error code 500000, got %v", resp["code"])
 		}
@@ -1527,7 +1529,9 @@ func TestRegisterRoutes_DatasetTreeCRUDCanonicalRoutes(t *testing.T) {
 			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
 		}
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
 		if resp["code"] != "500000" {
 			t.Fatalf("expected error code 500000, got %v", resp["code"])
 		}
