@@ -101,6 +101,42 @@ func (h *DatasourceHandler) Get(c *gin.Context) {
 	response.Success(c, sanitizeDatasourceResponse(result, h.service))
 }
 
+func (h *DatasourceHandler) HidePw(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+
+	result, err := h.service.GetByID(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, sanitizeDatasourceResponse(result, h.service))
+}
+
+func (h *DatasourceHandler) GetSimpleDs(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+
+	result, err := h.service.GetByID(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{"id": strconv.FormatInt(result.ID, 10), "name": result.Name, "type": result.Type})
+}
+
 func (h *DatasourceHandler) Save(c *gin.Context) {
 	req, ok := parseDatasourceWriteRequest(c, true)
 	if !ok {
@@ -144,6 +180,24 @@ func (h *DatasourceHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+}
+
+func (h *DatasourceHandler) PerDelete(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+
+	result, err := h.service.PerDelete(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
 }
 
 func (h *DatasourceHandler) Tables(c *gin.Context) {
@@ -404,9 +458,12 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/validate", h.Validate)
 		dsGroup.GET("/validate/:id", h.ValidateByID)
 		dsGroup.GET("/:id", h.Get)
+		dsGroup.GET("/hidePw/:id", h.HidePw)
+		dsGroup.GET("/simple/:id", h.GetSimpleDs)
 		dsGroup.POST("/save", h.Save)
 		dsGroup.POST("/update", h.Update)
 		dsGroup.POST("/delete/:id", h.Delete)
+		dsGroup.POST("/perDelete/:id", h.PerDelete)
 		dsGroup.POST("/move", h.Move)
 		dsGroup.POST("/reName", h.Rename)
 		dsGroup.POST("/createFolder", h.CreateFolder)
