@@ -75,6 +75,9 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "canonical datasource save", path: "/api/ds/save", body: "{"},
 		{name: "canonical datasource update", path: "/api/ds/update", body: "{"},
 		{name: "canonical datasource delete", path: "/api/ds/delete/not-a-number", body: "{"},
+		{name: "canonical datasource move", path: "/api/ds/move", body: "{"},
+		{name: "canonical datasource rename", path: "/api/ds/reName", body: "{"},
+		{name: "canonical datasource create folder", path: "/api/ds/createFolder", body: "{"},
 		{name: "canonical datasource tables", path: "/api/ds/tables", body: "{"},
 		{name: "canonical datasource table status", path: "/api/ds/tableStatus", body: "{"},
 		{name: "canonical datasource table field", path: "/api/ds/tableField", body: "{"},
@@ -168,6 +171,9 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 		"GET /api/ds/validate/:id":                   true,
 		"POST /api/ds/checkRepeat":                   true,
 		"POST /api/ds/checkApiDatasource":            true,
+		"POST /api/ds/move":                          true,
+		"POST /api/ds/reName":                        true,
+		"POST /api/ds/createFolder":                  true,
 		"POST /api/datasource/getTables":             true,
 		"GET /api/datasource/validate/:id":           true,
 		"POST /api/datasource/checkRepeat":           true,
@@ -366,9 +372,9 @@ func TestRegisterRoutes_DatasourceCheckAPIDatasourceRoutesReturnExplicitEnvelope
 
 			if tt.wantCode == "000000" {
 				var resp struct {
-					Code string                 `json:"code"`
-					Msg  string                 `json:"msg"`
-					Data map[string]interface{} `json:"data"`
+					Code string         `json:"code"`
+					Msg  string         `json:"msg"`
+					Data map[string]any `json:"data"`
 				}
 				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 					t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
@@ -431,9 +437,9 @@ func TestRegisterRoutes_DatasourceValidateSuccessEnvelopeAcrossAliases(t *testin
 			}
 
 			var resp struct {
-				Code string                 `json:"code"`
-				Msg  string                 `json:"msg"`
-				Data map[string]interface{} `json:"data"`
+				Code string         `json:"code"`
+				Msg  string         `json:"msg"`
+				Data map[string]any `json:"data"`
 			}
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 				t.Fatalf("unmarshal response for %s failed: %v", tt.path, err)

@@ -79,7 +79,7 @@ export const previewData = (data = {}) => {
     return res?.data
   })
 }
-export const validate = (data = {}) => request.post({ url: '/datasource/validate', data })
+export const validate = (data = {}) => request.post({ url: '/ds/validate', data })
 
 export const isShowFinishPage = async () => {
   return request.get({ url: '/datasource/showFinishPage' })
@@ -117,21 +117,21 @@ export const update = async (data = {}): Promise<Dataset> => {
 }
 
 export const move = async (data = {}): Promise<Dataset> => {
-  return request.post({ url: '/datasource/move', data }).then(res => {
+  return request.post({ url: '/ds/move', data }).then(res => {
     return res?.data
   })
 }
 
 export const reName = async (data = {}): Promise<Dataset> => {
   nameTrim(data)
-  return request.post({ url: '/datasource/reName', data }).then(res => {
+  return request.post({ url: '/ds/reName', data }).then(res => {
     return res?.data
   })
 }
 
 export const createFolder = async (data = {}): Promise<Dataset> => {
   nameTrim(data)
-  return request.post({ url: '/datasource/createFolder', data }).then(res => {
+  return request.post({ url: '/ds/createFolder', data }).then(res => {
     return res?.data
   })
 }

@@ -18,8 +18,11 @@ vi.mock('@/utils/utils', async () => {
 })
 
 import {
+  createFolder,
   listDatasourceTables,
   listDatasources,
+  move,
+  reName,
   validateById,
   checkRepeat,
   deleteById,
@@ -37,6 +40,7 @@ import {
   syncApiDs,
   checkApiItem
 } from '@/api/datasource'
+import { getDatasourceList, getTables } from '@/api/dataset'
 
 describe('Datasource API wrappers', () => {
   beforeEach(() => {
@@ -139,10 +143,56 @@ describe('Datasource API wrappers', () => {
     requestMock.post.mockResolvedValueOnce({ data: { valid: true } })
     const result = await validate({ id: '123' })
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/validate',
+      url: '/ds/validate',
       data: { id: '123' }
     })
     expect(result).toEqual({ data: { valid: true } })
+  })
+
+  it('migrates tree and folder management wrappers to canonical datasource routes', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1', pid: '0' } })
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1', name: 'rename' } })
+    requestMock.post.mockResolvedValueOnce({ data: { id: '2', name: 'folder' } })
+
+    const moved = await move({ id: '1', pid: '0' })
+    const renamed = await reName({ id: '1', name: '  rename  ' })
+    const folder = await createFolder({ pid: '0', name: '  folder  ' })
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, {
+      url: '/ds/move',
+      data: { id: '1', pid: '0' }
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, {
+      url: '/ds/reName',
+      data: { id: '1', name: '  rename  ' }
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(3, {
+      url: '/ds/createFolder',
+      data: { pid: '0', name: '  folder  ' }
+    })
+    expect(nameTrimMock).toHaveBeenCalledTimes(2)
+    expect(moved).toEqual({ id: '1', pid: '0' })
+    expect(renamed).toEqual({ id: '1', name: 'rename' })
+    expect(folder).toEqual({ id: '2', name: 'folder' })
+  })
+
+  it('migrates dataset datasource selection wrappers to canonical datasource routes', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: [{ id: '1', name: 'folder' }] })
+    requestMock.post.mockResolvedValueOnce({ data: [{ tableName: 'orders' }] })
+
+    const tree = await getDatasourceList(3)
+    const tables = await getTables({ datasourceId: '123' })
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, {
+      url: '/ds/tree',
+      data: { busiFlag: 'datasource', weight: 3 }
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, {
+      url: '/ds/tables',
+      data: { datasourceId: '123' }
+    })
+    expect(tree).toEqual([{ id: '1', name: 'folder' }])
+    expect(tables).toEqual([{ tableName: 'orders' }])
   })
 
   it('uses withDatasourceError decorator for syncApiTable method', async () => {

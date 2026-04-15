@@ -197,13 +197,13 @@ export const getDatasourceList = async (weight?: number): Promise<IResponse> => 
   if (weight) {
     data['weight'] = weight
   }
-  return request.post({ url: '/datasource/tree', data }).then(res => {
+  return request.post({ url: '/ds/tree', data }).then(res => {
     return res?.data
   })
 }
 
 export const getTables = async (data): Promise<Table[]> => {
-  return request.post({ url: `/datasource/getTables`, data }).then(res => {
+  return request.post({ url: `/ds/tables`, data }).then(res => {
     return res?.data
   })
 }

@@ -313,6 +313,67 @@ func (h *DatasourceHandler) CheckRepeat(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) Move(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	req, ok := parseDatasourceWriteRequest(c, false)
+	if !ok {
+		return
+	}
+
+	pid := int64(0)
+	if req.PID != nil {
+		pid = *req.PID
+	}
+
+	result, err := h.service.Move(req.ID, pid)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) Rename(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	req, ok := parseDatasourceWriteRequest(c, false)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.Rename(req.ID, req.Name)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) CreateFolder(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	req, ok := parseDatasourceWriteRequest(c, false)
+	if !ok {
+		return
+	}
+
+	pid := int64(0)
+	if req.PID != nil {
+		pid = *req.PID
+	}
+
+	result, err := h.service.CreateFolder(req.Name, pid)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -346,6 +407,9 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/save", h.Save)
 		dsGroup.POST("/update", h.Update)
 		dsGroup.POST("/delete/:id", h.Delete)
+		dsGroup.POST("/move", h.Move)
+		dsGroup.POST("/reName", h.Rename)
+		dsGroup.POST("/createFolder", h.CreateFolder)
 		dsGroup.POST("/checkRepeat", h.CheckRepeat)
 		dsGroup.POST("/checkApiDatasource", h.CheckAPIDatasource)
 		dsGroup.POST("/tables", h.Tables)
