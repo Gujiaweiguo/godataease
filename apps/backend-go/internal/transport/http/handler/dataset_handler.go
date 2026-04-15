@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -9,14 +10,16 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type DatasetHandler struct {
-	service *service.DatasetService
+	service      *service.DatasetService
+	chartService *service.ChartService
 }
 
-func NewDatasetHandler(service *service.DatasetService) *DatasetHandler {
-	return &DatasetHandler{service: service}
+func NewDatasetHandler(service *service.DatasetService, chartSvc *service.ChartService) *DatasetHandler {
+	return &DatasetHandler{service: service, chartService: chartSvc}
 }
 
 func (h *DatasetHandler) Tree(c *gin.Context) {
@@ -346,6 +349,128 @@ func (h *DatasetHandler) EnumValue(c *gin.Context) {
 		return
 	}
 	result, err := h.service.GetFieldEnum(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
+	defer recoverChartServicePanic(c)
+	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	userID := int64(middleware.GetUserID(c))
+	var result *chart.ChartFieldListResponse
+	if userID > 0 {
+		result, err = h.chartService.ListByDQWithPermission(datasetID, 0, userID)
+	} else {
+		result, err = h.chartService.ListByDQ(datasetID, 0)
+	}
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, flattenChartFieldList(result))
+}
+
+func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
+	defer recoverChartServicePanic(c)
+	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	userID := int64(middleware.GetUserID(c))
+	var result *chart.ChartFieldListResponse
+	if userID > 0 {
+		result, err = h.chartService.ListByDQWithPermission(datasetID, 0, userID)
+	} else {
+		result, err = h.chartService.ListByDQ(datasetID, 0)
+	}
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, flattenChartFieldList(result))
+}
+
+func (h *DatasetHandler) SaveField(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	var field dataset.CoreDatasetTableField
+	if err := c.ShouldBindJSON(&field); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.SaveField(&field)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) GetFieldFunctions(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	result := h.service.GetFieldFunctions()
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	req, ok := parseMultFieldValuesRequest(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetFieldEnum(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) CopilotFields(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	datasetID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	userID := int64(middleware.GetUserID(c))
+	if userID <= 0 {
+		response.Unauthorized(c, "authentication required")
+		return
+	}
+	result, err := h.service.CopilotFields(datasetID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.NotFound(c, "dataset not found")
+			return
+		}
+		if errors.Is(err, service.ErrDatasetViewPermissionDenied) {
+			response.Forbidden(c, "insufficient permissions")
+			return
+		}
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	var req struct {
+		DsIds []int64 `json:"dsIds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.ListFieldsByDsIds(req.DsIds)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
