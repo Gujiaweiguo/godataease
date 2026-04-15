@@ -104,7 +104,7 @@ export const save = async (data = {}): Promise<Dataset> => {
 }
 
 export const perDeleteDatasource = async (id): Promise<boolean> => {
-  return request.post({ url: `/datasource/perDelete/${id}`, data: {} }).then(res => {
+  return request.post({ url: `/ds/perDelete/${id}`, data: {} }).then(res => {
     return res?.data
   })
 }
@@ -168,9 +168,9 @@ export const deleteById = async (id: number) => {
 
 export const getById = (id: number) => request.get({ url: '/ds/' + id })
 
-export const getHidePwById = (id: number) => request.get({ url: '/datasource/hidePw/' + id })
+export const getHidePwById = (id: number) => request.get({ url: '/ds/hidePw/' + id })
 
-export const getSimpleDs = (id: number) => request.get({ url: '/datasource/getSimpleDs/' + id })
+export const getSimpleDs = (id: number) => request.get({ url: '/ds/simple/' + id })
 
 export const uploadFile = async (data): Promise<IResponse> => {
   return request

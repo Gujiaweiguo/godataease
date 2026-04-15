@@ -63,58 +63,66 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 	router.RegisterRoutes()
 
 	tests := []struct {
-		name string
-		path string
-		body string
+		name   string
+		method string
+		path   string
+		body   string
 	}{
-		{name: "canonical datasource list", path: "/api/ds/list", body: "{"},
-		{name: "canonical datasource tree", path: "/api/ds/tree", body: "{"},
-		{name: "canonical datasource validate", path: "/api/ds/validate", body: "{"},
-		{name: "canonical datasource check repeat", path: "/api/ds/checkRepeat", body: "{"},
-		{name: "canonical datasource check api datasource", path: "/api/ds/checkApiDatasource", body: "{"},
-		{name: "canonical datasource save", path: "/api/ds/save", body: "{"},
-		{name: "canonical datasource update", path: "/api/ds/update", body: "{"},
-		{name: "canonical datasource delete", path: "/api/ds/delete/not-a-number", body: "{"},
-		{name: "canonical datasource move", path: "/api/ds/move", body: "{"},
-		{name: "canonical datasource rename", path: "/api/ds/reName", body: "{"},
-		{name: "canonical datasource create folder", path: "/api/ds/createFolder", body: "{"},
-		{name: "canonical datasource tables", path: "/api/ds/tables", body: "{"},
-		{name: "canonical datasource table status", path: "/api/ds/tableStatus", body: "{"},
-		{name: "canonical datasource table field", path: "/api/ds/tableField", body: "{"},
-		{name: "canonical datasource preview data", path: "/api/ds/previewData", body: "{"},
-		{name: "canonical datasource sync api table", path: "/api/ds/syncApiTable", body: "{"},
-		{name: "canonical datasource sync api ds", path: "/api/ds/syncApiDs", body: "{"},
-		{name: "canonical datasource load remote file", path: "/api/ds/loadRemoteFile", body: "{"},
-		{name: "canonical datasource upload file", path: "/api/ds/uploadFile", body: `{}`},
-		{name: "api compatibility datasource list", path: "/api/datasource/list", body: "{"},
-		{name: "api compatibility datasource validate", path: "/api/datasource/validate", body: "{"},
-		{name: "api compatibility datasource check repeat", path: "/api/datasource/checkRepeat", body: "{"},
-		{name: "api compatibility datasource check api datasource", path: "/api/datasource/checkApiDatasource", body: "{"},
-		{name: "api compatibility datasource tables", path: "/api/datasource/getTables", body: "{"},
-		{name: "api compatibility datasource table status", path: "/api/datasource/getTableStatus", body: "{"},
-		{name: "api compatibility datasource table field", path: "/api/datasource/getTableField", body: "{"},
-		{name: "api compatibility datasource preview data", path: "/api/datasource/previewData", body: "{"},
-		{name: "api compatibility datasource sync api table", path: "/api/datasource/syncApiTable", body: "{"},
-		{name: "api compatibility datasource sync api ds", path: "/api/datasource/syncApiDs", body: "{"},
-		{name: "api compatibility datasource load remote file", path: "/api/datasource/loadRemoteFile", body: "{"},
-		{name: "api compatibility datasource upload file", path: "/api/datasource/uploadFile", body: `{}`},
-		{name: "de2api datasource list", path: "/de2api/datasource/list", body: "{"},
-		{name: "de2api datasource validate", path: "/de2api/datasource/validate", body: "{"},
-		{name: "de2api datasource check repeat", path: "/de2api/datasource/checkRepeat", body: "{"},
-		{name: "de2api datasource check api datasource", path: "/de2api/datasource/checkApiDatasource", body: "{"},
-		{name: "de2api datasource tables", path: "/de2api/datasource/getTables", body: "{"},
-		{name: "de2api datasource table status", path: "/de2api/datasource/getTableStatus", body: "{"},
-		{name: "de2api datasource table field", path: "/de2api/datasource/getTableField", body: "{"},
-		{name: "de2api datasource preview data", path: "/de2api/datasource/previewData", body: "{"},
-		{name: "de2api datasource sync api table", path: "/de2api/datasource/syncApiTable", body: "{"},
-		{name: "de2api datasource sync api ds", path: "/de2api/datasource/syncApiDs", body: "{"},
-		{name: "de2api datasource load remote file", path: "/de2api/datasource/loadRemoteFile", body: "{"},
-		{name: "de2api datasource upload file", path: "/de2api/datasource/uploadFile", body: `{}`},
+		{name: "canonical datasource list", method: "POST", path: "/api/ds/list", body: "{"},
+		{name: "canonical datasource tree", method: "POST", path: "/api/ds/tree", body: "{"},
+		{name: "canonical datasource validate", method: "POST", path: "/api/ds/validate", body: "{"},
+		{name: "canonical datasource hide password", method: "GET", path: "/api/ds/hidePw/not-a-number", body: ""},
+		{name: "canonical datasource simple", method: "GET", path: "/api/ds/simple/not-a-number", body: ""},
+		{name: "canonical datasource check repeat", method: "POST", path: "/api/ds/checkRepeat", body: "{"},
+		{name: "canonical datasource check api datasource", method: "POST", path: "/api/ds/checkApiDatasource", body: "{"},
+		{name: "canonical datasource save", method: "POST", path: "/api/ds/save", body: "{"},
+		{name: "canonical datasource update", method: "POST", path: "/api/ds/update", body: "{"},
+		{name: "canonical datasource delete", method: "POST", path: "/api/ds/delete/not-a-number", body: "{"},
+		{name: "canonical datasource per delete", method: "POST", path: "/api/ds/perDelete/not-a-number", body: ""},
+		{name: "canonical datasource move", method: "POST", path: "/api/ds/move", body: "{"},
+		{name: "canonical datasource rename", method: "POST", path: "/api/ds/reName", body: "{"},
+		{name: "canonical datasource create folder", method: "POST", path: "/api/ds/createFolder", body: "{"},
+		{name: "canonical datasource tables", method: "POST", path: "/api/ds/tables", body: "{"},
+		{name: "canonical datasource table status", method: "POST", path: "/api/ds/tableStatus", body: "{"},
+		{name: "canonical datasource table field", method: "POST", path: "/api/ds/tableField", body: "{"},
+		{name: "canonical datasource preview data", method: "POST", path: "/api/ds/previewData", body: "{"},
+		{name: "canonical datasource sync api table", method: "POST", path: "/api/ds/syncApiTable", body: "{"},
+		{name: "canonical datasource sync api ds", method: "POST", path: "/api/ds/syncApiDs", body: "{"},
+		{name: "canonical datasource load remote file", method: "POST", path: "/api/ds/loadRemoteFile", body: "{"},
+		{name: "canonical datasource upload file", method: "POST", path: "/api/ds/uploadFile", body: `{}`},
+		{name: "api compatibility datasource list", method: "POST", path: "/api/datasource/list", body: "{"},
+		{name: "api compatibility datasource validate", method: "POST", path: "/api/datasource/validate", body: "{"},
+		{name: "api compatibility datasource check repeat", method: "POST", path: "/api/datasource/checkRepeat", body: "{"},
+		{name: "api compatibility datasource check api datasource", method: "POST", path: "/api/datasource/checkApiDatasource", body: "{"},
+		{name: "api compatibility datasource tables", method: "POST", path: "/api/datasource/getTables", body: "{"},
+		{name: "api compatibility datasource table status", method: "POST", path: "/api/datasource/getTableStatus", body: "{"},
+		{name: "api compatibility datasource table field", method: "POST", path: "/api/datasource/getTableField", body: "{"},
+		{name: "api compatibility datasource preview data", method: "POST", path: "/api/datasource/previewData", body: "{"},
+		{name: "api compatibility datasource sync api table", method: "POST", path: "/api/datasource/syncApiTable", body: "{"},
+		{name: "api compatibility datasource sync api ds", method: "POST", path: "/api/datasource/syncApiDs", body: "{"},
+		{name: "api compatibility datasource load remote file", method: "POST", path: "/api/datasource/loadRemoteFile", body: "{"},
+		{name: "api compatibility datasource upload file", method: "POST", path: "/api/datasource/uploadFile", body: `{}`},
+		{name: "de2api datasource list", method: "POST", path: "/de2api/datasource/list", body: "{"},
+		{name: "de2api datasource validate", method: "POST", path: "/de2api/datasource/validate", body: "{"},
+		{name: "de2api datasource check repeat", method: "POST", path: "/de2api/datasource/checkRepeat", body: "{"},
+		{name: "de2api datasource check api datasource", method: "POST", path: "/de2api/datasource/checkApiDatasource", body: "{"},
+		{name: "de2api datasource tables", method: "POST", path: "/de2api/datasource/getTables", body: "{"},
+		{name: "de2api datasource table status", method: "POST", path: "/de2api/datasource/getTableStatus", body: "{"},
+		{name: "de2api datasource table field", method: "POST", path: "/de2api/datasource/getTableField", body: "{"},
+		{name: "de2api datasource preview data", method: "POST", path: "/de2api/datasource/previewData", body: "{"},
+		{name: "de2api datasource sync api table", method: "POST", path: "/de2api/datasource/syncApiTable", body: "{"},
+		{name: "de2api datasource sync api ds", method: "POST", path: "/de2api/datasource/syncApiDs", body: "{"},
+		{name: "de2api datasource load remote file", method: "POST", path: "/de2api/datasource/loadRemoteFile", body: "{"},
+		{name: "de2api datasource upload file", method: "POST", path: "/de2api/datasource/uploadFile", body: `{}`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			method := tt.method
+			if method == "" {
+				method = "POST"
+			}
+			req := httptest.NewRequest(method, tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -135,7 +143,7 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 			if resp.Code != "500000" {
 				t.Fatalf("expected code 500000 for %s, got %s", tt.path, resp.Code)
 			}
-			if tt.path == "/api/ds/delete/not-a-number" {
+			if tt.path == "/api/ds/delete/not-a-number" || tt.path == "/api/ds/hidePw/not-a-number" || tt.path == "/api/ds/simple/not-a-number" || tt.path == "/api/ds/perDelete/not-a-number" {
 				if !strings.Contains(resp.Msg, "Invalid datasource ID") {
 					t.Fatalf("expected invalid datasource id message for %s, got %q", tt.path, resp.Msg)
 				}
@@ -168,6 +176,9 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 		"POST /api/ds/syncApiDs":                     true,
 		"POST /api/ds/loadRemoteFile":                true,
 		"POST /api/ds/uploadFile":                    true,
+		"GET /api/ds/hidePw/:id":                     true,
+		"GET /api/ds/simple/:id":                     true,
+		"POST /api/ds/perDelete/:id":                 true,
 		"GET /api/ds/validate/:id":                   true,
 		"POST /api/ds/checkRepeat":                   true,
 		"POST /api/ds/checkApiDatasource":            true,

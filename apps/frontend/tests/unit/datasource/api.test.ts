@@ -32,6 +32,7 @@ import {
   getTableField,
   getTableStatus,
   getSimpleDs,
+  perDeleteDatasource,
   uploadFile,
   save,
   update,
@@ -89,8 +90,17 @@ describe('Datasource API wrappers', () => {
     getSimpleDs(id)
 
     expect(requestMock.get).toHaveBeenCalledWith({ url: `/ds/${id}` })
-    expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/hidePw/${id}` })
-    expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/getSimpleDs/${id}` })
+    expect(requestMock.get).toHaveBeenCalledWith({ url: `/ds/hidePw/${id}` })
+    expect(requestMock.get).toHaveBeenCalledWith({ url: `/ds/simple/${id}` })
+  })
+
+  it('uses canonical route for permanent datasource deletion', async () => {
+    const id = 9851884
+    requestMock.post.mockResolvedValueOnce({ data: true })
+
+    await perDeleteDatasource(id)
+
+    expect(requestMock.post).toHaveBeenCalledWith({ url: `/ds/perDelete/${id}`, data: {} })
   })
 
   it('injects datasource busiFlag when listing trees', async () => {
