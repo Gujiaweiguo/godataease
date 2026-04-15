@@ -197,4 +197,6 @@ func RegisterOrgRoutes(r *gin.RouterGroup, h *OrgHandler) {
 		orgGroup.POST("/updateStatus", h.UpdateOrgStatus)
 		orgGroup.GET("/children/:parentId", h.GetChildOrgs)
 	}
+
+	r.POST("/org/mounted", h.ListOrgs)
 }

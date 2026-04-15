@@ -1153,14 +1153,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			userGroup.POST("/delete/:id", user.DeleteUser)
 			userGroup.GET("/options", user.GetUserOptions)
 			userGroup.GET("/org/option", user.GetUserOptions)
-			userGroup.POST("/byCurOrg", user.ListUsers)
-			userGroup.POST("/excelTemplate", user.DownloadExcelTemplate)
-			userGroup.POST("/batchImport", user.BatchImportUsers)
-			userGroup.GET("/errorRecord/:key", user.DownloadErrorRecord)
-			userGroup.GET("/clearErrorRecord/:key", user.ClearErrorRecord)
 			userGroup.GET("/defaultPwd", user.GetDefaultPassword)
-			userGroup.GET("/personInfo", user.PersonInfo)
-			userGroup.GET("/ipInfo", user.IPInfo)
 			userGroup.POST("/enable", user.SwitchEnable)
 			userGroup.POST("/resetPwd/:uid", middleware.AuditLog(middleware.AuditConfig{
 				ActionType:   audit.ActionTypeUserAction,
@@ -1182,14 +1175,6 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			orgGroup.GET("/checkName", org.CheckOrgName)
 			orgGroup.POST("/updateStatus", org.UpdateOrgStatus)
 			orgGroup.GET("/children/:parentId", org.GetChildOrgs)
-			orgGroup.POST("/mounted", func(c *gin.Context) {
-				orgs, err := org.orgService.ListOrgs()
-				if err != nil {
-					response.Error(c, "500000", "Failed: "+err.Error())
-					return
-				}
-				response.Success(c, orgs)
-			})
 		}
 	}
 }
