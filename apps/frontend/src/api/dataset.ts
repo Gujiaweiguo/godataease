@@ -93,7 +93,7 @@ export const saveDatasetTree = async (data: DatasetOrFolder): Promise<IResponse>
   nameTrim(data)
   const copyData = cloneDeep(data)
   originNameHandle(copyData.allFields)
-  return request.post({ url: '/datasetTree/save', data: copyData }).then(res => {
+  return request.post({ url: '/dataset/save', data: copyData }).then(res => {
     if (res?.data?.allFields?.length) {
       originNameHandleBack(res?.data?.allFields)
     }
@@ -106,7 +106,7 @@ export const createDatasetTree = async (data: DatasetOrFolder): Promise<IRespons
   nameTrim(data)
   const copyData = cloneDeep(data)
   originNameHandle(copyData.allFields)
-  return request.post({ url: '/datasetTree/create', data: copyData }).then(res => {
+  return request.post({ url: '/dataset/create', data: copyData }).then(res => {
     if (res?.data?.allFields?.length) {
       originNameHandleBack(res?.data?.allFields)
     }
@@ -117,7 +117,7 @@ export const createDatasetTree = async (data: DatasetOrFolder): Promise<IRespons
 // rename
 export const renameDatasetTree = async (data: DatasetOrFolder): Promise<IResponse> => {
   nameTrim(data)
-  return request.post({ url: '/datasetTree/rename', data }).then(res => {
+  return request.post({ url: '/dataset/rename', data }).then(res => {
     return res?.data
   })
 }
@@ -135,7 +135,7 @@ export const enumValueDs = async (data: any): Promise<Record<string, string>[]> 
 }
 
 export const moveDatasetTree = async (data: DatasetOrFolder): Promise<IResponse> => {
-  return request.post({ url: '/datasetTree/move', data }).then(res => {
+  return request.post({ url: '/dataset/move', data }).then(res => {
     return res?.data
   })
 }
@@ -154,7 +154,7 @@ export const barInfoApi = async (id): Promise<IResponse> => {
 }
 
 export const delDatasetTree = async (id): Promise<IResponse> => {
-  return request.post({ url: `/datasetTree/delete/${id}`, data: {} }).then(res => {
+  return request.post({ url: `/dataset/delete/${id}`, data: {} }).then(res => {
     return res?.data
   })
 }
@@ -187,7 +187,7 @@ export const exportLimit = async (): Promise<boolean> => {
 }
 
 export const perDelete = async (id): Promise<boolean> => {
-  return request.post({ url: `/datasetTree/perDelete/${id}`, data: {} }).then(res => {
+  return request.post({ url: `/dataset/perDelete/${id}`, data: {} }).then(res => {
     return res?.data
   })
 }

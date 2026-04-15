@@ -21,7 +21,13 @@ import {
   getDatasetTree,
   getPreviewSql,
   getPreviewData,
-  getTableField
+  getTableField,
+  saveDatasetTree,
+  createDatasetTree,
+  renameDatasetTree,
+  moveDatasetTree,
+  delDatasetTree,
+  perDelete
 } from '@/api/dataset'
 
 describe('Dataset API wrappers', () => {
@@ -196,5 +202,28 @@ describe('Dataset API wrappers', () => {
       url: '/datasetField/deleteByChartId/446',
       data: {}
     })
+  })
+
+  it('migrates datasetTree CRUD wrappers to canonical dataset routes', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1', name: 'test' } })
+    requestMock.post.mockResolvedValueOnce({ data: { id: '2', name: 'new' } })
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1', name: 'renamed' } })
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1', pid: '0' } })
+    requestMock.post.mockResolvedValueOnce({ data: null })
+    requestMock.post.mockResolvedValueOnce({ data: true })
+
+    await saveDatasetTree({ name: 'test', nodeType: 'dataset' } as any)
+    await createDatasetTree({ name: 'new', nodeType: 'dataset' } as any)
+    await renameDatasetTree({ id: 1, name: 'renamed' } as any)
+    await moveDatasetTree({ id: 1, pid: 0 } as any)
+    await delDatasetTree(1)
+    await perDelete(1)
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, expect.objectContaining({ url: '/dataset/save' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, expect.objectContaining({ url: '/dataset/create' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(3, expect.objectContaining({ url: '/dataset/rename' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(4, expect.objectContaining({ url: '/dataset/move' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(5, expect.objectContaining({ url: '/dataset/delete/1' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(6, expect.objectContaining({ url: '/dataset/perDelete/1' }))
   })
 })
