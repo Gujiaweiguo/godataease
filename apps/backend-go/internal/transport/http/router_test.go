@@ -1555,3 +1555,49 @@ func TestRegisterRoutes_DatasetTreeCRUDCanonicalRoutes(t *testing.T) {
 		}
 	})
 }
+
+func TestRegisterRoutes_DatasetQueryCanonicalRoutes(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "canonical dataset get detail", method: "POST", path: "/api/dataset/get/1", body: ""},
+		{name: "canonical dataset get detail invalid id", method: "POST", path: "/api/dataset/get/not-a-number", body: ""},
+		{name: "canonical dataset details", method: "POST", path: "/api/dataset/details/1", body: ""},
+		{name: "canonical dataset dsDetails", method: "POST", path: "/api/dataset/dsDetails", body: `{}`},
+		{name: "canonical dataset getSqlParams", method: "POST", path: "/api/dataset/getSqlParams", body: `{}`},
+		{name: "canonical dataset barInfo", method: "GET", path: "/api/dataset/barInfo/1", body: ""},
+		{name: "canonical dataset barInfo invalid id", method: "GET", path: "/api/dataset/barInfo/not-a-number", body: ""},
+		{name: "canonical dataset getDatasetTotal", method: "POST", path: "/api/dataset/getDatasetTotal", body: `{"id":1}`},
+		{name: "canonical dataset previewSql", method: "POST", path: "/api/dataset/previewSql", body: `{}`},
+		{name: "canonical dataset enumValueObj", method: "POST", path: "/api/dataset/enumValueObj", body: `{}`},
+		{name: "canonical dataset enumValueDs", method: "POST", path: "/api/dataset/enumValueDs", body: `{}`},
+		{name: "canonical dataset enumValue", method: "POST", path: "/api/dataset/enumValue", body: `{}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+		})
+	}
+}

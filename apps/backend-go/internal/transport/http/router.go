@@ -681,6 +681,16 @@ func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
 		datasetGroup.POST("/move", r.datasetHandler.Move)
 		datasetGroup.POST("/delete/:id", r.datasetHandler.Delete)
 		datasetGroup.POST("/perDelete/:id", r.datasetHandler.PerDelete)
+		datasetGroup.POST("/get/:id", r.datasetHandler.GetDetail)
+		datasetGroup.POST("/details/:id", r.datasetHandler.Details)
+		datasetGroup.POST("/dsDetails", r.datasetHandler.DsDetails)
+		datasetGroup.POST("/getSqlParams", r.datasetHandler.GetSQLParams)
+		datasetGroup.GET("/barInfo/:id", r.datasetHandler.BarInfo)
+		datasetGroup.POST("/getDatasetTotal", r.datasetHandler.GetDatasetTotal)
+		datasetGroup.POST("/previewSql", r.datasetHandler.PreviewSQL)
+		datasetGroup.POST("/enumValueObj", r.datasetHandler.EnumValueObj)
+		datasetGroup.POST("/enumValueDs", r.datasetHandler.EnumValueDs)
+		datasetGroup.POST("/enumValue", r.datasetHandler.EnumValue)
 	}
 }
 

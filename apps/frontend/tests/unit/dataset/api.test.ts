@@ -27,7 +27,16 @@ import {
   renameDatasetTree,
   moveDatasetTree,
   delDatasetTree,
-  perDelete
+  perDelete,
+  enumValueObj,
+  enumValueDs,
+  barInfoApi,
+  getDatasetPreview,
+  getDatasetTotal,
+  getDatasetDetails,
+  getDsDetails,
+  getSqlParams,
+  getEnumValue
 } from '@/api/dataset'
 
 describe('Dataset API wrappers', () => {
@@ -95,7 +104,7 @@ describe('Dataset API wrappers', () => {
     expect(payload.allFields[0].originName).toBe('[orders.amount]')
   })
 
-  it('passes sqlVariableDetails through the previewSql compatibility wrapper', async () => {
+  it('passes sqlVariableDetails through the previewSql canonical route', async () => {
     requestMock.post.mockResolvedValueOnce({ data: { data: { fields: [], data: [] }, sql: 'U0VMRUNUIDE=' } })
 
     const payload = {
@@ -108,7 +117,7 @@ describe('Dataset API wrappers', () => {
     const result = await getPreviewSql(payload)
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasetData/previewSql',
+      url: '/dataset/previewSql',
       data: payload
     })
     expect(result).toEqual({ data: { fields: [], data: [] }, sql: 'U0VMRUNUIDE=' })
@@ -225,5 +234,38 @@ describe('Dataset API wrappers', () => {
     expect(requestMock.post).toHaveBeenNthCalledWith(4, expect.objectContaining({ url: '/dataset/move' }))
     expect(requestMock.post).toHaveBeenNthCalledWith(5, expect.objectContaining({ url: '/dataset/delete/1' }))
     expect(requestMock.post).toHaveBeenNthCalledWith(6, expect.objectContaining({ url: '/dataset/perDelete/1' }))
+  })
+
+  it('migrates datasetTree and datasetData query wrappers to canonical dataset routes', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: {} })
+    requestMock.get.mockResolvedValueOnce({ data: {} })
+    requestMock.post.mockResolvedValueOnce({ data: { allFields: [] } })
+    requestMock.post.mockResolvedValueOnce({ data: 0 })
+    requestMock.post.mockResolvedValueOnce({ data: { id: '1', name: 'test' } })
+    requestMock.post.mockResolvedValueOnce({ data: [] })
+    requestMock.post.mockResolvedValueOnce({ data: [] })
+    requestMock.post.mockResolvedValueOnce({ data: {} })
+    requestMock.post.mockResolvedValueOnce({ data: [] })
+    requestMock.post.mockResolvedValueOnce({ data: [] })
+
+    await enumValueObj({ queryId: '1', searchText: '' })
+    await barInfoApi(1)
+    await getDatasetPreview(1)
+    await getDatasetTotal(1)
+    await getDatasetDetails(1)
+    await getDsDetails({ ids: [1] })
+    await getSqlParams({ ids: [1] })
+    await getEnumValue({ fieldIds: [1] })
+    await enumValueDs({ field: { id: 1 } })
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, expect.objectContaining({ url: '/dataset/enumValueObj' }))
+    expect(requestMock.get).toHaveBeenCalledWith(expect.objectContaining({ url: '/dataset/barInfo/1' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, expect.objectContaining({ url: '/dataset/get/1' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(3, expect.objectContaining({ url: '/dataset/getDatasetTotal' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(4, expect.objectContaining({ url: '/dataset/details/1' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(5, expect.objectContaining({ url: '/dataset/dsDetails' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(6, expect.objectContaining({ url: '/dataset/getSqlParams' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(7, expect.objectContaining({ url: '/dataset/enumValue' }))
+    expect(requestMock.post).toHaveBeenNthCalledWith(8, expect.objectContaining({ url: '/dataset/enumValueDs' }))
   })
 })
