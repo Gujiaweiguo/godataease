@@ -1395,3 +1395,82 @@ func TestRegisterRoutes_ExportCenterRoutesRequireAuthentication(t *testing.T) {
 		})
 	}
 }
+
+func TestRegisterRoutes_DatasourceUIMetadataCanonicalRoutes(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	t.Run("GET /api/ds/types returns hardcoded type list", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/ds/types", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			Code string              `json:"code"`
+			Data []map[string]string `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed: %v", err)
+		}
+		if resp.Code != "000000" {
+			t.Fatalf("expected code 000000, got %s", resp.Code)
+		}
+		if len(resp.Data) != 5 {
+			t.Fatalf("expected 5 types, got %d", len(resp.Data))
+		}
+	})
+
+	t.Run("GET /api/ds/showFinishPage returns success envelope", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/ds/showFinishPage", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed: %v", err)
+		}
+	})
+
+	t.Run("POST /api/ds/showFinishPage returns success envelope", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/ds/showFinishPage", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed: %v", err)
+		}
+	})
+
+	t.Run("POST /api/ds/latestUse returns success envelope", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/ds/latestUse", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed: %v", err)
+		}
+	})
+
+	t.Run("POST /api/ds/syncRecord/1/1/10 returns success envelope", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/ds/syncRecord/1/1/10", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("unmarshal response failed: %v", err)
+		}
+	})
+}

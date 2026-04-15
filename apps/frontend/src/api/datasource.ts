@@ -44,8 +44,8 @@ export const listDatasources = data => {
     })
 }
 
-export const listDatasourceType = async (data = {}): Promise<IResponse> => {
-  return request.post({ url: '/datasource/types', data }).then(res => {
+export const listDatasourceType = async (): Promise<IResponse> => {
+  return request.get({ url: '/ds/types' }).then(res => {
     return res?.data
   })
 }
@@ -82,14 +82,14 @@ export const previewData = (data = {}) => {
 export const validate = (data = {}) => request.post({ url: '/ds/validate', data })
 
 export const isShowFinishPage = async () => {
-  return request.get({ url: '/datasource/showFinishPage' })
+  return request.get({ url: '/ds/showFinishPage' })
 }
 
 export const setShowFinishPage = (data = {}) => {
-  return request.post({ url: '/datasource/setShowFinishPage', data })
+  return request.post({ url: '/ds/showFinishPage', data })
 }
 export const latestUse = async (data = {}) => {
-  return request.post({ url: '/datasource/latestUse', data })
+  return request.post({ url: '/ds/latestUse', data })
 }
 
 // Canonical datasource validation/checking routes migrated in
@@ -190,7 +190,7 @@ export const loadRemoteFile = async (data = {}) => {
 }
 
 export const listSyncRecord = (page: number, limit: number, dsId: number | string) =>
-  request.post({ url: '/datasource/listSyncRecord/' + dsId + '/' + page + '/' + limit })
+  request.post({ url: '/ds/syncRecord/' + dsId + '/' + page + '/' + limit })
 
 export const getDeEngine = () => request.get({ url: '/engine/getEngine' })
 

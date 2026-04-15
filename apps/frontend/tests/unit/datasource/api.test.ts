@@ -39,7 +39,12 @@ import {
   validate,
   syncApiTable,
   syncApiDs,
-  checkApiItem
+  checkApiItem,
+  isShowFinishPage,
+  setShowFinishPage,
+  latestUse,
+  listSyncRecord,
+  listDatasourceType
 } from '@/api/datasource'
 import { getDatasourceList, getTables } from '@/api/dataset'
 
@@ -347,6 +352,30 @@ describe('Datasource API wrappers', () => {
       data: { url: 'http://example.com' }
     })
     expect(result).toEqual({ data: { valid: true } })
+  })
+
+  it('migrates ui metadata routes to canonical datasource paths', async () => {
+    requestMock.get.mockResolvedValueOnce({ data: [{ type: 'MySQL', name: 'MySQL' }] })
+    requestMock.get.mockResolvedValueOnce({ data: true })
+    requestMock.post.mockResolvedValueOnce({ data: null })
+    requestMock.post.mockResolvedValueOnce({ data: [{ type: 'MySQL' }] })
+    requestMock.post.mockResolvedValueOnce({ data: { records: [] } })
+
+    const types = await listDatasourceType()
+    const showFinish = await isShowFinishPage()
+    await setShowFinishPage()
+    const latest = await latestUse()
+    const syncRecords = await listSyncRecord(1, 10, 123)
+
+    expect(requestMock.get).toHaveBeenCalledWith({ url: '/ds/types' })
+    expect(requestMock.get).toHaveBeenCalledWith({ url: '/ds/showFinishPage' })
+    expect(requestMock.post).toHaveBeenCalledWith({ url: '/ds/showFinishPage', data: {} })
+    expect(requestMock.post).toHaveBeenCalledWith({ url: '/ds/latestUse', data: {} })
+    expect(requestMock.post).toHaveBeenCalledWith({ url: '/ds/syncRecord/123/1/10' })
+    expect(types).toEqual([{ type: 'MySQL', name: 'MySQL' }])
+    expect(showFinish).toEqual({ data: true })
+    expect(latest).toEqual({ data: [{ type: 'MySQL' }] })
+    expect(syncRecords).toEqual({ data: { records: [] } })
   })
 
 })

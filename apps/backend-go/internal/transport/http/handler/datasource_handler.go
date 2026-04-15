@@ -469,6 +469,45 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/createFolder", h.CreateFolder)
 		dsGroup.POST("/checkRepeat", h.CheckRepeat)
 		dsGroup.POST("/checkApiDatasource", h.CheckAPIDatasource)
+		dsGroup.GET("/types", func(c *gin.Context) {
+			defer recoverDatasourceServicePanic(c)
+			response.Success(c, []map[string]string{
+				{"type": "MySQL", "name": "MySQL"},
+				{"type": "PostgreSQL", "name": "PostgreSQL"},
+				{"type": "SQLServer", "name": "SQL Server"},
+				{"type": "Oracle", "name": "Oracle"},
+				{"type": "Excel", "name": "Excel"},
+			})
+		})
+		dsGroup.GET("/showFinishPage", func(c *gin.Context) {
+			defer recoverDatasourceServicePanic(c)
+			userID := getCurrentUserID(c)
+			result, err := h.service.ShowFinishPage(userID)
+			if err != nil {
+				response.Error(c, "500000", "Failed: "+err.Error())
+				return
+			}
+			response.Success(c, result)
+		})
+		dsGroup.POST("/showFinishPage", func(c *gin.Context) {
+			defer recoverDatasourceServicePanic(c)
+			userID := getCurrentUserID(c)
+			if err := h.service.SetShowFinishPage(userID); err != nil {
+				response.Error(c, "500000", "Failed: "+err.Error())
+				return
+			}
+			response.Success(c, nil)
+		})
+		dsGroup.POST("/latestUse", func(c *gin.Context) {
+			defer recoverDatasourceServicePanic(c)
+			username := getCurrentUsername(c)
+			result, err := h.service.LatestTypes(username)
+			if err != nil {
+				response.Error(c, "500000", "Failed: "+err.Error())
+				return
+			}
+			response.Success(c, result)
+		})
 		dsGroup.POST("/tables", h.Tables)
 		dsGroup.POST("/tableStatus", h.TableStatus)
 		dsGroup.POST("/tableField", h.TableField)
@@ -477,6 +516,46 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/syncApiTable", h.SyncApiTable)
 		dsGroup.POST("/syncApiDs", h.SyncApiDs)
 		dsGroup.POST("/loadRemoteFile", h.LoadRemoteFile)
+		dsGroup.POST("/syncRecord/:dsId/:page/:limit", func(c *gin.Context) {
+			defer recoverDatasourceServicePanic(c)
+			dsID, err := strconv.ParseInt(c.Param("dsId"), 10, 64)
+			if err != nil {
+				response.Error(c, "500000", "Invalid datasource ID")
+				return
+			}
+			page, _ := strconv.Atoi(c.Param("page"))
+			if page < 1 {
+				page = 1
+			}
+			limit, _ := strconv.Atoi(c.Param("limit"))
+			if limit < 1 {
+				limit = 10
+			}
+			result, err := h.service.ListSyncRecord(dsID, page, limit)
+			if err != nil {
+				response.Error(c, "500000", "Failed: "+err.Error())
+				return
+			}
+			response.Success(c, result)
+		})
 		dsGroup.POST("/uploadFile", h.UploadFile)
 	}
+}
+
+func getCurrentUserID(c *gin.Context) int64 {
+	if uid, exists := c.Get("userId"); exists {
+		if id, ok := uid.(int64); ok {
+			return id
+		}
+	}
+	return 0
+}
+
+func getCurrentUsername(c *gin.Context) string {
+	if username, exists := c.Get("username"); exists {
+		if s, ok := username.(string); ok {
+			return s
+		}
+	}
+	return ""
 }
