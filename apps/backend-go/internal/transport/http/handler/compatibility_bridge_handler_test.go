@@ -533,7 +533,7 @@ func TestChartSaveRouteUpdatesCoreFields(t *testing.T) {
 	repo := &fakeBridgeChartRepo{charts: map[int64]*chart.CoreChartView{}}
 	title := "old"
 	repo.charts[101] = &chart.CoreChartView{ID: 101, Title: &title}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
@@ -584,7 +584,7 @@ func TestChartListByDQRouteReturnsDimensionAndQuota(t *testing.T) {
 		DeType:         &deTypeD,
 		Checked:        &checked,
 	}}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
@@ -637,7 +637,7 @@ func TestApiAliasChartSaveAndListByDQ(t *testing.T) {
 			Checked:        &checked,
 		}}},
 	}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -714,7 +714,7 @@ func TestDatasetFieldListWithPermissions_FiltersDisabledAndMarksMasked(t *testin
 		t.Fatalf("create mask permission failed: %v", err)
 	}
 	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo))
-	chartHandler := NewChartHandler(chartService)
+	chartHandler := NewChartHandler(chartService, nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -779,7 +779,7 @@ func TestChartCopyAndDeleteFieldRoutes(t *testing.T) {
 		DeType:         &deType,
 		Checked:        &checked,
 	}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
@@ -849,7 +849,7 @@ func TestApiAliasChartCopyAndDeleteFieldByChart(t *testing.T) {
 		DeType:         &deType,
 		Checked:        &checked,
 	}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -914,7 +914,7 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 	require.NoError(t, datasetDB.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
 	datasetRepo := repository.NewDatasetRepository(datasetDB)
 	datasetService := service.NewDatasetService(datasetRepo)
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 	field := &dataset.CoreDatasetTableField{
 		ID:             21,
 		DatasetGroupID: 41,
@@ -941,7 +941,7 @@ func TestDatasetFieldAliasRoutes(t *testing.T) {
 		DeType:         &deType,
 		Checked:        &checked,
 	}).Error)
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
@@ -1013,7 +1013,7 @@ func setupStage3DatasetFieldRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	datasetRepo := repository.NewDatasetRepository(db)
 	datasetService := service.NewDatasetService(datasetRepo)
 	datasetService.SetUserRepository(repository.NewUserRepository(db))
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	chartRepo := &fakeBridgeChartRepo{
 		charts:        map[int64]*chart.CoreChartView{},
@@ -1022,7 +1022,7 @@ func setupStage3DatasetFieldRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
 		nextFieldID:   9000,
 	}
-	chartHandler := NewChartHandler(service.NewChartService(chartRepo))
+	chartHandler := NewChartHandler(service.NewChartService(chartRepo), nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
@@ -1040,7 +1040,7 @@ func setupStage3DatasetFieldRouterWithUser(t *testing.T, userID uint64) (*gin.En
 	datasetRepo := repository.NewDatasetRepository(db)
 	datasetService := service.NewDatasetService(datasetRepo)
 	datasetService.SetUserRepository(repository.NewUserRepository(db))
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	chartRepo := &fakeBridgeChartRepo{
 		charts:        map[int64]*chart.CoreChartView{},
@@ -1049,7 +1049,7 @@ func setupStage3DatasetFieldRouterWithUser(t *testing.T, userID uint64) (*gin.En
 		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
 		nextFieldID:   9000,
 	}
-	chartHandler := NewChartHandler(service.NewChartService(chartRepo))
+	chartHandler := NewChartHandler(service.NewChartService(chartRepo), nil)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -1162,7 +1162,7 @@ func TestPaginationResponseFormat(t *testing.T) {
 func TestErrorResponseFormat(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &fakeBridgeChartRepo{charts: map[int64]*chart.CoreChartView{}}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
@@ -1229,7 +1229,7 @@ func TestDatasetTreeExportDatasetRoute(t *testing.T) {
 		datasetSvc := service.NewDatasetService(repo)
 		exportRepo := &mockBridgeExportRepo{}
 		datasetSvc.SetExportRepository(exportRepo)
-		datasetHandler := NewDatasetHandler(datasetSvc)
+		datasetHandler := NewDatasetHandler(datasetSvc, nil)
 
 		rootPID := int64(0)
 		nodeType := dataset.NodeTypeDataset
@@ -1263,7 +1263,7 @@ func TestDatasetTreeExportDatasetRoute(t *testing.T) {
 		datasetSvc := service.NewDatasetService(repo)
 		exportRepo := &mockBridgeExportRepo{}
 		datasetSvc.SetExportRepository(exportRepo)
-		datasetHandler := NewDatasetHandler(datasetSvc)
+		datasetHandler := NewDatasetHandler(datasetSvc, nil)
 
 		rootPID := int64(0)
 		nodeType := dataset.NodeTypeDataset
@@ -1287,8 +1287,8 @@ func TestDatasetTreeExportDatasetRoute(t *testing.T) {
 	})
 
 	t.Run("keeps inline download behavior when dataEaseBi is true", func(t *testing.T) {
-		datasetHandler := NewDatasetHandler(service.NewDatasetService(nil))
-		chartHandler := NewChartHandler(nil)
+		datasetHandler := NewDatasetHandler(service.NewDatasetService(nil), nil)
+		chartHandler := NewChartHandler(nil, nil)
 
 		r := gin.New()
 		RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, chartHandler, nil)
@@ -1968,7 +1968,7 @@ func TestDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 
 	datasetService := service.NewDatasetService(nil)
 	datasetService.SetCalciteConfig(addr, 2*time.Second, 0)
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
@@ -2002,7 +2002,7 @@ func TestApiAliasDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 
 	datasetService := service.NewDatasetService(nil)
 	datasetService.SetCalciteConfig(addr, 2*time.Second, 0)
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -2032,7 +2032,7 @@ func TestApiAliasDatasetPreviewSQLRouteUsesCalciteValidation(t *testing.T) {
 func TestDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	datasetService := service.NewDatasetService(nil)
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -2057,7 +2057,7 @@ func TestDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t
 func TestApiAliasDatasetPreviewSQLRouteReturnsExplicitUnsupportedForExternalDatasource(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	datasetService := service.NewDatasetService(nil)
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -2095,7 +2095,7 @@ func TestDatasetPreviewSQLRouteRoutesMySQLDatasourcePreview(t *testing.T) {
 		assert.Equal(t, "root", cfg.Username)
 		return &bridgeStubPreviewExecutor{rows: []map[string]interface{}{{"name": "alice"}}}, nil
 	})
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -2136,7 +2136,7 @@ func TestDatasetPreviewSQLRouteReturnsPermissionDeniedForDirectPreview(t *testin
 	datasetService.SetResourcePermissionService(service.NewResourcePermissionService(&mockBridgeResourcePermRepo{hasPermission: false}, nil))
 	configBytes := base64.StdEncoding.EncodeToString([]byte(`{"host":"mysql.local","port":3306,"dataBase":"analytics","username":"root","password":"secret"}`))
 	require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 67, Name: "mysql-ds", Type: "mysql", Configuration: &configBytes}).Error)
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -2173,7 +2173,7 @@ func TestDatasetPreviewSQLRouteReturnsTimeoutAndTooLargeErrors(t *testing.T) {
 		datasetService.SetPreviewExecutorFactory(func(ds *datasource.CoreDatasource, cfg *datasource.ConnectionConfig) (service.PreviewExecutor, error) {
 			return &bridgeStubPreviewExecutor{err: execErr}, nil
 		})
-		datasetHandler := NewDatasetHandler(datasetService)
+		datasetHandler := NewDatasetHandler(datasetService, nil)
 
 		r := gin.New()
 		r.Use(func(c *gin.Context) {
@@ -2220,7 +2220,7 @@ func TestDatasetPreviewSQLRouteAcceptsSQLVariableDetailsForLocalPreview(t *testi
 	require.NoError(t, db.Exec("INSERT INTO preview_sql_local_variables (name) VALUES ('alice')").Error)
 
 	datasetService := service.NewDatasetService(repository.NewDatasetRepository(db))
-	datasetHandler := NewDatasetHandler(datasetService)
+	datasetHandler := NewDatasetHandler(datasetService, nil)
 
 	r := gin.New()
 	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, datasetHandler, nil, nil)
@@ -2358,7 +2358,7 @@ func TestCompatibilityBridge_ChartDataGetData_401_Unauthenticated(t *testing.T) 
 	permMiddleware.SetChartDatasetResolver(&mockBridgeChartDatasetResolver{datasetGroupIDs: map[int64]int64{101: 11}})
 
 	repo := &fakeBridgeChartRepo{chartDatasetGroups: map[int64]int64{101: 11}}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -2385,7 +2385,7 @@ func TestCompatibilityBridge_ChartGetData_403_Forbidden(t *testing.T) {
 	permMiddleware.SetChartDatasetResolver(&mockBridgeChartDatasetResolver{datasetGroupIDs: map[int64]int64{101: 11}})
 
 	repo := &fakeBridgeChartRepo{chartDatasetGroups: map[int64]int64{101: 11}}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -2416,7 +2416,7 @@ func TestCompatibilityBridge_ChartDataGetData_400_WhenDatasetFieldPretendsToBeCh
 	permMiddleware.SetChartDatasetResolver(&mockBridgeChartDatasetResolver{datasetGroupIDs: map[int64]int64{101: 11}})
 
 	repo := &fakeBridgeChartRepo{chartDatasetGroups: map[int64]int64{101: 11}}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -2454,7 +2454,7 @@ func TestCompatibilityBridge_ChartListByDQ_401_Unauthenticated(t *testing.T) {
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermSvc, exportPermSvc, adminChecker)
 
 	repo := &fakeBridgeChartRepo{}
-	chartHandler := NewChartHandler(service.NewChartService(repo))
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -2505,7 +2505,7 @@ func TestCompatibilityBridge_ChartListByDQ_UsesPermissionAwareFieldsWhenGoverned
 		t.Fatalf("create mask permission failed: %v", err)
 	}
 	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo))
-	chartHandler := NewChartHandler(chartService)
+	chartHandler := NewChartHandler(chartService, nil)
 
 	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
 	adminChecker := middleware.NewDefaultAdminChecker([]int64{})
@@ -2598,7 +2598,7 @@ func setupPermissionAwareDatasetDetailRouter(t *testing.T) *gin.Engine {
 	rowPermSvc := service.NewRowPermissionService(rowPermRepo, columnPermRepo, nil, middleware.NewDefaultAdminChecker([]int64{}))
 	rowPermSvc.SetDatasetFieldResolver(datasetRepo)
 	datasetSvc := service.NewDatasetServiceWithPermission(datasetRepo, rowPermSvc)
-	datasetHandler := NewDatasetHandler(datasetSvc)
+	datasetHandler := NewDatasetHandler(datasetSvc, nil)
 
 	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
 	adminChecker := middleware.NewDefaultAdminChecker([]int64{})

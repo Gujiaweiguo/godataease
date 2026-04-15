@@ -247,13 +247,14 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	}
 	datasetService.SetUserRepository(userRepo)
 	datasetService.SetDatasourceRepository(datasourceRepo)
-	datasetHandler := handler.NewDatasetHandler(datasetService)
 
 	chartRepo := repository.NewChartRepository(db)
 	chartService := service.NewChartService(chartRepo)
 	chartService.SetRowPermissionService(rowPermService)
 	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnPermRepo))
-	chartHandler := handler.NewChartHandler(chartService)
+	datasetHandler := handler.NewDatasetHandler(datasetService, chartService)
+
+	chartHandler := handler.NewChartHandler(chartService, datasetService)
 	dataPermissionService := service.NewDataPermissionAdminService(rowPermRepo, columnPermRepo, chartService)
 	dataPermissionHandler := handler.NewDataPermissionHandler(dataPermissionService)
 
@@ -563,7 +564,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
-		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, r.chartHandler, r.permMiddleware)
+		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, nil, r.permMiddleware)
 		handler.RegisterDatasetFieldDeleteRoutes(api.Group("/datasetField"), r.datasetHandler, r.chartHandler)
 	}
 }
@@ -700,9 +701,45 @@ func (r *Router) registerChartRoutes(api *gin.RouterGroup) {
 		chartGroup.POST("/query", r.chartHandler.Query)
 		if r.permMiddleware != nil {
 			chartGroup.POST("/data", r.permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), r.chartHandler.Data)
+			chartGroup.POST("/getData", r.permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), r.chartHandler.Data)
 		} else {
 			chartGroup.POST("/data", r.chartHandler.Data)
+			chartGroup.POST("/getData", r.chartHandler.Data)
 		}
+		chartGroup.POST("/getChart/:id", r.chartHandler.GetChart)
+		chartGroup.POST("/getDetail/:id", r.chartHandler.GetDetail)
+		chartGroup.GET("/checkSameDataSet/:viewIdSource/:viewIdTarget", r.chartHandler.CheckSameDataSet)
+		chartGroup.POST("/save", r.chartHandler.SaveFromMap)
+		if r.permMiddleware != nil {
+			chartGroup.POST("/listByDQ/:id/:chartId", r.permMiddleware.CheckDatasetView(), r.chartHandler.ListByDQ)
+		} else {
+			chartGroup.POST("/listByDQ/:id/:chartId", r.chartHandler.ListByDQ)
+		}
+		chartGroup.POST("/copyField/:id/:chartId", r.chartHandler.CopyField)
+		chartGroup.POST("/deleteField/:id", r.chartHandler.DeleteField)
+		chartGroup.POST("/deleteFieldByChart/:chartId", r.chartHandler.DeleteFieldByChart)
+	}
+	chartDataGroup := api.Group("/chartData")
+	{
+		if r.permMiddleware != nil {
+			chartDataGroup.POST("/getData", r.permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), r.chartHandler.Data)
+		} else {
+			chartDataGroup.POST("/getData", r.chartHandler.Data)
+		}
+		chartDataGroup.POST("/getFieldData/:fieldId/:fieldType", r.chartHandler.GetFieldData)
+		chartDataGroup.POST("/getDrillFieldData/:fieldId", r.chartHandler.GetDrillFieldData)
+		chartDataGroup.POST("/innerExportDetails", r.chartHandler.InnerExportDetails)
+		chartDataGroup.POST("/innerExportDataSetDetails", r.chartHandler.InnerExportDataSetDetails)
+	}
+	datasetFieldGroup := api.Group("/datasetField")
+	{
+		datasetFieldGroup.POST("/listByDatasetGroup/:datasetId", r.datasetHandler.ListByDatasetGroup)
+		datasetFieldGroup.GET("/listWithPermissions/:datasetId", r.datasetHandler.ListWithPermissions)
+		datasetFieldGroup.POST("/save", r.datasetHandler.SaveField)
+		datasetFieldGroup.POST("/getFunction", r.datasetHandler.GetFieldFunctions)
+		datasetFieldGroup.POST("/multFieldValuesForPermissions", r.datasetHandler.MultFieldValuesForPermissions)
+		datasetFieldGroup.POST("/copilotFields/:id", r.datasetHandler.CopilotFields)
+		datasetFieldGroup.POST("/listByDsIds", r.datasetHandler.ListFieldsByDsIds)
 	}
 }
 
