@@ -92,7 +92,9 @@ export const latestUse = async (data = {}) => {
   return request.post({ url: '/datasource/latestUse', data })
 }
 
-export const validateById = (id: number) => request.get({ url: '/datasource/validate/' + id })
+// Canonical datasource validation/checking routes migrated in
+// datasource-validation-checking-canonical-migration.
+export const validateById = (id: number) => request.get({ url: '/ds/validate/' + id })
 
 export const save = async (data = {}): Promise<Dataset> => {
   nameTrim(data)
@@ -135,13 +137,13 @@ export const createFolder = async (data = {}): Promise<Dataset> => {
 }
 
 export const checkRepeat = async (data = {}): Promise<Dataset> => {
-  return request.post({ url: '/datasource/checkRepeat', data }).then(res => {
+  return request.post({ url: '/ds/checkRepeat', data }).then(res => {
     return res?.data
   })
 }
 
 export const checkApiItem = async (data = {}): Promise<IResponse> => {
-  return withDatasourceError(() => request.post({ url: '/datasource/checkApiDatasource', data }))
+  return withDatasourceError(() => request.post({ url: '/ds/checkApiDatasource', data }))
 }
 
 export const getDatasetTree = async (data = {}): Promise<IResponse> => {

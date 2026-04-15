@@ -260,7 +260,7 @@ const showApiData = () => {
       const data = Base64.encode(JSON.stringify(apiItem))
       const params = Base64.encode(JSON.stringify(paramsList))
       loading.value = true
-      cancelMap['/datasource/checkApiDatasource']?.()
+      cancelMap['/api/ds/checkApiDatasource']?.()
       checkApiItem({ dsType: dsType.value, data: data, type: 'apiStructure', paramsList: params })
         .then(response => {
           originFieldItem.jsonFields = response.data.jsonFields
@@ -432,7 +432,7 @@ const stepNext = () => {
       }
     }
   }
-  cancelMap['/datasource/checkApiDatasource']?.()
+  cancelMap['/api/ds/checkApiDatasource']?.()
   const params = Base64.encode(JSON.stringify(paramsList))
   disabledNext.value = true
   formLoading.value = true
@@ -479,7 +479,7 @@ const validateItem = () => {
     ElMessage.error(t('datasource.please_input_dataPath'))
     return
   }
-  cancelMap['/datasource/checkApiDatasource']?.()
+  cancelMap['/api/ds/checkApiDatasource']?.()
   const params = Base64.encode(JSON.stringify(paramsList))
   formLoading.value = true
   checkApiItem({
@@ -516,7 +516,7 @@ const handleSubmit = param => {
 }
 
 const closeEditItem = () => {
-  cancelMap['/datasource/checkApiDatasource']?.()
+  cancelMap['/api/ds/checkApiDatasource']?.()
   if (isPlugin.value) {
     xpackApiItemBasicInfo?.value?.invokeMethod({
       methodName: 'resetForm',
