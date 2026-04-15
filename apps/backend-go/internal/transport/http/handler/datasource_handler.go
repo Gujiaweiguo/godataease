@@ -230,6 +230,54 @@ func (h *DatasourceHandler) SyncApiDs(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) LoadRemoteFile(c *gin.Context) {
+	var req struct {
+		URL          string `json:"url"`
+		UserName     string `json:"userName"`
+		Password     string `json:"passwd"`
+		DatasourceID int64  `json:"datasourceId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.LoadRemoteFile(req.URL, req.UserName, req.Password, req.DatasourceID)
+	if err != nil {
+		response.Error(c, "500000", "Failed to load remote file: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) UploadFile(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
+		return
+	}
+	defer file.Close()
+
+	var datasourceID int64
+	if idStr := c.PostForm("id"); idStr != "" {
+		datasourceID, _ = strconv.ParseInt(idStr, 10, 64)
+	}
+
+	var editType int
+	if editTypeStr := c.PostForm("editType"); editTypeStr != "" {
+		editType, _ = strconv.Atoi(editTypeStr)
+	}
+
+	result, err := h.service.UploadFile(file, header, datasourceID, editType)
+	if err != nil {
+		response.Error(c, "500000", "Failed to process file: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
@@ -247,5 +295,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/previewData", h.PreviewData)
 		dsGroup.POST("/syncApiTable", h.SyncApiTable)
 		dsGroup.POST("/syncApiDs", h.SyncApiDs)
+		dsGroup.POST("/loadRemoteFile", h.LoadRemoteFile)
+		dsGroup.POST("/uploadFile", h.UploadFile)
 	}
 }

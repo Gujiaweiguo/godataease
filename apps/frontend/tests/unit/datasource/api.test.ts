@@ -86,7 +86,7 @@ describe('Datasource API wrappers', () => {
     await uploadFile(payload)
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/uploadFile',
+      url: '/ds/uploadFile',
       data: payload,
       loading: true,
       headersType: 'multipart/form-data;'
@@ -222,7 +222,7 @@ describe('Datasource API wrappers', () => {
     })
   })
 
-  it('keeps upload and remote datasource routes on compatibility aliases', async () => {
+  it('queries upload and remote datasource routes through canonical aliases', async () => {
     requestMock.post.mockResolvedValueOnce({ code: '000000' })
     requestMock.post.mockResolvedValueOnce({ data: { loaded: true } })
 
@@ -231,14 +231,31 @@ describe('Datasource API wrappers', () => {
     await loadRemoteFile({ url: 'http://example.com/demo.csv' })
 
     expect(requestMock.post).toHaveBeenNthCalledWith(1, {
-      url: '/datasource/uploadFile',
+      url: '/ds/uploadFile',
       data: { file: 'mock-file' },
       loading: true,
       headersType: 'multipart/form-data;'
     })
     expect(requestMock.post).toHaveBeenNthCalledWith(2, {
-      url: '/datasource/loadRemoteFile',
+      url: '/ds/loadRemoteFile',
       data: { url: 'http://example.com/demo.csv' }
+    })
+  })
+
+  it('keeps non-scoped datasource endpoints on compatibility aliases', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: { valid: true } })
+    requestMock.get.mockResolvedValueOnce({ data: { supported: true } })
+
+    await checkApiItem({ url: 'http://example.com' })
+    const { supportSetKey } = await import('@/api/datasource')
+    await supportSetKey()
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, {
+      url: '/datasource/checkApiDatasource',
+      data: { url: 'http://example.com' }
+    })
+    expect(requestMock.get).toHaveBeenNthCalledWith(1, {
+      url: '/engine/supportSetKey'
     })
   })
 

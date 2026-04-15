@@ -79,6 +79,8 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "canonical datasource preview data", path: "/api/ds/previewData", body: "{"},
 		{name: "canonical datasource sync api table", path: "/api/ds/syncApiTable", body: "{"},
 		{name: "canonical datasource sync api ds", path: "/api/ds/syncApiDs", body: "{"},
+		{name: "canonical datasource load remote file", path: "/api/ds/loadRemoteFile", body: "{"},
+		{name: "canonical datasource upload file", path: "/api/ds/uploadFile", body: `{}`},
 		{name: "api compatibility datasource list", path: "/api/datasource/list", body: "{"},
 		{name: "api compatibility datasource validate", path: "/api/datasource/validate", body: "{"},
 		{name: "api compatibility datasource tables", path: "/api/datasource/getTables", body: "{"},
@@ -87,6 +89,8 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "api compatibility datasource preview data", path: "/api/datasource/previewData", body: "{"},
 		{name: "api compatibility datasource sync api table", path: "/api/datasource/syncApiTable", body: "{"},
 		{name: "api compatibility datasource sync api ds", path: "/api/datasource/syncApiDs", body: "{"},
+		{name: "api compatibility datasource load remote file", path: "/api/datasource/loadRemoteFile", body: "{"},
+		{name: "api compatibility datasource upload file", path: "/api/datasource/uploadFile", body: `{}`},
 		{name: "de2api datasource list", path: "/de2api/datasource/list", body: "{"},
 		{name: "de2api datasource validate", path: "/de2api/datasource/validate", body: "{"},
 		{name: "de2api datasource tables", path: "/de2api/datasource/getTables", body: "{"},
@@ -95,6 +99,8 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "de2api datasource preview data", path: "/de2api/datasource/previewData", body: "{"},
 		{name: "de2api datasource sync api table", path: "/de2api/datasource/syncApiTable", body: "{"},
 		{name: "de2api datasource sync api ds", path: "/de2api/datasource/syncApiDs", body: "{"},
+		{name: "de2api datasource load remote file", path: "/de2api/datasource/loadRemoteFile", body: "{"},
+		{name: "de2api datasource upload file", path: "/de2api/datasource/uploadFile", body: `{}`},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +132,12 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 				}
 				return
 			}
+			if strings.Contains(tt.path, "/uploadFile") {
+				if !strings.Contains(resp.Msg, "Failed to get uploaded file") {
+					t.Fatalf("expected upload file binding error for %s, got %q", tt.path, resp.Msg)
+				}
+				return
+			}
 			if !strings.Contains(resp.Msg, "Invalid request") {
 				t.Fatalf("expected invalid request message for %s, got %q", tt.path, resp.Msg)
 			}
@@ -145,6 +157,8 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 		"POST /api/ds/previewData":               true,
 		"POST /api/ds/syncApiTable":              true,
 		"POST /api/ds/syncApiDs":                 true,
+		"POST /api/ds/loadRemoteFile":            true,
+		"POST /api/ds/uploadFile":                true,
 		"POST /api/datasource/getTables":         true,
 		"POST /api/datasource/getTableStatus":    true,
 		"POST /api/datasource/getTableField":     true,
@@ -152,6 +166,8 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 		"POST /api/datasource/previewData":       true,
 		"POST /api/datasource/syncApiTable":      true,
 		"POST /api/datasource/syncApiDs":         true,
+		"POST /api/datasource/loadRemoteFile":    true,
+		"POST /api/datasource/uploadFile":        true,
 		"POST /de2api/datasource/getTables":      true,
 		"POST /de2api/datasource/getTableStatus": true,
 		"POST /de2api/datasource/getTableField":  true,
@@ -159,6 +175,8 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 		"POST /de2api/datasource/previewData":    true,
 		"POST /de2api/datasource/syncApiTable":   true,
 		"POST /de2api/datasource/syncApiDs":      true,
+		"POST /de2api/datasource/loadRemoteFile": true,
+		"POST /de2api/datasource/uploadFile":     true,
 	}
 
 	for _, route := range router.Engine().Routes() {
@@ -281,6 +299,8 @@ func TestRegisterRoutes_DatasourceListAliasesRequireAuthentication(t *testing.T)
 		{name: "canonical datasource preview data requires auth", path: "/api/ds/previewData"},
 		{name: "canonical datasource sync api table requires auth", path: "/api/ds/syncApiTable"},
 		{name: "canonical datasource sync api ds requires auth", path: "/api/ds/syncApiDs"},
+		{name: "canonical datasource load remote file requires auth", path: "/api/ds/loadRemoteFile"},
+		{name: "canonical datasource upload file requires auth", path: "/api/ds/uploadFile"},
 		{name: "api compatibility datasource list requires auth", path: "/api/datasource/list"},
 		{name: "api compatibility datasource tables requires auth", path: "/api/datasource/getTables"},
 		{name: "api compatibility datasource table status requires auth", path: "/api/datasource/getTableStatus"},
@@ -289,6 +309,8 @@ func TestRegisterRoutes_DatasourceListAliasesRequireAuthentication(t *testing.T)
 		{name: "api compatibility datasource preview data requires auth", path: "/api/datasource/previewData"},
 		{name: "api compatibility datasource sync api table requires auth", path: "/api/datasource/syncApiTable"},
 		{name: "api compatibility datasource sync api ds requires auth", path: "/api/datasource/syncApiDs"},
+		{name: "api compatibility datasource load remote file requires auth", path: "/api/datasource/loadRemoteFile"},
+		{name: "api compatibility datasource upload file requires auth", path: "/api/datasource/uploadFile"},
 		{name: "de2api datasource list requires auth", path: "/de2api/datasource/list"},
 		{name: "de2api datasource tables requires auth", path: "/de2api/datasource/getTables"},
 		{name: "de2api datasource table status requires auth", path: "/de2api/datasource/getTableStatus"},
@@ -297,6 +319,8 @@ func TestRegisterRoutes_DatasourceListAliasesRequireAuthentication(t *testing.T)
 		{name: "de2api datasource preview data requires auth", path: "/de2api/datasource/previewData"},
 		{name: "de2api datasource sync api table requires auth", path: "/de2api/datasource/syncApiTable"},
 		{name: "de2api datasource sync api ds requires auth", path: "/de2api/datasource/syncApiDs"},
+		{name: "de2api datasource load remote file requires auth", path: "/de2api/datasource/loadRemoteFile"},
+		{name: "de2api datasource upload file requires auth", path: "/de2api/datasource/uploadFile"},
 	}
 
 	for _, tt := range tests {
@@ -497,6 +521,62 @@ func TestRegisterRoutes_DatasourcePreviewAndSyncAliasesReturnExplicitErrorAfterA
 			}
 			if resp.Msg != tt.msg {
 				t.Fatalf("expected message %q for %s, got %q", tt.msg, tt.path, resp.Msg)
+			}
+		})
+	}
+}
+
+func TestRegisterRoutes_DatasourceFileIngestAliasesReturnExplicitErrorsAfterAuthentication(t *testing.T) {
+	router := newRouterWithJWTConfig()
+	router.RegisterRoutes()
+
+	jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{Secret: "test-secret", Expire: 3600})
+	token, err := jwtInstance.GenerateToken(1, "admin", "admin")
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		path          string
+		contentType   string
+		body          string
+		expectContain string
+	}{
+		{name: "canonical datasource load remote file explicit error after auth", path: "/api/ds/loadRemoteFile", contentType: "application/json", body: `{"url":"://bad"}`, expectContain: "Failed to load remote file:"},
+		{name: "api compatibility datasource load remote file explicit error after auth", path: "/api/datasource/loadRemoteFile", contentType: "application/json", body: `{"url":"://bad"}`, expectContain: "Failed to load remote file:"},
+		{name: "de2api datasource load remote file explicit error after auth", path: "/de2api/datasource/loadRemoteFile", contentType: "application/json", body: `{"url":"://bad"}`, expectContain: "Failed to load remote file:"},
+		{name: "canonical datasource upload file explicit error after auth", path: "/api/ds/uploadFile", contentType: "application/json", body: `{}`, expectContain: "Failed to get uploaded file:"},
+		{name: "api compatibility datasource upload file explicit error after auth", path: "/api/datasource/uploadFile", contentType: "application/json", body: `{}`, expectContain: "Failed to get uploaded file:"},
+		{name: "de2api datasource upload file explicit error after auth", path: "/de2api/datasource/uploadFile", contentType: "application/json", body: `{}`, expectContain: "Failed to get uploaded file:"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", tt.contentType)
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+
+			if resp.Code != "500000" {
+				t.Fatalf("expected code 500000 for %s, got %s", tt.path, resp.Code)
+			}
+			if !strings.Contains(resp.Msg, tt.expectContain) {
+				t.Fatalf("expected message containing %q for %s, got %q", tt.expectContain, tt.path, resp.Msg)
 			}
 		})
 	}
