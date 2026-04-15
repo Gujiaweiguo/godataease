@@ -70,6 +70,8 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "canonical datasource list", path: "/api/ds/list", body: "{"},
 		{name: "canonical datasource tree", path: "/api/ds/tree", body: "{"},
 		{name: "canonical datasource validate", path: "/api/ds/validate", body: "{"},
+		{name: "canonical datasource check repeat", path: "/api/ds/checkRepeat", body: "{"},
+		{name: "canonical datasource check api datasource", path: "/api/ds/checkApiDatasource", body: "{"},
 		{name: "canonical datasource save", path: "/api/ds/save", body: "{"},
 		{name: "canonical datasource update", path: "/api/ds/update", body: "{"},
 		{name: "canonical datasource delete", path: "/api/ds/delete/not-a-number", body: "{"},
@@ -83,6 +85,8 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "canonical datasource upload file", path: "/api/ds/uploadFile", body: `{}`},
 		{name: "api compatibility datasource list", path: "/api/datasource/list", body: "{"},
 		{name: "api compatibility datasource validate", path: "/api/datasource/validate", body: "{"},
+		{name: "api compatibility datasource check repeat", path: "/api/datasource/checkRepeat", body: "{"},
+		{name: "api compatibility datasource check api datasource", path: "/api/datasource/checkApiDatasource", body: "{"},
 		{name: "api compatibility datasource tables", path: "/api/datasource/getTables", body: "{"},
 		{name: "api compatibility datasource table status", path: "/api/datasource/getTableStatus", body: "{"},
 		{name: "api compatibility datasource table field", path: "/api/datasource/getTableField", body: "{"},
@@ -93,6 +97,8 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 		{name: "api compatibility datasource upload file", path: "/api/datasource/uploadFile", body: `{}`},
 		{name: "de2api datasource list", path: "/de2api/datasource/list", body: "{"},
 		{name: "de2api datasource validate", path: "/de2api/datasource/validate", body: "{"},
+		{name: "de2api datasource check repeat", path: "/de2api/datasource/checkRepeat", body: "{"},
+		{name: "de2api datasource check api datasource", path: "/de2api/datasource/checkApiDatasource", body: "{"},
 		{name: "de2api datasource tables", path: "/de2api/datasource/getTables", body: "{"},
 		{name: "de2api datasource table status", path: "/de2api/datasource/getTableStatus", body: "{"},
 		{name: "de2api datasource table field", path: "/de2api/datasource/getTableField", body: "{"},
@@ -150,33 +156,42 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 	router.RegisterRoutes()
 
 	wantRoutes := map[string]bool{
-		"POST /api/ds/tables":                    true,
-		"POST /api/ds/tableStatus":               true,
-		"POST /api/ds/tableField":                true,
-		"POST /api/ds/schema":                    true,
-		"POST /api/ds/previewData":               true,
-		"POST /api/ds/syncApiTable":              true,
-		"POST /api/ds/syncApiDs":                 true,
-		"POST /api/ds/loadRemoteFile":            true,
-		"POST /api/ds/uploadFile":                true,
-		"POST /api/datasource/getTables":         true,
-		"POST /api/datasource/getTableStatus":    true,
-		"POST /api/datasource/getTableField":     true,
-		"POST /api/datasource/getSchema":         true,
-		"POST /api/datasource/previewData":       true,
-		"POST /api/datasource/syncApiTable":      true,
-		"POST /api/datasource/syncApiDs":         true,
-		"POST /api/datasource/loadRemoteFile":    true,
-		"POST /api/datasource/uploadFile":        true,
-		"POST /de2api/datasource/getTables":      true,
-		"POST /de2api/datasource/getTableStatus": true,
-		"POST /de2api/datasource/getTableField":  true,
-		"POST /de2api/datasource/getSchema":      true,
-		"POST /de2api/datasource/previewData":    true,
-		"POST /de2api/datasource/syncApiTable":   true,
-		"POST /de2api/datasource/syncApiDs":      true,
-		"POST /de2api/datasource/loadRemoteFile": true,
-		"POST /de2api/datasource/uploadFile":     true,
+		"POST /api/ds/tables":                        true,
+		"POST /api/ds/tableStatus":                   true,
+		"POST /api/ds/tableField":                    true,
+		"POST /api/ds/schema":                        true,
+		"POST /api/ds/previewData":                   true,
+		"POST /api/ds/syncApiTable":                  true,
+		"POST /api/ds/syncApiDs":                     true,
+		"POST /api/ds/loadRemoteFile":                true,
+		"POST /api/ds/uploadFile":                    true,
+		"GET /api/ds/validate/:id":                   true,
+		"POST /api/ds/checkRepeat":                   true,
+		"POST /api/ds/checkApiDatasource":            true,
+		"POST /api/datasource/getTables":             true,
+		"GET /api/datasource/validate/:id":           true,
+		"POST /api/datasource/checkRepeat":           true,
+		"POST /api/datasource/checkApiDatasource":    true,
+		"POST /api/datasource/getTableStatus":        true,
+		"POST /api/datasource/getTableField":         true,
+		"POST /api/datasource/getSchema":             true,
+		"POST /api/datasource/previewData":           true,
+		"POST /api/datasource/syncApiTable":          true,
+		"POST /api/datasource/syncApiDs":             true,
+		"POST /api/datasource/loadRemoteFile":        true,
+		"POST /api/datasource/uploadFile":            true,
+		"POST /de2api/datasource/getTables":          true,
+		"POST /de2api/datasource/getTableStatus":     true,
+		"POST /de2api/datasource/getTableField":      true,
+		"POST /de2api/datasource/getSchema":          true,
+		"POST /de2api/datasource/previewData":        true,
+		"POST /de2api/datasource/syncApiTable":       true,
+		"POST /de2api/datasource/syncApiDs":          true,
+		"POST /de2api/datasource/loadRemoteFile":     true,
+		"POST /de2api/datasource/uploadFile":         true,
+		"GET /de2api/datasource/validate/:id":        true,
+		"POST /de2api/datasource/checkRepeat":        true,
+		"POST /de2api/datasource/checkApiDatasource": true,
 	}
 
 	for _, route := range router.Engine().Routes() {
@@ -186,6 +201,207 @@ func TestRegisterRoutes_DatasourceTableExplorationRoutesExistAcrossAliases(t *te
 
 	if len(wantRoutes) > 0 {
 		t.Fatalf("missing datasource table exploration routes: %+v", wantRoutes)
+	}
+}
+
+func TestRegisterRoutes_DatasourceValidateByIDCanonicalRouteReturnsExplicitFailureForInvalidID(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	req := httptest.NewRequest("GET", "/api/ds/validate/not-a-number", nil)
+	w := httptest.NewRecorder()
+
+	router.Engine().ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v; body=%s", err, w.Body.String())
+	}
+
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "Invalid datasource ID") {
+		t.Fatalf("expected invalid datasource id message, got %q", resp.Msg)
+	}
+}
+
+func TestRegisterRoutes_DatasourceCheckRepeatSuccessEnvelopeAcrossAliases(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "canonical datasource check repeat success envelope", path: "/api/ds/checkRepeat"},
+		{name: "api compatibility datasource check repeat success envelope", path: "/api/datasource/checkRepeat"},
+		{name: "de2api datasource check repeat success envelope", path: "/de2api/datasource/checkRepeat"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(`{"type":"folder"}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+				Data bool   `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+
+			if resp.Code != "000000" {
+				t.Fatalf("expected code 000000 for %s, got %s", tt.path, resp.Code)
+			}
+			if resp.Msg != "success" {
+				t.Fatalf("expected success msg for %s, got %q", tt.path, resp.Msg)
+			}
+			if resp.Data {
+				t.Fatalf("expected false repeat-check result for %s, got true", tt.path)
+			}
+		})
+	}
+}
+
+func TestRegisterRoutes_DatasourceCheckRepeatCanonicalRouteReturnsExplicitFailureWhenStoreUnavailable(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	req := httptest.NewRequest("POST", "/api/ds/checkRepeat", strings.NewReader(`{"type":"mysql","configuration":"eyJob3N0IjoibG9jYWxob3N0IiwicG9ydCI6MzMwNn0="}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.Engine().ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v; body=%s", err, w.Body.String())
+	}
+
+	if resp.Code != "500000" {
+		t.Fatalf("expected code 500000, got %s", resp.Code)
+	}
+	if !strings.Contains(resp.Msg, "repository is unavailable") {
+		t.Fatalf("expected repository unavailable message, got %q", resp.Msg)
+	}
+}
+
+func TestRegisterRoutes_DatasourceCheckAPIDatasourceRoutesReturnExplicitEnvelopesAcrossAliases(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	tests := []struct {
+		name         string
+		path         string
+		body         string
+		wantCode     string
+		wantDataType string
+		wantMessage  string
+	}{
+		{
+			name:         "canonical datasource check api datasource success envelope",
+			path:         "/api/ds/checkApiDatasource",
+			body:         `{"data":"eyJ1cmwiOiJodHRwOi8vZXhhbXBsZS5jb20ifQ==","type":"apiStructure"}`,
+			wantCode:     "000000",
+			wantDataType: "table",
+		},
+		{
+			name:         "api compatibility datasource check api datasource success envelope",
+			path:         "/api/datasource/checkApiDatasource",
+			body:         `{"data":"eyJ1cmwiOiJodHRwOi8vZXhhbXBsZS5jb20ifQ==","type":"apiStructure"}`,
+			wantCode:     "000000",
+			wantDataType: "table",
+		},
+		{
+			name:         "de2api datasource check api datasource success envelope",
+			path:         "/de2api/datasource/checkApiDatasource",
+			body:         `{"data":"eyJ1cmwiOiJodHRwOi8vZXhhbXBsZS5jb20ifQ==","type":"apiStructure"}`,
+			wantCode:     "000000",
+			wantDataType: "table",
+		},
+		{
+			name:        "canonical datasource check api datasource explicit failure",
+			path:        "/api/ds/checkApiDatasource",
+			body:        `{}`,
+			wantCode:    "500000",
+			wantMessage: "request is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.Engine().ServeHTTP(w, req)
+
+			if w.Code != 200 {
+				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			}
+
+			if tt.wantCode == "000000" {
+				var resp struct {
+					Code string                 `json:"code"`
+					Msg  string                 `json:"msg"`
+					Data map[string]interface{} `json:"data"`
+				}
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+				}
+				if resp.Code != tt.wantCode {
+					t.Fatalf("expected code %s for %s, got %s", tt.wantCode, tt.path, resp.Code)
+				}
+				if resp.Msg != "success" {
+					t.Fatalf("expected success msg for %s, got %q", tt.path, resp.Msg)
+				}
+				if resp.Data["type"] != tt.wantDataType {
+					t.Fatalf("expected type %q for %s, got %#v", tt.wantDataType, tt.path, resp.Data["type"])
+				}
+				if resp.Data["showApiStructure"] != true {
+					t.Fatalf("expected showApiStructure true for %s, got %#v", tt.path, resp.Data["showApiStructure"])
+				}
+				return
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("unmarshal response for %s failed: %v; body=%s", tt.path, err, w.Body.String())
+			}
+			if resp.Code != tt.wantCode {
+				t.Fatalf("expected code %s for %s, got %s", tt.wantCode, tt.path, resp.Code)
+			}
+			if !strings.Contains(resp.Msg, tt.wantMessage) {
+				t.Fatalf("expected message containing %q for %s, got %q", tt.wantMessage, tt.path, resp.Msg)
+			}
+		})
 	}
 }
 

@@ -51,6 +51,24 @@ func (h *DatasourceHandler) Validate(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) ValidateByID(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+
+	result, err := h.service.ValidateByID(id)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func (h *DatasourceHandler) Tree(c *gin.Context) {
 	var req datasource.ListRequest
 	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
@@ -278,16 +296,58 @@ func (h *DatasourceHandler) UploadFile(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) CheckRepeat(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	req, ok := parseDatasourceWriteRequest(c, false)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.CheckRepeat(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
+	var req map[string]string
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.CheckAPIDatasource(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed to check api datasource: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func recoverDatasourceServicePanic(c *gin.Context) {
+	if recovered := recover(); recovered != nil {
+		response.Error(c, "500000", "Failed: repository is unavailable")
+	}
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
 		dsGroup.POST("/list", h.List)
 		dsGroup.POST("/tree", h.Tree)
 		dsGroup.POST("/validate", h.Validate)
+		dsGroup.GET("/validate/:id", h.ValidateByID)
 		dsGroup.GET("/:id", h.Get)
 		dsGroup.POST("/save", h.Save)
 		dsGroup.POST("/update", h.Update)
 		dsGroup.POST("/delete/:id", h.Delete)
+		dsGroup.POST("/checkRepeat", h.CheckRepeat)
+		dsGroup.POST("/checkApiDatasource", h.CheckAPIDatasource)
 		dsGroup.POST("/tables", h.Tables)
 		dsGroup.POST("/tableStatus", h.TableStatus)
 		dsGroup.POST("/tableField", h.TableField)

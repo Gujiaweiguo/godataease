@@ -21,6 +21,7 @@ import {
   listDatasourceTables,
   listDatasources,
   validateById,
+  checkRepeat,
   deleteById,
   getById,
   getHidePwById,
@@ -45,7 +46,26 @@ describe('Datasource API wrappers', () => {
   it('keeps string id for validate endpoint', () => {
     const id = 9851884
     validateById(id)
-    expect(requestMock.get).toHaveBeenCalledWith({ url: `/datasource/validate/${id}` })
+    expect(requestMock.get).toHaveBeenCalledWith({ url: `/ds/validate/${id}` })
+  })
+
+  it('uses canonical validation checking routes while keeping compatibility wrappers', async () => {
+    requestMock.post.mockResolvedValueOnce({ data: false })
+    requestMock.post.mockResolvedValueOnce({ data: { valid: true } })
+
+    const repeatResult = await checkRepeat({ name: 'demo', type: 'mysql' })
+    const apiResult = await checkApiItem({ url: 'http://example.com' })
+
+    expect(requestMock.post).toHaveBeenNthCalledWith(1, {
+      url: '/ds/checkRepeat',
+      data: { name: 'demo', type: 'mysql' }
+    })
+    expect(requestMock.post).toHaveBeenNthCalledWith(2, {
+      url: '/ds/checkApiDatasource',
+      data: { url: 'http://example.com' }
+    })
+    expect(repeatResult).toBe(false)
+    expect(apiResult).toEqual({ data: { valid: true } })
   })
 
   it('prefers post delete endpoint for datasource removal', async () => {
@@ -251,7 +271,7 @@ describe('Datasource API wrappers', () => {
     await supportSetKey()
 
     expect(requestMock.post).toHaveBeenNthCalledWith(1, {
-      url: '/datasource/checkApiDatasource',
+      url: '/ds/checkApiDatasource',
       data: { url: 'http://example.com' }
     })
     expect(requestMock.get).toHaveBeenNthCalledWith(1, {
@@ -263,7 +283,7 @@ describe('Datasource API wrappers', () => {
     requestMock.post.mockResolvedValueOnce({ data: { valid: true } })
     const result = await checkApiItem({ url: 'http://example.com' })
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasource/checkApiDatasource',
+      url: '/ds/checkApiDatasource',
       data: { url: 'http://example.com' }
     })
     expect(result).toEqual({ data: { valid: true } })
