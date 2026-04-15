@@ -675,6 +675,12 @@ func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
 		} else {
 			datasetGroup.POST("/previewWithPerm", r.datasetHandler.PreviewWithPermission)
 		}
+		datasetGroup.POST("/save", r.datasetHandler.Save)
+		datasetGroup.POST("/create", r.datasetHandler.Create)
+		datasetGroup.POST("/rename", r.datasetHandler.Rename)
+		datasetGroup.POST("/move", r.datasetHandler.Move)
+		datasetGroup.POST("/delete/:id", r.datasetHandler.Delete)
+		datasetGroup.POST("/perDelete/:id", r.datasetHandler.PerDelete)
 	}
 }
 

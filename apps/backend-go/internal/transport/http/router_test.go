@@ -1474,3 +1474,80 @@ func TestRegisterRoutes_DatasourceUIMetadataCanonicalRoutes(t *testing.T) {
 		}
 	})
 }
+
+func TestRegisterRoutes_DatasetTreeCRUDCanonicalRoutes(t *testing.T) {
+	router := NewRouter(nil, nil)
+	router.RegisterRoutes()
+
+	t.Run("POST /api/dataset/save returns success envelope", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"test","nodeType":"dataset"}`)
+		req := httptest.NewRequest("POST", "/api/dataset/save", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("POST /api/dataset/create returns success envelope", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"test","nodeType":"dataset"}`)
+		req := httptest.NewRequest("POST", "/api/dataset/create", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("POST /api/dataset/rename returns error for missing id", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"test"}`)
+		req := httptest.NewRequest("POST", "/api/dataset/rename", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp["code"] != "500000" {
+			t.Fatalf("expected error code 500000, got %v", resp["code"])
+		}
+	})
+
+	t.Run("POST /api/dataset/move returns error for missing id", func(t *testing.T) {
+		body := strings.NewReader(`{}`)
+		req := httptest.NewRequest("POST", "/api/dataset/move", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp["code"] != "500000" {
+			t.Fatalf("expected error code 500000, got %v", resp["code"])
+		}
+	})
+
+	t.Run("POST /api/dataset/delete/1 returns success envelope", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/dataset/delete/1", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("POST /api/dataset/perDelete/1 returns success envelope", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/dataset/perDelete/1", nil)
+		w := httptest.NewRecorder()
+		router.Engine().ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+		}
+	})
+}
