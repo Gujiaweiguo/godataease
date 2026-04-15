@@ -496,4 +496,11 @@ func RegisterUserRoutes(r *gin.RouterGroup, h *UserHandler) {
 
 	r.GET("/user/info", h.GetUserInfo)
 	r.POST("/user/switch/:id", h.SwitchOrg)
+	r.POST("/user/excelTemplate", h.DownloadExcelTemplate)
+	r.POST("/user/batchImport", h.BatchImportUsers)
+	r.GET("/user/errorRecord/:key", h.DownloadErrorRecord)
+	r.GET("/user/clearErrorRecord/:key", h.ClearErrorRecord)
+	r.GET("/user/personInfo", h.PersonInfo)
+	r.GET("/user/ipInfo", h.IPInfo)
+	r.POST("/user/byCurOrg", h.ListUsers)
 }
