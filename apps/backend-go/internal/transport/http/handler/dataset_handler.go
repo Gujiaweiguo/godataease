@@ -99,7 +99,7 @@ func (h *DatasetHandler) PreviewWithPermission(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Save(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseDatasetWriteRequest(c, true)
 	if !ok {
 		return
@@ -113,7 +113,7 @@ func (h *DatasetHandler) Save(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Create(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseDatasetWriteRequest(c, true)
 	if !ok {
 		return
@@ -127,7 +127,7 @@ func (h *DatasetHandler) Create(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Rename(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseDatasetWriteRequest(c, true)
 	if !ok {
 		return
@@ -145,7 +145,7 @@ func (h *DatasetHandler) Rename(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Move(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseDatasetWriteRequest(c, false)
 	if !ok {
 		return
@@ -167,7 +167,7 @@ func (h *DatasetHandler) Move(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Delete(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -181,7 +181,7 @@ func (h *DatasetHandler) Delete(c *gin.Context) {
 }
 
 func (h *DatasetHandler) PerDelete(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -196,7 +196,7 @@ func (h *DatasetHandler) PerDelete(c *gin.Context) {
 }
 
 func (h *DatasetHandler) GetDetail(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -211,7 +211,7 @@ func (h *DatasetHandler) GetDetail(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Details(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -226,7 +226,7 @@ func (h *DatasetHandler) Details(c *gin.Context) {
 }
 
 func (h *DatasetHandler) DsDetails(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	ids, ok := parseDatasetIDs(c)
 	if !ok {
 		return
@@ -243,7 +243,7 @@ func (h *DatasetHandler) DsDetails(c *gin.Context) {
 }
 
 func (h *DatasetHandler) GetSQLParams(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	ids, ok := parseDatasetIDs(c)
 	if !ok {
 		return
@@ -257,7 +257,7 @@ func (h *DatasetHandler) GetSQLParams(c *gin.Context) {
 }
 
 func (h *DatasetHandler) BarInfo(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -282,7 +282,7 @@ func (h *DatasetHandler) BarInfo(c *gin.Context) {
 }
 
 func (h *DatasetHandler) GetDatasetTotal(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -302,7 +302,7 @@ func (h *DatasetHandler) GetDatasetTotal(c *gin.Context) {
 }
 
 func (h *DatasetHandler) PreviewSQL(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	var req dataset.SQLPreviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -317,7 +317,7 @@ func (h *DatasetHandler) PreviewSQL(c *gin.Context) {
 }
 
 func (h *DatasetHandler) EnumValueObj(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseEnumValueRequest(c)
 	if !ok {
 		return
@@ -331,7 +331,7 @@ func (h *DatasetHandler) EnumValueObj(c *gin.Context) {
 }
 
 func (h *DatasetHandler) EnumValueDs(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	fieldID, ok := parseEnumFieldID(c)
 	if !ok {
 		return
@@ -345,7 +345,7 @@ func (h *DatasetHandler) EnumValueDs(c *gin.Context) {
 }
 
 func (h *DatasetHandler) EnumValue(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseMultFieldValuesRequest(c)
 	if !ok {
 		return
@@ -359,7 +359,7 @@ func (h *DatasetHandler) EnumValue(c *gin.Context) {
 }
 
 func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -380,7 +380,7 @@ func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 }
 
 func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -401,7 +401,7 @@ func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
 }
 
 func (h *DatasetHandler) SaveField(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	var field dataset.CoreDatasetTableField
 	if err := c.ShouldBindJSON(&field); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -416,13 +416,13 @@ func (h *DatasetHandler) SaveField(c *gin.Context) {
 }
 
 func (h *DatasetHandler) GetFieldFunctions(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	result := h.service.GetFieldFunctions()
 	response.Success(c, result)
 }
 
 func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	req, ok := parseMultFieldValuesRequest(c)
 	if !ok {
 		return
@@ -436,7 +436,7 @@ func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
 }
 
 func (h *DatasetHandler) CopilotFields(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	datasetID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
@@ -464,7 +464,7 @@ func (h *DatasetHandler) CopilotFields(c *gin.Context) {
 }
 
 func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	var req struct {
 		DsIds []int64 `json:"dsIds"`
 	}
@@ -481,7 +481,7 @@ func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
 }
 
 func (h *DatasetHandler) DetailWithPerm(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	ids, ok := parseDatasetIDs(c)
 	if !ok {
 		return
@@ -507,7 +507,7 @@ func (h *DatasetHandler) DetailWithPerm(c *gin.Context) {
 }
 
 func (h *DatasetHandler) ExportDataset(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 	var req dataset.ExportDatasetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -540,12 +540,6 @@ func (h *DatasetHandler) ExportDataset(c *gin.Context) {
 		return
 	}
 	response.Success(c, result)
-}
-
-func recoverDatasetServicePanic(c *gin.Context) {
-	if r := recover(); r != nil {
-		response.Error(c, "500000", "Service unavailable")
-	}
 }
 
 func RegisterDatasetRoutes(r *gin.RouterGroup, h *DatasetHandler) {

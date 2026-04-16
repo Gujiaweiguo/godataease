@@ -52,7 +52,7 @@ func (h *DatasourceHandler) Validate(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) ValidateByID(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -102,7 +102,7 @@ func (h *DatasourceHandler) Get(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) HidePw(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -120,7 +120,7 @@ func (h *DatasourceHandler) HidePw(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) GetSimpleDs(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -183,7 +183,7 @@ func (h *DatasourceHandler) Delete(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) PerDelete(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -351,7 +351,7 @@ func (h *DatasourceHandler) UploadFile(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) CheckRepeat(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	req, ok := parseDatasourceWriteRequest(c, false)
 	if !ok {
@@ -368,7 +368,7 @@ func (h *DatasourceHandler) CheckRepeat(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Move(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	req, ok := parseDatasourceWriteRequest(c, false)
 	if !ok {
@@ -390,7 +390,7 @@ func (h *DatasourceHandler) Move(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Rename(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	req, ok := parseDatasourceWriteRequest(c, false)
 	if !ok {
@@ -407,7 +407,7 @@ func (h *DatasourceHandler) Rename(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) CreateFolder(c *gin.Context) {
-	defer recoverDatasourceServicePanic(c)
+	defer recoverServicePanic(c)
 
 	req, ok := parseDatasourceWriteRequest(c, false)
 	if !ok {
@@ -444,12 +444,6 @@ func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func recoverDatasourceServicePanic(c *gin.Context) {
-	if recovered := recover(); recovered != nil {
-		response.Error(c, "500000", "Failed: repository is unavailable")
-	}
-}
-
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
@@ -470,7 +464,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/checkRepeat", h.CheckRepeat)
 		dsGroup.POST("/checkApiDatasource", h.CheckAPIDatasource)
 		dsGroup.GET("/types", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
+			defer recoverServicePanic(c)
 			response.Success(c, []map[string]string{
 				{"type": "MySQL", "name": "MySQL"},
 				{"type": "PostgreSQL", "name": "PostgreSQL"},
@@ -480,7 +474,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 			})
 		})
 		dsGroup.GET("/showFinishPage", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
+			defer recoverServicePanic(c)
 			userID := getCurrentUserID(c)
 			result, err := h.service.ShowFinishPage(userID)
 			if err != nil {
@@ -490,7 +484,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 			response.Success(c, result)
 		})
 		dsGroup.POST("/showFinishPage", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
+			defer recoverServicePanic(c)
 			userID := getCurrentUserID(c)
 			if err := h.service.SetShowFinishPage(userID); err != nil {
 				response.Error(c, "500000", "Failed: "+err.Error())
@@ -499,7 +493,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 			response.Success(c, nil)
 		})
 		dsGroup.POST("/latestUse", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
+			defer recoverServicePanic(c)
 			username := getCurrentUsername(c)
 			result, err := h.service.LatestTypes(username)
 			if err != nil {
@@ -517,7 +511,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 		dsGroup.POST("/syncApiDs", h.SyncApiDs)
 		dsGroup.POST("/loadRemoteFile", h.LoadRemoteFile)
 		dsGroup.POST("/syncRecord/:dsId/:page/:limit", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
+			defer recoverServicePanic(c)
 			dsID, err := strconv.ParseInt(c.Param("dsId"), 10, 64)
 			if err != nil {
 				response.Error(c, "500000", "Invalid datasource ID")
