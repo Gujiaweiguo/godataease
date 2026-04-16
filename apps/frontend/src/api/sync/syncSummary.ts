@@ -9,7 +9,7 @@ interface IResourceCount {
 export const getResourceCount = () => {
   return request
     .get({
-      url: 'sync/summary/resourceCount',
+      url: '/sync/summary/resourceCount',
       method: 'get'
     })
     .then(res => {
