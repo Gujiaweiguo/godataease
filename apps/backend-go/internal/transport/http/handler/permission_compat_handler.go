@@ -90,18 +90,20 @@ type roleIDQuery struct {
 	RoleID int64 `json:"roleId"`
 }
 
-func parseRoleIDQuery(c *gin.Context) int64 {
+func parseRoleIDQuery(c *gin.Context) (int64, error) {
 	var req roleIDQuery
-	_ = c.ShouldBindJSON(&req)
+	if err := shouldBindOptionalJSON(c, &req); err != nil {
+		return 0, err
+	}
 	if req.RoleID > 0 {
-		return req.RoleID
+		return req.RoleID, nil
 	}
 	if roleIDStr := c.Query("roleId"); roleIDStr != "" {
 		if roleID, err := strconv.ParseInt(roleIDStr, 10, 64); err == nil {
-			return roleID
+			return roleID, nil
 		}
 	}
-	return 0
+	return 0, nil
 }
 
 func (h *PermissionCompatHandler) MenuPermission(c *gin.Context) {
@@ -111,7 +113,11 @@ func (h *PermissionCompatHandler) MenuPermission(c *gin.Context) {
 		return
 	}
 
-	roleID := parseRoleIDQuery(c)
+	roleID, err := parseRoleIDQuery(c)
+	if err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 
 	menuIDs := make([]int64, 0)
 	if roleID > 0 {
@@ -146,7 +152,11 @@ func (h *PermissionCompatHandler) SaveMenuPer(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) BusiPermission(c *gin.Context) {
-	roleID := parseRoleIDQuery(c)
+	roleID, err := parseRoleIDQuery(c)
+	if err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 
 	list, err := h.permService.ListPerms(&permission.PermQueryRequest{Current: 1, Size: 1000})
 	if err != nil {

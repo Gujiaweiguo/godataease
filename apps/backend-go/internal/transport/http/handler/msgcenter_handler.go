@@ -18,7 +18,10 @@ func NewMsgCenterHandler(service *service.MsgCenterService) *MsgCenterHandler {
 
 func (h *MsgCenterHandler) Count(c *gin.Context) {
 	var req msgcenter.CountRequest
-	_ = c.ShouldBindJSON(&req)
+	if err := shouldBindOptionalJSON(c, &req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 	response.Success(c, h.service.Count(&req))
 }
 
