@@ -10,9 +10,17 @@ import (
 )
 
 func recoverServicePanic(c *gin.Context) {
+	recoverServicePanicWithMessage(c, "Service unavailable")
+}
+
+func recoverServicePanicWithMessage(c *gin.Context, message string) {
 	if r := recover(); r != nil {
-		response.Error(c, "500000", "Service unavailable")
+		response.Error(c, "500000", message)
 	}
+}
+
+func recoverDatasourceServicePanic(c *gin.Context) {
+	recoverServicePanicWithMessage(c, "Failed: repository is unavailable")
 }
 
 func shouldBindOptionalJSON(c *gin.Context, target any) error {
