@@ -1060,6 +1060,30 @@ func setupStage3DatasetFieldRouterWithUser(t *testing.T, userID uint64) (*gin.En
 	return r, db
 }
 
+func setupStage3DatasetFieldRouterWithoutDataset(t *testing.T, userID uint64) *gin.Engine {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	chartRepo := &fakeBridgeChartRepo{
+		charts:        map[int64]*chart.CoreChartView{},
+		dsFields:      map[int64][]*dataset.CoreDatasetTableField{},
+		chartFields:   map[int64][]*dataset.CoreDatasetTableField{},
+		fieldRegistry: map[int64]*dataset.CoreDatasetTableField{},
+		nextFieldID:   9000,
+	}
+	chartHandler := NewChartHandler(service.NewChartService(chartRepo), nil)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		if userID > 0 {
+			c.Set("user_id", userID)
+		}
+		c.Next()
+	})
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
+	return r
+}
+
 func seedBridgeUser(t *testing.T, db *gorm.DB, id int64, username string, nickname string) {
 	t.Helper()
 	require.NoError(t, db.Create(&user.SysUser{UserID: id, Username: username, NickName: nickname, Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
@@ -1562,6 +1586,209 @@ func TestDatasetFieldMultFieldValuesForPermissionsRoute_NormalizesFieldIDs(t *te
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "000000", resp.Code)
 	assert.Equal(t, []string{"North", "South"}, resp.Data)
+}
+
+func TestDatasetFieldRoutesFallbackWhenDatasetHandlerNil(t *testing.T) {
+	r := setupStage3DatasetFieldRouterWithoutDataset(t, 9)
+
+	t.Run("save returns service unavailable", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/save", strings.NewReader(`{"name":"field1","datasetGroupId":1,"type":"string"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		resp := bridgeCodeResp{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "500000", resp.Code)
+		assert.Contains(t, resp.Msg, "dataset service unavailable")
+	})
+
+	t.Run("getFunction returns empty list", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/getFunction", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string                     `json:"code"`
+			Data []service.FunctionCategory `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Len(t, resp.Data, 0)
+	})
+
+	t.Run("multFieldValuesForPermissions returns empty list", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/multFieldValuesForPermissions", strings.NewReader(`{"fieldIds":[2201]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string   `json:"code"`
+			Data []string `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Len(t, resp.Data, 0)
+	})
+
+	t.Run("copilotFields returns service unavailable", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/copilotFields/2001", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		resp := bridgeCodeResp{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "500000", resp.Code)
+		assert.Contains(t, resp.Msg, "dataset service unavailable")
+	})
+
+	t.Run("listByDsIds returns empty list", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/listByDsIds", strings.NewReader(`{"dsIds":[11]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string                          `json:"code"`
+			Data []dataset.CoreDatasetTableField `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Len(t, resp.Data, 0)
+	})
+}
+
+func TestNilHandlerRouteGovernance_AllRouteGroupsSkippedWhenHandlerNil(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, nil, nil)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "datasource route skipped", method: http.MethodPost, path: "/datasource/types", body: `{}`},
+		{name: "datasetTree route skipped", method: http.MethodPost, path: "/datasetTree/tree", body: `{}`},
+		{name: "datasetData route skipped", method: http.MethodPost, path: "/datasetData/previewData", body: `{}`},
+		{name: "chart route skipped", method: http.MethodPost, path: "/chart/save", body: `{}`},
+		{name: "chartData route skipped", method: http.MethodPost, path: "/chartData/getData", body: `{}`},
+		{name: "datasetField read route skipped", method: http.MethodPost, path: "/datasetField/getFunction", body: `{}`},
+		{name: "datasetField write route skipped", method: http.MethodPost, path: "/datasetField/save", body: `{}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+	}
+}
+
+func TestNilDatasetHandler_DatasetFieldDeleteRoutesNotRegisteredWhenDatasetHandlerNil(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &fakeBridgeChartRepo{fieldRegistry: map[int64]*dataset.CoreDatasetTableField{}}
+	chartHandler := NewChartHandler(service.NewChartService(repo), nil)
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, nil, nil, chartHandler, nil)
+
+	t.Run("delete field route skipped", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/delete/1", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("delete by chart route skipped", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/deleteByChartId/1", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("other datasetField fallback routes still registered", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetField/getFunction", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string                     `json:"code"`
+			Data []service.FunctionCategory `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Len(t, resp.Data, 0)
+	})
+}
+
+func TestPartialHandlers_OnlyOwnRouteGroupsRegistered(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	datasourceHandler := NewDatasourceHandler(service.NewDatasourceService(nil))
+	chartRepo := &fakeBridgeChartRepo{charts: map[int64]*chart.CoreChartView{}}
+	chartHandler := NewChartHandler(service.NewChartService(chartRepo), nil)
+
+	r := gin.New()
+	RegisterCompatibilityBridgeRoutes(r, nil, nil, datasourceHandler, nil, chartHandler, nil)
+
+	t.Run("datasource routes are registered", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasource/types", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp bridgeResp
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+	})
+
+	t.Run("chart routes are registered", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/chart/listByDQ/1/1", strings.NewReader(`{"type":"bar"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp bridgeFieldListResp
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+	})
+
+	t.Run("datasetTree routes are skipped", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetTree/tree", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("datasetData routes are skipped", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/datasetData/previewData", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusNotFound, w.Code)
+	})
 }
 
 func TestDatasetFieldMultFieldValuesForPermissionsRoute_InvalidJSON(t *testing.T) {
