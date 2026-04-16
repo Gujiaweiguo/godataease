@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
 	"errors"
+	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +15,13 @@ import (
 )
 
 type DatasetHandler struct {
-	service      *service.DatasetService
-	chartService *service.ChartService
+	service            *service.DatasetService
+	chartService       *service.ChartService
+	chartExportService *service.ChartExportService
 }
 
-func NewDatasetHandler(service *service.DatasetService, chartSvc *service.ChartService) *DatasetHandler {
-	return &DatasetHandler{service: service, chartService: chartSvc}
+func NewDatasetHandler(dsSvc *service.DatasetService, chartSvc *service.ChartService) *DatasetHandler {
+	return &DatasetHandler{service: dsSvc, chartService: chartSvc, chartExportService: service.NewChartExportService(chartSvc)}
 }
 
 func (h *DatasetHandler) Tree(c *gin.Context) {
@@ -473,6 +475,68 @@ func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
 	result, err := h.service.ListFieldsByDsIds(req.DsIds)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) DetailWithPerm(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	ids, ok := parseDatasetIDs(c)
+	if !ok {
+		return
+	}
+	userID := int64(middleware.GetUserID(c))
+	result := make([]gin.H, 0, len(ids))
+	for _, id := range ids {
+		var (
+			detail gin.H
+			err    error
+		)
+		if userID > 0 {
+			detail, err = buildDatasetDetailWithPermission(h, id, userID)
+		} else {
+			detail, err = buildDatasetDetail(h, id)
+		}
+		if err != nil {
+			continue
+		}
+		result = append(result, detail)
+	}
+	response.Success(c, result)
+}
+
+func (h *DatasetHandler) ExportDataset(c *gin.Context) {
+	defer recoverDatasetServicePanic(c)
+	var req dataset.ExportDatasetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	if req.DataEaseBi {
+		buf, err := h.chartExportService.InnerExportDetails(&service.ExportChartRequest{
+			ViewName: req.ViewName,
+			Header:   req.Header,
+			Details:  req.Details,
+		})
+		if err != nil {
+			response.Error(c, "500000", "Failed to export: "+err.Error())
+			return
+		}
+
+		filename := service.GenerateExcelFilename(req.ViewName)
+		c.Header("Content-Description", "File Transfer")
+		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+		c.Header("Content-Transfer-Encoding", "binary")
+		c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+		return
+	}
+
+	result, err := h.service.ExportDataset(&req, int64(middleware.GetUserID(c)))
+	if err != nil {
+		response.Error(c, "500000", "Failed to export: "+err.Error())
 		return
 	}
 	response.Success(c, result)

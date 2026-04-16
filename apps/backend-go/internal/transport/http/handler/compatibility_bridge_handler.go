@@ -520,34 +520,10 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 				}
 				response.Success(c, result)
 			})
-			detailWithPermHandler := func(c *gin.Context) {
-				ids, ok := parseDatasetIDs(c)
-				if !ok {
-					return
-				}
-				userID := int64(middleware.GetUserID(c))
-				result := make([]gin.H, 0, len(ids))
-				for _, id := range ids {
-					var (
-						detail gin.H
-						err    error
-					)
-					if userID > 0 {
-						detail, err = buildDatasetDetailWithPermission(datasetHandler, id, userID)
-					} else {
-						detail, err = buildDatasetDetail(datasetHandler, id)
-					}
-					if err != nil {
-						continue
-					}
-					result = append(result, detail)
-				}
-				response.Success(c, result)
-			}
 			if permMiddleware != nil {
-				datasetTreeGroup.POST("/detailWithPerm", permMiddleware.CheckDatasetBatchView(), middleware.RowPermissionMiddleware(), detailWithPermHandler)
+				datasetTreeGroup.POST("/detailWithPerm", permMiddleware.CheckDatasetBatchView(), middleware.RowPermissionMiddleware(), datasetHandler.DetailWithPerm)
 			} else {
-				datasetTreeGroup.POST("/detailWithPerm", detailWithPermHandler)
+				datasetTreeGroup.POST("/detailWithPerm", datasetHandler.DetailWithPerm)
 			}
 			datasetTreeGroup.POST("/getSqlParams", func(c *gin.Context) {
 				ids, ok := parseDatasetIDs(c)
@@ -676,44 +652,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 
 				response.Success(c, barInfo)
 			})
-			datasetTreeGroup.POST("/exportDataset", func(c *gin.Context) {
-				var req dataset.ExportDatasetRequest
-				if err := c.ShouldBindJSON(&req); err != nil {
-					response.Error(c, "500000", "Invalid request: "+err.Error())
-					return
-				}
-
-				if req.DataEaseBi {
-					if chartHandler == nil || chartHandler.exportService == nil {
-						response.Error(c, "500000", "Failed to export: chart export service unavailable")
-						return
-					}
-					buf, err := chartHandler.exportService.InnerExportDetails(&service.ExportChartRequest{
-						ViewName: req.ViewName,
-						Header:   req.Header,
-						Details:  req.Details,
-					})
-					if err != nil {
-						response.Error(c, "500000", "Failed to export: "+err.Error())
-						return
-					}
-
-					filename := service.GenerateExcelFilename(req.ViewName)
-					c.Header("Content-Description", "File Transfer")
-					c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-					c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
-					c.Header("Content-Transfer-Encoding", "binary")
-					c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
-					return
-				}
-
-				result, err := datasetHandler.service.ExportDataset(&req, int64(middleware.GetUserID(c)))
-				if err != nil {
-					response.Error(c, "500000", "Failed to export: "+err.Error())
-					return
-				}
-				response.Success(c, result)
-			})
+			datasetTreeGroup.POST("/exportDataset", datasetHandler.ExportDataset)
 		}
 
 		datasetDataGroup := r.Group("/datasetData")
