@@ -195,7 +195,6 @@ func getEnv(key, defaultValue string) string {
 }
 
 func cleanupTables(tables ...interface{}) {
-	_ = tables
 	if err := testDB.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
 		panic(fmt.Sprintf("disable foreign key checks failed: %v", err))
 	}
@@ -205,28 +204,30 @@ func cleanupTables(tables ...interface{}) {
 		}
 	}()
 
-	tableNames, err := integrationTableNames()
-	if err != nil {
-		panic(fmt.Sprintf("list integration tables failed: %v", err))
-	}
-
-	for _, tableName := range tableNames {
-		mustExecCleanup(fmt.Sprintf("DELETE FROM `%s`", strings.ReplaceAll(tableName, "`", "``")))
+	for _, tableName := range cleanupTableNames(tables...) {
+		mustExecCleanup(fmt.Sprintf("TRUNCATE TABLE `%s`", strings.ReplaceAll(tableName, "`", "``")))
+		if tableName == "sys_user" {
+			mustExecCleanup("ALTER TABLE `sys_user` AUTO_INCREMENT = 2")
+		}
 	}
 }
 
-func integrationTableNames() ([]string, error) {
-	var tableNames []string
-	err := testDB.Raw(`
-SELECT TABLE_NAME
-FROM information_schema.tables
-WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
-ORDER BY TABLE_NAME DESC
-`).Scan(&tableNames).Error
-	if err != nil {
-		return nil, err
+func cleanupTableNames(tables ...interface{}) []string {
+	tableNames := make([]string, 0, len(tables))
+	for _, table := range tables {
+		switch v := table.(type) {
+		case string:
+			tableNames = append(tableNames, v)
+		default:
+			// Use GORM's built-in table name resolution
+			stmt := &gorm.Statement{DB: testDB}
+			if err := stmt.Parse(v); err != nil {
+				panic(fmt.Sprintf("cleanupTables: failed to parse table name for %T: %v", table, err))
+			}
+			tableNames = append(tableNames, stmt.Table)
+		}
 	}
-	return tableNames, nil
+	return tableNames
 }
 
 func mustExecCleanup(sql string) {

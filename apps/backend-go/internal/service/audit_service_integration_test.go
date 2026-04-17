@@ -13,7 +13,7 @@ import (
 )
 
 func TestAuditServiceIntegration_CreateAuditLog(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -45,7 +45,7 @@ func TestAuditServiceIntegration_CreateAuditLog(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_CreateAuditLog_WithFailure(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -76,7 +76,7 @@ func TestAuditServiceIntegration_CreateAuditLog_WithFailure(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_GetAuditLogByID(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -103,7 +103,7 @@ func TestAuditServiceIntegration_GetAuditLogByID(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_GetAuditLogByID_NotFound(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -115,7 +115,7 @@ func TestAuditServiceIntegration_GetAuditLogByID_NotFound(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_GetAuditLogsByUserID(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -143,7 +143,7 @@ func TestAuditServiceIntegration_GetAuditLogsByUserID(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_QueryAuditLogs(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -193,7 +193,7 @@ func TestAuditServiceIntegration_QueryAuditLogs(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_QueryAuditLogs_Empty(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -209,7 +209,7 @@ func TestAuditServiceIntegration_QueryAuditLogs_Empty(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_QueryAuditLogs_DefaultPagination(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -227,7 +227,7 @@ func TestAuditServiceIntegration_QueryAuditLogs_DefaultPagination(t *testing.T) 
 }
 
 func TestAuditServiceIntegration_RecordLoginFailure(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -250,7 +250,7 @@ func TestAuditServiceIntegration_RecordLoginFailure(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_DeleteAuditLogsBeforeDate(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -279,7 +279,7 @@ func TestAuditServiceIntegration_DeleteAuditLogsBeforeDate(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_DeleteAuditLogsBeforeDate_DefaultDays(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -304,7 +304,7 @@ func TestAuditServiceIntegration_DeleteAuditLogsBeforeDate_DefaultDays(t *testin
 }
 
 func TestAuditServiceIntegration_CheckSuspiciousLoginActivity(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -332,7 +332,7 @@ func TestAuditServiceIntegration_CheckSuspiciousLoginActivity(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_ExportAuditLogs(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -373,7 +373,7 @@ func TestAuditServiceIntegration_ExportAuditLogs(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_ExportAuditLogs_Empty(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -386,7 +386,7 @@ func TestAuditServiceIntegration_ExportAuditLogs_Empty(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_ExportAuditLogs_DefaultFormat(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -419,7 +419,7 @@ func TestAuditServiceIntegration_ExportAuditLogs_DefaultFormat(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_RecordLoginFailure_WithAllFields(t *testing.T) {
-	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{})
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
@@ -444,6 +444,8 @@ func TestAuditServiceIntegration_RecordLoginFailure_WithAllFields(t *testing.T) 
 }
 
 func TestAuditServiceIntegration_RecordLoginFailure_TableMissing(t *testing.T) {
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
+
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
 	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
@@ -451,9 +453,9 @@ func TestAuditServiceIntegration_RecordLoginFailure_TableMissing(t *testing.T) {
 
 	err := testDB.Migrator().DropTable(&audit.LoginFailure{})
 	assert.NoError(t, err)
-	defer func() {
+	t.Cleanup(func() {
 		_ = testDB.AutoMigrate(&audit.LoginFailure{})
-	}()
+	})
 
 	_, err = svc.RecordLoginFailure(&audit.LoginFailureRequest{Username: "missing_table_user"})
 	assert.Error(t, err)
@@ -461,6 +463,8 @@ func TestAuditServiceIntegration_RecordLoginFailure_TableMissing(t *testing.T) {
 }
 
 func TestAuditServiceIntegration_ExportToJSON_WriteFailure(t *testing.T) {
+	cleanupTables(&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{})
+
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
 	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)

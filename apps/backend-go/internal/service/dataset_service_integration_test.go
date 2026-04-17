@@ -611,11 +611,12 @@ func TestDatasetServiceIntegration_PreviewAndPreviewWithPermission(t *testing.T)
 }
 
 func TestDatasetServiceIntegration_PreviewWithPermission_AppliesRowFilterUsingDatasetFieldNames(t *testing.T) {
-	cleanupTables(&dataset.CoreDatasetGroup{})
+	cleanupTables(&dataset.CoreDatasetGroup{}, &permission.DataPermColumn{})
 	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &chart.CoreChartView{})
 	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
 	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
 	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
 	_ = testDB.Exec("DROP TABLE IF EXISTS it_preview_row_ds").Error
 	err := testDB.Exec("CREATE TABLE it_preview_row_ds (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64), city VARCHAR(64))").Error
 	assert.NoError(t, err)
@@ -1099,25 +1100,29 @@ func TestDatasetServiceIntegration_DeleteFieldOperations(t *testing.T) {
 }
 
 func TestDatasetServiceIntegration_DeleteFieldDependencyBlocking(t *testing.T) {
-	cleanupTables(
+	// Drop and recreate to ensure schema matches the current Go struct definitions.
+	// GORM AutoMigrate on existing tables can fail with "Invalid use of NULL value"
+	// when adding NOT NULL columns, so a clean DROP+CREATE is safer in tests.
+	for _, tbl := range []interface{}{
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
 		&permission.DataPermColumn{},
-		&auto.VisualizationLinkageField{},
-		&auto.VisualizationLinkJumpInfo{},
-		&auto.VisualizationOuterParamsTargetViewInfo{},
-		&dataset.CoreDatasetTable{},
-		&dataset.CoreDatasetTableField{},
-		&dataset.CoreDatasetGroup{},
-	)
+	} {
+		_ = testDB.Migrator().DropTable(tbl)
+	}
 	require.NoError(t, testDB.AutoMigrate(
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
 		&permission.DataPermColumn{},
-		&auto.VisualizationLinkageField{},
-		&auto.VisualizationLinkJumpInfo{},
-		&auto.VisualizationOuterParamsTargetViewInfo{},
 	))
+	cleanupTables(
+		&auto.CoreChartView{},
+		&permission.DataPermRow{},
+		&permission.DataPermColumn{},
+		&dataset.CoreDatasetTable{},
+		&dataset.CoreDatasetTableField{},
+		&dataset.CoreDatasetGroup{},
+	)
 
 	repo := repository.NewDatasetRepository(testDB)
 	svc := NewDatasetService(repo)
