@@ -149,7 +149,7 @@ export const getDrillFieldData = async ({ fieldId, data }): Promise<IResponse> =
 }
 
 export const getChartDetail = async (id: string): Promise<IResponse> => {
-  return request.post({ url: `chart/getDetail/${id}`, data: {} }).then(res => {
+  return request.post({ url: `/chart/getDetail/${id}`, data: {} }).then(res => {
     return res
   })
 }

@@ -31,7 +31,10 @@ func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
 	}
 
 	var req embedded.KeywordRequest
-	_ = c.ShouldBindJSON(&req)
+	if err := shouldBindOptionalJSON(c, &req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 
 	keyword := ""
 	if req.Keyword != nil {

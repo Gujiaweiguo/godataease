@@ -22,12 +22,6 @@ func NewChartHandler(svc *service.ChartService, dsSvc *service.DatasetService) *
 	return &ChartHandler{service: svc, exportService: service.NewChartExportService(svc), datasetService: dsSvc}
 }
 
-func recoverChartServicePanic(c *gin.Context) {
-	if r := recover(); r != nil {
-		response.Error(c, "500000", "Service unavailable")
-	}
-}
-
 func (h *ChartHandler) Query(c *gin.Context) {
 	var req chart.ChartQueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -67,7 +61,7 @@ func (h *ChartHandler) Data(c *gin.Context) {
 
 // CheckSameDataSet handles GET /chart/checkSameDataSet/:viewIdSource/:viewIdTarget
 func (h *ChartHandler) CheckSameDataSet(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	sourceID, err := strconv.ParseInt(c.Param("viewIdSource"), 10, 64)
 	if err != nil {
@@ -100,7 +94,7 @@ func (h *ChartHandler) CheckSameDataSet(c *gin.Context) {
 
 // SaveFromMap handles POST /chart/save
 func (h *ChartHandler) SaveFromMap(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -117,7 +111,7 @@ func (h *ChartHandler) SaveFromMap(c *gin.Context) {
 
 // ListByDQ handles POST /chart/listByDQ/:id/:chartId
 func (h *ChartHandler) ListByDQ(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	datasetGroupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -146,7 +140,7 @@ func (h *ChartHandler) ListByDQ(c *gin.Context) {
 
 // CopyField handles POST /chart/copyField/:id/:chartId
 func (h *ChartHandler) CopyField(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -167,7 +161,7 @@ func (h *ChartHandler) CopyField(c *gin.Context) {
 
 // DeleteField handles POST /chart/deleteField/:id
 func (h *ChartHandler) DeleteField(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -183,7 +177,7 @@ func (h *ChartHandler) DeleteField(c *gin.Context) {
 
 // DeleteFieldByChart handles POST /chart/deleteFieldByChart/:chartId
 func (h *ChartHandler) DeleteFieldByChart(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 	chartID, err := strconv.ParseInt(c.Param("chartId"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid chart ID")
@@ -197,7 +191,7 @@ func (h *ChartHandler) DeleteFieldByChart(c *gin.Context) {
 }
 
 func (h *ChartHandler) GetChart(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid chart ID")
@@ -212,7 +206,7 @@ func (h *ChartHandler) GetChart(c *gin.Context) {
 }
 
 func (h *ChartHandler) GetDetail(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid chart ID")
@@ -228,7 +222,7 @@ func (h *ChartHandler) GetDetail(c *gin.Context) {
 
 // GetFieldData handles POST /chartData/getFieldData/:fieldId/:fieldType
 func (h *ChartHandler) GetFieldData(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 
 	fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
 	if err != nil {
@@ -245,7 +239,7 @@ func (h *ChartHandler) GetFieldData(c *gin.Context) {
 
 // GetDrillFieldData handles POST /chartData/getDrillFieldData/:fieldId
 func (h *ChartHandler) GetDrillFieldData(c *gin.Context) {
-	defer recoverDatasetServicePanic(c)
+	defer recoverServicePanic(c)
 
 	fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
 	if err != nil {
@@ -262,7 +256,7 @@ func (h *ChartHandler) GetDrillFieldData(c *gin.Context) {
 
 // InnerExportDetails handles POST /chartData/innerExportDetails
 func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	var req service.ExportChartRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -286,7 +280,7 @@ func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
 
 // InnerExportDataSetDetails handles POST /chartData/innerExportDataSetDetails
 func (h *ChartHandler) InnerExportDataSetDetails(c *gin.Context) {
-	defer recoverChartServicePanic(c)
+	defer recoverServicePanic(c)
 
 	var req service.ExportChartRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -306,14 +300,4 @@ func (h *ChartHandler) InnerExportDataSetDetails(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
-}
-
-// RegisterChartRoutes is deprecated — registration is done via router.go registerChartRoutes().
-// Kept for backward compatibility.
-func RegisterChartRoutes(r *gin.RouterGroup, h *ChartHandler) {
-	chartGroup := r.Group("/chart")
-	{
-		chartGroup.POST("/query", h.Query)
-		chartGroup.POST("/data", h.Data)
-	}
 }

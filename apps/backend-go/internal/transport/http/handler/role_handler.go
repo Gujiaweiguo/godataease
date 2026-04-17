@@ -22,7 +22,10 @@ func NewRoleHandler(service *service.RoleService) *RoleHandler {
 
 func (h *RoleHandler) Query(c *gin.Context) {
 	var req role.RoleQueryRequest
-	_ = c.ShouldBindJSON(&req)
+	if err := shouldBindOptionalJSON(c, &req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 
 	result, err := h.service.QueryRoles(&req)
 	if err != nil {
@@ -35,7 +38,10 @@ func (h *RoleHandler) Query(c *gin.Context) {
 
 func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
 	var req role.RoleQueryRequest
-	_ = c.ShouldBindJSON(&req)
+	if err := shouldBindOptionalJSON(c, &req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
 
 	orgID := middleware.GetOrgID(c)
 	if orgID <= 0 {

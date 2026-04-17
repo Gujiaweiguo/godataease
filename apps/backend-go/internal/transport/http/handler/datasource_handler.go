@@ -444,12 +444,6 @@ func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func recoverDatasourceServicePanic(c *gin.Context) {
-	if recovered := recover(); recovered != nil {
-		response.Error(c, "500000", "Failed: repository is unavailable")
-	}
-}
-
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
 	{
