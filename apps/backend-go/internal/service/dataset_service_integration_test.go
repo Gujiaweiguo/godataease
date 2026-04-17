@@ -1104,17 +1104,11 @@ func TestDatasetServiceIntegration_DeleteFieldDependencyBlocking(t *testing.T) {
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
 		&permission.DataPermColumn{},
-		&auto.VisualizationLinkageField{},
-		&auto.VisualizationLinkJumpInfo{},
-		&auto.VisualizationOuterParamsTargetViewInfo{},
 	))
 	cleanupTables(
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
 		&permission.DataPermColumn{},
-		&auto.VisualizationLinkageField{},
-		&auto.VisualizationLinkJumpInfo{},
-		&auto.VisualizationOuterParamsTargetViewInfo{},
 		&dataset.CoreDatasetTable{},
 		&dataset.CoreDatasetTableField{},
 		&dataset.CoreDatasetGroup{},

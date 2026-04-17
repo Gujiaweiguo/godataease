@@ -206,6 +206,9 @@ func cleanupTables(tables ...interface{}) {
 
 	for _, tableName := range cleanupTableNames(tables...) {
 		mustExecCleanup(fmt.Sprintf("TRUNCATE TABLE `%s`", strings.ReplaceAll(tableName, "`", "``")))
+		if tableName == "sys_user" {
+			mustExecCleanup("ALTER TABLE `sys_user` AUTO_INCREMENT = 2")
+		}
 	}
 }
 
