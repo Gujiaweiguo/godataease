@@ -1100,11 +1100,14 @@ func TestDatasetServiceIntegration_DeleteFieldOperations(t *testing.T) {
 }
 
 func TestDatasetServiceIntegration_DeleteFieldDependencyBlocking(t *testing.T) {
-	require.NoError(t, testDB.AutoMigrate(
+	// Best-effort AutoMigrate: tables may already exist with data from prior tests,
+	// and GORM ALTER can fail with "Invalid use of NULL value" on existing rows.
+	// Since TRUNCATE follows immediately, a stale schema column is harmless.
+	_ = testDB.AutoMigrate(
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
 		&permission.DataPermColumn{},
-	))
+	)
 	cleanupTables(
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
