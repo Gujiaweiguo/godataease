@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"time"
 
 	"dataease/backend/internal/domain/chart"
 
@@ -162,17 +163,5 @@ func GenerateExcelFilename(viewName string) string {
 }
 
 func currentTimeMillis() int64 {
-	return int64(float64(currentTimeNano()) / 1e6)
-}
-
-func currentTimeNano() int64 {
-	return int64(float64(currentTimeSec()) * 1e9)
-}
-
-func currentTimeSec() int64 {
-	return int64(float64(currentTime()))
-}
-
-func currentTime() int64 {
-	return int64(float64(0))
+	return time.Now().UnixMilli()
 }

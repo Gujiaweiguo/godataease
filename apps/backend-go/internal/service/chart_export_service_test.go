@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -10,47 +11,50 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+// timestampSuffix matches _<digits>.xlsx where digits is a non-zero millisecond timestamp
+var timestampSuffix = regexp.MustCompile(`_\d{10,}.xlsx$`)
+
 func TestGenerateExcelFilename(t *testing.T) {
 	t.Run("empty name uses export default", func(t *testing.T) {
 		name := GenerateExcelFilename("")
-		assert.Equal(t, "export_0.xlsx", name)
+		assert.True(t, strings.HasPrefix(name, "export_"), "should start with export_")
+		assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
 	})
 
 	t.Run("replaces spaces and strips unsafe chars", func(t *testing.T) {
 		name := GenerateExcelFilename("Report / 2026")
-		assert.Equal(t, "Report__2026_0.xlsx", name)
+		assert.True(t, strings.HasPrefix(name, "Report__2026_"), "should start with Report__2026_")
+		assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
 	})
 
 	t.Run("truncates long name", func(t *testing.T) {
 		input := strings.Repeat("a", 120)
 		name := GenerateExcelFilename(input)
-		assert.True(t, strings.HasSuffix(name, "_0.xlsx"))
-		assert.Len(t, name, len("_0.xlsx")+100)
+		assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
+		assert.True(t, strings.HasPrefix(name, strings.Repeat("a", 100)+"_"))
 	})
 
 	t.Run("only unsafe chars falls back to timestamp suffix", func(t *testing.T) {
 		name := GenerateExcelFilename("/?:*\\")
-		assert.Equal(t, "_0.xlsx", name)
+		assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
 	})
 
 	t.Run("preserves dash and underscore", func(t *testing.T) {
 		name := GenerateExcelFilename("Report-Name_2026")
-		assert.Equal(t, "Report-Name_2026_0.xlsx", name)
+		assert.True(t, strings.HasPrefix(name, "Report-Name_2026_"), "should start with Report-Name_2026_")
+		assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
 	})
 
 	t.Run("exactly one hundred chars not over truncated", func(t *testing.T) {
 		input := strings.Repeat("b", 100)
 		name := GenerateExcelFilename(input)
-		assert.True(t, strings.HasPrefix(name, input))
-		assert.Len(t, name, 107)
+		assert.True(t, strings.HasPrefix(name, input), "should preserve 100-char safe prefix")
+		assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
 	})
 }
 
 func TestCurrentTimeHelpers(t *testing.T) {
-	assert.Equal(t, int64(0), currentTime())
-	assert.Equal(t, int64(0), currentTimeSec())
-	assert.Equal(t, int64(0), currentTimeNano())
-	assert.Equal(t, int64(0), currentTimeMillis())
+	assert.True(t, currentTimeMillis() > 0, "currentTimeMillis should return a non-zero timestamp")
 }
 
 func openExportWorkbook(t *testing.T, buf *bytes.Buffer) *excelize.File {
@@ -296,5 +300,6 @@ func mustGetCellValue(t *testing.T, f *excelize.File, sheet, cell string) string
 
 func TestGenerateExcelFilename_MixedUnicodeAndUnsafeCharsStillReturnsSafeSuffix(t *testing.T) {
 	name := GenerateExcelFilename("报告 Report / 2026")
-	assert.Equal(t, "_Report__2026_0.xlsx", name)
+	assert.True(t, strings.HasPrefix(name, "_Report__2026_"), "should start with _Report__2026_")
+	assert.True(t, timestampSuffix.MatchString(name), "should end with _<timestamp>.xlsx, got: %s", name)
 }
