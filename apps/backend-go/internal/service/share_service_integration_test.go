@@ -14,7 +14,7 @@ import (
 )
 
 func TestShareServiceIntegration_CreateShare(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -33,7 +33,7 @@ func TestShareServiceIntegration_CreateShare(t *testing.T) {
 }
 
 func TestShareServiceIntegration_CreateShare_NoPassword(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -51,7 +51,7 @@ func TestShareServiceIntegration_CreateShare_NoPassword(t *testing.T) {
 }
 
 func TestShareServiceIntegration_ValidateShare_Success(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -78,7 +78,7 @@ func TestShareServiceIntegration_ValidateShare_Success(t *testing.T) {
 }
 
 func TestShareServiceIntegration_ValidateShare_NotFound(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -93,7 +93,7 @@ func TestShareServiceIntegration_ValidateShare_NotFound(t *testing.T) {
 }
 
 func TestShareServiceIntegration_ValidateShare_Expired(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -119,7 +119,7 @@ func TestShareServiceIntegration_ValidateShare_Expired(t *testing.T) {
 }
 
 func TestShareServiceIntegration_ValidateShare_WrongPassword(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -144,7 +144,7 @@ func TestShareServiceIntegration_ValidateShare_WrongPassword(t *testing.T) {
 }
 
 func TestShareServiceIntegration_RevokeShare_Success(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -165,7 +165,7 @@ func TestShareServiceIntegration_RevokeShare_Success(t *testing.T) {
 }
 
 func TestShareServiceIntegration_RevokeShare_WrongCreator(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -186,7 +186,7 @@ func TestShareServiceIntegration_RevokeShare_WrongCreator(t *testing.T) {
 }
 
 func TestShareServiceIntegration_GetDetail(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -208,7 +208,7 @@ func TestShareServiceIntegration_GetDetail(t *testing.T) {
 }
 
 func TestShareServiceIntegration_GetDetail_NotFound(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -219,7 +219,7 @@ func TestShareServiceIntegration_GetDetail_NotFound(t *testing.T) {
 }
 
 func TestShareServiceIntegration_EditUUID(t *testing.T) {
-	cleanupTables(&share.Share{}, &share.ShareTicket{})
+	cleanupTables("core_share", "core_share_ticket")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -263,7 +263,7 @@ func TestShareServiceIntegration_EditUUID(t *testing.T) {
 }
 
 func TestShareServiceIntegration_EditExpAndPwdReflectInDetail(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -291,7 +291,7 @@ func TestShareServiceIntegration_EditExpAndPwdReflectInDetail(t *testing.T) {
 }
 
 func TestShareServiceIntegration_EditExpAndPwdRejectInvalidInput(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -307,7 +307,7 @@ func TestShareServiceIntegration_EditExpAndPwdRejectInvalidInput(t *testing.T) {
 }
 
 func TestShareServiceIntegration_EditRejectedForNonCreator(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -326,7 +326,7 @@ func TestShareServiceIntegration_EditRejectedForNonCreator(t *testing.T) {
 }
 
 func TestShareServiceIntegration_SwitchStatus_Create(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -342,7 +342,7 @@ func TestShareServiceIntegration_SwitchStatus_Create(t *testing.T) {
 }
 
 func TestShareServiceIntegration_SwitchStatus_Delete(t *testing.T) {
-	cleanupTables(&share.Share{})
+	cleanupTables("core_share")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -367,7 +367,7 @@ func TestShareServiceIntegration_SwitchStatus_Delete(t *testing.T) {
 }
 
 func TestShareServiceIntegration_Ticket(t *testing.T) {
-	cleanupTables(&share.Share{}, &share.ShareTicket{})
+	cleanupTables("core_share", "core_share_ticket")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -407,7 +407,7 @@ func TestShareServiceIntegration_Ticket(t *testing.T) {
 }
 
 func TestShareServiceIntegration_Ticket_WrongUUID(t *testing.T) {
-	cleanupTables(&share.Share{}, &share.ShareTicket{})
+	cleanupTables("core_share", "core_share_ticket")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -441,7 +441,7 @@ func TestShareServiceIntegration_Ticket_WrongUUID(t *testing.T) {
 }
 
 func TestShareServiceIntegration_Ticket_GenerateNew(t *testing.T) {
-	cleanupTables(&share.Share{}, &share.ShareTicket{})
+	cleanupTables("core_share", "core_share_ticket")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)
@@ -470,7 +470,7 @@ func TestShareServiceIntegration_Ticket_GenerateNew(t *testing.T) {
 }
 
 func TestShareServiceIntegration_Ticket_Expired(t *testing.T) {
-	cleanupTables(&share.Share{}, &share.ShareTicket{})
+	cleanupTables("core_share", "core_share_ticket")
 
 	repo := repository.NewShareRepository(testDB)
 	svc := NewShareService(repo)

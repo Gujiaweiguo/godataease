@@ -1127,6 +1127,7 @@ func TestDatasourceService_GetTableStatus(t *testing.T) {
 func TestDatasourceService_TableMetadataAndPreview_Success(t *testing.T) {
 	cleanupTables(&datasource.CoreDatasource{})
 	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
+	_ = testDB.Exec("DELETE FROM core_datasource_task_log").Error
 	_ = testDB.Exec("DROP TABLE IF EXISTS it_ds_preview_meta").Error
 
 	repo := repository.NewDatasourceRepository(testDB)
