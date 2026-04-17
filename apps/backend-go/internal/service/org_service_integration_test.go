@@ -14,7 +14,13 @@ import (
 
 // Helper function to create OrgService with all dependencies
 func newTestOrgService(t *testing.T) *OrgService {
-	cleanupTables(&org.SysOrg{})
+	cleanupTables(
+		&org.SysOrg{},
+		&user.SysUser{},
+		&user.SysUserRole{},
+		&audit.AuditLog{},
+		&audit.AuditLogDetail{},
+	)
 
 	orgRepo := repository.NewOrgRepository(testDB)
 	userRepo := repository.NewUserRepository(testDB)

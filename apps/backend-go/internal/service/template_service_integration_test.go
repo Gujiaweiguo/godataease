@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const templateTableName = "core_visualization_template"
+
 func TestTemplateServiceIntegration_CreateTemplate(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -38,7 +40,7 @@ func TestTemplateServiceIntegration_CreateTemplate(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_GetTemplate(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -61,7 +63,7 @@ func TestTemplateServiceIntegration_GetTemplate(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_GetTemplate_NotFound(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -71,7 +73,7 @@ func TestTemplateServiceIntegration_GetTemplate_NotFound(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_ListTemplates(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -97,7 +99,7 @@ func TestTemplateServiceIntegration_ListTemplates(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_ListTemplates_Empty(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -113,7 +115,7 @@ func TestTemplateServiceIntegration_ListTemplates_Empty(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_ListTemplates_InvalidPidFallsBack(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -126,7 +128,7 @@ func TestTemplateServiceIntegration_ListTemplates_InvalidPidFallsBack(t *testing
 }
 
 func TestTemplateServiceIntegration_UpdateTemplate(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -155,7 +157,7 @@ func TestTemplateServiceIntegration_UpdateTemplate(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_UpdateTemplate_NotFound(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -169,7 +171,7 @@ func TestTemplateServiceIntegration_UpdateTemplate_NotFound(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_UpdateTemplate_EmptyFieldsKeepOriginal(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -182,7 +184,7 @@ func TestTemplateServiceIntegration_UpdateTemplate_EmptyFieldsKeepOriginal(t *te
 }
 
 func TestTemplateServiceIntegration_DeleteTemplate(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -205,7 +207,7 @@ func TestTemplateServiceIntegration_DeleteTemplate(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_DeleteTemplate_NotFound(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)
@@ -216,7 +218,7 @@ func TestTemplateServiceIntegration_DeleteTemplate_NotFound(t *testing.T) {
 }
 
 func TestTemplateServiceIntegration_IncrementUseCount(t *testing.T) {
-	cleanupTables(&template.Template{})
+	cleanupTables(templateTableName)
 
 	repo := repository.NewTemplateRepository(testDB)
 	svc := NewTemplateService(repo)

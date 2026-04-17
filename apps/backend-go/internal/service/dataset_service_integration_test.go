@@ -611,11 +611,12 @@ func TestDatasetServiceIntegration_PreviewAndPreviewWithPermission(t *testing.T)
 }
 
 func TestDatasetServiceIntegration_PreviewWithPermission_AppliesRowFilterUsingDatasetFieldNames(t *testing.T) {
-	cleanupTables(&dataset.CoreDatasetGroup{})
+	cleanupTables(&dataset.CoreDatasetGroup{}, &permission.DataPermColumn{})
 	_ = testDB.AutoMigrate(&dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}, &chart.CoreChartView{})
 	_ = testDB.Exec("DELETE FROM core_dataset_table_field").Error
 	_ = testDB.Exec("DELETE FROM core_dataset_table").Error
 	_ = testDB.Exec("DELETE FROM data_perm_row").Error
+	_ = testDB.Exec("DELETE FROM data_perm_column").Error
 	_ = testDB.Exec("DROP TABLE IF EXISTS it_preview_row_ds").Error
 	err := testDB.Exec("CREATE TABLE it_preview_row_ds (id BIGINT PRIMARY KEY AUTO_INCREMENT, region VARCHAR(64), city VARCHAR(64))").Error
 	assert.NoError(t, err)
