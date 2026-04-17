@@ -114,6 +114,7 @@ type Router struct {
 	datasetHandler            *handler.DatasetHandler
 	chartHandler              *handler.ChartHandler
 	visualHandler             *handler.VisualizationHandler
+	linkageHandler            *handler.LinkageHandler
 	watermarkHandler          *handler.WatermarkHandler
 	systemParamHandler        *handler.SystemParamHandler
 	systemVariableHandler     *handler.SystemVariableHandler
@@ -261,6 +262,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	visualRepo := repository.NewVisualizationRepository(db)
 	visualService := service.NewVisualizationService(visualRepo)
 	visualHandler := handler.NewVisualizationHandler(visualService)
+
+	linkageRepo := repository.NewLinkageRepository(db)
+	linkageService := service.NewLinkageService(linkageRepo)
+	linkageHandler := handler.NewLinkageHandler(linkageService)
+
 	watermarkRepo := repository.NewWatermarkRepository(db)
 	watermarkService := service.NewWatermarkService(watermarkRepo)
 	watermarkHandler := handler.NewWatermarkHandler(watermarkService)
@@ -358,6 +364,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		datasetHandler:            datasetHandler,
 		chartHandler:              chartHandler,
 		visualHandler:             visualHandler,
+		linkageHandler:            linkageHandler,
 		watermarkHandler:          watermarkHandler,
 		systemParamHandler:        systemParamHandler,
 		systemVariableHandler:     systemVariableHandler,
@@ -450,6 +457,7 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterMsgCenterRoutes(r.engine, r.msgCenterHandler)
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
 	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler, r.permMiddleware)
+	handler.RegisterLinkageRoutes(r.engine.Group(""), r.linkageHandler)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, nil, nil)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, nil, nil, nil, nil, r.chartHandler, r.permMiddleware)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
