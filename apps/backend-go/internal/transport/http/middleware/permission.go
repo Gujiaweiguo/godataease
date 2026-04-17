@@ -65,7 +65,6 @@ func extractRowPermissionDatasetIDs(c *gin.Context) ([]int64, error) {
 	}
 
 	ids := make([]int64, 0, 4)
-
 	if datasetID := GetDatasetID(c); datasetID > 0 {
 		ids = append(ids, datasetID)
 	}
@@ -73,9 +72,25 @@ func extractRowPermissionDatasetIDs(c *gin.Context) ([]int64, error) {
 		ids = append(ids, resourceID)
 	}
 
+	bodyIDs, err := parseDatasetIDsFromBody(c)
+	if err != nil {
+		return nil, err
+	}
+	ids = append(ids, bodyIDs...)
+
+	ids = uniquePositiveIDs(ids)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("dataset id is required")
+	}
+
+	return ids, nil
+}
+
+func parseDatasetIDsFromBody(c *gin.Context) ([]int64, error) {
 	var payload map[string]interface{}
 	err := c.ShouldBindBodyWith(&payload, binding.JSON)
 	if err == nil {
+		ids := make([]int64, 0, 4)
 		for _, key := range []string{"id", "datasetGroupId", "datasetId"} {
 			if value, ok := payload[key]; ok {
 				id, parseErr := parseResourceIDFromAny(value)
@@ -95,27 +110,27 @@ func extractRowPermissionDatasetIDs(c *gin.Context) ([]int64, error) {
 				ids = append(ids, id)
 			}
 		}
-	} else if !errors.Is(err, io.EOF) {
-		var payloadList []interface{}
-		if listErr := c.ShouldBindBodyWith(&payloadList, binding.JSON); listErr == nil {
-			for _, value := range payloadList {
-				id, parseErr := parseResourceIDFromAny(value)
-				if parseErr != nil {
-					return nil, fmt.Errorf("invalid dataset id")
-				}
-				ids = append(ids, id)
+		return ids, nil
+	}
+
+	if errors.Is(err, io.EOF) {
+		return nil, nil
+	}
+
+	var payloadList []interface{}
+	if listErr := c.ShouldBindBodyWith(&payloadList, binding.JSON); listErr == nil {
+		ids := make([]int64, 0, len(payloadList))
+		for _, value := range payloadList {
+			id, parseErr := parseResourceIDFromAny(value)
+			if parseErr != nil {
+				return nil, fmt.Errorf("invalid dataset id")
 			}
-		} else {
-			return nil, fmt.Errorf("invalid request: %w", err)
+			ids = append(ids, id)
 		}
+		return ids, nil
 	}
 
-	ids = uniquePositiveIDs(ids)
-	if len(ids) == 0 {
-		return nil, fmt.Errorf("dataset id is required")
-	}
-
-	return ids, nil
+	return nil, fmt.Errorf("invalid request: %w", err)
 }
 
 func uniquePositiveIDs(ids []int64) []int64 {

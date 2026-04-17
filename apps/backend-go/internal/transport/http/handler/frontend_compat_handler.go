@@ -285,6 +285,8 @@ func (h *FrontendCompatHandler) GetWebSocketInfo(c *gin.Context) {
 //
 //	NOTE: Non-/api/ prefixed versions (e.g. /roleRouter/query) are aliases for /api/* routes.
 //	Both exist for backward compatibility with legacy frontend builds.
+//
+//nolint:dupl // route registration pattern is intentionally similar
 func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *FrontendCompatHandler) {
 	// Dual-support transition: /de2api/* prefix (aliased for /api/*)
 	protected.GET("/de2api/roleRouter/query", h.GetRoleRouters)
