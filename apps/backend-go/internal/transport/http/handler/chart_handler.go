@@ -280,24 +280,5 @@ func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
 
 // InnerExportDataSetDetails handles POST /chartData/innerExportDataSetDetails
 func (h *ChartHandler) InnerExportDataSetDetails(c *gin.Context) {
-	defer recoverServicePanic(c)
-
-	var req service.ExportChartRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
-		return
-	}
-
-	buf, err := h.exportService.InnerExportDetails(&req)
-	if err != nil {
-		response.Error(c, "500000", "Failed to export: "+err.Error())
-		return
-	}
-
-	filename := service.GenerateExcelFilename(req.ViewName)
-	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
-	c.Header("Content-Transfer-Encoding", "binary")
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+	h.InnerExportDetails(c)
 }
