@@ -6,6 +6,8 @@ import (
 
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/repository"
+
+	"github.com/google/uuid"
 )
 
 type LinkageRequest struct {
@@ -117,7 +119,7 @@ func (s *LinkageService) SaveLinkage(req *LinkageRequest) error {
 			continue
 		}
 
-		linkageID := time.Now().UnixNano()
+		linkageID := generateLinkageID()
 		linkage := &auto.SnapshotVisualizationLinkage{
 			ID:            linkageID,
 			DvID:          req.DvID,
@@ -133,8 +135,7 @@ func (s *LinkageService) SaveLinkage(req *LinkageRequest) error {
 
 		if info.LinkageActive && len(info.LinkageFields) > 0 {
 			for _, field := range info.LinkageFields {
-				fieldID := time.Now().UnixNano()
-				time.Sleep(1)
+				fieldID := generateLinkageID()
 				linkageField := &auto.SnapshotVisualizationLinkageField{
 					ID:          fieldID,
 					LinkageID:   linkageID,
@@ -164,4 +165,9 @@ func (s *LinkageService) UpdateLinkageActive(req *LinkageRequest) (map[string][]
 
 func (s *LinkageService) RemoveLinkage(req *LinkageRequest) error {
 	return s.repo.DeleteLinkageAndFields(req.DvID, req.SourceViewID)
+}
+
+// generateLinkageID produces a unique int64 ID using UUID v4 hash.
+func generateLinkageID() int64 {
+	return int64(uuid.New().ID())
 }
