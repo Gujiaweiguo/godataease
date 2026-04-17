@@ -429,20 +429,9 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 	if err != nil {
 		return nil, err
 	}
-	if s.rowPermissionService != nil && s.rowPermissionService.columnPermRepo != nil {
-		columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
-		disabledColumns, err := columnSvc.GetDisabledColumns(req.DatasetGroupID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load disabled columns: %w", err)
-		}
-		maskRules, err := columnSvc.GetMaskRules(req.DatasetGroupID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load mask rules: %w", err)
-		}
-		for i := range rows {
-			rows[i] = columnSvc.FilterDisabledColumns(rows[i], disabledColumns)
-			rows[i] = columnSvc.MaskRowData(rows[i], maskRules)
-		}
+	rows, err = s.applyColumnPermissionFilter(rows, req.DatasetGroupID)
+	if err != nil {
+		return nil, err
 	}
 	total, err := s.repo.CountRows(tableName)
 	if err != nil {
@@ -462,6 +451,26 @@ func (s *DatasetService) PreviewWithPermission(req *dataset.PreviewRequest, user
 		Rows:    rows,
 		Total:   total,
 	}, nil
+}
+
+func (s *DatasetService) applyColumnPermissionFilter(rows []map[string]interface{}, datasetGroupID int64) ([]map[string]interface{}, error) {
+	if s.rowPermissionService == nil || s.rowPermissionService.columnPermRepo == nil {
+		return rows, nil
+	}
+	columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+	disabledColumns, err := columnSvc.GetDisabledColumns(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
+	}
+	maskRules, err := columnSvc.GetMaskRules(datasetGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mask rules: %w", err)
+	}
+	for i := range rows {
+		rows[i] = columnSvc.FilterDisabledColumns(rows[i], disabledColumns)
+		rows[i] = columnSvc.MaskRowData(rows[i], maskRules)
+	}
+	return rows, nil
 }
 
 func (s *DatasetService) ensureDatasourceDependenciesViewable(datasetGroupID, userID int64) error {

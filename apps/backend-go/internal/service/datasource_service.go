@@ -483,6 +483,8 @@ func (s *DatasourceService) Update(req *datasource.WriteRequest) (*datasource.Co
 		return nil, err
 	}
 
+	mergeUpdateFields(existing, req)
+
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		name = existing.Name
@@ -492,15 +494,24 @@ func (s *DatasourceService) Update(req *datasource.WriteRequest) (*datasource.Co
 		pid = *existing.PID
 	}
 
-	count, err := s.repo.CountByNameAndPID(name, pid, &req.ID)
-	if err != nil {
+	if err = s.validateNoDuplicateName(name, pid, req.ID); err != nil {
 		return nil, err
 	}
-	if count > 0 {
-		return nil, fmt.Errorf("datasource name already exists")
+	if err = s.repo.Update(existing); err != nil {
+		return nil, err
 	}
+	return existing, nil
+}
 
-	existing.Name = name
+func mergeUpdateFields(existing *datasource.CoreDatasource, req *datasource.WriteRequest) {
+	name := strings.TrimSpace(req.Name)
+	if name != "" {
+		existing.Name = name
+	}
+	pid := normalizedPID(req.PID)
+	if req.PID == nil && existing.PID != nil {
+		pid = *existing.PID
+	}
 	existing.PID = &pid
 	if req.Description != nil {
 		existing.Description = req.Description
@@ -519,11 +530,17 @@ func (s *DatasourceService) Update(req *datasource.WriteRequest) (*datasource.Co
 	}
 	now := time.Now().UnixMilli()
 	existing.UpdateTime = &now
+}
 
-	if err = s.repo.Update(existing); err != nil {
-		return nil, err
+func (s *DatasourceService) validateNoDuplicateName(name string, pid int64, excludeID int64) error {
+	count, err := s.repo.CountByNameAndPID(name, pid, &excludeID)
+	if err != nil {
+		return err
 	}
-	return existing, nil
+	if count > 0 {
+		return fmt.Errorf("datasource name already exists")
+	}
+	return nil
 }
 
 func (s *DatasourceService) CreateFolder(name string, pid int64) (*datasource.CoreDatasource, error) {

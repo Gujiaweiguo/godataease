@@ -13,6 +13,8 @@ import (
 	"dataease/backend/internal/domain/permission"
 )
 
+const chartDefaultFieldName = "field"
+
 type ChartRepository interface {
 	GetByID(id int64) (*chart.CoreChartView, error)
 	Update(view *chart.CoreChartView) error
@@ -327,7 +329,7 @@ func (s *ChartService) DeleteFieldByChart(chartID int64) error {
 func (s *ChartService) nextCopyName(datasetGroupID int64, source string) (string, error) {
 	name := strings.TrimSpace(source)
 	if name == "" {
-		name = "field"
+		name = chartDefaultFieldName
 	}
 	for {
 		name = name + "_copy"

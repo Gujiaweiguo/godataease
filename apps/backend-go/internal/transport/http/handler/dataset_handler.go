@@ -542,6 +542,7 @@ func (h *DatasetHandler) ExportDataset(c *gin.Context) {
 	response.Success(c, result)
 }
 
+//nolint:dupl // route registration pattern is intentionally similar
 func RegisterDatasetRoutes(r *gin.RouterGroup, h *DatasetHandler) {
 	datasetGroup := r.Group("/dataset")
 	{
