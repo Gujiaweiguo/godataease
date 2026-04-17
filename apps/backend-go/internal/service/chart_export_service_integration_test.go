@@ -113,8 +113,6 @@ func TestChartExportServiceIntegration_GenerateExcelFilename(t *testing.T) {
 	assert.Contains(t, empty, "export_")
 	assert.Contains(t, empty, ".xlsx")
 
-	assert.Equal(t, int64(0), currentTime())
-	assert.Equal(t, int64(0), currentTimeSec())
-	assert.Equal(t, int64(0), currentTimeNano())
-	assert.Equal(t, int64(0), currentTimeMillis())
+	ts := currentTimeMillis()
+	assert.Greater(t, ts, int64(0), "currentTimeMillis should return a real timestamp")
 }
