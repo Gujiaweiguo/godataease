@@ -115,6 +115,7 @@ type Router struct {
 	chartHandler              *handler.ChartHandler
 	visualHandler             *handler.VisualizationHandler
 	linkageHandler            *handler.LinkageHandler
+	linkJumpHandler           *handler.LinkJumpHandler
 	watermarkHandler          *handler.WatermarkHandler
 	systemParamHandler        *handler.SystemParamHandler
 	systemVariableHandler     *handler.SystemVariableHandler
@@ -267,6 +268,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	linkageService := service.NewLinkageService(linkageRepo)
 	linkageHandler := handler.NewLinkageHandler(linkageService)
 
+	linkJumpRepo := repository.NewLinkJumpRepository(db)
+	linkJumpService := service.NewLinkJumpService(linkJumpRepo)
+	linkJumpHandler := handler.NewLinkJumpHandler(linkJumpService)
+
 	watermarkRepo := repository.NewWatermarkRepository(db)
 	watermarkService := service.NewWatermarkService(watermarkRepo)
 	watermarkHandler := handler.NewWatermarkHandler(watermarkService)
@@ -365,6 +370,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		chartHandler:              chartHandler,
 		visualHandler:             visualHandler,
 		linkageHandler:            linkageHandler,
+		linkJumpHandler:           linkJumpHandler,
 		watermarkHandler:          watermarkHandler,
 		systemParamHandler:        systemParamHandler,
 		systemVariableHandler:     systemVariableHandler,
@@ -458,6 +464,7 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
 	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler, r.permMiddleware)
 	handler.RegisterLinkageRoutes(r.engine.Group(""), r.linkageHandler)
+	handler.RegisterLinkJumpRoutes(r.engine.Group(""), r.linkJumpHandler)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, nil, nil)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, nil, nil, nil, nil, r.chartHandler, r.permMiddleware)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
