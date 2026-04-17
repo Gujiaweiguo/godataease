@@ -189,6 +189,94 @@ func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChar
 		view.CustomFilter = &v
 	}
 
+	// Extended axis and chart config fields
+	if v, ok := marshalJSONField(body, "xAxisExt"); ok {
+		view.XAxisExt = &v
+	}
+	if v, ok := marshalJSONField(body, "yAxisExt"); ok {
+		view.YAxisExt = &v
+	}
+	if v, ok := marshalJSONField(body, "extStack"); ok {
+		view.ExtStack = &v
+	}
+	if v, ok := marshalJSONField(body, "extBubble"); ok {
+		view.ExtBubble = &v
+	}
+	if v, ok := marshalJSONField(body, "extLabel"); ok {
+		view.ExtLabel = &v
+	}
+	if v, ok := marshalJSONField(body, "extTooltip"); ok {
+		view.ExtTooltip = &v
+	}
+	if v, ok := marshalJSONField(body, "customAttrMobile"); ok {
+		view.CustomAttrMobile = &v
+	}
+	if v, ok := marshalJSONField(body, "customStyleMobile"); ok {
+		view.CustomStyleMobile = &v
+	}
+	if v, ok := marshalJSONField(body, "drillFields"); ok {
+		view.DrillFields = &v
+	}
+	if v, ok := marshalJSONField(body, "senior"); ok {
+		view.Senior = &v
+	}
+	if v, ok := marshalJSONField(body, "snapshot"); ok {
+		view.Snapshot = &v
+	}
+	if v, ok := marshalJSONField(body, "viewFields"); ok {
+		view.ViewFields = &v
+	}
+	if v, ok := marshalJSONField(body, "extColor"); ok {
+		view.ExtColor = &v
+	}
+	if v, ok := marshalJSONField(body, "sortPriority"); ok {
+		view.SortPriority = &v
+	}
+
+	// Simple string fields
+	if v, ok := stringFromAny(body["stylePriority"]); ok {
+		view.StylePriority = &v
+	}
+	if v, ok := stringFromAny(body["chartType"]); ok {
+		view.ChartType = &v
+	}
+	if v, ok := stringFromAny(body["refreshUnit"]); ok {
+		view.RefreshUnit = &v
+	}
+	if v, ok := stringFromAny(body["flowMapStartName"]); ok {
+		view.FlowMapStartName = &v
+	}
+	if v, ok := stringFromAny(body["flowMapEndName"]); ok {
+		view.FlowMapEndName = &v
+	}
+
+	// Bool fields
+	if v, ok := body["isPlugin"]; ok {
+		b := boolFromAny(v)
+		view.IsPlugin = &b
+	}
+	if v, ok := body["refreshViewEnable"]; ok {
+		b := boolFromAny(v)
+		view.RefreshViewEnable = &b
+	}
+	if v, ok := body["linkageActive"]; ok {
+		b := boolFromAny(v)
+		view.LinkageActive = &b
+	}
+	if v, ok := body["jumpActive"]; ok {
+		b := boolFromAny(v)
+		view.JumpActive = &b
+	}
+	if v, ok := body["aggregate"]; ok {
+		b := boolFromAny(v)
+		view.Aggregate = &b
+	}
+
+	// Int fields
+	if v, ok := intFromAny(body["refreshTime"]); ok {
+		view.RefreshTime = &v
+	}
+
 	now := time.Now().UnixMilli()
 	view.UpdateTime = &now
 	if err = s.repo.Update(view); err != nil {
@@ -539,4 +627,22 @@ func fieldNameShort(seed string) string {
 		return "f_" + hex
 	}
 	return "f_" + hex[8:24]
+}
+
+func boolFromAny(v interface{}) bool {
+	switch b := v.(type) {
+	case bool:
+		return b
+	case string:
+		return strings.EqualFold(b, "true") || b == "1"
+	case float64:
+		return b != 0
+	case int:
+		return b != 0
+	case json.Number:
+		s := strings.ToLower(string(b))
+		return s == "true" || s == "1"
+	default:
+		return false
+	}
 }
