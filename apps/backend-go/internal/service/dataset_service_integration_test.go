@@ -1100,6 +1100,14 @@ func TestDatasetServiceIntegration_DeleteFieldOperations(t *testing.T) {
 }
 
 func TestDatasetServiceIntegration_DeleteFieldDependencyBlocking(t *testing.T) {
+	require.NoError(t, testDB.AutoMigrate(
+		&auto.CoreChartView{},
+		&permission.DataPermRow{},
+		&permission.DataPermColumn{},
+		&auto.VisualizationLinkageField{},
+		&auto.VisualizationLinkJumpInfo{},
+		&auto.VisualizationOuterParamsTargetViewInfo{},
+	))
 	cleanupTables(
 		&auto.CoreChartView{},
 		&permission.DataPermRow{},
@@ -1111,14 +1119,6 @@ func TestDatasetServiceIntegration_DeleteFieldDependencyBlocking(t *testing.T) {
 		&dataset.CoreDatasetTableField{},
 		&dataset.CoreDatasetGroup{},
 	)
-	require.NoError(t, testDB.AutoMigrate(
-		&auto.CoreChartView{},
-		&permission.DataPermRow{},
-		&permission.DataPermColumn{},
-		&auto.VisualizationLinkageField{},
-		&auto.VisualizationLinkJumpInfo{},
-		&auto.VisualizationOuterParamsTargetViewInfo{},
-	))
 
 	repo := repository.NewDatasetRepository(testDB)
 	svc := NewDatasetService(repo)
