@@ -293,28 +293,7 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.GET("/de2api/auth/menuResource", h.GetMenuResource)
 	protected.POST("/de2api/dataVisualization/interactiveTree", h.InteractiveTree)
 	protected.POST("/de2api/store/query", h.QueryStore)
-
-	// Permanent shim: xpack/plugin/AI integration
-	engine.GET("/aiBase/findTargetUrl", h.FindTargetUrl)
-	engine.GET("/xpackComponent/content/:id", h.GetXpackContent)
-	engine.GET("/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
-	engine.GET("/websocket/info", h.GetWebSocketInfo)
-
-	// Dual-support transition: /api/* prefix (primary compat form)
-	protected.GET("/api/roleRouter/query", h.GetRoleRouters)
-	protected.GET("/api/auth/menuResource", h.GetMenuResource)
-	protected.POST("/api/dataVisualization/interactiveTree", h.InteractiveTree)
 	protected.POST("/api/store/query", h.QueryStore)
-	engine.GET("/api/aiBase/findTargetUrl", h.FindTargetUrl)
-	engine.GET("/api/xpackComponent/content/:id", h.GetXpackContent)
-	engine.GET("/api/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
-	engine.GET("/api/websocket/info", h.GetWebSocketInfo)
-
-	// Legacy prefix aliases (non-/api/) — kept for backward compat, will be removed after C3
-	protected.GET("/roleRouter/query", h.GetRoleRouters)
-	protected.GET("/auth/menuResource", h.GetMenuResource)
-	protected.POST("/dataVisualization/interactiveTree", h.InteractiveTree)
-	protected.POST("/store/query", h.QueryStore)
 }
 
 func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
