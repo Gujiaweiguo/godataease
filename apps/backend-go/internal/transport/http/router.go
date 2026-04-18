@@ -138,6 +138,7 @@ type Router struct {
 	syncHandler                    *handler.SyncHandler
 	frontendCompatHandler          *handler.FrontendCompatHandler
 	permissionCompatHandler        *handler.PermissionCompatHandler
+	customGeoHandler               *handler.CustomGeoHandler
 	dataPermissionHandler          *handler.DataPermissionHandler
 	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
 	menuAuthMiddleware             *middleware.MenuAuthMiddleware
@@ -320,6 +321,9 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	geoService := service.NewGeoService(geoRepo)
 	geoHandler := handler.NewGeoHandler(geoService)
 
+	customGeoRepo := repository.NewCustomGeoRepository(db)
+	customGeoHandler := handler.NewCustomGeoHandler(customGeoRepo)
+
 	// Static module initialization
 	staticRepo := repository.NewStaticRepository(db)
 	storeRepo := repository.NewStoreRepository(db)
@@ -404,6 +408,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		shareHandler:                   shareHandler,
 		ticketHandler:                  ticketHandler,
 		geoHandler:                     geoHandler,
+		customGeoHandler:               customGeoHandler,
 		staticHandler:                  staticHandler,
 		subjectHandler:                 subjectHandler,
 		fontHandler:                    fontHandler,
@@ -604,6 +609,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterShareRoutes(api, r.shareHandler)
 		handler.RegisterTicketRoutes(api, r.ticketHandler)
 		handler.RegisterGeoRoutes(api, r.geoHandler)
+		handler.RegisterCustomGeoRoutes(api, r.customGeoHandler)
 		handler.RegisterStaticRoutes(api, r.staticHandler)
 		handler.RegisterSubjectRoutes(api, r.subjectHandler)
 		handler.RegisterFontRoutes(api, r.fontHandler)
