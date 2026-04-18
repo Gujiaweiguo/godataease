@@ -242,6 +242,18 @@ func registerDatasetDataCompatRoutes(g *gin.RouterGroup, datasetHandler *Dataset
 		}
 		response.Success(c, result)
 	})
+	g.POST("/getFieldTree", func(c *gin.Context) {
+		req, ok := parseMultFieldValuesRequest(c)
+		if !ok {
+			return
+		}
+		result, err := datasetHandler.service.GetFieldTree(req)
+		if err != nil {
+			response.Error(c, "500000", "Failed: "+err.Error())
+			return
+		}
+		response.Success(c, result)
+	})
 }
 
 func makeBarInfoHandler(datasetHandler *DatasetHandler) gin.HandlerFunc {

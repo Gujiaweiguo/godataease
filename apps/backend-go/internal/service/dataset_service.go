@@ -61,6 +61,12 @@ type sqlVariableDetailRaw struct {
 	Params       []interface{} `json:"params"`
 }
 
+type fieldTreeSpec struct {
+	field  *dataset.CoreDatasetTableField
+	alias  string
+	column string
+}
+
 func NewDatasetService(repo *repository.DatasetRepository) *DatasetService {
 	return &DatasetService{
 		repo:                   repo,
@@ -733,6 +739,63 @@ func (s *DatasetService) GetFieldEnum(req *dataset.MultFieldValuesRequest) ([]st
 	return result, nil
 }
 
+func (s *DatasetService) GetFieldTree(req *dataset.MultFieldValuesRequest) ([]dataset.BaseTreeNode, error) {
+	if req == nil || len(req.FieldIDs) == 0 {
+		return []dataset.BaseTreeNode{}, nil
+	}
+
+	limit := 1000
+	if req.ResultMode == 1 {
+		limit = 5000
+	}
+
+	var tableName string
+	specs := make([]fieldTreeSpec, 0, len(req.FieldIDs))
+	for _, fieldID := range req.FieldIDs {
+		if fieldID <= 0 {
+			continue
+		}
+		field, resolvedTableName, columnName, err := s.resolveEnumFieldTarget(fieldID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		if tableName == "" {
+			tableName = resolvedTableName
+		}
+		if resolvedTableName != tableName {
+			continue
+		}
+		specs = append(specs, fieldTreeSpec{
+			field:  field,
+			alias:  enumAlias(fieldID),
+			column: columnName,
+		})
+	}
+	if tableName == "" || len(specs) == 0 {
+		return []dataset.BaseTreeNode{}, nil
+	}
+
+	filters, err := s.buildEnumFilterClauses(req.Filter, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	columns := make([]dataset.EnumObjectColumn, 0, len(specs))
+	for _, spec := range specs {
+		columns = append(columns, dataset.EnumObjectColumn{Column: spec.column, Alias: spec.alias})
+	}
+
+	rows, err := s.repo.QueryFieldTreeValues(tableName, columns, filters, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildFieldTreeNodes(rows, specs), nil
+}
+
 func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[string]interface{}, error) { //nolint:gocyclo // complex enum value extraction with multiple branches
 	if req == nil || req.QueryID <= 0 {
 		return []map[string]interface{}{}, nil
@@ -1289,6 +1352,69 @@ func enumFieldIDFromAlias(alias string) int64 {
 		return 0
 	}
 	return id
+}
+
+func buildFieldTreeNodes(rows []map[string]interface{}, specs []fieldTreeSpec) []dataset.BaseTreeNode {
+	if len(rows) == 0 || len(specs) == 0 {
+		return []dataset.BaseTreeNode{}
+	}
+
+	type mutableTreeNode struct {
+		node     dataset.BaseTreeNode
+		children []*mutableTreeNode
+	}
+
+	rootNodes := make([]*mutableTreeNode, 0)
+	index := make(map[string]*mutableTreeNode)
+
+	for _, row := range rows {
+		parentPath := ""
+		var parent *mutableTreeNode
+		for _, spec := range specs {
+			rawValue, exists := row[spec.alias]
+			if !exists {
+				break
+			}
+			text := normalizeEnumValue(fmt.Sprintf("%v", normalizePreviewValue(rawValue)), spec.field.DeType)
+			if text == "" {
+				break
+			}
+
+			currentPath := spec.alias + ":" + text
+			if parentPath != "" {
+				currentPath = parentPath + "->" + currentPath
+			}
+
+			node, ok := index[currentPath]
+			if !ok {
+				node = &mutableTreeNode{node: dataset.BaseTreeNode{ID: currentPath, Pid: parentPath, Text: text, NodeType: ""}}
+				index[currentPath] = node
+				if parent == nil {
+					rootNodes = append(rootNodes, node)
+				} else {
+					parent.children = append(parent.children, node)
+				}
+			}
+
+			parent = node
+			parentPath = currentPath
+		}
+	}
+
+	var freeze func(nodes []*mutableTreeNode) []dataset.BaseTreeNode
+	freeze = func(nodes []*mutableTreeNode) []dataset.BaseTreeNode {
+		result := make([]dataset.BaseTreeNode, 0, len(nodes))
+		for _, node := range nodes {
+			item := node.node
+			if len(node.children) > 0 {
+				item.Children = freeze(node.children)
+			}
+			result = append(result, item)
+		}
+		return result
+	}
+
+	return freeze(rootNodes)
 }
 
 func (s *DatasetService) Save(req *dataset.WriteRequest) (*dataset.CoreDatasetGroup, error) {

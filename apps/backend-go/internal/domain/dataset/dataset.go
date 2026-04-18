@@ -164,6 +164,14 @@ type MultFieldValuesRequest struct {
 	ResultMode int          `json:"resultMode"`
 }
 
+type BaseTreeNode struct {
+	ID       string         `json:"id"`
+	Pid      string         `json:"pid,omitempty"`
+	Text     string         `json:"text"`
+	NodeType string         `json:"nodeType,omitempty"`
+	Children []BaseTreeNode `json:"children,omitempty"`
+}
+
 type EnumFilterClause struct {
 	Column string
 	Values []string

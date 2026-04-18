@@ -550,6 +550,92 @@ func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns 
 	return rows, nil
 }
 
+func (r *DatasetRepository) QueryFieldTreeValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, limit int) ([]map[string]interface{}, error) {
+	if !tableNamePattern.MatchString(tableName) {
+		return nil, fmt.Errorf("invalid table name")
+	}
+	if len(columns) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+
+	quotedTable, err := quoteIdentifier(tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	selectParts, orderParts, err := buildTreeSelectOrder(columns)
+	if err != nil {
+		return nil, err
+	}
+
+	query := strings.Builder{}
+	query.WriteString("SELECT DISTINCT ")
+	query.WriteString(strings.Join(selectParts, ", "))
+	query.WriteString(" FROM ")
+	query.WriteString(quotedTable)
+
+	args := make([]interface{}, 0)
+	whereParts := buildFilterWhereParts(filters, &args)
+
+	if len(whereParts) > 0 {
+		query.WriteString(" WHERE ")
+		query.WriteString(strings.Join(whereParts, " AND "))
+	}
+
+	if len(orderParts) > 0 {
+		query.WriteString(" ORDER BY ")
+		query.WriteString(strings.Join(orderParts, ", "))
+	}
+	if limit > 0 {
+		query.WriteString(" LIMIT ?")
+		args = append(args, limit)
+	}
+
+	rows := make([]map[string]interface{}, 0)
+	if err = r.db.Raw(query.String(), args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func buildTreeSelectOrder(columns []dataset.EnumObjectColumn) ([]string, []string, error) {
+	selectParts := make([]string, 0, len(columns))
+	orderParts := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quotedColumn, err := quoteIdentifier(column.Column)
+		if err != nil {
+			return nil, nil, err
+		}
+		quotedAlias, err := quoteIdentifier(column.Alias)
+		if err != nil {
+			return nil, nil, err
+		}
+		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", quotedColumn, quotedAlias))
+		orderParts = append(orderParts, quotedColumn+" ASC")
+	}
+	return selectParts, orderParts, nil
+}
+
+func buildFilterWhereParts(filters []dataset.EnumFilterClause, args *[]interface{}) []string {
+	whereParts := make([]string, 0)
+	for _, filter := range filters {
+		if strings.TrimSpace(filter.Column) == "" || len(filter.Values) == 0 {
+			continue
+		}
+		quotedColumn, err := quoteIdentifier(filter.Column)
+		if err != nil {
+			continue
+		}
+		placeholders := make([]string, 0, len(filter.Values))
+		for _, value := range filter.Values {
+			placeholders = append(placeholders, "?")
+			*args = append(*args, value)
+		}
+		whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", quotedColumn, strings.Join(placeholders, ", ")))
+	}
+	return whereParts
+}
+
 func (r *DatasetRepository) CountRows(tableName string) (int64, error) {
 	if !tableNamePattern.MatchString(tableName) {
 		return 0, fmt.Errorf("invalid table name")
