@@ -550,6 +550,79 @@ func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns 
 	return rows, nil
 }
 
+func (r *DatasetRepository) QueryFieldTreeValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, limit int) ([]map[string]interface{}, error) {
+	if !tableNamePattern.MatchString(tableName) {
+		return nil, fmt.Errorf("invalid table name")
+	}
+	if len(columns) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+
+	quotedTable, err := quoteIdentifier(tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	selectParts := make([]string, 0, len(columns))
+	orderParts := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quotedColumn, quoteErr := quoteIdentifier(column.Column)
+		if quoteErr != nil {
+			return nil, quoteErr
+		}
+		quotedAlias, quoteErr := quoteIdentifier(column.Alias)
+		if quoteErr != nil {
+			return nil, quoteErr
+		}
+		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", quotedColumn, quotedAlias))
+		orderParts = append(orderParts, quotedColumn+" ASC")
+	}
+
+	query := strings.Builder{}
+	query.WriteString("SELECT DISTINCT ")
+	query.WriteString(strings.Join(selectParts, ", "))
+	query.WriteString(" FROM ")
+	query.WriteString(quotedTable)
+
+	args := make([]interface{}, 0)
+	whereParts := make([]string, 0)
+	for _, filter := range filters {
+		if strings.TrimSpace(filter.Column) == "" || len(filter.Values) == 0 {
+			continue
+		}
+		quotedFilterColumn, quoteErr := quoteIdentifier(filter.Column)
+		if quoteErr != nil {
+			continue
+		}
+		placeholders := make([]string, 0, len(filter.Values))
+		for _, value := range filter.Values {
+			placeholders = append(placeholders, "?")
+			args = append(args, value)
+		}
+		whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", quotedFilterColumn, strings.Join(placeholders, ", ")))
+	}
+
+	if len(whereParts) > 0 {
+		query.WriteString(" WHERE ")
+		query.WriteString(strings.Join(whereParts, " AND "))
+	}
+
+	if len(orderParts) > 0 {
+		query.WriteString(" ORDER BY ")
+		query.WriteString(strings.Join(orderParts, ", "))
+	}
+	if limit > 0 {
+		query.WriteString(" LIMIT ?")
+		args = append(args, limit)
+	}
+
+	rows := make([]map[string]interface{}, 0)
+	if err = r.db.Raw(query.String(), args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
 func (r *DatasetRepository) CountRows(tableName string) (int64, error) {
 	if !tableNamePattern.MatchString(tableName) {
 		return 0, fmt.Errorf("invalid table name")
