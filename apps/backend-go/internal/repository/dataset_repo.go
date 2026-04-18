@@ -563,19 +563,9 @@ func (r *DatasetRepository) QueryFieldTreeValues(tableName string, columns []dat
 		return nil, err
 	}
 
-	selectParts := make([]string, 0, len(columns))
-	orderParts := make([]string, 0, len(columns))
-	for _, column := range columns {
-		quotedColumn, quoteErr := quoteIdentifier(column.Column)
-		if quoteErr != nil {
-			return nil, quoteErr
-		}
-		quotedAlias, quoteErr := quoteIdentifier(column.Alias)
-		if quoteErr != nil {
-			return nil, quoteErr
-		}
-		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", quotedColumn, quotedAlias))
-		orderParts = append(orderParts, quotedColumn+" ASC")
+	selectParts, orderParts, err := buildTreeSelectOrder(columns)
+	if err != nil {
+		return nil, err
 	}
 
 	query := strings.Builder{}
@@ -585,22 +575,7 @@ func (r *DatasetRepository) QueryFieldTreeValues(tableName string, columns []dat
 	query.WriteString(quotedTable)
 
 	args := make([]interface{}, 0)
-	whereParts := make([]string, 0)
-	for _, filter := range filters {
-		if strings.TrimSpace(filter.Column) == "" || len(filter.Values) == 0 {
-			continue
-		}
-		quotedFilterColumn, quoteErr := quoteIdentifier(filter.Column)
-		if quoteErr != nil {
-			continue
-		}
-		placeholders := make([]string, 0, len(filter.Values))
-		for _, value := range filter.Values {
-			placeholders = append(placeholders, "?")
-			args = append(args, value)
-		}
-		whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", quotedFilterColumn, strings.Join(placeholders, ", ")))
-	}
+	whereParts := buildFilterWhereParts(filters, &args)
 
 	if len(whereParts) > 0 {
 		query.WriteString(" WHERE ")
@@ -621,6 +596,44 @@ func (r *DatasetRepository) QueryFieldTreeValues(tableName string, columns []dat
 		return nil, err
 	}
 	return rows, nil
+}
+
+func buildTreeSelectOrder(columns []dataset.EnumObjectColumn) ([]string, []string, error) {
+	selectParts := make([]string, 0, len(columns))
+	orderParts := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quotedColumn, err := quoteIdentifier(column.Column)
+		if err != nil {
+			return nil, nil, err
+		}
+		quotedAlias, err := quoteIdentifier(column.Alias)
+		if err != nil {
+			return nil, nil, err
+		}
+		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", quotedColumn, quotedAlias))
+		orderParts = append(orderParts, quotedColumn+" ASC")
+	}
+	return selectParts, orderParts, nil
+}
+
+func buildFilterWhereParts(filters []dataset.EnumFilterClause, args *[]interface{}) []string {
+	whereParts := make([]string, 0)
+	for _, filter := range filters {
+		if strings.TrimSpace(filter.Column) == "" || len(filter.Values) == 0 {
+			continue
+		}
+		quotedColumn, err := quoteIdentifier(filter.Column)
+		if err != nil {
+			continue
+		}
+		placeholders := make([]string, 0, len(filter.Values))
+		for _, value := range filter.Values {
+			placeholders = append(placeholders, "?")
+			*args = append(*args, value)
+		}
+		whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", quotedColumn, strings.Join(placeholders, ", ")))
+	}
+	return whereParts
 }
 
 func (r *DatasetRepository) CountRows(tableName string) (int64, error) {
