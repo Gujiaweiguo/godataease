@@ -130,6 +130,7 @@ type Router struct {
 	staticHandler                  *handler.StaticHandler
 	subjectHandler                 *handler.SubjectHandler
 	fontHandler                    *handler.FontHandler
+	pdfTemplateHandler             *handler.PdfTemplateHandler
 	exportHandler                  *handler.ExportHandler
 	engineHandler                  *handler.EngineHandler
 	driverHandler                  *handler.DriverHandler
@@ -334,6 +335,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	subjectHandler := handler.NewSubjectHandler(subjectRepo)
 
 	fontHandler := handler.NewFontHandler(typefaceRepo)
+	pdfTemplateHandler := handler.NewPdfTemplateHandler()
 
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
@@ -410,6 +412,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		staticHandler:                  staticHandler,
 		subjectHandler:                 subjectHandler,
 		fontHandler:                    fontHandler,
+		pdfTemplateHandler:             pdfTemplateHandler,
 		exportHandler:                  exportHandler,
 		engineHandler:                  engineHandler,
 		driverHandler:                  driverHandler,
@@ -610,11 +613,13 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterStaticRoutes(api, r.staticHandler)
 		handler.RegisterSubjectRoutes(api, r.subjectHandler)
 		handler.RegisterFontRoutes(api, r.fontHandler)
+		handler.RegisterPdfTemplateRoutes(api, r.pdfTemplateHandler)
 		handler.RegisterExportRoutes(exportAPI, r.exportHandler)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
+		api.GET("/panel/view/getComponentInfo/:dvId", r.visualHandler.GetComponentInfo)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, nil, r.permMiddleware)
 		handler.RegisterDatasetFieldDeleteRoutes(api.Group("/datasetField"), r.datasetHandler, r.chartHandler)
 	}

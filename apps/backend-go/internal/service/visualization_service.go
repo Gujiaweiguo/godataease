@@ -334,3 +334,7 @@ func (s *VisualizationService) RecoverToPublished(id int64, updateBy string) (*v
 	}
 	return s.repo.GetByID(id)
 }
+
+func (s *VisualizationService) ViewDetailList(dvID int64) ([]map[string]interface{}, error) {
+	return s.repo.GetChartViewsBySceneID(dvID)
+}

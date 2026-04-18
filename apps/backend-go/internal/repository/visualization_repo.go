@@ -136,3 +136,9 @@ func (r *VisualizationRepository) CountByNameAndPID(name string, pid *int64, exc
 	err := query.Count(&count).Error
 	return count, err
 }
+
+func (r *VisualizationRepository) GetChartViewsBySceneID(sceneID int64) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	err := r.db.Table("core_chart_view").Where("scene_id = ?", sceneID).Find(&results).Error
+	return results, err
+}
