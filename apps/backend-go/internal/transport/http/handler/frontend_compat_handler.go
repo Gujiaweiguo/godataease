@@ -314,7 +314,6 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.GET("/roleRouter/query", h.GetRoleRouters)
 	protected.GET("/auth/menuResource", h.GetMenuResource)
 	protected.POST("/dataVisualization/interactiveTree", h.InteractiveTree)
-	protected.POST("/store/query", h.QueryStore)
 }
 
 func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {

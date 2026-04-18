@@ -96,46 +96,48 @@ func determineRouteSource(path string) string {
 }
 
 type Router struct {
-	engine                    *gin.Engine
-	app                       *app.Application
-	db                        *gorm.DB
-	permMiddleware            *middleware.PermissionMiddleware
-	auditHandler              *handler.AuditHandler
-	userHandler               *handler.UserHandler
-	orgHandler                *handler.OrgHandler
-	permHandler               *handler.PermHandler
-	embeddedHandler           *handler.EmbeddedHandler
-	roleHandler               *handler.RoleHandler
-	roleMenuHandler           *handler.RoleMenuHandler
-	menuHandler               *handler.MenuHandler
-	mapHandler                *handler.MapHandler
-	authHandler               *handler.AuthHandler
-	datasourceHandler         *handler.DatasourceHandler
-	datasetHandler            *handler.DatasetHandler
-	chartHandler              *handler.ChartHandler
-	visualHandler             *handler.VisualizationHandler
-	linkageHandler            *handler.LinkageHandler
-	linkJumpHandler           *handler.LinkJumpHandler
-	outerParamsHandler        *handler.OuterParamsHandler
-	watermarkHandler          *handler.WatermarkHandler
-	systemParamHandler        *handler.SystemParamHandler
-	systemVariableHandler     *handler.SystemVariableHandler
-	licenseHandler            *handler.LicenseHandler
-	msgCenterHandler          *handler.MsgCenterHandler
-	shareHandler              *handler.ShareHandler
-	ticketHandler             *handler.TicketHandler
-	geoHandler                *handler.GeoHandler
-	staticHandler             *handler.StaticHandler
-	exportHandler             *handler.ExportHandler
-	engineHandler             *handler.EngineHandler
-	driverHandler             *handler.DriverHandler
-	templateHandler           *handler.TemplateHandler
-	syncHandler               *handler.SyncHandler
-	frontendCompatHandler     *handler.FrontendCompatHandler
-	permissionCompatHandler   *handler.PermissionCompatHandler
-	dataPermissionHandler     *handler.DataPermissionHandler
-	resourceGovernanceHandler *handler.ResourceGovernanceHandler
-	menuAuthMiddleware        *middleware.MenuAuthMiddleware
+	engine                         *gin.Engine
+	app                            *app.Application
+	db                             *gorm.DB
+	permMiddleware                 *middleware.PermissionMiddleware
+	auditHandler                   *handler.AuditHandler
+	userHandler                    *handler.UserHandler
+	orgHandler                     *handler.OrgHandler
+	permHandler                    *handler.PermHandler
+	embeddedHandler                *handler.EmbeddedHandler
+	roleHandler                    *handler.RoleHandler
+	roleMenuHandler                *handler.RoleMenuHandler
+	menuHandler                    *handler.MenuHandler
+	mapHandler                     *handler.MapHandler
+	authHandler                    *handler.AuthHandler
+	datasourceHandler              *handler.DatasourceHandler
+	datasetHandler                 *handler.DatasetHandler
+	chartHandler                   *handler.ChartHandler
+	visualHandler                  *handler.VisualizationHandler
+	linkageHandler                 *handler.LinkageHandler
+	linkJumpHandler                *handler.LinkJumpHandler
+	outerParamsHandler             *handler.OuterParamsHandler
+	visualizationBackgroundHandler *handler.VisualizationBackgroundHandler
+	storeHandler                   *handler.StoreHandler
+	watermarkHandler               *handler.WatermarkHandler
+	systemParamHandler             *handler.SystemParamHandler
+	systemVariableHandler          *handler.SystemVariableHandler
+	licenseHandler                 *handler.LicenseHandler
+	msgCenterHandler               *handler.MsgCenterHandler
+	shareHandler                   *handler.ShareHandler
+	ticketHandler                  *handler.TicketHandler
+	geoHandler                     *handler.GeoHandler
+	staticHandler                  *handler.StaticHandler
+	exportHandler                  *handler.ExportHandler
+	engineHandler                  *handler.EngineHandler
+	driverHandler                  *handler.DriverHandler
+	templateHandler                *handler.TemplateHandler
+	syncHandler                    *handler.SyncHandler
+	frontendCompatHandler          *handler.FrontendCompatHandler
+	permissionCompatHandler        *handler.PermissionCompatHandler
+	dataPermissionHandler          *handler.DataPermissionHandler
+	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
+	menuAuthMiddleware             *middleware.MenuAuthMiddleware
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -277,6 +279,12 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	outerParamsService := service.NewOuterParamsService(outerParamsRepo)
 	outerParamsHandler := handler.NewOuterParamsHandler(outerParamsService)
 
+	visualizationBackgroundRepo := repository.NewVisualizationBackgroundRepository(db)
+	visualizationBackgroundHandler := handler.NewVisualizationBackgroundHandler(visualizationBackgroundRepo)
+
+	favoriteRepo := repository.NewFavoriteRepository(db)
+	storeHandler := handler.NewStoreHandler(favoriteRepo)
+
 	watermarkRepo := repository.NewWatermarkRepository(db)
 	watermarkService := service.NewWatermarkService(watermarkRepo)
 	watermarkHandler := handler.NewWatermarkHandler(watermarkService)
@@ -356,46 +364,48 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
 	return &Router{
-		engine:                    engine,
-		app:                       application,
-		db:                        db,
-		permMiddleware:            permMiddleware,
-		auditHandler:              auditHandler,
-		userHandler:               userHandler,
-		orgHandler:                orgHandler,
-		permHandler:               permHandler,
-		embeddedHandler:           embeddedHandler,
-		roleHandler:               roleHandler,
-		roleMenuHandler:           roleMenuHandler,
-		menuHandler:               menuHandler,
-		mapHandler:                mapHandler,
-		authHandler:               authHandler,
-		datasourceHandler:         datasourceHandler,
-		datasetHandler:            datasetHandler,
-		chartHandler:              chartHandler,
-		visualHandler:             visualHandler,
-		linkageHandler:            linkageHandler,
-		linkJumpHandler:           linkJumpHandler,
-		outerParamsHandler:        outerParamsHandler,
-		watermarkHandler:          watermarkHandler,
-		systemParamHandler:        systemParamHandler,
-		systemVariableHandler:     systemVariableHandler,
-		licenseHandler:            licenseHandler,
-		msgCenterHandler:          msgCenterHandler,
-		shareHandler:              shareHandler,
-		ticketHandler:             ticketHandler,
-		geoHandler:                geoHandler,
-		staticHandler:             staticHandler,
-		exportHandler:             exportHandler,
-		engineHandler:             engineHandler,
-		driverHandler:             driverHandler,
-		templateHandler:           templateHandler,
-		syncHandler:               syncHandler,
-		frontendCompatHandler:     frontendCompatHandler,
-		permissionCompatHandler:   permissionCompatHandler,
-		dataPermissionHandler:     dataPermissionHandler,
-		resourceGovernanceHandler: resourceGovernanceHandler,
-		menuAuthMiddleware:        menuAuthMiddleware,
+		engine:                         engine,
+		app:                            application,
+		db:                             db,
+		permMiddleware:                 permMiddleware,
+		auditHandler:                   auditHandler,
+		userHandler:                    userHandler,
+		orgHandler:                     orgHandler,
+		permHandler:                    permHandler,
+		embeddedHandler:                embeddedHandler,
+		roleHandler:                    roleHandler,
+		roleMenuHandler:                roleMenuHandler,
+		menuHandler:                    menuHandler,
+		mapHandler:                     mapHandler,
+		authHandler:                    authHandler,
+		datasourceHandler:              datasourceHandler,
+		datasetHandler:                 datasetHandler,
+		chartHandler:                   chartHandler,
+		visualHandler:                  visualHandler,
+		linkageHandler:                 linkageHandler,
+		linkJumpHandler:                linkJumpHandler,
+		outerParamsHandler:             outerParamsHandler,
+		visualizationBackgroundHandler: visualizationBackgroundHandler,
+		storeHandler:                   storeHandler,
+		watermarkHandler:               watermarkHandler,
+		systemParamHandler:             systemParamHandler,
+		systemVariableHandler:          systemVariableHandler,
+		licenseHandler:                 licenseHandler,
+		msgCenterHandler:               msgCenterHandler,
+		shareHandler:                   shareHandler,
+		ticketHandler:                  ticketHandler,
+		geoHandler:                     geoHandler,
+		staticHandler:                  staticHandler,
+		exportHandler:                  exportHandler,
+		engineHandler:                  engineHandler,
+		driverHandler:                  driverHandler,
+		templateHandler:                templateHandler,
+		syncHandler:                    syncHandler,
+		frontendCompatHandler:          frontendCompatHandler,
+		permissionCompatHandler:        permissionCompatHandler,
+		dataPermissionHandler:          dataPermissionHandler,
+		resourceGovernanceHandler:      resourceGovernanceHandler,
+		menuAuthMiddleware:             menuAuthMiddleware,
 	}
 }
 
@@ -472,6 +482,8 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterLinkageRoutes(r.engine.Group(""), r.linkageHandler)
 	handler.RegisterLinkJumpRoutes(r.engine.Group(""), r.linkJumpHandler)
 	handler.RegisterOuterParamsRoutes(r.engine.Group(""), r.outerParamsHandler)
+	handler.RegisterVisualizationBackgroundRoutes(r.engine.Group(""), r.visualizationBackgroundHandler)
+	handler.RegisterStoreRoutes(r.engine.Group(""), r.storeHandler)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, nil, nil)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, nil, nil, nil, nil, r.chartHandler, r.permMiddleware)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
