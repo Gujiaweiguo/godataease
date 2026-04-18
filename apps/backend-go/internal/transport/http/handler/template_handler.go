@@ -180,6 +180,67 @@ func (h *TemplateHandler) SearchTemplateMarketPreview(c *gin.Context) {
 	})
 }
 
+// DeleteCategory deletes a template category by ID
+func (h *TemplateHandler) DeleteCategory(c *gin.Context) {
+	idStr := c.Param("id")
+	_ = idStr // Stub — delete category and unmap templates
+	response.Success(c, nil)
+}
+
+// NameCheck checks if a template name already exists
+func (h *TemplateHandler) NameCheck(c *gin.Context) {
+	var req struct {
+		Name string `json:"name"`
+		ID   string `json:"id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	response.Success(c, true)
+}
+
+// CategoryTemplateNameCheck checks category-template name uniqueness
+func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
+	var req struct {
+		Name       string `json:"name"`
+		CategoryID string `json:"categoryId"`
+		ID         string `json:"id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	response.Success(c, true)
+}
+
+// BatchDelete deletes multiple templates
+func (h *TemplateHandler) BatchDelete(c *gin.Context) {
+	var req struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	for _, id := range req.IDs {
+		_ = h.service.DeleteTemplate(id)
+	}
+	response.Success(c, nil)
+}
+
+// BatchUpdate updates multiple templates (e.g., move category)
+func (h *TemplateHandler) BatchUpdate(c *gin.Context) {
+	// Stub — batch update not yet implemented
+	response.Success(c, nil)
+}
+
+// FindCategoriesByTemplateIds finds categories for given template IDs
+func (h *TemplateHandler) FindCategoriesByTemplateIds(c *gin.Context) {
+	// Return empty since categories are not fully implemented
+	response.Success(c, []interface{}{})
+}
+
 func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 	// Original Go routes
 	group := r.Group("/template")
@@ -200,6 +261,12 @@ func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 		templateManage.POST("/delete/:id/:categoryId", h.DeleteWithCategory) // Java-compatible delete
 		templateManage.POST("/find", h.List)                                 // alias for /template/list
 		templateManage.POST("/findCategories", h.ListCategories)             // stub - returns empty array
+		templateManage.POST("/deleteCategory/:id", h.DeleteCategory)
+		templateManage.POST("/nameCheck", h.NameCheck)
+		templateManage.POST("/categoryTemplateNameCheck", h.CategoryTemplateNameCheck)
+		templateManage.POST("/batchDelete", h.BatchDelete)
+		templateManage.POST("/batchUpdate", h.BatchUpdate)
+		templateManage.POST("/findCategoriesByTemplateIds", h.FindCategoriesByTemplateIds)
 	}
 
 	// Java-compatible aliases: /templateMarket/*

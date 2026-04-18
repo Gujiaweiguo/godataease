@@ -138,6 +138,7 @@ type Router struct {
 	syncHandler                    *handler.SyncHandler
 	frontendCompatHandler          *handler.FrontendCompatHandler
 	permissionCompatHandler        *handler.PermissionCompatHandler
+	relationHandler                *handler.RelationHandler
 	customGeoHandler               *handler.CustomGeoHandler
 	dataPermissionHandler          *handler.DataPermissionHandler
 	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
@@ -376,6 +377,8 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
+	relationHandler := handler.NewRelationHandler()
+
 	return &Router{
 		engine:                         engine,
 		app:                            application,
@@ -420,6 +423,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		syncHandler:                    syncHandler,
 		frontendCompatHandler:          frontendCompatHandler,
 		permissionCompatHandler:        permissionCompatHandler,
+		relationHandler:                relationHandler,
 		dataPermissionHandler:          dataPermissionHandler,
 		resourceGovernanceHandler:      resourceGovernanceHandler,
 		menuAuthMiddleware:             menuAuthMiddleware,
@@ -622,6 +626,23 @@ func (r *Router) registerAPIRoutes() {
 		api.GET("/panel/view/getComponentInfo/:dvId", r.visualHandler.GetComponentInfo)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, nil, r.permMiddleware)
 		handler.RegisterDatasetFieldDeleteRoutes(api.Group("/datasetField"), r.datasetHandler, r.chartHandler)
+
+		handler.RegisterRelationRoutes(api, r.relationHandler)
+
+		copilot := api.Group("/copilot")
+		{
+			copilot.POST("/chat", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
+			copilot.POST("/getList", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": []interface{}{}, "msg": ""}) })
+			copilot.POST("/clearAll", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
+		}
+
+		api.POST("/login/platformLogin/:origin", func(c *gin.Context) {
+			c.JSON(200, gin.H{"code": "500000", "data": nil, "msg": "Platform login not supported"})
+		})
+
+		api.GET("/sqlbot/dataset/:dvInfo", func(c *gin.Context) {
+			c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""})
+		})
 	}
 }
 
