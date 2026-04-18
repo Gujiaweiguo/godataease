@@ -129,6 +129,7 @@ type Router struct {
 	geoHandler                     *handler.GeoHandler
 	staticHandler                  *handler.StaticHandler
 	subjectHandler                 *handler.SubjectHandler
+	fontHandler                    *handler.FontHandler
 	exportHandler                  *handler.ExportHandler
 	engineHandler                  *handler.EngineHandler
 	driverHandler                  *handler.DriverHandler
@@ -328,6 +329,8 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	subjectRepo := repository.NewSubjectRepository(db)
 	subjectHandler := handler.NewSubjectHandler(subjectRepo)
 
+	fontHandler := handler.NewFontHandler(typefaceRepo)
+
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
 	roleService.SetResourcePermissionRepository(resourcePermRepo)
@@ -401,6 +404,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		geoHandler:                     geoHandler,
 		staticHandler:                  staticHandler,
 		subjectHandler:                 subjectHandler,
+		fontHandler:                    fontHandler,
 		exportHandler:                  exportHandler,
 		engineHandler:                  engineHandler,
 		driverHandler:                  driverHandler,
@@ -599,6 +603,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterGeoRoutes(api, r.geoHandler)
 		handler.RegisterStaticRoutes(api, r.staticHandler)
 		handler.RegisterSubjectRoutes(api, r.subjectHandler)
+		handler.RegisterFontRoutes(api, r.fontHandler)
 		handler.RegisterExportRoutes(exportAPI, r.exportHandler)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)

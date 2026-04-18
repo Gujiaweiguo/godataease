@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/static"
 
 	"gorm.io/gorm"
@@ -55,4 +56,50 @@ func (r *TypefaceRepository) ListTypefaces() ([]*static.Typeface, error) {
 	var typefaces []*static.Typeface
 	err := r.db.Find(&typefaces).Error
 	return typefaces, err
+}
+
+// Font CRUD methods use core_font table for full font management.
+
+func (r *TypefaceRepository) ListFonts() ([]auto.CoreFont, error) {
+	var fonts []auto.CoreFont
+	err := r.db.Find(&fonts).Error
+	return fonts, err
+}
+
+func (r *TypefaceRepository) GetFontByID(id int64) (*auto.CoreFont, error) {
+	var font auto.CoreFont
+	err := r.db.Where("id = ?", id).First(&font).Error
+	return &font, err
+}
+
+func (r *TypefaceRepository) FindFontByName(name string) (*auto.CoreFont, error) {
+	var font auto.CoreFont
+	err := r.db.Where("name = ?", name).First(&font).Error
+	return &font, err
+}
+
+func (r *TypefaceRepository) CreateFont(font *auto.CoreFont) error {
+	return r.db.Create(font).Error
+}
+
+func (r *TypefaceRepository) UpdateFont(font *auto.CoreFont) error {
+	return r.db.Save(font).Error
+}
+
+func (r *TypefaceRepository) DeleteFont(id int64) error {
+	return r.db.Where("id = ?", id).Delete(&auto.CoreFont{}).Error
+}
+
+func (r *TypefaceRepository) SetDefaultFont(id int64, isDefault bool) error {
+	return r.db.Model(&auto.CoreFont{}).Where("id = ?", id).Update("is_default", isDefault).Error
+}
+
+func (r *TypefaceRepository) ClearDefaultFonts(excludeID int64) error {
+	return r.db.Model(&auto.CoreFont{}).Where("id != ?", excludeID).Update("is_default", false).Error
+}
+
+func (r *TypefaceRepository) ListDefaultFonts() ([]auto.CoreFont, error) {
+	var fonts []auto.CoreFont
+	err := r.db.Where("is_default = ?", true).Find(&fonts).Error
+	return fonts, err
 }
