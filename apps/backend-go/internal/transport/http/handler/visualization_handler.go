@@ -438,6 +438,70 @@ func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
 	return "system"
 }
 
+func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
+	dvID, err := strconv.ParseInt(c.Param("dvId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dvId")
+		return
+	}
+	result, err := h.service.Detail(&visualization.DetailRequest{ID: dvID})
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	if result != nil && result.PID != nil && *result.PID == -1 {
+		response.Success(c, result)
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
+	dvID, err := strconv.ParseInt(c.Param("dvId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid dvId")
+		return
+	}
+	result, err := h.service.ViewDetailList(dvID)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
+	response.Success(c, "success")
+}
+
+func (h *VisualizationHandler) GetComponentInfo(c *gin.Context) {
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
+	response.Success(c, map[string]interface{}{})
+}
+
+func (h *VisualizationHandler) ExportLogApp(c *gin.Context) {
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) ExportLogTemplate(c *gin.Context) {
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) ExportLogPDF(c *gin.Context) {
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) ExportLogImg(c *gin.Context) {
+	response.Success(c, nil)
+}
+
+func (h *VisualizationHandler) Decompression(c *gin.Context) {
+	response.Success(c, nil)
+}
+
 func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, permMiddleware *middleware.PermissionMiddleware) {
 	vg := r.Group("/dataVisualization")
 	{
@@ -481,5 +545,14 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, pe
 			vg.POST("/deleteLogic/:id", h.DeleteLogic)
 			vg.POST("/deleteLogic/:id/:busiFlag", h.DeleteLogic)
 		}
+		vg.GET("/findCopyResource/:dvId/:busiFlag", h.FindCopyResource)
+		vg.GET("/viewDetailList/:dvId", h.ViewDetailList)
+		vg.POST("/appCanvasNameCheck", h.AppCanvasNameCheck)
+		vg.POST("/decompression", h.Decompression)
+		vg.POST("/export2AppCheck", h.Export2AppCheck)
+		vg.POST("/exportLogApp", h.ExportLogApp)
+		vg.POST("/exportLogTemplate", h.ExportLogTemplate)
+		vg.POST("/exportLogPDF", h.ExportLogPDF)
+		vg.POST("/exportLogImg", h.ExportLogImg)
 	}
 }
