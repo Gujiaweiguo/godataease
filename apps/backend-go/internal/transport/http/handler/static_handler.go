@@ -190,13 +190,6 @@ func RegisterStaticRoutes(r *gin.RouterGroup, h *StaticHandler) {
 		storeGroup.GET("/list", h.ListStores)
 	}
 
-	typefaceGroup := r.Group("/typeface")
-	{
-		typefaceGroup.GET("/list", h.ListTypefaces)
-		typefaceGroup.GET("/listFont", h.ListFont)
-		typefaceGroup.GET("/defaultFont", h.DefaultFont)
-	}
-
 	// Xpack model endpoint
 	r.GET("/xpackModel", h.XpackModel)
 }
