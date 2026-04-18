@@ -130,6 +130,7 @@ type Router struct {
 	staticHandler                  *handler.StaticHandler
 	subjectHandler                 *handler.SubjectHandler
 	fontHandler                    *handler.FontHandler
+	pdfTemplateHandler             *handler.PdfTemplateHandler
 	exportHandler                  *handler.ExportHandler
 	engineHandler                  *handler.EngineHandler
 	driverHandler                  *handler.DriverHandler
@@ -137,6 +138,7 @@ type Router struct {
 	syncHandler                    *handler.SyncHandler
 	frontendCompatHandler          *handler.FrontendCompatHandler
 	permissionCompatHandler        *handler.PermissionCompatHandler
+	customGeoHandler               *handler.CustomGeoHandler
 	dataPermissionHandler          *handler.DataPermissionHandler
 	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
 	menuAuthMiddleware             *middleware.MenuAuthMiddleware
@@ -319,6 +321,9 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	geoService := service.NewGeoService(geoRepo)
 	geoHandler := handler.NewGeoHandler(geoService)
 
+	customGeoRepo := repository.NewCustomGeoRepository(db)
+	customGeoHandler := handler.NewCustomGeoHandler(customGeoRepo)
+
 	// Static module initialization
 	staticRepo := repository.NewStaticRepository(db)
 	storeRepo := repository.NewStoreRepository(db)
@@ -330,6 +335,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	subjectHandler := handler.NewSubjectHandler(subjectRepo)
 
 	fontHandler := handler.NewFontHandler(typefaceRepo)
+	pdfTemplateHandler := handler.NewPdfTemplateHandler()
 
 	// Permission middleware initialization
 	resourcePermRepo := repository.NewResourcePermissionRepository(db)
@@ -402,9 +408,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		shareHandler:                   shareHandler,
 		ticketHandler:                  ticketHandler,
 		geoHandler:                     geoHandler,
+		customGeoHandler:               customGeoHandler,
 		staticHandler:                  staticHandler,
 		subjectHandler:                 subjectHandler,
 		fontHandler:                    fontHandler,
+		pdfTemplateHandler:             pdfTemplateHandler,
 		exportHandler:                  exportHandler,
 		engineHandler:                  engineHandler,
 		driverHandler:                  driverHandler,
@@ -601,14 +609,17 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterShareRoutes(api, r.shareHandler)
 		handler.RegisterTicketRoutes(api, r.ticketHandler)
 		handler.RegisterGeoRoutes(api, r.geoHandler)
+		handler.RegisterCustomGeoRoutes(api, r.customGeoHandler)
 		handler.RegisterStaticRoutes(api, r.staticHandler)
 		handler.RegisterSubjectRoutes(api, r.subjectHandler)
 		handler.RegisterFontRoutes(api, r.fontHandler)
+		handler.RegisterPdfTemplateRoutes(api, r.pdfTemplateHandler)
 		handler.RegisterExportRoutes(exportAPI, r.exportHandler)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
+		api.GET("/panel/view/getComponentInfo/:dvId", r.visualHandler.GetComponentInfo)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, nil, r.permMiddleware)
 		handler.RegisterDatasetFieldDeleteRoutes(api.Group("/datasetField"), r.datasetHandler, r.chartHandler)
 	}
