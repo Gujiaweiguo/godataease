@@ -3,6 +3,7 @@ package service
 import (
 	"testing"
 
+	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
@@ -806,4 +807,244 @@ func TestVisualizationService_Decompression(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.CanvasViewInfo, 1)
 	})
+}
+
+func setupExport2AppCheckTest(t *testing.T) (*VisualizationService, *gorm.DB) {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	require.NoError(t, db.Exec(`CREATE TABLE core_chart_view (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, scene_id INTEGER, table_id INTEGER,
+		type TEXT, render TEXT, result_count INTEGER, result_mode TEXT,
+		x_axis TEXT, y_axis TEXT, custom_attr TEXT, custom_style TEXT, custom_filter TEXT,
+		create_by TEXT, create_time INTEGER, update_time INTEGER, data_from TEXT,
+		x_axis_ext TEXT, y_axis_ext TEXT, ext_stack TEXT, ext_bubble TEXT,
+		ext_label TEXT, ext_tooltip TEXT, custom_attr_mobile TEXT, custom_style_mobile TEXT,
+		drill_fields TEXT, senior TEXT, snapshot TEXT, style_priority TEXT,
+		chart_type TEXT, is_plugin INTEGER, view_fields TEXT,
+		refresh_view_enable INTEGER, refresh_unit TEXT, refresh_time INTEGER,
+		linkage_active INTEGER, jump_active INTEGER, copy_from INTEGER, copy_id INTEGER,
+		aggregate INTEGER, flow_map_start_name TEXT, flow_map_end_name TEXT,
+		ext_color TEXT, sort_priority TEXT
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE core_dataset_group (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pid INTEGER, level INTEGER,
+		node_type TEXT, type TEXT, del_flag INTEGER, create_by TEXT, create_time INTEGER,
+		update_by TEXT, last_update_time INTEGER
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE core_dataset_table (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, datasource_id INTEGER,
+		dataset_group_id INTEGER, table_name TEXT, type TEXT
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE core_dataset_table_field (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, datasource_id INTEGER,
+		dataset_table_id INTEGER, dataset_group_id INTEGER, chart_id INTEGER,
+		origin_name TEXT, name TEXT, dataease_name TEXT, field_short_name TEXT,
+		group_type TEXT, type TEXT, de_type INTEGER, de_extract_type INTEGER,
+		ext_field INTEGER, checked INTEGER, params TEXT
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE core_datasource (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT, pid INTEGER,
+		description TEXT, configuration TEXT, create_time INTEGER, update_time INTEGER,
+		status TEXT, del_flag INTEGER
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE core_datasource_task (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, ds_id INTEGER, name TEXT,
+		update_type TEXT, start_time INTEGER, sync_rate TEXT, cron TEXT,
+		simple_cron_value INTEGER, simple_cron_type TEXT, end_limit TEXT,
+		end_time INTEGER, create_time INTEGER, last_exec_time INTEGER,
+		last_exec_status TEXT, extra_data TEXT, task_status TEXT
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE visualization_linkage (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, dv_id INTEGER, source_view_id INTEGER,
+		target_view_id INTEGER, update_time INTEGER, update_people TEXT,
+		linkage_active INTEGER, ext1 TEXT, ext2 TEXT, copy_from INTEGER, copy_id INTEGER
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE visualization_linkage_field (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, linkage_id INTEGER, source_field INTEGER,
+		target_field INTEGER, update_time INTEGER, copy_from INTEGER, copy_id INTEGER
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE visualization_link_jump (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, source_dv_id INTEGER, source_view_id INTEGER,
+		link_jump_info TEXT, checked INTEGER, copy_from INTEGER, copy_id INTEGER
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE visualization_link_jump_info (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, link_jump_id INTEGER, link_type TEXT,
+		jump_type TEXT, target_dv_id INTEGER, source_field_id INTEGER,
+		content TEXT, checked INTEGER, attach_params INTEGER, copy_from INTEGER,
+		copy_id INTEGER, window_size TEXT
+	)`).Error)
+
+	require.NoError(t, db.Exec(`CREATE TABLE visualization_link_jump_target_view_info (
+		target_id INTEGER PRIMARY KEY AUTOINCREMENT, link_jump_info_id INTEGER,
+		source_field_active_id INTEGER, target_view_id TEXT, target_field_id TEXT,
+		copy_from INTEGER, copy_id INTEGER, target_type TEXT
+	)`).Error)
+
+	repo := repository.NewVisualizationRepository(db)
+	return NewVisualizationService(repo), db
+}
+
+func insertExportTestData(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	require.NoError(t, db.Exec(`INSERT INTO core_datasource (id, name, type, configuration, create_time, update_time) VALUES (1, 'test_ds', 'MySQL', '{}', 1, 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_group (id, name, node_type, create_by, create_time, update_by, last_update_time) VALUES (100, 'grp1', 'dataset', 'admin', 1, 'admin', 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_table (id, name, datasource_id, dataset_group_id, type) VALUES (200, 't1', 1, 100, 'db')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_table_field (id, dataset_group_id, origin_name, name, group_type, type, de_type) VALUES (300, 100, 'f1', 'field1', 'd', 'VARCHAR', 0)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_chart_view (id, title, scene_id, table_id, type) VALUES (400, 'chart1', 500, 200, 'bar')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_datasource_task (id, ds_id, name, update_type, sync_rate, task_status) VALUES (600, 1, 'task1', 'all', '0', 'Success')`).Error)
+
+	require.NoError(t, db.Exec(`INSERT INTO visualization_linkage (id, dv_id, source_view_id, target_view_id, linkage_active) VALUES (700, 500, 400, 401, 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO visualization_linkage_field (id, linkage_id, source_field, target_field) VALUES (800, 700, 300, 301)`).Error)
+
+	require.NoError(t, db.Exec(`INSERT INTO visualization_link_jump (id, source_dv_id, source_view_id, checked) VALUES (900, 500, 400, 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO visualization_link_jump_info (id, link_jump_id, link_type, jump_type, source_field_id, checked) VALUES (1000, 900, 'inner', '_blank', 300, 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO visualization_link_jump_target_view_info (target_id, link_jump_info_id, source_field_active_id, target_view_id, target_field_id) VALUES (1100, 1000, 300, '999', '888')`).Error)
+}
+
+func TestVisualizationService_Export2AppCheck_SuccessPath(t *testing.T) {
+	svc, db := setupExport2AppCheckTest(t)
+	insertExportTestData(t, db)
+
+	resp, err := svc.Export2AppCheck(&visualization.Export2AppCheckRequest{
+		DvID:    500,
+		ViewIDs: []int64{400},
+		DsIDs:   []int64{100},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	assert.True(t, resp.CheckStatus)
+	assert.Equal(t, "success", resp.CheckMes)
+	assert.Len(t, resp.ChartViewsInfo, 1)
+	assert.Len(t, resp.DatasetGroupsInfo, 1)
+	assert.Len(t, resp.DatasetTablesInfo, 1)
+	assert.Len(t, resp.DatasetTableFieldsInfo, 1)
+	assert.Len(t, resp.DatasourceInfo, 1)
+	assert.Len(t, resp.DatasourceTaskInfo, 1)
+	assert.Len(t, resp.Linkages, 1)
+	assert.Len(t, resp.LinkageFields, 1)
+	assert.Len(t, resp.LinkJumps, 1)
+	assert.Len(t, resp.LinkJumpInfos, 1)
+	assert.Len(t, resp.LinkJumpTargetInfos, 1)
+	assert.Equal(t, "400", resp.ChartViewsInfo[0]["id"])
+	assert.Equal(t, "500", resp.ChartViewsInfo[0]["scene_id"])
+	assert.Equal(t, "100", resp.DatasetGroupsInfo[0]["id"])
+	assert.Equal(t, "1", resp.DatasourceInfo[0]["id"])
+}
+
+func TestVisualizationService_Export2AppCheck_MissingDatasource(t *testing.T) {
+	svc, db := setupExport2AppCheckTest(t)
+
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_group (id, name, node_type, create_by, create_time, update_by, last_update_time) VALUES (100, 'grp1', 'dataset', 'admin', 1, 'admin', 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_table (id, name, datasource_id, dataset_group_id, type) VALUES (200, 't1', 999, 100, 'db')`).Error)
+
+	resp, err := svc.Export2AppCheck(&visualization.Export2AppCheckRequest{
+		DvID:  500,
+		DsIDs: []int64{100},
+	})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "当前不存在数据源无法导出")
+}
+
+func TestVisualizationService_Export2AppCheck_APIDatasourceRejected(t *testing.T) {
+	svc, db := setupExport2AppCheckTest(t)
+
+	require.NoError(t, db.Exec(`INSERT INTO core_datasource (id, name, type, configuration, create_time, update_time) VALUES (1, 'api_ds', 'API', '{}', 1, 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_group (id, name, node_type, create_by, create_time, update_by, last_update_time) VALUES (100, 'grp1', 'dataset', 'admin', 1, 'admin', 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_table (id, name, datasource_id, dataset_group_id, type) VALUES (200, 't1', 1, 100, 'api')`).Error)
+
+	resp, err := svc.Export2AppCheck(&visualization.Export2AppCheckRequest{
+		DvID:  500,
+		DsIDs: []int64{100},
+	})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "API")
+}
+
+func TestVisualizationService_Export2AppCheck_EmptyDsIDsRejected(t *testing.T) {
+	svc, _ := setupExport2AppCheckTest(t)
+
+	resp, err := svc.Export2AppCheck(&visualization.Export2AppCheckRequest{
+		DvID: 999,
+	})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "当前不存在数据源无法导出")
+}
+
+func TestVisualizationService_Export2AppCheck_NilRequest(t *testing.T) {
+	svc, _ := setupExport2AppCheckTest(t)
+
+	resp, err := svc.Export2AppCheck(nil)
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "required")
+}
+
+func TestVisualizationService_AppCanvasNameCheck(t *testing.T) {
+	svc, db := setupExport2AppCheckTest(t)
+	svc.SetDatasetRepository(repository.NewDatasetRepository(db))
+
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_group (id, name, pid, node_type, create_by, create_time, update_by, last_update_time) VALUES (1, 'Folder A', 10, 'folder', 'admin', 1, 'admin', 1)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_dataset_group (id, name, pid, node_type, create_by, create_time, update_by, last_update_time) VALUES (2, 'Folder A', 10, 'dataset', 'admin', 1, 'admin', 1)`).Error)
+
+	pid := int64(10)
+	result, err := svc.AppCanvasNameCheck(&visualization.AppCanvasNameCheckRequest{
+		DatasetFolderPid:  &pid,
+		DatasetFolderName: "Folder A",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "repeat", result)
+
+	result, err = svc.AppCanvasNameCheck(&visualization.AppCanvasNameCheckRequest{
+		DatasetFolderPid:  &pid,
+		DatasetFolderName: "Folder B",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "success", result)
+}
+
+func TestVisualizationService_RecordExportLog(t *testing.T) {
+	auditSvc, db := setupAuditServiceRepoTest(t)
+	svc := NewVisualizationService(nil)
+	svc.SetAuditService(auditSvc)
+
+	id := int64(123)
+	userID := int64(7)
+	username := "tester"
+	ipAddress := "127.0.0.1"
+	userAgent := "vitest"
+	require.NoError(t, svc.RecordExportLog(&visualization.ExportLogRequest{ID: &id, Type: "screen"}, &userID, &username, &ipAddress, &userAgent, "template"))
+
+	var logs []audit.AuditLog
+	require.NoError(t, db.Order("id ASC").Find(&logs).Error)
+	require.Len(t, logs, 1)
+	assert.Equal(t, audit.ActionTypeDataAccess, logs[0].ActionType)
+	assert.Equal(t, audit.OperationExport, logs[0].Operation)
+	assert.Equal(t, "导出样式模板", logs[0].ActionName)
+	require.NotNil(t, logs[0].ResourceType)
+	assert.Equal(t, "SCREEN", *logs[0].ResourceType)
+	require.NotNil(t, logs[0].ResourceID)
+	assert.Equal(t, id, *logs[0].ResourceID)
+}
+
+func TestVisualizationService_RecordExportLog_NoAuditService(t *testing.T) {
+	svc := NewVisualizationService(nil)
+	id := int64(123)
+	err := svc.RecordExportLog(&visualization.ExportLogRequest{ID: &id, Type: "dashboard"}, nil, nil, nil, nil, "app")
+	require.NoError(t, err)
 }

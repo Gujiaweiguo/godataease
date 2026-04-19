@@ -115,6 +115,40 @@ type DecompressionRequest struct {
 	StaticResource  string `json:"staticResource"`  // static resource info
 }
 
+// Export2AppCheckRequest is the request body for POST /dataVisualization/export2AppCheck.
+type Export2AppCheckRequest struct {
+	DvID    int64   `json:"dvId"`
+	ViewIDs []int64 `json:"viewIds"`
+	DsIDs   []int64 `json:"dsIds"`
+}
+
+type AppCanvasNameCheckRequest struct {
+	DatasetFolderPid  *int64 `json:"datasetFolderPid"`
+	DatasetFolderName string `json:"datasetFolderName"`
+}
+
+type ExportLogRequest struct {
+	ID   *int64 `json:"id"`
+	Type string `json:"type"`
+}
+
+// Export2AppCheckResponse mirrors Java VisualizationExport2AppVO for non-market template app export.
+type Export2AppCheckResponse struct {
+	CheckStatus            bool                     `json:"checkStatus"`
+	CheckMes               string                   `json:"checkMes"`
+	ChartViewsInfo         []map[string]interface{} `json:"chartViewsInfo"`
+	DatasetGroupsInfo      []map[string]interface{} `json:"datasetGroupsInfo"`
+	DatasetTablesInfo      []map[string]interface{} `json:"datasetTablesInfo"`
+	DatasetTableFieldsInfo []map[string]interface{} `json:"datasetTableFieldsInfo"`
+	DatasourceInfo         []map[string]interface{} `json:"datasourceInfo"`
+	DatasourceTaskInfo     []map[string]interface{} `json:"datasourceTaskInfo"`
+	LinkJumps              []map[string]interface{} `json:"linkJumps"`
+	LinkJumpInfos          []map[string]interface{} `json:"linkJumpInfos"`
+	LinkJumpTargetInfos    []map[string]interface{} `json:"linkJumpTargetInfos"`
+	Linkages               []map[string]interface{} `json:"linkages"`
+	LinkageFields          []map[string]interface{} `json:"linkageFields"`
+}
+
 // DecompressionResponse is the Java-compatible response consumed by frontend canvasUtils.ts.
 type DecompressionResponse struct {
 	ID              string                            `json:"id"` // new visualization ID as string
