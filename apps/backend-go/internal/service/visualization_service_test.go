@@ -679,3 +679,131 @@ func TestVisualizationService_CopyAndUpdateExtraBranches(t *testing.T) {
 		assert.Nil(t, recovered)
 	})
 }
+
+func TestVisualizationService_Decompression(t *testing.T) {
+	t.Run("unsupported newFrom returns error", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		_, err := svc.Decompression(nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required")
+
+		_, err = svc.Decompression(&visualization.DecompressionRequest{NewFrom: "bad"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported newFrom")
+	})
+
+	t.Run("new_market_template returns clear error", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		_, err := svc.Decompression(&visualization.DecompressionRequest{NewFrom: "new_market_template", TemplateURL: "http://example.com/t.json"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not yet supported")
+	})
+
+	t.Run("new_inner_template without templateId returns error", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		_, err := svc.Decompression(&visualization.DecompressionRequest{NewFrom: "new_inner_template"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "templateId is required")
+	})
+
+	t.Run("new_outer_template returns correct response shape", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+
+		dynamicData := `{"view_100": {"title": "Chart1", "type": "bar", "tableId": 5}}`
+		componentData := `[{"id":"view_100","type":"bar"}]`
+		canvasStyleData := `{"scale":100}`
+
+		resp, err := svc.Decompression(&visualization.DecompressionRequest{
+			NewFrom:         "new_outer_template",
+			Name:            "Test Panel",
+			Type:            "dashboard",
+			CanvasStyleData: canvasStyleData,
+			ComponentData:   componentData,
+			DynamicData:     dynamicData,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		assert.Equal(t, "Test Panel", resp.Name)
+		assert.Equal(t, "dashboard", resp.Type)
+		assert.Equal(t, 3, resp.Version)
+		assert.Equal(t, canvasStyleData, resp.CanvasStyleData)
+		assert.NotEmpty(t, resp.ID)
+		assert.NotNil(t, resp.CanvasViewInfo)
+		assert.Len(t, resp.CanvasViewInfo, 1)
+
+		for viewIDStr, cv := range resp.CanvasViewInfo {
+			assert.NotEmpty(t, viewIDStr)
+			assert.Equal(t, "Chart1", cv["title"])
+			assert.Equal(t, "bar", cv["type"])
+			assert.Equal(t, "template", cv["dataFrom"])
+			assert.Equal(t, int64(5), cv["sourceTableId"])
+			assert.Nil(t, cv["tableId"])
+			assert.Contains(t, resp.ComponentData, viewIDStr)
+			assert.NotContains(t, resp.ComponentData, "view_100")
+		}
+	})
+
+	t.Run("appData keeps tableId for imported app templates", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+
+		resp, err := svc.Decompression(&visualization.DecompressionRequest{
+			NewFrom:       "new_outer_template",
+			Name:          "App Import",
+			Type:          "dashboard",
+			ComponentData: `[{"id":"v1"}]`,
+			DynamicData:   `{"v1":{"title":"C","type":"line","tableId":7}}`,
+			AppData:       `{"visualizationInfo":{"id":1}}`,
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.CanvasViewInfo, 1)
+		for _, view := range resp.CanvasViewInfo {
+			assert.Equal(t, int64(7), view["sourceTableId"])
+			assert.Equal(t, int64(7), view["tableId"])
+		}
+	})
+
+	t.Run("new_outer_template with empty dynamicData returns empty canvasViewInfo", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+
+		resp, err := svc.Decompression(&visualization.DecompressionRequest{
+			NewFrom:       "new_outer_template",
+			Name:          "Empty Dynamic",
+			Type:          "dataV",
+			ComponentData: `[]`,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, resp.CanvasViewInfo)
+		assert.Equal(t, "dataV", resp.Type)
+	})
+
+	t.Run("customFilter array is adapted to object", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+
+		dynamicData := `{"v1": {"title":"C","type":"line","customFilter":[1,2,3]}}`
+		resp, err := svc.Decompression(&visualization.DecompressionRequest{
+			NewFrom:       "new_outer_template",
+			Name:          "Filter Adapt",
+			Type:          "dashboard",
+			ComponentData: `[{"id":"v1"}]`,
+			DynamicData:   dynamicData,
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.CanvasViewInfo, 1)
+	})
+
+	t.Run("dynamicData with string values handles correctly", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+
+		dynamicData := `{"view_200": "{\"title\":\"Embedded\",\"type\":\"pie\"}"}`
+		resp, err := svc.Decompression(&visualization.DecompressionRequest{
+			NewFrom:       "new_outer_template",
+			Name:          "String Values",
+			Type:          "dashboard",
+			ComponentData: `[{"id":"view_200"}]`,
+			DynamicData:   dynamicData,
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.CanvasViewInfo, 1)
+	})
+}
