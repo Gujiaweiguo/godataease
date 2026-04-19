@@ -12,29 +12,29 @@ export const roleUpdateApi = (data: any) => request.post({ url: '/system/role/up
 export const roleDeleteApi = (roleId: number) =>
   request.post({ url: '/system/role/delete/' + roleId })
 
-export const resourceTreeApi = (flag: string) => request.get({ url: '/auth/busiResource/' + flag })
+export const resourceTreeApi = (flag: string) => request.get({ url: '/system/permission/busiResource/' + flag })
 
 export const menuTreeApi = () => request.get({ url: '/auth/menuResource' })
 
-export const resourcePerApi = data => request.post({ url: '/auth/busiPermission', data })
+export const resourcePerApi = data => request.post({ url: '/system/permission/busiPermission', data })
 
-export const menuPerApi = data => request.post({ url: '/auth/menuPermission', data })
+export const menuPerApi = data => request.post({ url: '/system/permission/menuPermission', data })
 
-export const busiPerSaveApi = data => request.post({ url: '/auth/saveBusiPer', data })
-export const menuPerSaveApi = data => request.post({ url: '/auth/saveMenuPer', data })
+export const busiPerSaveApi = data => request.post({ url: '/system/permission/saveBusiPer', data })
+export const menuPerSaveApi = data => request.post({ url: '/system/permission/saveMenuPer', data })
 
 export const resourcePerSaveApi = data =>
   request.post({ url: '/system/role/permission/save', data })
 
 export const resourceTargetPerApi = data =>
-  request.post({ url: '/auth/busiTargetPermission', data })
+  request.post({ url: '/system/permission/busiTargetPermission', data })
 
-export const userPerspectiveApi = data => request.post({ url: '/auth/userPerspective', data })
+export const userPerspectiveApi = data => request.post({ url: '/system/permission/userPerspective', data })
 
-export const menuTargetPerApi = data => request.post({ url: '/auth/menuTargetPermission', data })
+export const menuTargetPerApi = data => request.post({ url: '/system/permission/menuTargetPermission', data })
 
-export const busiTargetPerSaveApi = data => request.post({ url: '/auth/saveBusiTargetPer', data })
-export const menuTargetPerSaveApi = data => request.post({ url: '/auth/saveMenuTargetPer', data })
+export const busiTargetPerSaveApi = data => request.post({ url: '/system/permission/saveBusiTargetPer', data })
+export const menuTargetPerSaveApi = data => request.post({ url: '/system/permission/saveMenuTargetPer', data })
 
 export const roleMenuAuthApi = (roleId: number) => request.get({ url: '/roleMenu/auth/' + roleId })
 export const roleMenuAuthSaveApi = (data: { roleId: number; menuIds: number[] }) =>
