@@ -599,6 +599,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterMenuRoutes(api, r.menuHandler)
 		handler.RegisterPermissionCompatRoutes(permissionCompatAPI, r.permissionCompatHandler)
 		handler.RegisterPermissionCompatRoutes(permissionCompatDe2API, r.permissionCompatHandler)
+		handler.RegisterPermissionRoutes(api, r.permissionCompatHandler)
 		handler.RegisterResourceGovernanceRoutes(roleAPI, r.resourceGovernanceHandler)
 		handler.RegisterDataPermissionRoutes(dataPermissionAPI, r.dataPermissionHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
