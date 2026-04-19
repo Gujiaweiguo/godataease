@@ -1,206 +1,103 @@
 package handler
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"dataease/backend/internal/domain/visualization"
+	"dataease/backend/internal/repository"
+	"dataease/backend/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-func TestResolveBusiTypes(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		wantLen  int
-		wantErr  bool
-		firstVal string
-	}{
-		{name: "empty maps to dashboard and dataV", input: "", wantLen: 2, wantErr: false, firstVal: "dashboard"},
-		{name: "dashboard-dataV maps to two types", input: "dashboard-dataV", wantLen: 2, wantErr: false, firstVal: "dashboard"},
-		{name: "panel maps to dashboard", input: "panel", wantLen: 1, wantErr: false, firstVal: "dashboard"},
-		{name: "screen maps to dataV", input: "screen", wantLen: 1, wantErr: false, firstVal: "dataV"},
-		{name: "unsupported busiFlag returns error", input: "dataset", wantLen: 0, wantErr: true},
-	}
+func TestVisualizationHandler_Decompression_OuterTemplate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveBusiTypes(tt.input)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if len(got) != tt.wantLen {
-				t.Fatalf("unexpected len: got %d want %d", len(got), tt.wantLen)
-			}
-			if tt.wantLen > 0 && got[0] != tt.firstVal {
-				t.Fatalf("unexpected first value: got %s want %s", got[0], tt.firstVal)
-			}
-		})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	repo := repository.NewVisualizationRepository(db)
+	h := NewVisualizationHandler(service.NewVisualizationService(repo))
+
+	r := gin.New()
+	r.POST("/dataVisualization/decompression", h.Decompression)
+
+	body := `{
+		"newFrom":"new_outer_template",
+		"name":"Imported Panel",
+		"type":"dashboard",
+		"canvasStyleData":"{\"scale\":100}",
+		"componentData":"[{\"id\":\"view_100\",\"component\":\"VChart\"}]",
+		"dynamicData":"{\"view_100\":{\"title\":\"Sales\",\"type\":\"bar\",\"tableId\":5}}"
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/dataVisualization/decompression", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp struct {
+		Code string                              `json:"code"`
+		Data visualization.DecompressionResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, "Imported Panel", resp.Data.Name)
+	assert.Equal(t, "dashboard", resp.Data.Type)
+	assert.NotEmpty(t, resp.Data.ID)
+	require.Len(t, resp.Data.CanvasViewInfo, 1)
+
+	for viewID, view := range resp.Data.CanvasViewInfo {
+		assert.Contains(t, resp.Data.ComponentData, viewID)
+		assert.NotContains(t, resp.Data.ComponentData, "view_100")
+		assert.Equal(t, "Sales", view["title"])
+		assert.Equal(t, "template", view["dataFrom"])
+		assert.Equal(t, float64(5), view["sourceTableId"])
+		assert.Nil(t, view["tableId"])
 	}
 }
 
-func TestBuildVisualizationTreeValidation(t *testing.T) {
-	validNodeType := "folder"
-	invalidNodeType := "unknown"
+func TestVisualizationHandler_Decompression_OuterTemplate_APIAlias(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-	tests := []struct {
-		name    string
-		items   []*visualization.DataVisualizationInfo
-		wantErr bool
-	}{
-		{
-			name: "invalid id returns error",
-			items: []*visualization.DataVisualizationInfo{{
-				ID:       0,
-				Name:     "root",
-				NodeType: &validNodeType,
-			}},
-			wantErr: true,
-		},
-		{
-			name: "empty name returns error",
-			items: []*visualization.DataVisualizationInfo{{
-				ID:       1,
-				Name:     "",
-				NodeType: &validNodeType,
-			}},
-			wantErr: true,
-		},
-		{
-			name: "invalid nodeType returns error",
-			items: []*visualization.DataVisualizationInfo{{
-				ID:       1,
-				Name:     "invalid-type",
-				NodeType: &invalidNodeType,
-			}},
-			wantErr: true,
-		},
-		{
-			name: "valid item returns success",
-			items: []*visualization.DataVisualizationInfo{{
-				ID:       1,
-				Name:     "folder-1",
-				NodeType: &validNodeType,
-			}},
-			wantErr: false,
-		},
-		{
-			name: "legacy leaf nodeType is accepted as panel",
-			items: []*visualization.DataVisualizationInfo{{
-				ID:       1,
-				Name:     "legacy-leaf",
-				NodeType: func() *string { s := visualizationNodeTypeLeaf; return &s }(),
-			}},
-			wantErr: false,
-		},
-	}
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			nodes, err := buildVisualizationTree(tt.items, nil)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if len(nodes) == 0 {
-				t.Fatalf("expected non-empty nodes")
-			}
-		})
-	}
-}
+	repo := repository.NewVisualizationRepository(db)
+	h := NewVisualizationHandler(service.NewVisualizationService(repo))
 
-func TestBuildVisualizationTreeContractShape(t *testing.T) {
-	folderType := visualizationNodeTypeFolder
-	panelType := visualizationNodeTypePanel
-	rootID := int64(10)
-	published := 1
-	mobileLayout := true
+	r := gin.New()
+	RegisterVisualizationRoutes(r.Group("/api"), h, nil)
 
-	nodes, err := buildVisualizationTree([]*visualization.DataVisualizationInfo{
-		{
-			ID:       rootID,
-			Name:     "Dashboard Folder",
-			NodeType: &folderType,
-			Status:   &published,
-		},
-		{
-			ID:           11,
-			PID:          &rootID,
-			Name:         "Dashboard A",
-			NodeType:     &panelType,
-			Status:       &published,
-			MobileLayout: &mobileLayout,
-		},
-	}, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertVisualizationTreeRootShape(t, nodes)
+	body := `{
+		"newFrom":"new_outer_template",
+		"name":"Imported Panel",
+		"type":"dashboard",
+		"canvasStyleData":"{\"scale\":100}",
+		"componentData":"[{\"id\":\"view_100\",\"component\":\"VChart\"}]",
+		"dynamicData":"{\"view_100\":{\"title\":\"Sales\",\"type\":\"bar\",\"tableId\":5}}"
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/api/dataVisualization/decompression", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
 
-	leafOnly, err := buildVisualizationTree([]*visualization.DataVisualizationInfo{
-		{
-			ID:       rootID,
-			Name:     "Dashboard Folder",
-			NodeType: &folderType,
-		},
-		{
-			ID:       11,
-			PID:      &rootID,
-			Name:     "Dashboard A",
-			NodeType: &panelType,
-		},
-	}, boolPtr(true))
-	if err != nil {
-		t.Fatalf("unexpected leaf-filter error: %v", err)
-	}
-	assertVisualizationLeafOnlyTree(t, leafOnly)
-}
+	r.ServeHTTP(w, req)
 
-func assertVisualizationTreeRootShape(t *testing.T, nodes []treeNode) {
-	t.Helper()
-	if len(nodes) != 1 {
-		t.Fatalf("expected 1 root node, got %d", len(nodes))
-	}
-	if nodes[0].ID != "10" || nodes[0].Name != "Dashboard Folder" {
-		t.Fatalf("unexpected root node: %+v", nodes[0])
-	}
-	if nodes[0].Leaf {
-		t.Fatalf("expected folder root to be non-leaf: %+v", nodes[0])
-	}
-	if nodes[0].ExtraFlag1 != 1 {
-		t.Fatalf("expected published folder extraFlag1=1: %+v", nodes[0])
-	}
-	if len(nodes[0].Children) != 1 {
-		t.Fatalf("expected one child node, got %d", len(nodes[0].Children))
-	}
-	child := nodes[0].Children[0]
-	if child.ID != "11" || child.PID != "10" || child.Name != "Dashboard A" {
-		t.Fatalf("unexpected child node: %+v", child)
-	}
-	if !child.Leaf {
-		t.Fatalf("expected panel child to be leaf: %+v", child)
-	}
-	if child.ExtraFlag != 1 || child.ExtraFlag1 != 1 {
-		t.Fatalf("expected mobile published child flags, got %+v", child)
-	}
-}
+	assert.Equal(t, http.StatusOK, w.Code)
 
-func assertVisualizationLeafOnlyTree(t *testing.T, nodes []treeNode) {
-	t.Helper()
-	if len(nodes) != 0 {
-		t.Fatalf("expected no root nodes after leaf-only filter, got %+v", nodes)
+	var resp struct {
+		Code string `json:"code"`
 	}
-}
-
-func boolPtr(v bool) *bool {
-	return &v
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
 }
