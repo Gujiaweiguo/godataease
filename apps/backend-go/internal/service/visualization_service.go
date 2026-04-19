@@ -302,7 +302,7 @@ func resolveInteractiveVisualizationTypes(busiFlag string) ([]string, error) {
 
 func (s *VisualizationService) NameCheck(req *visualization.NameCheckRequest) (string, error) {
 	if req == nil {
-		return "success", nil
+		return compatResultSuccess, nil
 	}
 	var excludeID *int64
 	if req.ID > 0 {
@@ -315,7 +315,7 @@ func (s *VisualizationService) NameCheck(req *visualization.NameCheckRequest) (s
 	if count > 0 {
 		return "repeat", nil
 	}
-	return "success", nil
+	return compatResultSuccess, nil
 }
 
 func (s *VisualizationService) CheckCanvasChange(req *visualization.CanvasChangeRequest) (string, error) {
@@ -367,14 +367,14 @@ func (s *VisualizationService) ViewDetailList(dvID int64) ([]map[string]interfac
 
 func (s *VisualizationService) AppCanvasNameCheck(req *visualization.AppCanvasNameCheckRequest) (string, error) {
 	if req == nil {
-		return "success", nil
+		return compatResultSuccess, nil
 	}
 	if s.datasetRepo == nil {
-		return "success", nil
+		return compatResultSuccess, nil
 	}
 	name := strings.TrimSpace(req.DatasetFolderName)
 	if name == "" {
-		return "success", nil
+		return compatResultSuccess, nil
 	}
 	var pid int64
 	if req.DatasetFolderPid != nil {
@@ -387,7 +387,7 @@ func (s *VisualizationService) AppCanvasNameCheck(req *visualization.AppCanvasNa
 	if count > 0 {
 		return "repeat", nil
 	}
-	return "success", nil
+	return compatResultSuccess, nil
 }
 
 func (s *VisualizationService) RecordExportLog(req *visualization.ExportLogRequest, userID *int64, username *string, ipAddress *string, userAgent *string, logType string) error {
@@ -428,18 +428,50 @@ func (s *VisualizationService) Export2AppCheck(req *visualization.Export2AppChec
 		return nil, fmt.Errorf("export2AppCheck request is required")
 	}
 
-	ensureEmpty := func(m []map[string]interface{}) []map[string]interface{} {
-		if m == nil {
-			return []map[string]interface{}{}
-		}
-		return stringifyExportIDs(m)
+	data, err := s.loadExport2AppCheckData(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateExport2AppDatasources(data.datasources); err != nil {
+		return nil, err
 	}
 
+	return &visualization.Export2AppCheckResponse{
+		CheckStatus:            true,
+		CheckMes:               compatResultSuccess,
+		ChartViewsInfo:         stringifyExportPayload(data.chartViews),
+		DatasetGroupsInfo:      stringifyExportPayload(data.datasetGroups),
+		DatasetTablesInfo:      stringifyExportPayload(data.datasetTables),
+		DatasetTableFieldsInfo: stringifyExportPayload(data.datasetTableFields),
+		DatasourceInfo:         stringifyExportPayload(data.datasources),
+		DatasourceTaskInfo:     stringifyExportPayload(data.datasourceTasks),
+		LinkJumps:              stringifyExportPayload(data.linkJumps),
+		LinkJumpInfos:          stringifyExportPayload(data.linkJumpInfos),
+		LinkJumpTargetInfos:    stringifyExportPayload(data.linkJumpTargets),
+		Linkages:               stringifyExportPayload(data.linkages),
+		LinkageFields:          stringifyExportPayload(data.linkageFields),
+	}, nil
+}
+
+type export2AppCheckData struct {
+	chartViews         []map[string]interface{}
+	datasetGroups      []map[string]interface{}
+	datasetTables      []map[string]interface{}
+	datasetTableFields []map[string]interface{}
+	datasources        []map[string]interface{}
+	datasourceTasks    []map[string]interface{}
+	linkages           []map[string]interface{}
+	linkageFields      []map[string]interface{}
+	linkJumps          []map[string]interface{}
+	linkJumpInfos      []map[string]interface{}
+	linkJumpTargets    []map[string]interface{}
+}
+
+func (s *VisualizationService) loadExport2AppCheckData(req *visualization.Export2AppCheckRequest) (*export2AppCheckData, error) {
 	chartViews, err := s.repo.FindChartViewsByIDs(req.ViewIDs)
 	if err != nil {
 		return nil, fmt.Errorf("query chart views: %w", err)
 	}
-
 	datasetGroups, err := s.repo.FindDatasetGroupsByIDs(req.DsIDs)
 	if err != nil {
 		return nil, fmt.Errorf("query dataset groups: %w", err)
@@ -460,20 +492,6 @@ func (s *VisualizationService) Export2AppCheck(req *visualization.Export2AppChec
 	if err != nil {
 		return nil, fmt.Errorf("query datasource tasks: %w", err)
 	}
-
-	if len(datasources) == 0 {
-		return nil, fmt.Errorf("当前不存在数据源无法导出")
-	}
-
-	for _, ds := range datasources {
-		if dsType, ok := ds["type"]; ok {
-			typeStr := fmt.Sprintf("%v", dsType)
-			if strings.Contains(strings.ToUpper(typeStr), "API") {
-				return nil, fmt.Errorf("包含API数据源不支持导出")
-			}
-		}
-	}
-
 	linkages, err := s.repo.FindLinkagesByDvID(req.DvID)
 	if err != nil {
 		return nil, fmt.Errorf("query linkages: %w", err)
@@ -494,22 +512,41 @@ func (s *VisualizationService) Export2AppCheck(req *visualization.Export2AppChec
 	if err != nil {
 		return nil, fmt.Errorf("query link jump target view infos: %w", err)
 	}
-
-	return &visualization.Export2AppCheckResponse{
-		CheckStatus:            true,
-		CheckMes:               "success",
-		ChartViewsInfo:         ensureEmpty(chartViews),
-		DatasetGroupsInfo:      ensureEmpty(datasetGroups),
-		DatasetTablesInfo:      ensureEmpty(datasetTables),
-		DatasetTableFieldsInfo: ensureEmpty(datasetTableFields),
-		DatasourceInfo:         ensureEmpty(datasources),
-		DatasourceTaskInfo:     ensureEmpty(datasourceTasks),
-		LinkJumps:              ensureEmpty(linkJumps),
-		LinkJumpInfos:          ensureEmpty(linkJumpInfos),
-		LinkJumpTargetInfos:    ensureEmpty(linkJumpTargets),
-		Linkages:               ensureEmpty(linkages),
-		LinkageFields:          ensureEmpty(linkageFields),
+	return &export2AppCheckData{
+		chartViews:         chartViews,
+		datasetGroups:      datasetGroups,
+		datasetTables:      datasetTables,
+		datasetTableFields: datasetTableFields,
+		datasources:        datasources,
+		datasourceTasks:    datasourceTasks,
+		linkages:           linkages,
+		linkageFields:      linkageFields,
+		linkJumps:          linkJumps,
+		linkJumpInfos:      linkJumpInfos,
+		linkJumpTargets:    linkJumpTargets,
 	}, nil
+}
+
+func validateExport2AppDatasources(datasources []map[string]interface{}) error {
+	if len(datasources) == 0 {
+		return fmt.Errorf("当前不存在数据源无法导出")
+	}
+	for _, ds := range datasources {
+		if dsType, ok := ds["type"]; ok {
+			typeStr := fmt.Sprintf("%v", dsType)
+			if strings.Contains(strings.ToUpper(typeStr), "API") {
+				return fmt.Errorf("包含API数据源不支持导出")
+			}
+		}
+	}
+	return nil
+}
+
+func stringifyExportPayload(rows []map[string]interface{}) []map[string]interface{} {
+	if rows == nil {
+		return []map[string]interface{}{}
+	}
+	return stringifyExportIDs(rows)
 }
 
 func stringifyExportIDs(rows []map[string]interface{}) []map[string]interface{} {
@@ -542,6 +579,7 @@ const (
 	newFromInnerTemplate  = "new_inner_template"
 	newFromOuterTemplate  = "new_outer_template"
 	newFromMarketTemplate = "new_market_template"
+	compatResultSuccess   = "success"
 )
 
 func (s *VisualizationService) Decompression(req *visualization.DecompressionRequest) (*visualization.DecompressionResponse, error) {

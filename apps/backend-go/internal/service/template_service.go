@@ -14,6 +14,11 @@ type TemplateService struct {
 	repo *repository.TemplateRepository
 }
 
+const (
+	checkResultNone     = "none"
+	checkResultExistAll = "existAll"
+)
+
 func NewTemplateService(repo *repository.TemplateRepository) *TemplateService {
 	return &TemplateService{repo: repo}
 }
@@ -126,7 +131,7 @@ func (s *TemplateService) IncrementUseCount(id int64) error {
 func (s *TemplateService) NameCheck(optType string, name string, id string) (string, error) {
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
-		return "none", nil
+		return checkResultNone, nil
 	}
 	var excludeID *int64
 	if strings.EqualFold(optType, "update") && strings.TrimSpace(id) != "" {
@@ -139,9 +144,9 @@ func (s *TemplateService) NameCheck(optType string, name string, id string) (str
 		return "", err
 	}
 	if count == 0 {
-		return "none", nil
+		return checkResultNone, nil
 	}
-	return "existAll", nil
+	return checkResultExistAll, nil
 }
 
 func (s *TemplateService) CategoryTemplateNameCheck(name string, categories []string, templateNames []string, templateArray []string) (string, error) {
@@ -151,20 +156,20 @@ func (s *TemplateService) CategoryTemplateNameCheck(name string, categories []st
 			return "", err
 		}
 		if count == 0 {
-			return "none", nil
+			return checkResultNone, nil
 		}
-		return "existAll", nil
+		return checkResultExistAll, nil
 	}
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" || len(categories) == 0 {
-		return "none", nil
+		return checkResultNone, nil
 	}
 	count, err := s.repo.CountByNameInCategories(trimmedName, categories)
 	if err != nil {
 		return "", err
 	}
 	if count == 0 {
-		return "none", nil
+		return checkResultNone, nil
 	}
-	return "existAll", nil
+	return checkResultExistAll, nil
 }
