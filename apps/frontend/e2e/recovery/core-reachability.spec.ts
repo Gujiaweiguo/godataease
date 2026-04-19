@@ -153,7 +153,7 @@ test.describe('Core feature reachability', () => {
     const loggedIn = await loginAndWaitForAppShell(page, context)
     if (!loggedIn) return
 
-    const datasetId = await fetchLeafIdFromTree(page, '/api/datasetTree/tree', { busiFlag: 'dataset' })
+    const datasetId = await fetchLeafIdFromTree(page, '/api/dataset/tree', { busiFlag: 'dataset' })
     expect(datasetId).toBeTruthy()
 
     const pageErrors: string[] = []
@@ -174,7 +174,7 @@ test.describe('Core feature reachability', () => {
     const loggedIn = await loginAndWaitForAppShell(page, context)
     if (!loggedIn) return
 
-    const datasetId = await fetchLeafIdFromTree(page, '/api/datasetTree/tree', { busiFlag: 'dataset' })
+    const datasetId = await fetchLeafIdFromTree(page, '/api/dataset/tree', { busiFlag: 'dataset' })
     expect(datasetId).toBeTruthy()
 
     const pageErrors: string[] = []
