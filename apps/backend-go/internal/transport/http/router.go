@@ -775,6 +775,13 @@ func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
 		datasetGroup.POST("/enumValueObj", r.datasetHandler.EnumValueObj)
 		datasetGroup.POST("/enumValueDs", r.datasetHandler.EnumValueDs)
 		datasetGroup.POST("/enumValue", r.datasetHandler.EnumValue)
+		datasetGroup.POST("/exportDataset", r.datasetHandler.ExportDataset)
+		if r.permMiddleware != nil {
+			datasetGroup.POST("/detailWithPerm", r.permMiddleware.CheckDatasetBatchView(), middleware.RowPermissionMiddleware(), r.datasetHandler.DetailWithPerm)
+		} else {
+			datasetGroup.POST("/detailWithPerm", r.datasetHandler.DetailWithPerm)
+		}
+		datasetGroup.POST("/fieldTree", r.datasetHandler.GetFieldTree)
 	}
 }
 
