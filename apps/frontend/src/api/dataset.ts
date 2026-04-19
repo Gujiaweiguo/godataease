@@ -167,7 +167,7 @@ export const exportDatasetData = (data: Record<string, unknown> = {}) => {
     loading: boolean
     responseType?: 'blob'
   } = {
-    url: '/datasetTree/exportDataset',
+    url: '/dataset/exportDataset',
     method: 'post',
     data: data,
     loading: true
@@ -268,7 +268,7 @@ export const getDsDetails = async (data): Promise<DatasetDetail[]> => {
   })
 }
 export const getDsDetailsWithPerm = async (data): Promise<DatasetDetail[]> => {
-  return request.post({ url: '/datasetTree/detailWithPerm', data }).then(res => {
+  return request.post({ url: '/dataset/detailWithPerm', data }).then(res => {
     ;(res?.data || []).forEach(ele => {
       originNameHandleBackWithArr(ele, ['dimensionList', 'quotaList'])
     })
@@ -424,7 +424,7 @@ export const listByDsIds = async (data): Promise<IResponse> => {
 }
 
 export const getFieldTree = async (data): Promise<IResponse> => {
-  return request.post({ url: '/datasetData/getFieldTree', data }).then(res => {
+  return request.post({ url: '/dataset/fieldTree', data }).then(res => {
     return res?.data
   })
 }

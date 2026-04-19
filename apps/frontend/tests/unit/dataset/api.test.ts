@@ -169,7 +169,7 @@ describe('Dataset API wrappers', () => {
     const result = await exportDatasetData(payload)
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasetTree/exportDataset',
+      url: '/dataset/exportDataset',
       method: 'post',
       data: payload,
       loading: true
@@ -183,7 +183,7 @@ describe('Dataset API wrappers', () => {
     await exportDatasetData({ id: '12', dataEaseBi: true })
 
     expect(requestMock.post).toHaveBeenCalledWith({
-      url: '/datasetTree/exportDataset',
+      url: '/dataset/exportDataset',
       method: 'post',
       data: { id: '12', dataEaseBi: true },
       loading: true,

@@ -56,6 +56,9 @@ apps/backend-go/dataease-backend
 apps/backend-go/coverage.out
 apps/backend-go/tmp/
 
+# Root-level coverage artifacts
+coverage.out
+
 # Legacy Java backend (read-only backup)
 legacy/backend-java/core-backend/src/main/resources/static/
 legacy/backend-java/core-backend/src/test
@@ -94,6 +97,7 @@ legacy/sdk/*/target/
 # Python cache
 __pycache__/
 *.pyc
+.ruff_cache/
 
 # AI agent workspace
 .sisyphus/

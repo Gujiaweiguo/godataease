@@ -460,3 +460,26 @@ func RegisterPermissionCompatRoutes(r *gin.RouterGroup, h *PermissionCompatHandl
 		systemRoleGroup.POST("/permission/save", h.SaveRolePermission)
 	}
 }
+
+// RegisterPermissionRoutes registers canonical permission routes under /system/permission.
+func RegisterPermissionRoutes(r *gin.RouterGroup, h *PermissionCompatHandler) {
+	if h == nil {
+		return
+	}
+
+	permGroup := r.Group("/system/permission")
+	{
+		permGroup.GET("/menuPermission", h.MenuPermission)
+		permGroup.POST("/menuPermission", h.MenuPermission)
+		permGroup.GET("/busiPermission", h.BusiPermission)
+		permGroup.POST("/busiPermission", h.BusiPermission)
+		permGroup.GET("/busiResource/:flag", h.BusiResource)
+		permGroup.POST("/userPerspective", h.UserPerspective)
+		permGroup.POST("/menuTargetPermission", h.MenuTargetPermission)
+		permGroup.POST("/busiTargetPermission", h.BusiTargetPermission)
+		permGroup.POST("/saveMenuPer", h.SaveMenuPer)
+		permGroup.POST("/saveBusiPer", h.SaveBusiPer)
+		permGroup.POST("/saveMenuTargetPer", h.SaveMenuTargetPer)
+		permGroup.POST("/saveBusiTargetPer", h.SaveBusiTargetPer)
+	}
+}

@@ -542,6 +542,21 @@ func (h *DatasetHandler) ExportDataset(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// GetFieldTree returns a tree structure of field values for the given field IDs.
+func (h *DatasetHandler) GetFieldTree(c *gin.Context) {
+	defer recoverServicePanic(c)
+	req, ok := parseMultFieldValuesRequest(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetFieldTree(req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 //nolint:dupl // route registration pattern is intentionally similar
 func RegisterDatasetRoutes(r *gin.RouterGroup, h *DatasetHandler) {
 	datasetGroup := r.Group("/dataset")
@@ -566,5 +581,8 @@ func RegisterDatasetRoutes(r *gin.RouterGroup, h *DatasetHandler) {
 		datasetGroup.POST("/enumValueObj", h.EnumValueObj)
 		datasetGroup.POST("/enumValueDs", h.EnumValueDs)
 		datasetGroup.POST("/enumValue", h.EnumValue)
+		datasetGroup.POST("/exportDataset", h.ExportDataset)
+		datasetGroup.POST("/detailWithPerm", h.DetailWithPerm)
+		datasetGroup.POST("/fieldTree", h.GetFieldTree)
 	}
 }

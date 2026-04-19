@@ -44,7 +44,7 @@ const openDataPermissionTab = async (page: Page) => {
 const fetchFirstDatasetLeaf = async (page: Page): Promise<DatasetNode | null> => {
   return page.evaluate(async () => {
     const token = localStorage.getItem('user.token')
-    const rsp = await fetch('/de2api/datasetTree/tree', {
+    const rsp = await fetch('/de2api/dataset/tree', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

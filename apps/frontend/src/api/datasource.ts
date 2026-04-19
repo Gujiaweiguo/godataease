@@ -148,7 +148,7 @@ export const checkApiItem = async (data = {}): Promise<IResponse> => {
 
 export const getDatasetTree = async (data = {}): Promise<IResponse> => {
   return request
-    .post({ url: '/datasetTree/tree', data: { ...data, ...{ busiFlag: 'dataset' } } })
+    .post({ url: '/dataset/tree', data: { ...data, ...{ busiFlag: 'dataset' } } })
     .then(res => {
       return res?.data
     })
