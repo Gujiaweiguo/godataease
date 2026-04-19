@@ -375,6 +375,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateService := service.NewTemplateService(templateRepo)
 	templateHandler := handler.NewTemplateHandler(templateService)
 
+	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
+	visualService.SetTemplateService(templateService)
+	visualService.SetTemplateExtendDataRepo(templateExtendDataRepo)
+
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
 	relationHandler := handler.NewRelationHandler()
@@ -836,6 +840,7 @@ func (r *Router) registerVisualizationRoutes(api *gin.RouterGroup) {
 			visualGroup.POST("/saveCanvas", r.visualHandler.SaveCanvas)
 		}
 		visualGroup.POST("/list", r.visualHandler.List)
+		visualGroup.POST("/decompression", r.visualHandler.Decompression)
 	}
 }
 

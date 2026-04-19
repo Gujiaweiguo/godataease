@@ -499,7 +499,18 @@ func (h *VisualizationHandler) ExportLogImg(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) Decompression(c *gin.Context) {
-	response.Success(c, nil)
+	var req visualization.DecompressionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.Decompression(&req)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, permMiddleware *middleware.PermissionMiddleware) {

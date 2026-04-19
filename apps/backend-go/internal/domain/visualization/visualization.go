@@ -99,3 +99,30 @@ type ListResponse struct {
 	Current int                      `json:"current"`
 	Size    int                      `json:"size"`
 }
+
+// DecompressionRequest represents the template import request sent by the frontend.
+type DecompressionRequest struct {
+	NewFrom         string `json:"newFrom"`         // "new_inner_template" | "new_outer_template" | "new_market_template"
+	TemplateID      *int64 `json:"templateId"`      // required for new_inner_template
+	ResourceName    string `json:"resourceName"`    // used by new_market_template
+	TemplateURL     string `json:"templateUrl"`     // used by new_market_template
+	Name            string `json:"name"`            // used by new_outer_template
+	Type            string `json:"type"`            // visualization type (dashboard/dataV)
+	CanvasStyleData string `json:"canvasStyleData"` // used by new_outer_template
+	ComponentData   string `json:"componentData"`   // used by new_outer_template
+	DynamicData     string `json:"dynamicData"`     // used by new_outer_template
+	AppData         string `json:"appData"`         // optional app import payload
+	StaticResource  string `json:"staticResource"`  // static resource info
+}
+
+// DecompressionResponse is the Java-compatible response consumed by frontend canvasUtils.ts.
+type DecompressionResponse struct {
+	ID              string                            `json:"id"` // new visualization ID as string
+	Name            string                            `json:"name"`
+	Type            string                            `json:"type"` // "dashboard" or "dataV"
+	Version         int                               `json:"version"`
+	CanvasStyleData string                            `json:"canvasStyleData"` // JSON string (frontend does JSON.parse)
+	ComponentData   string                            `json:"componentData"`   // JSON string (frontend does JSON.parse)
+	AppData         string                            `json:"appData"`         // JSON string or empty
+	CanvasViewInfo  map[string]map[string]interface{} `json:"canvasViewInfo"`  // keyed by new view ID string
+}

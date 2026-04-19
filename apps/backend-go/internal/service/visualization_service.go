@@ -1,17 +1,24 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
+
+	"github.com/google/uuid"
 )
 
 type VisualizationService struct {
-	repo                *repository.VisualizationRepository
-	resourcePermService *ResourcePermissionService
+	repo                   *repository.VisualizationRepository
+	resourcePermService    *ResourcePermissionService
+	templateService        *TemplateService
+	templateExtendDataRepo *repository.TemplateExtendDataRepository
 }
 
 const (
@@ -28,6 +35,14 @@ func NewVisualizationService(repo *repository.VisualizationRepository) *Visualiz
 
 func (s *VisualizationService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
 	s.resourcePermService = resourcePermSvc
+}
+
+func (s *VisualizationService) SetTemplateService(ts *TemplateService) {
+	s.templateService = ts
+}
+
+func (s *VisualizationService) SetTemplateExtendDataRepo(r *repository.TemplateExtendDataRepository) {
+	s.templateExtendDataRepo = r
 }
 
 func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy string) (int64, error) {
@@ -337,4 +352,209 @@ func (s *VisualizationService) RecoverToPublished(id int64, updateBy string) (*v
 
 func (s *VisualizationService) ViewDetailList(dvID int64) ([]map[string]interface{}, error) {
 	return s.repo.GetChartViewsBySceneID(dvID)
+}
+
+const (
+	newFromInnerTemplate  = "new_inner_template"
+	newFromOuterTemplate  = "new_outer_template"
+	newFromMarketTemplate = "new_market_template"
+)
+
+func (s *VisualizationService) Decompression(req *visualization.DecompressionRequest) (*visualization.DecompressionResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("decompression request is required")
+	}
+	newDvID := int64(uuid.New().ID())
+
+	var templateStyle, templateData, dynamicData, name, dvType, appDataStr string
+	var version int
+
+	switch req.NewFrom {
+	case newFromInnerTemplate:
+		if req.TemplateID == nil || *req.TemplateID <= 0 {
+			return nil, fmt.Errorf("templateId is required for new_inner_template")
+		}
+		if s.templateService == nil {
+			return nil, fmt.Errorf("template service is not initialized")
+		}
+		tmpl, err := s.templateService.GetTemplate(*req.TemplateID)
+		if err != nil {
+			return nil, fmt.Errorf("template not found: %w", err)
+		}
+		templateStyle = tmpl.TemplateStyle
+		templateData = tmpl.TemplateData
+		dynamicData = tmpl.DynamicData
+		name = tmpl.Name
+		dvType = tmpl.DvType
+		version = tmpl.Version
+		appDataStr = tmpl.AppData
+		_ = s.templateService.IncrementUseCount(tmpl.ID)
+
+	case newFromOuterTemplate:
+		templateStyle = req.CanvasStyleData
+		templateData = req.ComponentData
+		dynamicData = req.DynamicData
+		appDataStr = req.AppData
+		name = req.Name
+		dvType = req.Type
+		version = 3
+
+	case newFromMarketTemplate:
+		return nil, fmt.Errorf("new_market_template is not yet supported: templateUrl=%s", req.TemplateURL)
+
+	default:
+		return nil, fmt.Errorf("unsupported newFrom: %s", req.NewFrom)
+	}
+
+	appDataStr = processAppData(appDataStr, newDvID)
+
+	hasAppData := strings.TrimSpace(appDataStr) != ""
+	canvasViewInfo, err := s.processDynamicData(dynamicData, newDvID, &templateData, &appDataStr, hasAppData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &visualization.DecompressionResponse{
+		ID:              fmt.Sprintf("%d", newDvID),
+		Name:            name,
+		Type:            dvType,
+		Version:         version,
+		CanvasStyleData: templateStyle,
+		ComponentData:   templateData,
+		AppData:         appDataStr,
+		CanvasViewInfo:  canvasViewInfo,
+	}, nil
+}
+
+func processAppData(appDataStr string, newDvID int64) string {
+	if len(appDataStr) <= 10 {
+		return appDataStr
+	}
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(appDataStr), &parsed); err != nil {
+		return appDataStr
+	}
+	visInfoRaw, ok := parsed["visualizationInfo"]
+	if !ok {
+		return appDataStr
+	}
+	var baseInfo struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(visInfoRaw, &baseInfo); err != nil {
+		return appDataStr
+	}
+	if baseInfo.ID <= 0 {
+		return appDataStr
+	}
+	return strings.ReplaceAll(appDataStr, fmt.Sprintf("%d", baseInfo.ID), fmt.Sprintf("%d", newDvID))
+}
+
+func (s *VisualizationService) processDynamicData(dynamicData string, newDvID int64, templateData *string, appDataStr *string, hasAppData bool) (map[string]map[string]interface{}, error) {
+	canvasViewInfo := make(map[string]map[string]interface{})
+	if strings.TrimSpace(dynamicData) == "" {
+		return canvasViewInfo, nil
+	}
+
+	dynamicMap, err := parseDynamicData(dynamicData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dynamicData: %w", err)
+	}
+
+	var extendRecords []auto.VisualizationTemplateExtendDatum
+
+	for originViewIDStr, rawViewData := range dynamicMap {
+		newViewID := int64(uuid.New().ID())
+		originalViewJSON := rawViewData
+
+		var viewMap map[string]interface{}
+		if err := json.Unmarshal([]byte(rawViewData), &viewMap); err != nil {
+			return nil, fmt.Errorf("failed to parse dynamicData view %s: %w", originViewIDStr, err)
+		}
+
+		if cf, ok := viewMap["customFilter"]; ok {
+			if _, isSlice := cf.([]interface{}); isSlice {
+				viewMap["customFilter"] = map[string]interface{}{}
+			}
+		}
+
+		viewMap["id"] = newViewID
+		viewMap["sceneId"] = newDvID
+		viewMap["dataFrom"] = "template"
+
+		if tableID, ok := extractInt64Value(viewMap["tableId"]); ok {
+			viewMap["sourceTableId"] = tableID
+			viewMap["tableId"] = nil
+			if hasAppData {
+				viewMap["tableId"] = tableID
+			}
+		}
+
+		if _, err := json.Marshal(viewMap); err != nil {
+			return nil, fmt.Errorf("failed to marshal dynamicData view %s: %w", originViewIDStr, err)
+		}
+
+		extendRecords = append(extendRecords, auto.VisualizationTemplateExtendDatum{
+			ID:          int64(uuid.New().ID()),
+			DvID:        newDvID,
+			ViewID:      newViewID,
+			ViewDetails: originalViewJSON,
+			CopyFrom:    originViewIDStr,
+			CopyID:      "",
+		})
+
+		*templateData = strings.ReplaceAll(*templateData, originViewIDStr, fmt.Sprintf("%d", newViewID))
+		if *appDataStr != "" {
+			*appDataStr = strings.ReplaceAll(*appDataStr, originViewIDStr, fmt.Sprintf("%d", newViewID))
+		}
+
+		canvasViewInfo[fmt.Sprintf("%d", newViewID)] = viewMap
+	}
+
+	if s.templateExtendDataRepo != nil && len(extendRecords) > 0 {
+		if err := s.templateExtendDataRepo.BatchCreate(extendRecords); err != nil {
+			return nil, err
+		}
+	}
+
+	return canvasViewInfo, nil
+}
+
+func extractInt64Value(value interface{}) (int64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return int64(v), true
+	case int64:
+		return v, true
+	case int:
+		return int64(v), true
+	case json.Number:
+		parsed, err := v.Int64()
+		if err == nil {
+			return parsed, true
+		}
+	}
+	return 0, false
+}
+
+func parseDynamicData(raw string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &rawMap); err != nil {
+		return nil, err
+	}
+
+	for key, rawVal := range rawMap {
+		valStr := string(rawVal)
+		if strings.HasPrefix(strings.TrimSpace(valStr), "\"") {
+			var unquoted string
+			if err := json.Unmarshal(rawVal, &unquoted); err == nil {
+				valStr = unquoted
+			}
+		}
+		result[key] = valStr
+	}
+
+	return result, nil
 }
