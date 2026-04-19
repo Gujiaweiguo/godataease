@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strconv"
 	"time"
 
 	"dataease/backend/internal/domain/template"
@@ -126,6 +127,68 @@ func (r *TemplateRepository) Count(pid int64, dvType string) (int64, error) {
 func (r *TemplateRepository) IncrementUseCount(id int64) error {
 	return r.db.Model(&coreVisualizationTemplate{}).Where("id = ?", id).
 		UpdateColumn("use_count", gorm.Expr("use_count + 1")).Error
+}
+
+func (r *TemplateRepository) CountByName(name string, excludeID *int64) (int64, error) {
+	var count int64
+	q := r.db.Model(&coreVisualizationTemplate{}).Where("name = ?", name)
+	if excludeID != nil && *excludeID > 0 {
+		q = q.Where("id <> ?", *excludeID)
+	}
+	err := q.Count(&count).Error
+	return count, err
+}
+
+func (r *TemplateRepository) CountByNameInCategories(name string, categories []string) (int64, error) {
+	ids, err := r.templateIDsByCategories(categories)
+	if err != nil || len(ids) == 0 {
+		return 0, err
+	}
+	var count int64
+	err = r.db.Model(&coreVisualizationTemplate{}).Where("name = ? AND id IN ?", name, ids).Count(&count).Error
+	return count, err
+}
+
+func (r *TemplateRepository) CountBatchNamesInCategories(names []string, categories []string, excludeTemplateIDs []string) (int64, error) {
+	ids, err := r.templateIDsByCategories(categories)
+	if err != nil || len(ids) == 0 || len(names) == 0 {
+		return 0, err
+	}
+	excludeIDs := make([]int64, 0, len(excludeTemplateIDs))
+	for _, raw := range excludeTemplateIDs {
+		if parsed, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil && parsed > 0 {
+			excludeIDs = append(excludeIDs, parsed)
+		}
+	}
+	var count int64
+	q := r.db.Model(&coreVisualizationTemplate{}).Where("name IN ? AND id IN ?", names, ids)
+	if len(excludeIDs) > 0 {
+		q = q.Where("id NOT IN ?", excludeIDs)
+	}
+	err = q.Count(&count).Error
+	return count, err
+}
+
+func (r *TemplateRepository) templateIDsByCategories(categories []string) ([]int64, error) {
+	if len(categories) == 0 {
+		return nil, nil
+	}
+	var rawIDs []string
+	err := r.db.Table("visualization_template_category_map").
+		Where("category_id IN ?", categories).
+		Distinct("template_id").
+		Pluck("template_id", &rawIDs).Error
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int64, 0, len(rawIDs))
+	for _, raw := range rawIDs {
+		parsed, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr == nil && parsed > 0 {
+			ids = append(ids, parsed)
+		}
+	}
+	return ids, nil
 }
 
 func (r *TemplateRepository) toTemplate(record coreVisualizationTemplate) *template.Template {
