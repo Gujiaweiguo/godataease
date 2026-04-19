@@ -465,11 +465,10 @@ func (s *VisualizationService) processDynamicData(dynamicData string, newDvID in
 
 	for originViewIDStr, rawViewData := range dynamicMap {
 		newViewID := int64(uuid.New().ID())
-		viewJSON := rawViewData
 		originalViewJSON := rawViewData
 
 		var viewMap map[string]interface{}
-		if err := json.Unmarshal([]byte(viewJSON), &viewMap); err != nil {
+		if err := json.Unmarshal([]byte(rawViewData), &viewMap); err != nil {
 			return nil, fmt.Errorf("failed to parse dynamicData view %s: %w", originViewIDStr, err)
 		}
 
@@ -491,11 +490,9 @@ func (s *VisualizationService) processDynamicData(dynamicData string, newDvID in
 			}
 		}
 
-		fixedJSON, err := json.Marshal(viewMap)
-		if err != nil {
+		if _, err := json.Marshal(viewMap); err != nil {
 			return nil, fmt.Errorf("failed to marshal dynamicData view %s: %w", originViewIDStr, err)
 		}
-		viewJSON = string(fixedJSON)
 
 		extendRecords = append(extendRecords, auto.VisualizationTemplateExtendDatum{
 			ID:          int64(uuid.New().ID()),
