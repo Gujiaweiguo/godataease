@@ -164,6 +164,13 @@ var menuTitleMapZhCN = map[string]string{
 	"audit-settings":         "审计设置",
 	"datasource-form":        "数据源表单",
 	"dataset-form":           "数据集表单",
+	"commons.system_setting":    "系统设置",
+	"system.user_management":   "用户管理",
+	"system.org_management":    "组织管理",
+	"system.role_management":   "角色管理",
+	"system.permission_config": "权限配置",
+	"system.menu_config":       "菜单配置",
+	"system.font_management":   "字体管理",
 }
 
 var menuTitleMapEn = map[string]string{
@@ -193,6 +200,13 @@ var menuTitleMapEn = map[string]string{
 	"audit-settings":         "Audit Settings",
 	"datasource-form":        "Data Source Form",
 	"dataset-form":           "Dataset Form",
+	"commons.system_setting":    "System Settings",
+	"system.user_management":   "User Management",
+	"system.org_management":    "Organization Management",
+	"system.role_management":   "Role Management",
+	"system.permission_config": "Permission Config",
+	"system.menu_config":       "Menu Config",
+	"system.font_management":   "Font Management",
 }
 
 var menuTitleMapTw = map[string]string{
@@ -222,6 +236,13 @@ var menuTitleMapTw = map[string]string{
 	"audit-settings":         "審計設置",
 	"datasource-form":        "數據源表單",
 	"dataset-form":           "數據集表單",
+	"commons.system_setting":    "系統設置",
+	"system.user_management":   "用戶管理",
+	"system.org_management":    "組織管理",
+	"system.role_management":   "角色管理",
+	"system.permission_config": "權限配置",
+	"system.menu_config":       "菜單配置",
+	"system.font_management":   "字體管理",
 }
 
 var menuTitleLeafMapZhCN = map[string]string{
