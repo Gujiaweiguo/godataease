@@ -1,11 +1,23 @@
 package database
 
 import (
+	"dataease/backend/internal/domain/areamap"
+	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/chart"
+	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/driver"
+	"dataease/backend/internal/domain/embedded"
+	"dataease/backend/internal/domain/engine"
+	"dataease/backend/internal/domain/geo"
+	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/static"
+	"dataease/backend/internal/domain/system"
 	"dataease/backend/internal/domain/user"
+	"dataease/backend/internal/domain/visualization"
 	applogger "dataease/backend/internal/pkg/logger"
 
 	"go.uber.org/zap"
@@ -29,6 +41,39 @@ func AutoMigrate(db *gorm.DB) error {
 		&static.StaticResource{},
 		&static.Store{},
 		&static.Typeface{},
+		// areamap
+		&areamap.Area{},
+		&areamap.CoreAreaCustom{},
+		// audit
+		&audit.AuditLog{},
+		&audit.AuditLogDetail{},
+		&audit.LoginFailure{},
+		// chart
+		&chart.CoreChartView{},
+		// dataset
+		&dataset.CoreDatasetGroup{},
+		&dataset.CoreDatasetTable{},
+		&dataset.CoreDatasetTableField{},
+		// datasource
+		&datasource.CoreDatasource{},
+		// driver
+		&driver.Driver{},
+		&driver.DriverJar{},
+		// embedded
+		&embedded.CoreEmbedded{},
+		// engine
+		&engine.Engine{},
+		// geo
+		&geo.GeometryArea{},
+		// menu
+		&menu.CoreMenu{},
+		// system
+		&system.SysVariable{},
+		&system.SysVariableValue{},
+		// visualization
+		&visualization.DataVisualizationInfo{},
+		&visualization.SnapshotCanvasChartView{},
+		&visualization.Watermark{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {
