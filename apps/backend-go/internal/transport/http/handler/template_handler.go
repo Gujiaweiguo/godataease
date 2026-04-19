@@ -190,28 +190,45 @@ func (h *TemplateHandler) DeleteCategory(c *gin.Context) {
 // NameCheck checks if a template name already exists
 func (h *TemplateHandler) NameCheck(c *gin.Context) {
 	var req struct {
-		Name string `json:"name"`
-		ID   string `json:"id"`
+		Name    string `json:"name"`
+		ID      string `json:"id"`
+		OptType string `json:"optType"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
-	response.Success(c, true)
+	result, err := h.service.NameCheck(req.OptType, req.Name, req.ID)
+	if err != nil {
+		response.InternalError(c, "Failed to check template name: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 // CategoryTemplateNameCheck checks category-template name uniqueness
 func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
 	var req struct {
-		Name       string `json:"name"`
-		CategoryID string `json:"categoryId"`
-		ID         string `json:"id"`
+		Name          string   `json:"name"`
+		CategoryID    string   `json:"categoryId"`
+		Categories    []string `json:"categories"`
+		TemplateNames []string `json:"templateNames"`
+		TemplateArray []string `json:"templateArray"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
-	response.Success(c, true)
+	categories := req.Categories
+	if len(categories) == 0 && req.CategoryID != "" {
+		categories = []string{req.CategoryID}
+	}
+	result, err := h.service.CategoryTemplateNameCheck(req.Name, categories, req.TemplateNames, req.TemplateArray)
+	if err != nil {
+		response.InternalError(c, "Failed to check category template name: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 // BatchDelete deletes multiple templates

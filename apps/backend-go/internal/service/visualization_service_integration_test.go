@@ -5,6 +5,9 @@ package service
 import (
 	"testing"
 
+	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/auto"
+	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
@@ -317,6 +320,230 @@ func TestVisualizationServiceIntegration_BackfillGovernedResourcesWithOptions(t 
 	require.NoError(t, err)
 	assert.True(t, screenExists)
 	assert.ElementsMatch(t, []int64{91, 92}, screenPermIDs)
+}
+
+func TestVisualizationServiceIntegration_AppCanvasNameCheck(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	datasetRepo := repository.NewDatasetRepository(testDB)
+	svc := NewVisualizationService(repo)
+	svc.SetDatasetRepository(datasetRepo)
+
+	pid := int64(10)
+	nodeType := dataset.NodeTypeFolder
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetGroup{
+		ID:             101,
+		Name:           "Folder A",
+		PID:            &pid,
+		NodeType:       &nodeType,
+		CreateBy:       "tester",
+		CreateTime:     1,
+		UpdateBy:       "tester",
+		LastUpdateTime: 1,
+	}).Error)
+
+	result, err := svc.AppCanvasNameCheck(&visualization.AppCanvasNameCheckRequest{
+		DatasetFolderPid:  &pid,
+		DatasetFolderName: "Folder A",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "repeat", result)
+
+	result, err = svc.AppCanvasNameCheck(&visualization.AppCanvasNameCheckRequest{
+		DatasetFolderPid:  &pid,
+		DatasetFolderName: "Folder B",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "success", result)
+}
+
+func TestVisualizationServiceIntegration_RecordExportLog(t *testing.T) {
+	cleanupTables(&audit.AuditLog{})
+
+	repo := repository.NewVisualizationRepository(testDB)
+	auditSvc := NewAuditService(
+		repository.NewAuditLogRepository(testDB),
+		repository.NewLoginFailureRepository(testDB),
+		repository.NewAuditLogDetailRepository(testDB),
+	)
+	svc := NewVisualizationService(repo)
+	svc.SetAuditService(auditSvc)
+
+	id := int64(123)
+	userID := int64(7)
+	username := "tester"
+	ipAddress := "127.0.0.1"
+	userAgent := "integration-test"
+	require.NoError(t, svc.RecordExportLog(&visualization.ExportLogRequest{ID: &id, Type: "screen"}, &userID, &username, &ipAddress, &userAgent, "app"))
+
+	var logs []audit.AuditLog
+	require.NoError(t, testDB.Order("id ASC").Find(&logs).Error)
+	require.Len(t, logs, 1)
+	assert.Equal(t, audit.ActionTypeDataAccess, logs[0].ActionType)
+	assert.Equal(t, audit.OperationExport, logs[0].Operation)
+	assert.Equal(t, "导出应用模板", logs[0].ActionName)
+	require.NotNil(t, logs[0].ResourceType)
+	assert.Equal(t, "SCREEN", *logs[0].ResourceType)
+}
+
+func ensureExport2AppCheckTables(t *testing.T) {
+	t.Helper()
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS core_chart_view (
+		id BIGINT PRIMARY KEY,
+		title VARCHAR(255),
+		scene_id BIGINT,
+		table_id BIGINT,
+		type VARCHAR(64)
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS core_dataset_table (
+		id BIGINT PRIMARY KEY,
+		name VARCHAR(255),
+		datasource_id BIGINT,
+		dataset_group_id BIGINT,
+		table_name VARCHAR(255),
+		type VARCHAR(64)
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS core_dataset_table_field (
+		id BIGINT PRIMARY KEY,
+		datasource_id BIGINT,
+		dataset_table_id BIGINT,
+		dataset_group_id BIGINT,
+		chart_id BIGINT,
+		origin_name VARCHAR(255),
+		name VARCHAR(255),
+		group_type VARCHAR(64),
+		type VARCHAR(64),
+		de_type INT
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_linkage (
+		id BIGINT PRIMARY KEY,
+		dv_id BIGINT,
+		source_view_id BIGINT,
+		target_view_id BIGINT,
+		linkage_active TINYINT
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_linkage_field (
+		id BIGINT PRIMARY KEY,
+		linkage_id BIGINT,
+		source_field BIGINT,
+		target_field BIGINT
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_link_jump (
+		id BIGINT PRIMARY KEY,
+		source_dv_id BIGINT,
+		source_view_id BIGINT,
+		checked TINYINT
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_link_jump_info (
+		id BIGINT PRIMARY KEY,
+		link_jump_id BIGINT,
+		link_type VARCHAR(64),
+		jump_type VARCHAR(64),
+		source_field_id BIGINT,
+		checked TINYINT
+	)`).Error)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_link_jump_target_view_info (
+		target_id BIGINT PRIMARY KEY,
+		link_jump_info_id BIGINT,
+		source_field_active_id BIGINT,
+		target_view_id VARCHAR(64),
+		target_field_id VARCHAR(64)
+	)`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM visualization_link_jump_target_view_info`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM visualization_link_jump_info`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM visualization_link_jump`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM visualization_linkage_field`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM visualization_linkage`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM core_dataset_table_field`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM core_chart_view`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM core_dataset_table`).Error)
+}
+
+func TestVisualizationServiceIntegration_Export2AppCheck(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{}, &auto.CoreDatasourceTask{}, &auto.CoreDatasource{})
+	ensureExport2AppCheckTables(t)
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	groupPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetGroup{ID: 100, Name: "grp1", PID: &groupPID, NodeType: &nodeType, CreateBy: "tester", CreateTime: 1, UpdateBy: "tester", LastUpdateTime: 1}).Error)
+	require.NoError(t, testDB.Create(&auto.CoreDatasource{ID: 1, Name: "ds1", Type: "MySQL"}).Error)
+	require.NoError(t, testDB.Create(&auto.CoreDatasourceTask{ID: 2, DsID: 1, Name: "task1", UpdateType: "all", SyncRate: "0"}).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO core_dataset_table (id, name, datasource_id, dataset_group_id, table_name, type) VALUES (200, 't1', 1, 100, 'table_a', 'db')`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO core_dataset_table_field (id, datasource_id, dataset_table_id, dataset_group_id, chart_id, origin_name, name, group_type, type, de_type) VALUES (300, 1, 200, 100, 400, 'f1', 'field1', 'd', 'varchar', 0)`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO core_chart_view (id, title, scene_id, table_id, type) VALUES (400, 'chart1', 500, 100, 'bar')`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO visualization_linkage (id, dv_id, source_view_id, target_view_id, linkage_active) VALUES (700, 500, 400, 401, 1)`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO visualization_linkage_field (id, linkage_id, source_field, target_field) VALUES (800, 700, 300, 301)`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO visualization_link_jump (id, source_dv_id, source_view_id, checked) VALUES (900, 500, 400, 1)`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO visualization_link_jump_info (id, link_jump_id, link_type, jump_type, source_field_id, checked) VALUES (1000, 900, 'inner', '_blank', 300, 1)`).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO visualization_link_jump_target_view_info (target_id, link_jump_info_id, source_field_active_id, target_view_id, target_field_id) VALUES (1100, 1000, 300, '999', '888')`).Error)
+
+	resp, err := svc.Export2AppCheck(&visualization.Export2AppCheckRequest{DvID: 500, ViewIDs: []int64{400}, DsIDs: []int64{100}})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.True(t, resp.CheckStatus)
+	assert.Equal(t, "success", resp.CheckMes)
+	assert.Len(t, resp.ChartViewsInfo, 1)
+	assert.Len(t, resp.DatasourceInfo, 1)
+	assert.Len(t, resp.LinkJumps, 1)
+}
+
+func TestVisualizationServiceIntegration_Export2AppCheck_RejectsAPIDataSource(t *testing.T) {
+	cleanupTables(&dataset.CoreDatasetGroup{}, &auto.CoreDatasource{})
+	ensureExport2AppCheckTables(t)
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+
+	groupPID := int64(0)
+	nodeType := dataset.NodeTypeDataset
+	require.NoError(t, testDB.Create(&dataset.CoreDatasetGroup{ID: 101, Name: "grp-api", PID: &groupPID, NodeType: &nodeType, CreateBy: "tester", CreateTime: 1, UpdateBy: "tester", LastUpdateTime: 1}).Error)
+	require.NoError(t, testDB.Create(&auto.CoreDatasource{ID: 11, Name: "api-ds", Type: "API"}).Error)
+	require.NoError(t, testDB.Exec(`INSERT INTO core_dataset_table (id, name, datasource_id, dataset_group_id, table_name, type) VALUES (201, 't2', 11, 101, 'table_b', 'db')`).Error)
+
+	resp, err := svc.Export2AppCheck(&visualization.Export2AppCheckRequest{DvID: 0, DsIDs: []int64{101}})
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "API")
+}
+
+func TestVisualizationServiceIntegration_HelperCoverage(t *testing.T) {
+	cleanupTables()
+	ensureExport2AppCheckTables(t)
+
+	repo := repository.NewVisualizationRepository(testDB)
+	svc := NewVisualizationService(repo)
+	svc.SetTemplateService(NewTemplateService(repository.NewTemplateRepository(testDB)))
+	svc.SetTemplateExtendDataRepo(repository.NewTemplateExtendDataRepository(testDB))
+
+	require.NoError(t, testDB.Exec(`INSERT INTO core_chart_view (id, title, scene_id, table_id, type) VALUES (401, 'chart-helper', 501, 100, 'line')`).Error)
+	rows, err := svc.ViewDetailList(501)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	converted := stringifyExportIDs([]map[string]interface{}{{
+		"id":        int64(1),
+		"scene_id":  int32(2),
+		"target_id": uint64(3),
+		"plain":     "keep",
+	}})
+	assert.Equal(t, "1", converted[0]["id"])
+	assert.Equal(t, "2", converted[0]["scene_id"])
+	assert.Equal(t, "3", converted[0]["target_id"])
+	assert.Equal(t, "keep", converted[0]["plain"])
+
+	appData := `{"visualizationInfo":{"id":11}}`
+	assert.Contains(t, processAppData(appData, 22), `"id":22`)
+	assert.Equal(t, `not-json`, processAppData(`not-json`, 22))
+
+	value, ok := extractInt64Value(int64(7))
+	assert.True(t, ok)
+	assert.Equal(t, int64(7), value)
+	_, ok = extractInt64Value("bad")
+	assert.False(t, ok)
 }
 
 func TestVisualizationServiceIntegration_BackfillGovernedResourcesWithOptions_FiltersByOrg(t *testing.T) {

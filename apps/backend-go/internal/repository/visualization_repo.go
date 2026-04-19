@@ -142,3 +142,104 @@ func (r *VisualizationRepository) GetChartViewsBySceneID(sceneID int64) ([]map[s
 	err := r.db.Table("core_chart_view").Where("scene_id = ?", sceneID).Find(&results).Error
 	return results, err
 }
+
+func (r *VisualizationRepository) FindChartViewsByIDs(viewIDs []int64) ([]map[string]interface{}, error) {
+	if len(viewIDs) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	var results []map[string]interface{}
+	err := r.db.Table("core_chart_view").Where("id IN ?", viewIDs).Find(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindDatasetGroupsByIDs(dsIDs []int64) ([]map[string]interface{}, error) {
+	if len(dsIDs) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	var results []map[string]interface{}
+	err := r.db.Table("core_dataset_group").Where("id IN ?", dsIDs).Find(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindDatasetTablesByGroupIDs(dsIDs []int64) ([]map[string]interface{}, error) {
+	if len(dsIDs) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	var results []map[string]interface{}
+	err := r.db.Table("core_dataset_table").Where("dataset_group_id IN ?", dsIDs).Find(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindDatasetTableFieldsByGroupIDs(dsIDs []int64) ([]map[string]interface{}, error) {
+	if len(dsIDs) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	var results []map[string]interface{}
+	err := r.db.Table("core_dataset_table_field").Where("dataset_group_id IN ?", dsIDs).Find(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindDatasourcesByGroupIDs(dsIDs []int64) ([]map[string]interface{}, error) {
+	if len(dsIDs) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	var results []map[string]interface{}
+	err := r.db.Raw(`
+		SELECT DISTINCT core_datasource.* FROM core_datasource
+		INNER JOIN core_dataset_table ON core_dataset_table.datasource_id = core_datasource.id
+		WHERE core_dataset_table.dataset_group_id IN ?`, dsIDs).Scan(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindDatasourceTasksByGroupIDs(dsIDs []int64) ([]map[string]interface{}, error) {
+	if len(dsIDs) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	var results []map[string]interface{}
+	err := r.db.Raw(`
+		SELECT core_datasource_task.* FROM core_datasource_task
+		INNER JOIN core_datasource ON core_datasource_task.ds_id = core_datasource.id
+		INNER JOIN core_dataset_table ON core_dataset_table.datasource_id = core_datasource.id
+		WHERE core_dataset_table.dataset_group_id IN ?`, dsIDs).Scan(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindLinkagesByDvID(dvID int64) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	err := r.db.Table("visualization_linkage").Where("dv_id = ?", dvID).Find(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindLinkageFieldsByDvID(dvID int64) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	err := r.db.Raw(`
+		SELECT visualization_linkage_field.* FROM visualization_linkage_field
+		INNER JOIN visualization_linkage ON visualization_linkage.id = visualization_linkage_field.linkage_id
+		WHERE visualization_linkage.dv_id = ?`, dvID).Scan(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindLinkJumpsByDvID(dvID int64) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	err := r.db.Table("visualization_link_jump").Where("source_dv_id = ?", dvID).Find(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindLinkJumpInfosByDvID(dvID int64) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	err := r.db.Raw(`
+		SELECT visualization_link_jump_info.* FROM visualization_link_jump_info
+		INNER JOIN visualization_link_jump ON visualization_link_jump.id = visualization_link_jump_info.link_jump_id
+		WHERE visualization_link_jump.source_dv_id = ?`, dvID).Scan(&results).Error
+	return results, err
+}
+
+func (r *VisualizationRepository) FindLinkJumpTargetViewInfosByDvID(dvID int64) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	err := r.db.Raw(`
+		SELECT visualization_link_jump_target_view_info.* FROM visualization_link_jump_target_view_info
+		INNER JOIN visualization_link_jump_info ON visualization_link_jump_target_view_info.link_jump_info_id = visualization_link_jump_info.id
+		INNER JOIN visualization_link_jump ON visualization_link_jump.id = visualization_link_jump_info.link_jump_id
+		WHERE visualization_link_jump.source_dv_id = ?`, dvID).Scan(&results).Error
+	return results, err
+}

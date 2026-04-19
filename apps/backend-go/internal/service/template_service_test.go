@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -32,6 +33,16 @@ type testCoreVisualizationTemplate struct {
 	Version       int        `gorm:"column:version;default:3"`
 }
 
+type testVisualizationTemplateCategoryMap struct {
+	ID         string `gorm:"column:id;primaryKey"`
+	CategoryID string `gorm:"column:category_id"`
+	TemplateID string `gorm:"column:template_id"`
+}
+
+func (testVisualizationTemplateCategoryMap) TableName() string {
+	return "visualization_template_category_map"
+}
+
 func (testCoreVisualizationTemplate) TableName() string {
 	return "core_visualization_template"
 }
@@ -42,6 +53,7 @@ func setupTemplateServiceRepoTest(t *testing.T) (*TemplateService, *gorm.DB) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&testCoreVisualizationTemplate{}))
+	require.NoError(t, db.AutoMigrate(&testVisualizationTemplateCategoryMap{}))
 
 	repo := repository.NewTemplateRepository(db)
 	return NewTemplateService(repo), db
@@ -259,6 +271,45 @@ func TestTemplateService_UpdateTemplate(t *testing.T) {
 		assert.Equal(t, `{"new":"app"}`, updated.AppData)
 		assert.Equal(t, `{"same":1}`, updated.TemplateData)
 	})
+}
+
+func TestTemplateService_NameCheck(t *testing.T) {
+	svc, _ := setupTemplateServiceRepoTest(t)
+	created := createTemplateFixture(t, svc, "Repeated Name")
+
+	result, err := svc.NameCheck("insert", "Repeated Name", "")
+	require.NoError(t, err)
+	assert.Equal(t, "existAll", result)
+
+	result, err = svc.NameCheck("update", "Repeated Name", strconv.FormatInt(created.ID, 10))
+	require.NoError(t, err)
+	assert.Equal(t, "none", result)
+
+	result, err = svc.NameCheck("insert", "Fresh Name", "")
+	require.NoError(t, err)
+	assert.Equal(t, "none", result)
+}
+
+func TestTemplateService_CategoryTemplateNameCheck(t *testing.T) {
+	svc, db := setupTemplateServiceRepoTest(t)
+	created := createTemplateFixture(t, svc, "Category Template")
+	require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-1", CategoryID: "cat-1", TemplateID: strconv.FormatInt(created.ID, 10)}).Error)
+
+	result, err := svc.CategoryTemplateNameCheck("Category Template", []string{"cat-1"}, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "existAll", result)
+
+	result, err = svc.CategoryTemplateNameCheck("Other Template", []string{"cat-1"}, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "none", result)
+
+	result, err = svc.CategoryTemplateNameCheck("", []string{"cat-1"}, []string{"Category Template"}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "existAll", result)
+
+	result, err = svc.CategoryTemplateNameCheck("", []string{"cat-1"}, []string{"Category Template"}, []string{strconv.FormatInt(created.ID, 10)})
+	require.NoError(t, err)
+	assert.Equal(t, "none", result)
 }
 
 func TestTemplateService_DeleteTemplate(t *testing.T) {

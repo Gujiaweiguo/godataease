@@ -2,6 +2,7 @@ package service
 
 import (
 	"strconv"
+	"strings"
 
 	"dataease/backend/internal/domain/template"
 	"dataease/backend/internal/repository"
@@ -12,6 +13,11 @@ import (
 type TemplateService struct {
 	repo *repository.TemplateRepository
 }
+
+const (
+	checkResultNone     = "none"
+	checkResultExistAll = "existAll"
+)
 
 func NewTemplateService(repo *repository.TemplateRepository) *TemplateService {
 	return &TemplateService{repo: repo}
@@ -120,4 +126,50 @@ func (s *TemplateService) DeleteTemplate(id int64) error {
 
 func (s *TemplateService) IncrementUseCount(id int64) error {
 	return s.repo.IncrementUseCount(id)
+}
+
+func (s *TemplateService) NameCheck(optType string, name string, id string) (string, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return checkResultNone, nil
+	}
+	var excludeID *int64
+	if strings.EqualFold(optType, "update") && strings.TrimSpace(id) != "" {
+		if parsed, err := strconv.ParseInt(id, 10, 64); err == nil && parsed > 0 {
+			excludeID = &parsed
+		}
+	}
+	count, err := s.repo.CountByName(trimmedName, excludeID)
+	if err != nil {
+		return "", err
+	}
+	if count == 0 {
+		return checkResultNone, nil
+	}
+	return checkResultExistAll, nil
+}
+
+func (s *TemplateService) CategoryTemplateNameCheck(name string, categories []string, templateNames []string, templateArray []string) (string, error) {
+	if len(templateNames) > 0 {
+		count, err := s.repo.CountBatchNamesInCategories(templateNames, categories, templateArray)
+		if err != nil {
+			return "", err
+		}
+		if count == 0 {
+			return checkResultNone, nil
+		}
+		return checkResultExistAll, nil
+	}
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" || len(categories) == 0 {
+		return checkResultNone, nil
+	}
+	count, err := s.repo.CountByNameInCategories(trimmedName, categories)
+	if err != nil {
+		return "", err
+	}
+	if count == 0 {
+		return checkResultNone, nil
+	}
+	return checkResultExistAll, nil
 }

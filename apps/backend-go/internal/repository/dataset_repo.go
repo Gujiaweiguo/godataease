@@ -115,6 +115,14 @@ func (r *DatasetRepository) CountGroupByNameAndPID(name string, pid int64, exclu
 	return count, err
 }
 
+func (r *DatasetRepository) CountFolderByNameAndPID(name string, pid int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&dataset.CoreDatasetGroup{}).
+		Where("name = ? AND COALESCE(pid, 0) = ? AND COALESCE(del_flag, 0) = 0 AND node_type = ?", name, pid, "folder").
+		Count(&count).Error
+	return count, err
+}
+
 func (r *DatasetRepository) ListGroupChildren(parentID int64) ([]*dataset.CoreDatasetGroup, error) {
 	var list []*dataset.CoreDatasetGroup
 	err := r.db.Model(&dataset.CoreDatasetGroup{}).
