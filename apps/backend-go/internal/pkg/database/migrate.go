@@ -133,9 +133,24 @@ func AutoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	// core_sys_setting lives in repository package (circular dep), migrate inline
+	if err := db.AutoMigrate(&coreSysSettingMigrate{}); err != nil {
+		return err
+	}
+
 	applogger.Info("Database migration completed",
-		zap.Int("tables", len(models)),
+		zap.Int("tables", len(models)+1),
 	)
 
 	return nil
 }
+
+type coreSysSettingMigrate struct {
+	ID   int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	Pkey string `gorm:"column:pkey"`
+	Pval string `gorm:"column:pval"`
+	Type string `gorm:"column:type"`
+	Sort int    `gorm:"column:sort"`
+}
+
+func (coreSysSettingMigrate) TableName() string { return "core_sys_setting" }
