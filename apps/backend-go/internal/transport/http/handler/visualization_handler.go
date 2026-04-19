@@ -471,7 +471,17 @@ func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
-	response.Success(c, "success")
+	var req visualization.AppCanvasNameCheckRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.AppCanvasNameCheck(&req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *VisualizationHandler) GetComponentInfo(c *gin.Context) {
@@ -479,22 +489,63 @@ func (h *VisualizationHandler) GetComponentInfo(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
-	response.Success(c, map[string]interface{}{})
+	var req visualization.Export2AppCheckRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.Export2AppCheck(&req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *VisualizationHandler) ExportLogApp(c *gin.Context) {
-	response.Success(c, nil)
+	h.recordExportLog(c, "app")
 }
 
 func (h *VisualizationHandler) ExportLogTemplate(c *gin.Context) {
-	response.Success(c, nil)
+	h.recordExportLog(c, "template")
 }
 
 func (h *VisualizationHandler) ExportLogPDF(c *gin.Context) {
-	response.Success(c, nil)
+	h.recordExportLog(c, "pdf")
 }
 
 func (h *VisualizationHandler) ExportLogImg(c *gin.Context) {
+	h.recordExportLog(c, "img")
+}
+
+func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
+	var req visualization.ExportLogRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	var userID *int64
+	if uid, exists := c.Get("userId"); exists {
+		switch v := uid.(type) {
+		case int64:
+			userID = &v
+		case int:
+			converted := int64(v)
+			userID = &converted
+		}
+	}
+	var username *string
+	if raw, exists := c.Get("userName"); exists {
+		if name, ok := raw.(string); ok && strings.TrimSpace(name) != "" {
+			username = &name
+		}
+	}
+	ipAddress := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+	if err := h.service.RecordExportLog(&req, userID, username, &ipAddress, &userAgent, logType); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
 	response.Success(c, nil)
 }
 

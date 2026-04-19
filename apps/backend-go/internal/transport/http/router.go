@@ -376,8 +376,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateHandler := handler.NewTemplateHandler(templateService)
 
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
+	visualService.SetDatasetRepository(datasetRepo)
 	visualService.SetTemplateService(templateService)
 	visualService.SetTemplateExtendDataRepo(templateExtendDataRepo)
+	visualService.SetAuditService(auditService)
 
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
