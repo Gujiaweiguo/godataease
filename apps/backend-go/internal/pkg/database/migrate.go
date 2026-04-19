@@ -1,6 +1,7 @@
 package database
 
 import (
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/chart"
@@ -74,6 +75,58 @@ func AutoMigrate(db *gorm.DB) error {
 		&visualization.DataVisualizationInfo{},
 		&visualization.SnapshotCanvasChartView{},
 		&visualization.Watermark{},
+		// auto-generated domain models
+		&auto.CoreAPITraffic{},
+		&auto.CoreCopilotConfig{},
+		&auto.CoreCopilotToken{},
+		&auto.CoreCustomGeoArea{},
+		&auto.CoreCustomGeoSubArea{},
+		&auto.CoreDatasetTableSqlLog{},
+		&auto.CoreDatasourceTask{},
+		&auto.CoreDatasourceTaskLog{},
+		&auto.CoreDeEngine{},
+		&auto.CoreDriver{},
+		&auto.CoreDriverJar{},
+		&auto.CoreDsFinishPage{},
+		&auto.CoreExportDownloadTask{},
+		&auto.CoreExportTask{},
+		&auto.CoreFont{},
+		&auto.CoreOptRecent{},
+		&auto.CoreRsa{},
+		&auto.CoreShareTicket{},
+		&auto.CoreStore{},
+		&auto.CoreSysStartupJob{},
+		&auto.SnapshotDataVisualizationInfo{},
+		&auto.SnapshotVisualizationLinkJump{},
+		&auto.SnapshotVisualizationLinkJumpInfo{},
+		&auto.SnapshotVisualizationLinkJumpTargetViewInfo{},
+		&auto.SnapshotVisualizationLinkage{},
+		&auto.SnapshotVisualizationLinkageField{},
+		&auto.SnapshotVisualizationOuterParam{},
+		&auto.SnapshotVisualizationOuterParamsInfo{},
+		&auto.SnapshotVisualizationOuterParamsTargetViewInfo{},
+		&auto.VisualizationBackground{},
+		&auto.VisualizationBackgroundImage{},
+		&auto.VisualizationLinkJump{},
+		&auto.VisualizationLinkJumpInfo{},
+		&auto.VisualizationLinkJumpTargetViewInfo{},
+		&auto.VisualizationLinkage{},
+		&auto.VisualizationLinkageField{},
+		&auto.VisualizationOuterParam{},
+		&auto.VisualizationOuterParamsInfo{},
+		&auto.VisualizationOuterParamsTargetViewInfo{},
+		&auto.VisualizationReportFilter{},
+		&auto.VisualizationSubject{},
+		&auto.VisualizationTemplate{},
+		&auto.VisualizationTemplateCategory{},
+		&auto.VisualizationTemplateCategoryMap{},
+		&auto.VisualizationTemplateExtendDatum{},
+		&auto.XpackPlatformToken{},
+		&auto.XpackSettingAuthentication{},
+		&auto.XpackShare{},
+		&auto.XpackThresholdInfo{},
+		&auto.XpackThresholdInstance{},
+		&auto.XpackWebhook{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {
