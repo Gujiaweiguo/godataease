@@ -3,12 +3,14 @@
 package service
 
 import (
+	"strconv"
 	"testing"
 
 	"dataease/backend/internal/domain/template"
 	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const templateTableName = "core_visualization_template"
@@ -239,4 +241,57 @@ func TestTemplateServiceIntegration_IncrementUseCount(t *testing.T) {
 	tpl, err := svc.GetTemplate(created.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, tpl.UseCount)
+}
+
+func TestTemplateServiceIntegration_NameCheck(t *testing.T) {
+	cleanupTables(templateTableName)
+
+	repo := repository.NewTemplateRepository(testDB)
+	svc := NewTemplateService(repo)
+
+	created, err := svc.CreateTemplate(&template.TemplateCreateRequest{
+		Name:     "NameCheck Template",
+		Pid:      0,
+		DvType:   "dashboard",
+		NodeType: "leaf",
+	}, "tester")
+	assert.NoError(t, err)
+
+	result, err := svc.NameCheck("insert", "NameCheck Template", "")
+	assert.NoError(t, err)
+	assert.Equal(t, "existAll", result)
+
+	result, err = svc.NameCheck("update", "NameCheck Template", strconv.FormatInt(created.ID, 10))
+	assert.NoError(t, err)
+	assert.Equal(t, "none", result)
+}
+
+func TestTemplateServiceIntegration_CategoryTemplateNameCheck(t *testing.T) {
+	cleanupTables(templateTableName)
+	require.NoError(t, testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_template_category_map (
+        id VARCHAR(64) PRIMARY KEY,
+        category_id VARCHAR(64),
+        template_id VARCHAR(64)
+    )`).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM visualization_template_category_map`).Error)
+
+	repo := repository.NewTemplateRepository(testDB)
+	svc := NewTemplateService(repo)
+
+	created, err := svc.CreateTemplate(&template.TemplateCreateRequest{
+		Name:     "Category Template",
+		Pid:      0,
+		DvType:   "dashboard",
+		NodeType: "leaf",
+	}, "tester")
+	assert.NoError(t, err)
+	require.NoError(t, testDB.Exec(`INSERT INTO visualization_template_category_map (id, category_id, template_id) VALUES (?, ?, ?)`, "map-1", "cat-1", strconv.FormatInt(created.ID, 10)).Error)
+
+	result, err := svc.CategoryTemplateNameCheck("Category Template", []string{"cat-1"}, nil, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "existAll", result)
+
+	result, err = svc.CategoryTemplateNameCheck("", []string{"cat-1"}, []string{"Category Template"}, []string{strconv.FormatInt(created.ID, 10)})
+	assert.NoError(t, err)
+	assert.Equal(t, "none", result)
 }
