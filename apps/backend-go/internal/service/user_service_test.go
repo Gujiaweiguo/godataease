@@ -115,31 +115,34 @@ func TestUserServiceHelpers_NormalizeLanguage(t *testing.T) {
 	}
 }
 
-func TestUserServiceHelpers_RequestedOrgID(t *testing.T) {
-	five := int64(5)
-	three := int64(3)
+func TestResolveOrgID(t *testing.T) {
+	ten := int64(10)
+	twenty := int64(20)
 	zero := int64(0)
-	negative := int64(-1)
 
 	tests := []struct {
 		name           string
 		orgID          *int64
 		organizationID *int64
-		want           int64
-		ok             bool
+		wantNil        bool
+		wantVal        int64
 	}{
-		{name: "prefers organization id", orgID: &three, organizationID: &five, want: 5, ok: true},
-		{name: "falls back to org id", orgID: &three, organizationID: nil, want: 3, ok: true},
-		{name: "ignores zero organization id", orgID: &three, organizationID: &zero, want: 3, ok: true},
-		{name: "rejects negative org id", orgID: &negative, organizationID: nil, want: 0, ok: false},
-		{name: "none provided", orgID: nil, organizationID: nil, want: 0, ok: false},
+		{name: "prefers orgID", orgID: &ten, organizationID: &twenty, wantNil: false, wantVal: 10},
+		{name: "falls back to organizationID", orgID: nil, organizationID: &twenty, wantNil: false, wantVal: 20},
+		{name: "ignores zero orgID with organizationID", orgID: &zero, organizationID: &twenty, wantNil: false, wantVal: 20},
+		{name: "rejects zero orgID alone", orgID: &zero, organizationID: nil, wantNil: true},
+		{name: "nil both", orgID: nil, organizationID: nil, wantNil: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := requestedOrgID(tt.orgID, tt.organizationID)
-			assert.Equal(t, tt.ok, ok)
-			assert.Equal(t, tt.want, got)
+			got := resolveOrgID(tt.orgID, tt.organizationID)
+			if tt.wantNil {
+				assert.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				assert.Equal(t, tt.wantVal, *got)
+			}
 		})
 	}
 }
@@ -503,6 +506,44 @@ func TestUserService_CreateAndUpdateUsers(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "failed to update user")
 		})
+	})
+
+	t.Run("update user switches organization", func(t *testing.T) {
+		svc, db := setupUserServiceOrgBindingTest(t)
+		require.NoError(t, db.Create(&user.SysUser{UserID: 401, Username: "org-switch-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+		require.NoError(t, db.Create(&domainorg.SysOrg{OrgID: 10, OrgName: "Old Org", Status: domainorg.StatusEnabled}).Error)
+		require.NoError(t, db.Create(&domainorg.SysOrg{OrgID: 20, OrgName: "New Org", Status: domainorg.StatusEnabled}).Error)
+		require.NoError(t, db.Create(&domainrole.SysRole{RoleID: 1, RoleCode: "org-user", Status: domainrole.StatusEnabled}).Error)
+		require.NoError(t, db.Create(&user.SysUserRole{UserID: 401, RoleID: 1, OrgID: 10}).Error)
+
+		newOrgID := int64(20)
+		require.NoError(t, svc.UpdateUser(&user.UserUpdateRequest{ID: 401, OrgID: &newOrgID}))
+
+		var binding user.SysUserRole
+		require.NoError(t, db.Where("user_id = ?", 401).First(&binding).Error)
+		assert.Equal(t, int64(20), binding.OrgID)
+	})
+
+	t.Run("update user rejects disabled target org", func(t *testing.T) {
+		svc, db := setupUserServiceOrgBindingTest(t)
+		require.NoError(t, db.Create(&user.SysUser{UserID: 402, Username: "org-disabled-target", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+		require.NoError(t, db.Create(&domainorg.SysOrg{OrgID: 30, OrgName: "Disabled Org", Status: domainorg.StatusEnabled}).Error)
+		require.NoError(t, db.Model(&domainorg.SysOrg{}).Where("org_id = ?", 30).Update("status", domainorg.StatusDisabled).Error)
+
+		newOrgID := int64(30)
+		err := svc.UpdateUser(&user.UserUpdateRequest{ID: 402, OrgID: &newOrgID})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "organization is disabled")
+	})
+
+	t.Run("update user rejects nonexistent target org", func(t *testing.T) {
+		svc, db := setupUserServiceOrgBindingTest(t)
+		require.NoError(t, db.Create(&user.SysUser{UserID: 403, Username: "org-missing-target", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+
+		newOrgID := int64(9999)
+		err := svc.UpdateUser(&user.UserUpdateRequest{ID: 403, OrganizationID: &newOrgID})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "organization not found")
 	})
 }
 
