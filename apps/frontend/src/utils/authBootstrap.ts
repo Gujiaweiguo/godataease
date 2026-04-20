@@ -1,5 +1,4 @@
 const expWarningMs = 10000
-const sessionAgeWarningMs = 90000
 
 type BootstrapSessionState = {
   exp?: number | null
@@ -12,7 +11,6 @@ type BootstrapSessionState = {
 export const isBootstrapSessionValid = ({
   token,
   exp,
-  time,
   isDesktop,
   now = Date.now()
 }: BootstrapSessionState) => {
@@ -25,8 +23,5 @@ export const isBootstrapSessionValid = ({
   if (exp - now < expWarningMs) {
     return false
   }
-  if (!time) {
-    return true
-  }
-  return now - time <= sessionAgeWarningMs
+  return true
 }

@@ -30,7 +30,7 @@ describe('isBootstrapSessionValid', () => {
     ).toBe(true)
   })
 
-  it('returns false when session age exceeds refresh window', () => {
+  it('returns true when session age exceeds refresh window but token expiry is still safe', () => {
     expect(
       isBootstrapSessionValid({
         token: 'token',
@@ -38,7 +38,7 @@ describe('isBootstrapSessionValid', () => {
         time: 1000,
         now: 92001
       })
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('returns false when refresh time is recent but token is already near expiry', () => {

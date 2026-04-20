@@ -37,6 +37,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := database.SeedDefaults(db); err != nil {
+		logger.Fatal("Failed to seed database", zap.String("error", err.Error()))
+		os.Exit(1)
+	}
+
 	go func() {
 		if err := httptransport.Start(application, db); err != nil {
 			logger.Fatal("Failed to start HTTP server", zap.String("error", err.Error()))
