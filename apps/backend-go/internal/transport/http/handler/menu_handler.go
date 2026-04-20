@@ -225,11 +225,17 @@ func (h *MenuHandler) Detail(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func RegisterMenuRoutes(r *gin.RouterGroup, h *MenuHandler) {
+func RegisterMenuReadRoutes(r *gin.RouterGroup, h *MenuHandler) {
 	menuGroup := r.Group("/menu")
 	{
 		menuGroup.GET("/query", h.Query)
 		menuGroup.GET("/detail/:id", h.Detail)
+	}
+}
+
+func RegisterMenuWriteRoutes(r *gin.RouterGroup, h *MenuHandler) {
+	menuGroup := r.Group("/menu")
+	{
 		menuGroup.POST("/create", h.Create)
 		menuGroup.POST("/update", h.Update)
 		menuGroup.POST("/delete/:id", h.Delete)

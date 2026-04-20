@@ -532,6 +532,7 @@ func (r *Router) registerAPIRoutes() {
 	visualizationDe2API := r.engine.Group("/de2api")
 	auditAPI := api
 	exportAPI := api
+	menuWriteAPI := api
 	if r.app != nil && r.app.Config != nil {
 		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
 			Secret: r.app.Config.JWT.Secret,
@@ -580,6 +581,10 @@ func (r *Router) registerAPIRoutes() {
 		protectedExportAPI := r.engine.Group("/api")
 		protectedExportAPI.Use(middleware.Auth(jwtInstance))
 		exportAPI = protectedExportAPI
+
+		protectedMenuWriteAPI := r.engine.Group("/api")
+		protectedMenuWriteAPI.Use(middleware.Auth(jwtInstance))
+		menuWriteAPI = protectedMenuWriteAPI
 	}
 	{
 		api.GET("/ping", func(c *gin.Context) {
@@ -596,7 +601,8 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterRoleRoutes(roleAPI, r.roleHandler)
 		handler.RegisterRoleRoutes(roleDe2API, r.roleHandler)
 		handler.RegisterRoleMenuRoutes(roleMenuAPI, r.roleMenuHandler)
-		handler.RegisterMenuRoutes(api, r.menuHandler)
+		handler.RegisterMenuReadRoutes(api, r.menuHandler)
+		handler.RegisterMenuWriteRoutes(menuWriteAPI, r.menuHandler)
 		handler.RegisterPermissionCompatRoutes(permissionCompatAPI, r.permissionCompatHandler)
 		handler.RegisterPermissionCompatRoutes(permissionCompatDe2API, r.permissionCompatHandler)
 		handler.RegisterPermissionRoutes(api, r.permissionCompatHandler)
