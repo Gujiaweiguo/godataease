@@ -234,6 +234,12 @@ func (r *UserPermRepository) GetByUserID(userID int64) ([]*user.SysUserPerm, err
 	return perms, err
 }
 
+func (r *UserRoleRepository) SwitchOrgForUser(userID, newOrgID int64) error {
+	return r.db.Model(&user.SysUserRole{}).
+		Where("user_id = ?", userID).
+		Update("org_id", newOrgID).Error
+}
+
 func (r *UserRoleRepository) GetRoleIDsByUserID(userID int64) ([]int64, error) {
 	var roleIDs []int64
 	err := r.db.Model(&user.SysUserRole{}).
