@@ -175,6 +175,14 @@ func (s *UserService) UpdateUser(req *user.UserUpdateRequest) error {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
+	newOrgID := resolveOrgID(req.OrgID, req.OrganizationID)
+	if newOrgID != nil && *newOrgID > 0 {
+		if err := s.switchUserOrg(req.ID, *newOrgID); err != nil {
+			logger.Error("Failed to switch user org", zap.Int64("userId", req.ID), zap.Error(err))
+			return fmt.Errorf("failed to update user organization: %w", err)
+		}
+	}
+
 	logger.Info("User updated", zap.Int64("userId", req.ID))
 	return nil
 }
@@ -452,4 +460,28 @@ func (s *UserService) ensureDefaultOrgUserRole() (int64, error) {
 	}
 
 	return defaultRole.RoleID, nil
+}
+
+func resolveOrgID(orgID *int64, organizationID *int64) *int64 {
+	if orgID != nil && *orgID > 0 {
+		return orgID
+	}
+	if organizationID != nil && *organizationID > 0 {
+		return organizationID
+	}
+	return nil
+}
+
+func (s *UserService) switchUserOrg(userID int64, newOrgID int64) error {
+	if s.orgRepo == nil {
+		return fmt.Errorf("org repository is not configured")
+	}
+	orgEntity, err := s.orgRepo.GetByID(newOrgID)
+	if err != nil {
+		return fmt.Errorf("target organization not found: %w", err)
+	}
+	if orgEntity.Status != domainorg.StatusEnabled {
+		return fmt.Errorf("target organization is disabled")
+	}
+	return s.userRoleRepo.SwitchOrgForUser(userID, newOrgID)
 }
