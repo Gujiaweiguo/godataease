@@ -1,9 +1,9 @@
 package database
 
 import (
-	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
