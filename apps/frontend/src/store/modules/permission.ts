@@ -132,17 +132,23 @@ const hasCurrentRouter = (locations, routers, index) => {
   if (!routers?.length) {
     return false
   }
+
   const location = locations[index]
-  let kids = []
-  const isvalid = routers.some(router => {
-    kids = router.children
+  const matchedRouters = routers.filter(router => {
     return router.path === location || '/' + location === router.path
   })
 
-  if (isvalid && index < locations.length - 1) {
-    return hasCurrentRouter(locations, kids, index + 1)
+  if (!matchedRouters.length) {
+    return false
   }
-  return isvalid
+
+  if (index >= locations.length - 1) {
+    return true
+  }
+
+  return matchedRouters.some(router => {
+    return hasCurrentRouter(locations, router.children || [], index + 1)
+  })
 }
 
 export const getFirstAuthMenu = () => {
