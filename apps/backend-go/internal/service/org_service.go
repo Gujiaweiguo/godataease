@@ -88,6 +88,36 @@ func (s *OrgService) UpdateOrg(req *org.OrgUpdateRequest) error {
 		existing.OrgDesc = req.OrgDesc
 	}
 
+	if req.ParentID != nil {
+		newParentID := *req.ParentID
+		if newParentID == existing.OrgID {
+			return fmt.Errorf("organization cannot be its own parent")
+		}
+		if newParentID != existing.ParentID {
+			if newParentID > 0 {
+				parent, err := s.orgRepo.GetByID(newParentID)
+				if err != nil {
+					return fmt.Errorf("parent organization not found: %w", err)
+				}
+				if parent.Status != org.StatusEnabled {
+					return fmt.Errorf("parent organization is disabled")
+				}
+				isDesc, err := s.orgRepo.IsDescendant(existing.OrgID, newParentID)
+				if err != nil {
+					return fmt.Errorf("failed to check descendant: %w", err)
+				}
+				if isDesc {
+					return fmt.Errorf("cannot move organization under its own descendant")
+				}
+				existing.ParentID = newParentID
+				existing.Level = parent.Level + 1
+			} else {
+				existing.ParentID = org.RootParentID
+				existing.Level = 1
+			}
+		}
+	}
+
 	now := time.Now()
 	existing.UpdateTime = &now
 
