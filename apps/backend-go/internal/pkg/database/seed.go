@@ -1,10 +1,15 @@
 package database
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
+	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
@@ -37,6 +42,201 @@ func SeedDefaults(db *gorm.DB) error {
 	}
 
 	return ensureAdminBinding(db, adminUser.UserID, adminRole.RoleID, defaultOrg.OrgID)
+}
+
+// SeedDemoData ensures a demo datasource and dataset exist on first launch.
+// It is idempotent — safe to call on every startup.
+func SeedDemoData(db *gorm.DB) error {
+	now := time.Now().UnixMilli()
+
+	demoDatasource, err := ensureDemoDatasource(db, now)
+	if err != nil {
+		return err
+	}
+
+	demoFolder, err := ensureDemoDatasetFolder(db, now)
+	if err != nil {
+		return err
+	}
+
+	teaSalesDataset, err := ensureTeaSalesDataset(db, demoFolder.ID, now)
+	if err != nil {
+		return err
+	}
+
+	demoTable, err := ensureTeaSalesTable(db, demoDatasource.ID, teaSalesDataset.ID)
+	if err != nil {
+		return err
+	}
+
+	if err := ensureTeaSalesFields(db, demoDatasource.ID, teaSalesDataset.ID, demoTable.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ensureDemoDatasource(db *gorm.DB, now int64) (*datasource.CoreDatasource, error) {
+	var out datasource.CoreDatasource
+	rootPID := int64(0)
+	result := db.Where("name = ? AND pid = ? AND del_flag = 0", "Demo MySQL", rootPID).First(&out)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		configJSON, err := json.Marshal(datasource.ConnectionConfig{
+			Database: "dataease_demo",
+			Host:     "127.0.0.1",
+			Port:     3306,
+			Username: "root",
+			Password: "Admin168",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal demo datasource config: %w", err)
+		}
+
+		encodedConfig := base64.StdEncoding.EncodeToString(configJSON)
+		out = datasource.CoreDatasource{
+			PID:            ptrInt64(rootPID),
+			Name:           "Demo MySQL",
+			Type:           "MySQL",
+			EditType:       ptrString("0"),
+			Configuration:  ptrString(encodedConfig),
+			Status:         ptrString(datasource.StatusSuccess),
+			EnableDataFill: ptrBool(false),
+			CreateTime:     ptrInt64(now),
+			UpdateTime:     ptrInt64(now),
+			CreateBy:       ptrString("system"),
+			DelFlag:        ptrInt(0),
+		}
+		if err := db.Create(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to create demo datasource: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to query demo datasource: %w", result.Error)
+	}
+
+	return &out, nil
+}
+
+func ensureDemoDatasetFolder(db *gorm.DB, now int64) (*dataset.CoreDatasetGroup, error) {
+	var out dataset.CoreDatasetGroup
+	rootPID := int64(0)
+	folderType := dataset.NodeTypeFolder
+	result := db.Where("name = ? AND pid = ? AND node_type = ? AND del_flag = 0", "Demo Datasets", rootPID, folderType).First(&out)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		out = dataset.CoreDatasetGroup{
+			Name:           "Demo Datasets",
+			PID:            ptrInt64(rootPID),
+			Level:          ptrInt(0),
+			NodeType:       ptrString(folderType),
+			DelFlag:        ptrInt(0),
+			CreateBy:       "system",
+			CreateTime:     now,
+			UpdateBy:       "system",
+			LastUpdateTime: now,
+		}
+		if err := db.Create(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to create demo dataset folder: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to query demo dataset folder: %w", result.Error)
+	}
+
+	return &out, nil
+}
+
+func ensureTeaSalesDataset(db *gorm.DB, folderID int64, now int64) (*dataset.CoreDatasetGroup, error) {
+	var out dataset.CoreDatasetGroup
+	datasetNodeType := dataset.NodeTypeDataset
+	datasetType := "db"
+	result := db.Where("name = ? AND pid = ? AND node_type = ? AND type = ? AND del_flag = 0", "Tea Sales", folderID, datasetNodeType, datasetType).First(&out)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		out = dataset.CoreDatasetGroup{
+			Name:           "Tea Sales",
+			PID:            ptrInt64(folderID),
+			Level:          ptrInt(1),
+			NodeType:       ptrString(datasetNodeType),
+			Type:           ptrString(datasetType),
+			DelFlag:        ptrInt(0),
+			CreateBy:       "system",
+			CreateTime:     now,
+			UpdateBy:       "system",
+			LastUpdateTime: now,
+		}
+		if err := db.Create(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to create tea sales dataset: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to query tea sales dataset: %w", result.Error)
+	}
+
+	return &out, nil
+}
+
+func ensureTeaSalesTable(db *gorm.DB, datasourceID, datasetGroupID int64) (*dataset.CoreDatasetTable, error) {
+	var out dataset.CoreDatasetTable
+	result := db.Where("datasource_id = ? AND dataset_group_id = ? AND table_name = ?", datasourceID, datasetGroupID, "tea_sales").First(&out)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		tableType := "db"
+		out = dataset.CoreDatasetTable{
+			Name:           ptrString("tea_sales"),
+			DatasourceID:   ptrInt64(datasourceID),
+			DatasetGroupID: datasetGroupID,
+			PhysicalTable:  ptrString("tea_sales"),
+			Type:           ptrString(tableType),
+		}
+		if err := db.Create(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to create tea sales dataset table: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to query tea sales dataset table: %w", result.Error)
+	}
+
+	return &out, nil
+}
+
+func ensureTeaSalesFields(db *gorm.DB, datasourceID, datasetGroupID, datasetTableID int64) error {
+	fields := []dataset.CoreDatasetTableField{
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "id", "q", "BIGINT", 2),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "product_name", "d", "LONGTEXT", 0),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "category", "d", "LONGTEXT", 0),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "region", "d", "LONGTEXT", 0),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "sales_amount", "q", "LONGTEXT", 2),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "quantity", "q", "BIGINT", 2),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "sale_date", "d", "DATETIME", 1),
+		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "salesperson", "d", "LONGTEXT", 0),
+	}
+
+	for _, field := range fields {
+		result := db.Where("dataset_table_id = ? AND origin_name = ?", datasetTableID, *field.OriginName).First(&dataset.CoreDatasetTableField{})
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			fieldCopy := field
+			if err := db.Create(&fieldCopy).Error; err != nil {
+				return fmt.Errorf("failed to create demo dataset field %s: %w", *field.OriginName, err)
+			}
+		} else if result.Error != nil {
+			return fmt.Errorf("failed to query demo dataset field %s: %w", *field.OriginName, result.Error)
+		}
+	}
+
+	return nil
+}
+
+func newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID int64, originName, groupType, fieldType string, deType int) dataset.CoreDatasetTableField {
+	dataeaseName := "f_" + originName
+	return dataset.CoreDatasetTableField{
+		DatasourceID:   ptrInt64(datasourceID),
+		DatasetTableID: ptrInt64(datasetTableID),
+		DatasetGroupID: datasetGroupID,
+		OriginName:     ptrString(originName),
+		Name:           ptrString(originName),
+		DataeaseName:   ptrString(dataeaseName),
+		FieldShortName: ptrString(dataeaseName),
+		GroupType:      ptrString(groupType),
+		Type:           ptrString(fieldType),
+		DeType:         ptrInt(deType),
+		DeExtractType:  ptrInt(deType),
+		ExtField:       ptrInt(0),
+		Checked:        ptrBool(true),
+	}
 }
 
 func ensureAdminRole(db *gorm.DB, out *role.SysRole) error {
@@ -171,3 +371,7 @@ func CleanupStaleMenuData(db *gorm.DB) {
 func ptrString(s string) *string { return &s }
 
 func ptrInt(i int) *int { return &i }
+
+func ptrInt64(i int64) *int64 { return &i }
+
+func ptrBool(b bool) *bool { return &b }

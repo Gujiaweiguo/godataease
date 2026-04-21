@@ -44,6 +44,11 @@ func main() {
 
 	database.CleanupStaleMenuData(db)
 
+	if err := database.SeedDemoData(db); err != nil {
+		logger.Fatal("Failed to seed demo data", zap.String("error", err.Error()))
+		os.Exit(1)
+	}
+
 	go func() {
 		if err := httptransport.Start(application, db); err != nil {
 			logger.Fatal("Failed to start HTTP server", zap.String("error", err.Error()))
