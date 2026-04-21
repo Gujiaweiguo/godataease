@@ -659,7 +659,7 @@ func TestVisualizationServiceIntegration_Detail(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Get detail
-	req := &visualization.DetailRequest{ID: id}
+	req := &visualization.DetailRequest{ID: visualization.FlexInt(id)}
 	detail, err := svc.Detail(req)
 	assert.NoError(t, err)
 	assert.Equal(t, "Detail Test", detail.Name)
@@ -688,7 +688,7 @@ func TestVisualizationServiceIntegration_Detail_Completeness(t *testing.T) {
 	id, err := svc.Save(createReq, "tester")
 	assert.NoError(t, err)
 
-	detail, err := svc.Detail(&visualization.DetailRequest{ID: id})
+	detail, err := svc.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(id)})
 	assert.NoError(t, err)
 	assert.Equal(t, "Detail Complete", detail.Name)
 	if assert.NotNil(t, detail.NodeType) {
@@ -720,7 +720,7 @@ func TestVisualizationServiceIntegration_Detail_NotFound(t *testing.T) {
 	repo := repository.NewVisualizationRepository(testDB)
 	svc := NewVisualizationService(repo)
 
-	req := &visualization.DetailRequest{ID: 99999}
+	req := &visualization.DetailRequest{ID: visualization.FlexInt(99999)}
 	_, err := svc.Detail(req)
 	assert.Error(t, err)
 }

@@ -121,7 +121,7 @@ func TestVisualizationService_Detail_DeleteLogic_FindDvType(t *testing.T) {
 		id, err := svc.Save(&visualization.SaveRequest{Name: "Detail Item"}, "tester")
 		require.NoError(t, err)
 
-		item, err := svc.Detail(&visualization.DetailRequest{ID: id})
+		item, err := svc.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(id)})
 		require.NoError(t, err)
 		assert.Equal(t, "Detail Item", item.Name)
 	})

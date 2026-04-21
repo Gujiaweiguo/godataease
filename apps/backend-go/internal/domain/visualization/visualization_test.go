@@ -118,8 +118,8 @@ func TestUpdateRequest_Fields(t *testing.T) {
 }
 
 func TestDetailRequest_Fields(t *testing.T) {
-	req := DetailRequest{ID: 1}
-	if req.ID != 1 {
+	req := DetailRequest{ID: FlexInt(1)}
+	if req.ID != FlexInt(1) {
 		t.Errorf("Expected ID 1, got %d", req.ID)
 	}
 }

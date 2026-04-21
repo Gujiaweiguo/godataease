@@ -1,5 +1,38 @@
 package visualization
 
+import (
+	"encoding/json"
+	"reflect"
+	"strconv"
+)
+
+// FlexInt decodes from JSON number or quoted string (frontend sends id as "2").
+type FlexInt int64
+
+func (f *FlexInt) UnmarshalJSON(data []byte) error {
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		if i, err := n.Int64(); err == nil {
+			*f = FlexInt(i)
+			return nil
+		}
+		if parsed, err := strconv.ParseInt(n.String(), 10, 64); err == nil {
+			*f = FlexInt(parsed)
+			return nil
+		}
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		if parsed, err := strconv.ParseInt(s, 10, 64); err == nil {
+			*f = FlexInt(parsed)
+			return nil
+		}
+	}
+	return &json.UnmarshalTypeError{Value: "flexint", Type: reflect.TypeOf(int64(0))}
+}
+
+func (f FlexInt) Int64() int64 { return int64(f) }
+
 type DataVisualizationInfo struct {
 	ID              int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Name            string  `gorm:"column:name" json:"name"`
@@ -83,7 +116,7 @@ type MoveRequest struct {
 }
 
 type DetailRequest struct {
-	ID int64 `json:"id" binding:"required"`
+	ID FlexInt `json:"id" binding:"required"`
 }
 
 type ListRequest struct {

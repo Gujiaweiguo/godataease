@@ -505,7 +505,7 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterLicenseRoutes(r.engine, r.licenseHandler)
 	handler.RegisterMsgCenterRoutes(r.engine, r.msgCenterHandler)
 	handler.RegisterTicketRoutes(r.engine, r.ticketHandler)
-	handler.RegisterVisualizationRoutes(r.engine.Group(""), r.visualHandler, r.permMiddleware)
+	handler.RegisterVisualizationRoutes(protected, r.visualHandler, r.permMiddleware)
 	handler.RegisterLinkageRoutes(r.engine.Group(""), r.linkageHandler)
 	handler.RegisterLinkJumpRoutes(r.engine.Group(""), r.linkJumpHandler)
 	handler.RegisterOuterParamsRoutes(r.engine.Group(""), r.outerParamsHandler)
@@ -530,6 +530,7 @@ func (r *Router) registerAPIRoutes() {
 	datasetAPI := api
 	datasetDe2API := r.engine.Group("/de2api")
 	visualizationDe2API := r.engine.Group("/de2api")
+	visualizationAPI := api
 	auditAPI := api
 	exportAPI := api
 	menuWriteAPI := api
@@ -574,6 +575,10 @@ func (r *Router) registerAPIRoutes() {
 		protectedVisualizationDe2API.Use(middleware.Auth(jwtInstance))
 		visualizationDe2API = protectedVisualizationDe2API
 
+		protectedVisualizationAPI := r.engine.Group("/api")
+		protectedVisualizationAPI.Use(middleware.Auth(jwtInstance))
+		visualizationAPI = protectedVisualizationAPI
+
 		protectedAuditAPI := r.engine.Group("/api")
 		protectedAuditAPI.Use(middleware.Auth(jwtInstance))
 		auditAPI = protectedAuditAPI
@@ -616,7 +621,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterCompatibilityBridgeRoutes(datasetAPI, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
 		handler.RegisterCompatibilityBridgeRoutes(datasetDe2API, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
 		r.registerChartRoutes(api)
-		r.registerVisualizationRoutes(api)
+		r.registerVisualizationRoutes(visualizationAPI)
 		r.registerVisualizationDe2DetailRoute(visualizationDe2API)
 		handler.RegisterWatermarkRoutes(api, r.watermarkHandler)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)

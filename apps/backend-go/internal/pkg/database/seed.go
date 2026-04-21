@@ -266,7 +266,7 @@ func ensureDemoDashboard(db *gorm.DB, folderID int64, now int64) (*visualization
 	vizType := "dashboard"
 	result := db.Where("name = ? AND pid = ? AND node_type = ? AND type = ? AND delete_flag = 0", "Tea Sales Dashboard", folderID, nodeType, vizType).First(&out)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		canvasStyle := `{"width":1920,"height":1080,"scale":100,"scaleWidth":1920,"scaleHeight":1080,"dashboard":{"gap":"yes","gapSize":5,"matrixBase":4},"themeId":"10001","color":"#ffffff","dashboardAdaptor":"view","dashboardThemeColor":"light","fontFamily":"","fontSize":14,"componentGap":"yes"}`
+		canvasStyle := `{"width":1920,"height":1080,"scale":100,"scaleWidth":1920,"scaleHeight":1080,"dashboard":{"gap":"yes","gapSize":5,"matrixBase":4},"themeId":"10001","color":"#ffffff","dashboardAdaptor":"view","dashboardThemeColor":"light","fontFamily":"","fontSize":14,"componentGap":"yes","component":{}}`
 		out = visualization.DataVisualizationInfo{
 			Name:            "Tea Sales Dashboard",
 			PID:             ptrInt64(folderID),
