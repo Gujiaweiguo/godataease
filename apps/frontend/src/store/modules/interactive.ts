@@ -189,9 +189,9 @@ const convertInteractive = (list): InnerInteractive => {
 }
 
 const hasMenuAuth = (flag: number): boolean => {
-  let path = '/panel/index'
+  let path = '/visualization/panel'
   if (flag === 1) {
-    path = '/screen/index'
+    path = '/visualization/screen'
   } else if (flag === 2) {
     path = '/data/dataset'
   } else if (flag === 3) {
