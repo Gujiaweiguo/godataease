@@ -329,15 +329,18 @@ func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 			if node == nil {
 				continue
 			}
-			path := strings.TrimSpace(node.Path)
+			// Normalize: strip leading "/" so both "panel" and "/panel" match.
+			// Child menus (pid != 0) have their leading "/" stripped by convertToVO,
+			// so paths arrive as "panel", "screen", "dataset", "datasource".
+			p := strings.TrimPrefix(strings.TrimSpace(node.Path), "/")
 			switch {
-			case strings.HasPrefix(path, interactiveMenuPathPanel):
+			case p == "panel" || strings.HasPrefix(p, "panel/") || strings.HasSuffix(p, "/panel"):
 				authorized[interactiveBusiFlagDashboard] = true
-			case strings.HasPrefix(path, interactiveMenuPathScreen):
+			case p == "screen" || strings.HasPrefix(p, "screen/") || strings.HasSuffix(p, "/screen"):
 				authorized[interactiveBusiFlagDataV] = true
-			case strings.HasPrefix(path, interactiveMenuPathDataset):
+			case p == "dataset" || strings.HasPrefix(p, "dataset/") || strings.HasSuffix(p, "/dataset"):
 				authorized[interactiveBusiFlagDataset] = true
-			case strings.HasPrefix(path, interactiveMenuPathDatasource):
+			case p == "datasource" || strings.HasPrefix(p, "datasource/") || strings.HasSuffix(p, "/datasource"):
 				authorized[interactiveBusiFlagDatasource] = true
 			}
 			if len(node.Children) > 0 {
