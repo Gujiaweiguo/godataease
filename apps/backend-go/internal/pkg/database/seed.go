@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
+	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/pkg/logger"
 
 	"go.uber.org/zap"
@@ -76,6 +77,16 @@ func SeedDemoData(db *gorm.DB) error {
 	}
 
 	if err := ensureTeaSalesFields(db, demoDatasource.ID, teaSalesDataset.ID, demoTable.ID); err != nil {
+		return err
+	}
+
+	// Seed demo dashboard folder and panel
+	dashFolder, err := ensureDemoDashboardFolder(db, now)
+	if err != nil {
+		return err
+	}
+
+	if _, err := ensureDemoDashboard(db, dashFolder.ID, now); err != nil {
 		return err
 	}
 
@@ -214,6 +225,72 @@ func ensureTeaSalesDataset(db *gorm.DB, folderID int64, now int64) (*dataset.Cor
 		return nil, fmt.Errorf("failed to query tea sales dataset: %w", result.Error)
 	}
 
+	return &out, nil
+}
+
+func ensureDemoDashboardFolder(db *gorm.DB, now int64) (*visualization.DataVisualizationInfo, error) {
+	var out visualization.DataVisualizationInfo
+	rootPID := int64(0)
+	nodeType := "folder"
+	vizType := "dashboard"
+	result := db.Where("name = ? AND pid = ? AND node_type = ? AND type = ? AND delete_flag = 0", "Demo Dashboards", rootPID, nodeType, vizType).First(&out)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		out = visualization.DataVisualizationInfo{
+			Name:         "Demo Dashboards",
+			PID:          ptrInt64(rootPID),
+			NodeType:     ptrString(nodeType),
+			Type:         ptrString(vizType),
+			Status:       ptrInt(1),
+			Level:        ptrInt(0),
+			Sort:         ptrInt(0),
+			MobileLayout: ptrBool(false),
+			CreateTime:   ptrInt64(now),
+			UpdateTime:   ptrInt64(now),
+			CreateBy:     ptrString("system"),
+			UpdateBy:     ptrString("system"),
+			DeleteFlag:   ptrBool(false),
+			Version:      ptrInt(3),
+		}
+		if err := db.Create(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to create demo dashboard folder: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to query demo dashboard folder: %w", result.Error)
+	}
+	return &out, nil
+}
+
+func ensureDemoDashboard(db *gorm.DB, folderID int64, now int64) (*visualization.DataVisualizationInfo, error) {
+	var out visualization.DataVisualizationInfo
+	nodeType := "panel"
+	vizType := "dashboard"
+	result := db.Where("name = ? AND pid = ? AND node_type = ? AND type = ? AND delete_flag = 0", "Tea Sales Dashboard", folderID, nodeType, vizType).First(&out)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		canvasStyle := `{"width":1920,"height":1080,"scale":100,"scaleWidth":1920,"scaleHeight":1080,"dashboard":{"gap":"yes","gapSize":5,"matrixBase":4},"themeId":"10001","color":"#ffffff","dashboardAdaptor":"view","dashboardThemeColor":"light","fontFamily":"","fontSize":14,"componentGap":"yes"}`
+		out = visualization.DataVisualizationInfo{
+			Name:            "Tea Sales Dashboard",
+			PID:             ptrInt64(folderID),
+			NodeType:        ptrString(nodeType),
+			Type:            ptrString(vizType),
+			Status:          ptrInt(1),
+			Level:           ptrInt(1),
+			Sort:            ptrInt(0),
+			CanvasStyleData: ptrString(canvasStyle),
+			ComponentData:   ptrString("[]"),
+			MobileLayout:    ptrBool(false),
+			CreateTime:      ptrInt64(now),
+			UpdateTime:      ptrInt64(now),
+			CreateBy:        ptrString("system"),
+			UpdateBy:        ptrString("system"),
+			DeleteFlag:      ptrBool(false),
+			Version:         ptrInt(3),
+		}
+		if err := db.Create(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to create demo dashboard: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to query demo dashboard: %w", result.Error)
+	}
 	return &out, nil
 }
 
