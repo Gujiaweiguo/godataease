@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
 	"errors"
@@ -19,23 +20,27 @@ type RoleMenuService struct {
 	roleMenuRepo *repository.RoleMenuRepository
 	roleRepo     *repository.RoleRepository
 	menuRepo     *repository.MenuRepository
+	menuService  *MenuService
 }
 
 func NewRoleMenuService(
 	roleMenuRepo *repository.RoleMenuRepository,
 	roleRepo *repository.RoleRepository,
 	menuRepo *repository.MenuRepository,
+	menuService *MenuService,
 ) *RoleMenuService {
 	return &RoleMenuService{
 		roleMenuRepo: roleMenuRepo,
 		roleRepo:     roleRepo,
 		menuRepo:     menuRepo,
+		menuService:  menuService,
 	}
 }
 
 type RoleMenuAuthVO struct {
-	RoleID  int64   `json:"roleId"`
-	MenuIDs []int64 `json:"menuIds"`
+	RoleID   int64          `json:"roleId"`
+	MenuIDs  []int64        `json:"menuIds"`
+	MenuTree []*menu.MenuVO `json:"menuTree"`
 }
 
 type SaveRoleMenuRequest struct {
@@ -60,9 +65,15 @@ func (s *RoleMenuService) GetRoleMenuAuth(roleID int64) (*RoleMenuAuthVO, error)
 		return nil, err
 	}
 
+	var menuTree []*menu.MenuVO
+	if s.menuService != nil {
+		menuTree, _ = s.menuService.Query()
+	}
+
 	return &RoleMenuAuthVO{
-		RoleID:  roleID,
-		MenuIDs: menuIDs,
+		RoleID:   roleID,
+		MenuIDs:  menuIDs,
+		MenuTree: menuTree,
 	}, nil
 }
 

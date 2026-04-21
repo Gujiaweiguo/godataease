@@ -18,7 +18,7 @@ func TestRoleMenuServiceIntegration_GetRoleMenuAuth(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role
 	testRole := &role.SysRole{
@@ -63,7 +63,7 @@ func TestRoleMenuServiceIntegration_GetRoleMenuAuth_InvalidRoleID(t *testing.T) 
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	_, err := svc.GetRoleMenuAuth(0)
 	assert.Equal(t, ErrInvalidRoleID, err)
@@ -78,7 +78,7 @@ func TestRoleMenuServiceIntegration_GetRoleMenuAuth_RoleNotFound(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	_, err := svc.GetRoleMenuAuth(99999)
 	assert.Equal(t, ErrRoleNotFound, err)
@@ -90,7 +90,7 @@ func TestRoleMenuServiceIntegration_SaveRoleMenuAuth(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role
 	testRole := &role.SysRole{
@@ -128,7 +128,7 @@ func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_EmptyMenuIDs(t *testing.T) 
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role
 	testRole := &role.SysRole{
@@ -165,7 +165,7 @@ func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_InvalidMenuID(t *testing.T)
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role
 	testRole := &role.SysRole{
@@ -192,7 +192,7 @@ func TestRoleMenuServiceIntegration_GetAuthorizedMenuIDs(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create roles
 	role1 := &role.SysRole{RoleName: "Auth Role 1", RoleCode: "auth_role_1", Status: 1, CreateBy: strPtr("tester")}
@@ -225,7 +225,7 @@ func TestRoleMenuServiceIntegration_GetAuthorizedMenuIDs_Empty(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	menuIDs, err := svc.GetAuthorizedMenuIDs([]int64{})
 	assert.NoError(t, err)
@@ -238,7 +238,7 @@ func TestRoleMenuServiceIntegration_IsMenuAuthorized(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role
 	testRole := &role.SysRole{
@@ -276,7 +276,7 @@ func TestRoleMenuServiceIntegration_IsMenuAuthorized_EmptyRoleIDs(t *testing.T) 
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create menu
 	testMenu := &menu.CoreMenu{Name: "Test Menu", Pid: 0, MenuSort: 1}
@@ -299,7 +299,7 @@ func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role
 	testRole := &role.SysRole{
@@ -333,7 +333,7 @@ func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth(t *testing.T) {
 func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth_InvalidRoleID(t *testing.T) {
 	cleanupTables(&role.RoleMenu{}, &role.SysRole{}, &menu.CoreMenu{})
 
-	svc := NewRoleMenuService(repository.NewRoleMenuRepository(testDB), repository.NewRoleRepository(testDB), repository.NewMenuRepository(testDB))
+	svc := NewRoleMenuService(repository.NewRoleMenuRepository(testDB), repository.NewRoleRepository(testDB), repository.NewMenuRepository(testDB), nil)
 	assert.Equal(t, ErrInvalidRoleID, svc.DeleteRoleMenuAuth(0))
 	assert.Equal(t, ErrInvalidRoleID, svc.DeleteRoleMenuAuth(-1))
 }
@@ -344,7 +344,7 @@ func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_RoleNotFound(t *testing.T) 
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create menus
 	menu1 := &menu.CoreMenu{Name: "NoRole Menu", Pid: 0, MenuSort: 1}
@@ -365,7 +365,7 @@ func TestRoleMenuServiceIntegration_SaveRoleMenuAuth_InvalidRoleID(t *testing.T)
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	req := &SaveRoleMenuRequest{
 		RoleID:  0,
@@ -385,7 +385,7 @@ func TestRoleMenuServiceIntegration_DeleteRoleMenuAuth_Success(t *testing.T) {
 	roleRepo := repository.NewRoleRepository(testDB)
 	menuRepo := repository.NewMenuRepository(testDB)
 	roleMenuRepo := repository.NewRoleMenuRepository(testDB)
-	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	svc := NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 
 	// Create role and menus
 	testRole := &role.SysRole{

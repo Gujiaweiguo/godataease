@@ -89,7 +89,7 @@ func TestPermissionCompatHandlerIntegration_MenuPermissionAndSaveRoundTrip(t *te
 	roleMenuRepo := repository.NewRoleMenuRepository(db)
 
 	menuSvc := service.NewMenuService(menuRepo)
-	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 	h := NewPermissionCompatHandler(menuSvc, nil, roleMenuSvc, nil)
 
 	testRole := &role.SysRole{
@@ -170,7 +170,7 @@ func TestPermissionCompatHandlerIntegration_MenuTargetPermissionAndSaveRoundTrip
 	roleMenuRepo := repository.NewRoleMenuRepository(db)
 
 	menuSvc := service.NewMenuService(menuRepo)
-	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	roleMenuSvc := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil)
 	h := NewPermissionCompatHandler(menuSvc, nil, roleMenuSvc, nil)
 
 	testRole := &role.SysRole{RoleName: "Menu Target Role", RoleCode: "menu_target_role", Status: 1}

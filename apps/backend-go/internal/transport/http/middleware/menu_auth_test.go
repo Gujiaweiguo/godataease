@@ -42,7 +42,7 @@ func createBackedMenuAuthMiddleware(t *testing.T) *MenuAuthMiddleware {
 	dashboard := &menu.CoreMenu{ID: 101, Name: "Dashboard", Path: "/dashboard", Type: 2, Auth: true, MenuSort: 1}
 	require.NoError(t, menuRepo.Create(dashboard))
 	require.NoError(t, roleMenuRepo.SaveRoleMenus(2, []int64{dashboard.ID}))
-	return NewMenuAuthMiddleware(service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo), service.NewMenuServiceWithRoleFilter(menuRepo, roleMenuRepo))
+	return NewMenuAuthMiddleware(service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil), service.NewMenuServiceWithRoleFilter(menuRepo, roleMenuRepo))
 }
 
 func TestCheckMenuAccess_NoRole(t *testing.T) {

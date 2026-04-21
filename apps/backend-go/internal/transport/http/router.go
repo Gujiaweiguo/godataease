@@ -202,7 +202,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	menuHandler := handler.NewMenuHandler(menuService)
 
 	// RoleMenu module initialization
-	roleMenuService := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo)
+	roleMenuService := service.NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, menuService)
 	roleMenuHandler := handler.NewRoleMenuHandler(roleMenuService)
 	menuAuthMiddleware := middleware.NewMenuAuthMiddleware(roleMenuService, menuService)
 
