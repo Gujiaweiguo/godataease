@@ -48,9 +48,10 @@ type OrgCreateRequest struct {
 
 // OrgUpdateRequest 更新组织请求
 type OrgUpdateRequest struct {
-	OrgID   int64   `json:"orgId" binding:"required"`
-	OrgName string  `json:"orgName"`
-	OrgDesc *string `json:"orgDesc"`
+	OrgID    int64   `json:"orgId" binding:"required"`
+	OrgName  string  `json:"orgName"`
+	OrgDesc  *string `json:"orgDesc"`
+	ParentID *int64  `json:"parentId"`
 }
 
 // OrgStatusRequest 更新组织状态请求

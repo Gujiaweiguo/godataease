@@ -9,6 +9,8 @@ import (
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -228,6 +230,66 @@ func TestOrgUpdateOrg_UnchangedNameSkipsDuplicateCheckAndNilDescKeepsExisting(t 
 	if updated.UpdateTime == nil {
 		t.Fatal("expected update time to be set")
 	}
+}
+
+func TestOrgUpdateOrg_MoveToNewParent(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	parent := createSeedOrg(t, mockRepo, "Parent Org", org.RootParentID, 1)
+	child := createSeedOrg(t, mockRepo, "Child Org", org.RootParentID, 1)
+
+	newParentID := parent.OrgID
+	require.NoError(t, svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &newParentID}))
+
+	updated, err := mockRepo.repo.GetByID(child.OrgID)
+	require.NoError(t, err)
+	assert.Equal(t, parent.OrgID, updated.ParentID)
+	assert.Equal(t, parent.Level+1, updated.Level)
+}
+
+func TestOrgUpdateOrg_MoveToRoot(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	parent := createSeedOrg(t, mockRepo, "Parent Org", org.RootParentID, 1)
+	child := createSeedOrg(t, mockRepo, "Child Org", parent.OrgID, parent.Level+1)
+
+	rootID := int64(0)
+	require.NoError(t, svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &rootID}))
+
+	updated, err := mockRepo.repo.GetByID(child.OrgID)
+	require.NoError(t, err)
+	assert.Equal(t, org.RootParentID, updated.ParentID)
+	assert.Equal(t, 1, updated.Level)
+}
+
+func TestOrgUpdateOrg_RejectSelfAsParent(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	existing := createSeedOrg(t, mockRepo, "Self Parent", org.RootParentID, 1)
+
+	selfID := existing.OrgID
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, ParentID: &selfID})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be its own parent")
+}
+
+func TestOrgUpdateOrg_RejectDescendantAsParent(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	parent := createSeedOrg(t, mockRepo, "Grandparent", org.RootParentID, 1)
+	child := createSeedOrg(t, mockRepo, "Child", parent.OrgID, parent.Level+1)
+	grandchild := createSeedOrg(t, mockRepo, "Grandchild", child.OrgID, child.Level+1)
+
+	descendantID := grandchild.OrgID
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: parent.OrgID, ParentID: &descendantID})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "own descendant")
+}
+
+func TestOrgUpdateOrg_RejectNonexistentParent(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	existing := createSeedOrg(t, mockRepo, "MoveToMissing", org.RootParentID, 1)
+
+	missingID := int64(9999)
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, ParentID: &missingID})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parent organization not found")
 }
 
 func TestOrgDeleteOrg_Success(t *testing.T) {

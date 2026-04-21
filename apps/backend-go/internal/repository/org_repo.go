@@ -89,3 +89,24 @@ func (r *OrgRepository) GetByIDs(ids []int64) ([]*org.SysOrg, error) {
 		Find(&orgs).Error
 	return orgs, err
 }
+
+func (r *OrgRepository) IsDescendant(ancestorID, candidateID int64) (bool, error) {
+	var children []*org.SysOrg
+	if err := r.db.Where("parent_id = ? AND del_flag = ?", ancestorID, org.DelFlagNormal).
+		Find(&children).Error; err != nil {
+		return false, err
+	}
+	for _, child := range children {
+		if child.OrgID == candidateID {
+			return true, nil
+		}
+		found, err := r.IsDescendant(child.OrgID, candidateID)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			return true, nil
+		}
+	}
+	return false, nil
+}
