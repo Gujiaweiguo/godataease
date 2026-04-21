@@ -152,6 +152,8 @@ func ensureAdminBinding(db *gorm.DB, userID, roleID, orgID int64) error {
 
 // CleanupStaleMenuData removes obsolete/duplicate menu records and their
 // role_menu bindings that were left behind by earlier migration iterations.
+// It also fixes top-level navigation menus whose hidden flag was incorrectly
+// set to true by older migration scripts.
 // It is idempotent — safe to call on every startup.
 func CleanupStaleMenuData(db *gorm.DB) {
 	staleMenuIDs := []int64{11, 12, 15, 16, 19, 31, 64, 70, 71, 200}
@@ -160,6 +162,10 @@ func CleanupStaleMenuData(db *gorm.DB) {
 	db.Exec("DELETE FROM core_menu WHERE id IN ?", staleMenuIDs)
 
 	db.Exec("DELETE FROM core_menu WHERE pid IN ?", staleMenuIDs)
+
+	// Fix top-level directory menus that should be visible in the header bar.
+	// Older migration iterations left hidden=1 on these records.
+	db.Exec("UPDATE core_menu SET hidden = 0 WHERE id IN (1, 4, 100, 101) AND hidden = 1")
 }
 
 func ptrString(s string) *string { return &s }
