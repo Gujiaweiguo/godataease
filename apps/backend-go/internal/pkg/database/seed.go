@@ -13,7 +13,9 @@ import (
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
+	"dataease/backend/internal/pkg/logger"
 
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -47,6 +49,10 @@ func SeedDefaults(db *gorm.DB) error {
 // SeedDemoData ensures a demo datasource and dataset exist on first launch.
 // It is idempotent — safe to call on every startup.
 func SeedDemoData(db *gorm.DB) error {
+	if err := ensureDemoDatabase(db); err != nil {
+		logger.Warn("Failed to ensure demo database", zap.Error(err))
+	}
+
 	now := time.Now().UnixMilli()
 
 	demoDatasource, err := ensureDemoDatasource(db, now)
@@ -71,6 +77,46 @@ func SeedDemoData(db *gorm.DB) error {
 
 	if err := ensureTeaSalesFields(db, demoDatasource.ID, teaSalesDataset.ID, demoTable.ID); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func ensureDemoDatabase(db *gorm.DB) error {
+	statements := []string{
+		"CREATE DATABASE IF NOT EXISTS dataease_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
+		`CREATE TABLE IF NOT EXISTS dataease_demo.tea_sales (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			product_name VARCHAR(100),
+			category VARCHAR(50),
+			region VARCHAR(50),
+			sales_amount DECIMAL(10,2),
+			quantity INT,
+			sale_date DATETIME,
+			salesperson VARCHAR(50)
+		)`,
+		`INSERT IGNORE INTO dataease_demo.tea_sales (id, product_name, category, region, sales_amount, quantity, sale_date, salesperson) VALUES
+			(1, '龙井茶', '绿茶', '华东', 1280.00, 32, '2025-01-15 10:30:00', '张伟'),
+			(2, '铁观音', '乌龙茶', '华南', 960.00, 24, '2025-01-16 14:20:00', '李娜'),
+			(3, '普洱茶', '黑茶', '西南', 2150.00, 18, '2025-01-17 09:15:00', '王芳'),
+			(4, '碧螺春', '绿茶', '华东', 880.00, 22, '2025-01-18 11:45:00', '张伟'),
+			(5, '大红袍', '乌龙茶', '华南', 3200.00, 16, '2025-01-19 16:00:00', '陈明'),
+			(6, '白毫银针', '白茶', '华北', 4500.00, 10, '2025-01-20 13:30:00', '李娜'),
+			(7, '黄山毛峰', '绿茶', '华东', 680.00, 28, '2025-01-21 10:00:00', '王芳'),
+			(8, '凤凰单丛', '乌龙茶', '华南', 1560.00, 20, '2025-01-22 15:45:00', '赵军'),
+			(9, '祁门红茶', '红茶', '华东', 1120.00, 26, '2025-01-23 09:30:00', '张伟'),
+			(10, '六安瓜片', '绿茶', '华东', 760.00, 30, '2025-01-24 14:00:00', '陈明'),
+			(11, '正山小种', '红茶', '华北', 1880.00, 14, '2025-01-25 11:15:00', '赵军'),
+			(12, '安溪铁观音', '乌龙茶', '华南', 1080.00, 22, '2025-01-26 16:30:00', '李娜'),
+			(13, '信阳毛尖', '绿茶', '华中', 920.00, 25, '2025-01-27 10:45:00', '王芳'),
+			(14, '福鼎白茶', '白茶', '华东', 2800.00, 12, '2025-01-28 13:00:00', '赵军'),
+			(15, '茉莉花茶', '花茶', '华北', 560.00, 35, '2025-01-29 15:15:00', '陈明')`,
+	}
+
+	for _, statement := range statements {
+		if err := db.Exec(statement).Error; err != nil {
+			return err
+		}
 	}
 
 	return nil
