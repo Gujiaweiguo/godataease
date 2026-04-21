@@ -323,7 +323,12 @@ const getTree = async (notOpen = false) => {
     resourceTable: props.resourceTable
   } as BusiTreeRequest
   const isDashboard = curCanvasType.value === 'dashboard'
-  await interactiveStore.setInteractive(request)
+  const isInteractiveCanvas = ['dashboard', 'dataV'].includes(curCanvasType.value)
+  if (isInteractiveCanvas) {
+    await interactiveStore.initInteractive(true)
+  } else {
+    await interactiveStore.setInteractive(request)
+  }
   const interactiveData = isDashboard ? interactiveStore.getPanel : interactiveStore.getScreen
   const nodeData = interactiveData.treeNodes
   rootManage.value = interactiveData.rootManage

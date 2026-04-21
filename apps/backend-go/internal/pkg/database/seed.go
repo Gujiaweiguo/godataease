@@ -486,9 +486,17 @@ func CleanupStaleMenuData(db *gorm.DB) {
 
 	db.Exec("DELETE FROM core_menu WHERE pid IN ?", staleMenuIDs)
 
-	// Fix top-level directory menus that should be visible in the header bar.
-	// Older migration iterations left hidden=1 on these records.
 	db.Exec("UPDATE core_menu SET hidden = 0 WHERE id IN (1, 4, 100, 101) AND hidden = 1")
+
+	// Fix component paths to match actual frontend view file locations.
+	// The Vue router's resolveViewComponent resolves ../views/${component}.vue or
+	// ../views/${component}/index.vue. Legacy Java seed data had paths without /index suffix
+	// or pointed to nonexistent view files.
+	db.Exec("UPDATE core_menu SET component = 'visualized/data/dataset/index' WHERE id = 5 AND component = 'visualized/data/dataset'")
+	db.Exec("UPDATE core_menu SET component = 'visualized/data/datasource/index' WHERE id = 6 AND component = 'visualized/data/datasource'")
+	db.Exec("UPDATE core_menu SET component = 'visualized/view/screen/index' WHERE id = 3 AND component = 'visualized/view/screen'")
+	db.Exec("UPDATE core_menu SET component = 'dashboard/DashboardPreviewShow' WHERE id = 2 AND component = 'visualized/view/panel'")
+	db.Exec("UPDATE core_menu SET component = 'workbranch/index' WHERE id = 1 AND component = 'workbranch'")
 }
 
 func ptrString(s string) *string { return &s }
