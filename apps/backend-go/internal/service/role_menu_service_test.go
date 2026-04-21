@@ -23,7 +23,7 @@ func setupRoleMenuServiceTest(t *testing.T) (*RoleMenuService, *gorm.DB) {
 	roleRepo := repository.NewRoleRepository(db)
 	menuRepo := repository.NewMenuRepository(db)
 	roleMenuRepo := repository.NewRoleMenuRepository(db)
-	return NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo), db
+	return NewRoleMenuService(roleMenuRepo, roleRepo, menuRepo, nil), db
 }
 
 func setupRoleMenuServiceSplitDBTest(t *testing.T) (*RoleMenuService, *gorm.DB, *gorm.DB, *gorm.DB) {
@@ -41,11 +41,7 @@ func setupRoleMenuServiceSplitDBTest(t *testing.T) (*RoleMenuService, *gorm.DB, 
 	require.NoError(t, err)
 	require.NoError(t, roleMenuDB.AutoMigrate(&role.RoleMenu{}))
 
-	return NewRoleMenuService(
-		repository.NewRoleMenuRepository(roleMenuDB),
-		repository.NewRoleRepository(roleDB),
-		repository.NewMenuRepository(menuDB),
-	), roleDB, menuDB, roleMenuDB
+	return NewRoleMenuService(repository.NewRoleMenuRepository(roleMenuDB), repository.NewRoleRepository(roleDB), repository.NewMenuRepository(menuDB), nil), roleDB, menuDB, roleMenuDB
 }
 
 func closeGormDB(t *testing.T, db *gorm.DB) {
