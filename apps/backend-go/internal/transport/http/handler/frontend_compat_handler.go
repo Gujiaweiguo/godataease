@@ -267,6 +267,11 @@ func (h *FrontendCompatHandler) GetWebSocketInfo(c *gin.Context) {
 	})
 }
 
+// StubEmptyData returns an empty success response for stubbed frontend compat routes.
+func (h *FrontendCompatHandler) StubEmptyData(c *gin.Context) {
+	response.Success(c, map[string]interface{}{})
+}
+
 // RegisterFrontendCompatRoutes registers frontend-facing compatibility routes.
 //
 // P4 Legacy Compat Contract classification (C1 policy lock):
@@ -314,6 +319,13 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.GET("/roleRouter/query", h.GetRoleRouters)
 	protected.GET("/auth/menuResource", h.GetMenuResource)
 	protected.POST("/dataVisualization/interactiveTree", h.InteractiveTree)
+
+	// Stub routes for dashboard canvas linkage/jump info (returns empty data)
+	// Note: Root-level /linkage/... and /linkJump/... are already registered by
+	// RegisterLinkageRoutes and RegisterLinkJumpRoutes in registerRootRoutes().
+	// Only /api/ prefixed aliases are needed here for frontend compat.
+	protected.GET("/api/linkage/getVisualizationAllLinkageInfo/:dvId/:resourceTable", h.StubEmptyData)
+	protected.GET("/api/linkJump/queryVisualizationJumpInfo/:dvId/:resourceTable", h.StubEmptyData)
 }
 
 func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {

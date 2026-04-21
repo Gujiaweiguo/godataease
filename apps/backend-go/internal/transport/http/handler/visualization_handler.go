@@ -12,6 +12,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +26,7 @@ func NewVisualizationHandler(service *service.VisualizationService) *Visualizati
 
 func (h *VisualizationHandler) FindByID(c *gin.Context) {
 	var req visualization.DetailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -39,7 +40,52 @@ func (h *VisualizationHandler) FindByID(c *gin.Context) {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
-	response.Success(c, result)
+
+	// Enrich response with fields the frontend canvas expects.
+	// The raw DataVisualizationInfo lacks watermarkInfo, canvasViewInfo,
+	// weight, creatorName, etc. that initCanvasDataPrepare() requires.
+	enriched := buildEnrichedVisualizationResponse(result)
+	response.Success(c, enriched)
+}
+
+// buildEnrichedVisualizationResponse wraps the raw domain model into a
+// map containing all fields the frontend's initCanvasDataPrepare expects.
+func buildEnrichedVisualizationResponse(v *visualization.DataVisualizationInfo) map[string]interface{} {
+	var mobileLayout bool
+	if v.MobileLayout != nil {
+		mobileLayout = *v.MobileLayout
+	}
+	var createTime int64
+	if v.CreateTime != nil {
+		createTime = *v.CreateTime
+	}
+	var updateTime int64
+	if v.UpdateTime != nil {
+		updateTime = *v.UpdateTime
+	}
+	resp := map[string]interface{}{
+		"id":                  v.ID,
+		"name":                v.Name,
+		"pid":                 v.PID,
+		"status":              v.Status,
+		"type":                v.Type,
+		"nodeType":            v.NodeType,
+		"componentData":       v.ComponentData,
+		"canvasStyleData":     v.CanvasStyleData,
+		"mobileLayout":        mobileLayout,
+		"version":             v.Version,
+		"contentId":           v.ContentID,
+		"selfWatermarkStatus": true,
+		"watermarkInfo":       map[string]interface{}{"id": "1", "settingContent": "{}"},
+		"weight":              9,
+		"ext":                 map[string]interface{}{},
+		"canvasViewInfo":      map[string]interface{}{},
+		"creatorName":         "admin",
+		"updateName":          "admin",
+		"createTime":          createTime,
+		"updateTime":          updateTime,
+	}
+	return resp
 }
 
 func (h *VisualizationHandler) List(c *gin.Context) {
@@ -280,7 +326,7 @@ func (h *VisualizationHandler) UpdateCheckVersion(c *gin.Context) {
 		response.Error(c, "500000", "Invalid ID")
 		return
 	}
-	result, err := h.service.Detail(&visualization.DetailRequest{ID: id})
+	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(id)})
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -386,7 +432,7 @@ func (h *VisualizationHandler) RecoverToPublished(c *gin.Context) {
 		return
 	}
 	updateBy := h.getUpdateBy(c)
-	result, err := h.service.RecoverToPublished(req.ID, updateBy)
+	result, err := h.service.RecoverToPublished(req.ID.Int64(), updateBy)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -444,7 +490,7 @@ func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
 		response.Error(c, "500000", "Invalid dvId")
 		return
 	}
-	result, err := h.service.Detail(&visualization.DetailRequest{ID: dvID})
+	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(dvID)})
 	if err != nil {
 		response.Error(c, "500000", err.Error())
 		return

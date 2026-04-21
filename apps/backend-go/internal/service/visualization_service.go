@@ -237,7 +237,7 @@ func (s *VisualizationService) Update(req *visualization.UpdateRequest, updateBy
 }
 
 func (s *VisualizationService) Detail(req *visualization.DetailRequest) (*visualization.DataVisualizationInfo, error) {
-	return s.repo.GetByID(req.ID)
+	return s.repo.GetByID(req.ID.Int64())
 }
 
 func (s *VisualizationService) List(req *visualization.ListRequest) (*visualization.ListResponse, error) {
