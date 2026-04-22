@@ -78,6 +78,7 @@ func TestChartDataRequest_Fields(t *testing.T) {
 		ID:          1,
 		ResultCount: &resultCount,
 		ResultMode:  "custom",
+		Payload:     map[string]interface{}{"id": 1.0},
 	}
 
 	if req.ID != 1 {
@@ -88,6 +89,9 @@ func TestChartDataRequest_Fields(t *testing.T) {
 	}
 	if req.ResultMode != "custom" {
 		t.Errorf("Expected ResultMode 'custom', got '%s'", req.ResultMode)
+	}
+	if req.Payload["id"] != 1.0 {
+		t.Errorf("Expected payload id 1, got %v", req.Payload["id"])
 	}
 }
 
@@ -100,6 +104,16 @@ func TestChartDataResponse_Fields(t *testing.T) {
 			{"category": "B", "value": 200},
 		},
 		Total: 2,
+		Data: []ChartDataPoint{{
+			Field:         "A",
+			Name:          "A",
+			Value:         100,
+			DimensionList: []ChartDataFieldItem{{ID: "2", Value: "A"}},
+			QuotaList:     []ChartDataFieldItem{{ID: "5"}},
+		}},
+		Fields:       []map[string]interface{}{{"id": "2", "name": "Category"}},
+		TableRow:     []map[string]interface{}{{"f_category": "A", "f_value": 100}},
+		SourceFields: []map[string]interface{}{{"id": "2"}, {"id": "5"}},
 	}
 
 	if resp.ChartID != 1 {
@@ -113,6 +127,18 @@ func TestChartDataResponse_Fields(t *testing.T) {
 	}
 	if resp.Total != 2 {
 		t.Errorf("Expected Total 2, got %d", resp.Total)
+	}
+	if len(resp.Data) != 1 {
+		t.Errorf("Expected 1 data point, got %d", len(resp.Data))
+	}
+	if len(resp.Fields) != 1 {
+		t.Errorf("Expected 1 field, got %d", len(resp.Fields))
+	}
+	if len(resp.TableRow) != 1 {
+		t.Errorf("Expected 1 table row, got %d", len(resp.TableRow))
+	}
+	if len(resp.SourceFields) != 2 {
+		t.Errorf("Expected 2 source fields, got %d", len(resp.SourceFields))
 	}
 }
 
