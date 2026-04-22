@@ -237,7 +237,7 @@ const renderChart = (viewInfo: Chart, resetPageInfo: boolean) => {
   recursionTransObj(customStyleTrans, actualChart.customStyle, scale.value, terminal.value)
 
   setupPage(actualChart, resetPageInfo)
-  nextTick().then(() => debounceRender())
+  setTimeout(() => debounceRender(), 0)
 }
 
 const getFacetController = () => {
@@ -248,6 +248,7 @@ const getFacetController = () => {
 }
 
 const debounceRender = debounce(() => {
+  if (!actualChart) return
   const facetController = getFacetController()
   facetController?.timer?.stop()
   facetController?.cancelScrollFrame?.()
@@ -257,6 +258,7 @@ const debounceRender = debounce(() => {
     actualChart.render,
     actualChart.type
   ) as S2ChartView<any>
+  if (!chartView) return
   myChart = chartView.drawChart({
     container: containerId,
     chart: toRaw(actualChart),
@@ -539,10 +541,10 @@ const trackMenuCmp = computed(() => {
   let jumpCount = 0
   chartData.value?.fields?.forEach(item => {
     const sourceInfo = view.value.id + '#' + item.id
-    if (nowPanelTrackInfo.value[sourceInfo]) {
+    if ((nowPanelTrackInfo.value || {})[sourceInfo]) {
       linkageCount++
     }
-    if (nowPanelJumpInfo.value[sourceInfo]) {
+    if ((nowPanelJumpInfo.value || {})[sourceInfo]) {
       jumpCount++
     }
   })
@@ -574,10 +576,10 @@ const trackMenuCalc = itemId => {
   let jumpCount = 0
   let drillCount = 0
   const sourceInfo = view.value.id + '#' + itemId
-  if (nowPanelTrackInfo.value[sourceInfo]) {
+  if ((nowPanelTrackInfo.value || {})[sourceInfo]) {
     linkageCount++
   }
-  if (nowPanelJumpInfo.value[sourceInfo]) {
+  if ((nowPanelJumpInfo.value || {})[sourceInfo]) {
     jumpCount++
   }
   jumpCount &&

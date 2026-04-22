@@ -207,7 +207,7 @@ const checkSelected = param => {
       )
         .map(item => item?.id)
         .filter(id =>
-          Object.keys(nowPanelTrackInfo.value).some(
+          Object.keys(nowPanelTrackInfo.value || {}).some(
             key => key.startsWith(view.value.id) && key.split('#')[1] === id
           )
         )
@@ -565,7 +565,7 @@ const trackClick = trackAction => {
     for (let i = 0; i < fieldIds.length; i++) {
       const id = fieldIds[i]
       const sourceInfo = view.value.id + '#' + id
-      if (nowPanelJumpInfo.value[sourceInfo]) {
+      if ((nowPanelJumpInfo.value || {})[sourceInfo]) {
         jumpName = id
         break
       }
@@ -639,10 +639,10 @@ const trackMenu = computed(() => {
           ?.filter(item => !drillFields.includes(item.id))
           .forEach(item => {
             const sourceInfo = view.value.id + '#' + item.id
-            if (nowPanelTrackInfo.value[sourceInfo]) {
+            if ((nowPanelTrackInfo.value || {})[sourceInfo]) {
               linkageCount++
             }
-            if (nowPanelJumpInfo.value[sourceInfo]) {
+            if ((nowPanelJumpInfo.value || {})[sourceInfo]) {
               jumpCount++
             }
           })
@@ -652,10 +652,10 @@ const trackMenu = computed(() => {
         ?.filter(item => !drillFields.includes(item.id))
         .forEach(item => {
           const sourceInfo = view.value.id + '#' + item.id
-          if (nowPanelTrackInfo.value[sourceInfo]) {
+          if ((nowPanelTrackInfo.value || {})[sourceInfo]) {
             linkageCount++
           }
-          if (nowPanelJumpInfo.value[sourceInfo]) {
+          if ((nowPanelJumpInfo.value || {})[sourceInfo]) {
             jumpCount++
           }
         })

@@ -177,7 +177,7 @@ service.interceptors.response.use(
     if (response.config.responseType === 'blob') {
       // 如果是文件流，直接过
       return response
-    } else if (response.data.code === result_code || response.data.code === 50002) {
+    } else if (response.data.code === result_code || response.data.code === 0 || response.data.code === 50002) {
       return response.data
     } else if (response.config.url.match(/^\/map|geo\/\d{3}\/\d+\.json$/)) {
       // 处理静态地图文件

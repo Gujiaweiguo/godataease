@@ -4,6 +4,8 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"math"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -75,12 +77,7 @@ func (s *ChartService) QueryData(req *chart.ChartDataRequest) (*chart.ChartDataR
 		sort.Strings(columns)
 	}
 
-	return &chart.ChartDataResponse{
-		ChartID: req.ID,
-		Columns: columns,
-		Rows:    rows,
-		Total:   total,
-	}, nil
+	return s.buildChartDataResponse(req, rows, columns, total)
 }
 
 func (s *ChartService) QueryDataWithPermission(req *chart.ChartDataRequest, userID int64) (*chart.ChartDataResponse, error) {
@@ -134,7 +131,408 @@ func (s *ChartService) QueryDataWithPermission(req *chart.ChartDataRequest, user
 		sort.Strings(columns)
 	}
 
-	return &chart.ChartDataResponse{ChartID: req.ID, Columns: columns, Rows: rows, Total: total}, nil
+	return s.buildChartDataResponse(req, rows, columns, total)
+}
+
+func (s *ChartService) buildChartDataResponse(req *chart.ChartDataRequest, rows []map[string]interface{}, columns []string, total int64) (*chart.ChartDataResponse, error) {
+	chartType, xAxis, yAxis, err := s.resolveChartDataConfig(req)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &chart.ChartDataResponse{
+		ChartID:      req.ID,
+		Columns:      columns,
+		Rows:         rows,
+		Total:        total,
+		Fields:       cloneFieldList(xAxis),
+		SourceFields: append(cloneFieldList(xAxis), cloneFieldList(yAxis)...),
+	}
+
+	switch strings.ToLower(strings.TrimSpace(chartType)) {
+	case "table-info", "table-normal":
+		resp.TableRow = buildTableRows(rows, resp.SourceFields)
+	default:
+		if len(xAxis) == 0 && len(yAxis) == 0 {
+			resp.TableRow = cloneRows(rows)
+			break
+		}
+		resp.Data = buildSeriesData(rows, xAxis, yAxis)
+	}
+
+	return resp, nil
+}
+
+func (s *ChartService) resolveChartDataConfig(req *chart.ChartDataRequest) (string, []map[string]interface{}, []map[string]interface{}, error) {
+	payload := req.Payload
+	chartType := strings.TrimSpace(anyToString(payload["type"]))
+	xAxis := fieldListFromAny(payload["xAxis"])
+	yAxis := fieldListFromAny(payload["yAxis"])
+	if chartType != "" && (len(xAxis) > 0 || len(yAxis) > 0) {
+		return chartType, xAxis, yAxis, nil
+	}
+
+	view, err := s.repo.GetByID(req.ID)
+	if err != nil || view == nil {
+		return chartType, xAxis, yAxis, err
+	}
+
+	if chartType == "" {
+		chartType = stringValue(view.Type)
+	}
+	if len(xAxis) == 0 {
+		xAxis = fieldListFromJSONString(view.XAxis)
+	}
+	if len(yAxis) == 0 {
+		yAxis = fieldListFromJSONString(view.YAxis)
+	}
+
+	return chartType, xAxis, yAxis, nil
+}
+
+func fieldListFromJSONString(raw *string) []map[string]interface{} {
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil
+	}
+	var parsed interface{}
+	if err := json.Unmarshal([]byte(*raw), &parsed); err != nil {
+		return nil
+	}
+	return fieldListFromAny(parsed)
+}
+
+func fieldListFromAny(value interface{}) []map[string]interface{} {
+	items, ok := value.([]interface{})
+	if !ok {
+		mapped, ok := value.([]map[string]interface{})
+		if !ok {
+			return nil
+		}
+		return cloneFieldList(mapped)
+	}
+
+	result := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		mapped, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		result = append(result, cloneMap(mapped))
+	}
+	return result
+}
+
+func buildTableRows(rows []map[string]interface{}, sourceFields []map[string]interface{}) []map[string]interface{} {
+	if len(rows) == 0 {
+		return []map[string]interface{}{}
+	}
+	if len(sourceFields) == 0 {
+		return cloneRows(rows)
+	}
+
+	result := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		item := make(map[string]interface{}, len(sourceFields))
+		for _, field := range sourceFields {
+			key := preferredFieldKey(field)
+			if key == "" {
+				continue
+			}
+			item[key] = fieldRowValue(row, field)
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func buildSeriesData(rows []map[string]interface{}, xAxis []map[string]interface{}, yAxis []map[string]interface{}) []chart.ChartDataPoint {
+	if len(rows) == 0 || len(yAxis) == 0 {
+		return []chart.ChartDataPoint{}
+	}
+
+	groups := make(map[string]*seriesGroup)
+	order := make([]string, 0)
+	for _, row := range rows {
+		key, category, dimensions := buildDimensionKey(row, xAxis)
+		group, ok := groups[key]
+		if !ok {
+			group = &seriesGroup{category: category, dimensions: dimensions, metrics: make(map[string]*metricAccumulator)}
+			groups[key] = group
+			order = append(order, key)
+		}
+		for _, quota := range yAxis {
+			quotaID := fieldIDString(quota)
+			if quotaID == "" {
+				quotaID = preferredFieldKey(quota)
+			}
+			acc, ok := group.metrics[quotaID]
+			if !ok {
+				acc = &metricAccumulator{summary: strings.ToLower(strings.TrimSpace(anyToString(quota["summary"])))}
+				if acc.summary == "" {
+					acc.summary = "sum"
+				}
+				group.metrics[quotaID] = acc
+			}
+			acc.add(fieldRowValue(row, quota), isCountField(quota))
+		}
+	}
+
+	result := make([]chart.ChartDataPoint, 0, len(order)*len(yAxis))
+	for _, key := range order {
+		group := groups[key]
+		for _, quota := range yAxis {
+			quotaID := fieldIDString(quota)
+			if quotaID == "" {
+				quotaID = preferredFieldKey(quota)
+			}
+			acc := group.metrics[quotaID]
+			if acc == nil {
+				continue
+			}
+			result = append(result, chart.ChartDataPoint{
+				Field:         group.category,
+				Name:          group.category,
+				Category:      group.category,
+				Value:         acc.value(),
+				DimensionList: cloneDimensionItems(group.dimensions),
+				QuotaList:     []chart.ChartDataFieldItem{{ID: quotaID}},
+			})
+		}
+	}
+	return result
+}
+
+type seriesGroup struct {
+	category   string
+	dimensions []chart.ChartDataFieldItem
+	metrics    map[string]*metricAccumulator
+}
+
+const summaryCount = "count"
+
+type metricAccumulator struct {
+	summary string
+	sum     float64
+	count   int
+	min     float64
+	max     float64
+	seeded  bool
+}
+
+func (m *metricAccumulator) add(value interface{}, countOnly bool) {
+	if countOnly || m.summary == summaryCount {
+		m.count++
+		return
+	}
+
+	number, ok := toFloat64(value)
+	if !ok {
+		return
+	}
+	if !m.seeded {
+		m.min = number
+		m.max = number
+		m.seeded = true
+	}
+	if number < m.min {
+		m.min = number
+	}
+	if number > m.max {
+		m.max = number
+	}
+	m.sum += number
+	m.count++
+}
+
+func (m *metricAccumulator) value() float64 {
+	switch m.summary {
+	case summaryCount, "count_distinct", "countdistinct":
+		return float64(m.count)
+	case "avg", "average":
+		if m.count == 0 {
+			return 0
+		}
+		return m.sum / float64(m.count)
+	case "min":
+		if !m.seeded {
+			return 0
+		}
+		return m.min
+	case "max":
+		if !m.seeded {
+			return 0
+		}
+		return m.max
+	default:
+		return m.sum
+	}
+}
+
+func buildDimensionKey(row map[string]interface{}, xAxis []map[string]interface{}) (string, string, []chart.ChartDataFieldItem) {
+	if len(xAxis) == 0 {
+		return "__all__", "全部", nil
+	}
+
+	parts := make([]string, 0, len(xAxis))
+	labels := make([]string, 0, len(xAxis))
+	dimensions := make([]chart.ChartDataFieldItem, 0, len(xAxis))
+	for _, field := range xAxis {
+		value := fieldRowValue(row, field)
+		text := anyToString(value)
+		parts = append(parts, text)
+		labels = append(labels, text)
+		dimensions = append(dimensions, chart.ChartDataFieldItem{ID: fieldIDString(field), Value: value})
+	}
+	label := strings.Join(labels, " / ")
+	if strings.TrimSpace(label) == "" {
+		label = "全部"
+	}
+	return strings.Join(parts, "\x1f"), label, dimensions
+}
+
+func fieldRowValue(row map[string]interface{}, field map[string]interface{}) interface{} {
+	if isCountField(field) {
+		return 1
+	}
+	for _, key := range fieldLookupKeys(field) {
+		if value, ok := row[key]; ok {
+			return value
+		}
+	}
+	return nil
+}
+
+func fieldLookupKeys(field map[string]interface{}) []string {
+	keys := make([]string, 0, 4)
+	for _, candidate := range []string{anyToString(field["dataeaseName"]), anyToString(field["originName"]), anyToString(field["name"]), anyToString(field["fieldShortName"])} {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" || candidate == "*" {
+			continue
+		}
+		alreadyExists := false
+		for _, existing := range keys {
+			if existing == candidate {
+				alreadyExists = true
+				break
+			}
+		}
+		if !alreadyExists {
+			keys = append(keys, candidate)
+		}
+	}
+	return keys
+}
+
+func preferredFieldKey(field map[string]interface{}) string {
+	for _, key := range []string{anyToString(field["dataeaseName"]), anyToString(field["originName"]), anyToString(field["name"]), anyToString(field["fieldShortName"])} {
+		trimmed := strings.TrimSpace(key)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func fieldIDString(field map[string]interface{}) string {
+	return strings.TrimSpace(anyToString(field["id"]))
+}
+
+func isCountField(field map[string]interface{}) bool {
+	return strings.TrimSpace(anyToString(field["dataeaseName"])) == "*" || strings.EqualFold(strings.TrimSpace(anyToString(field["summary"])), summaryCount) && preferredFieldKey(field) == "*"
+}
+
+func cloneRows(rows []map[string]interface{}) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, cloneMap(row))
+	}
+	return result
+}
+
+func cloneFieldList(fields []map[string]interface{}) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(fields))
+	for _, field := range fields {
+		result = append(result, cloneMap(field))
+	}
+	return result
+}
+
+func cloneMap(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return map[string]interface{}{}
+	}
+	cloned := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		cloned[k] = v
+	}
+	return cloned
+}
+
+func cloneDimensionItems(items []chart.ChartDataFieldItem) []chart.ChartDataFieldItem {
+	result := make([]chart.ChartDataFieldItem, len(items))
+	copy(result, items)
+	return result
+}
+
+func anyToString(v interface{}) string {
+	switch value := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(value)
+	case json.Number:
+		return value.String()
+	case float64:
+		if math.Mod(value, 1) == 0 {
+			return fmt.Sprintf("%.0f", value)
+		}
+		return fmt.Sprintf("%v", value)
+	case float32:
+		f := float64(value)
+		if math.Mod(f, 1) == 0 {
+			return fmt.Sprintf("%.0f", f)
+		}
+		return fmt.Sprintf("%v", value)
+	default:
+		return fmt.Sprintf("%v", value)
+	}
+}
+
+func toFloat64(v interface{}) (float64, bool) {
+	switch value := v.(type) {
+	case nil:
+		return 0, false
+	case float64:
+		return value, true
+	case float32:
+		return float64(value), true
+	case json.Number:
+		n, err := value.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	case string:
+		n, err := json.Number(strings.TrimSpace(value)).Float64()
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	default:
+		return intLikeToFloat(value)
+	}
+}
+
+func intLikeToFloat(v interface{}) (float64, bool) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(rv.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(rv.Uint()), true
+	default:
+		return 0, false
+	}
 }
 
 func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) { //nolint:gocyclo // chart view construction with multiple field types
@@ -446,7 +844,7 @@ func countChartField(datasetGroupID int64) chart.ChartField {
 		ExtField:       1,
 		Checked:        true,
 		Desensitized:   false,
-		Summary:        "count",
+		Summary:        summaryCount,
 	}
 }
 
@@ -466,7 +864,7 @@ func convertToChartField(field *dataset.CoreDatasetTableField) chart.ChartField 
 	}
 	summary := "sum"
 	if field.ID == -1 || deType == 0 || deType == 1 || deType == 7 {
-		summary = "count"
+		summary = summaryCount
 	}
 	return chart.ChartField{
 		ID:             field.ID,

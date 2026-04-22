@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/org"
@@ -76,7 +77,8 @@ func SeedDemoData(db *gorm.DB) error {
 		return err
 	}
 
-	if err := ensureTeaSalesFields(db, demoDatasource.ID, teaSalesDataset.ID, demoTable.ID); err != nil {
+	fieldIDs, err := ensureTeaSalesFields(db, demoDatasource.ID, teaSalesDataset.ID, demoTable.ID)
+	if err != nil {
 		return err
 	}
 
@@ -86,7 +88,17 @@ func SeedDemoData(db *gorm.DB) error {
 		return err
 	}
 
-	if _, err := ensureDemoDashboard(db, dashFolder.ID, now); err != nil {
+	dashboard, err := ensureDemoDashboard(db, dashFolder.ID, nil, now)
+	if err != nil {
+		return err
+	}
+
+	chartViewIDs, err := ensureDemoChartViews(db, dashboard.ID, teaSalesDataset.ID, demoTable.ID, fieldIDs, now)
+	if err != nil {
+		return err
+	}
+
+	if _, err := ensureDemoDashboard(db, dashFolder.ID, chartViewIDs, now); err != nil {
 		return err
 	}
 
@@ -127,6 +139,43 @@ func ensureDemoDatabase(db *gorm.DB) error {
 	for _, statement := range statements {
 		if err := db.Exec(statement).Error; err != nil {
 			return err
+		}
+	}
+
+	// Also create the tea_sales table in the current (application) database
+	// so the chart data query can access it directly.
+	appStatements := []string{
+		`CREATE TABLE IF NOT EXISTS tea_sales (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			product_name VARCHAR(100),
+			category VARCHAR(50),
+			region VARCHAR(50),
+			sales_amount DECIMAL(10,2),
+			quantity INT,
+			sale_date DATETIME,
+			salesperson VARCHAR(50)
+		)`,
+		`INSERT IGNORE INTO tea_sales (id, product_name, category, region, sales_amount, quantity, sale_date, salesperson) VALUES
+			(1, '龙井茶', '绿茶', '华东', 1280.00, 32, '2025-01-15 10:30:00', '张伟'),
+			(2, '铁观音', '乌龙茶', '华南', 960.00, 24, '2025-01-16 14:20:00', '李娜'),
+			(3, '普洱茶', '黑茶', '西南', 2150.00, 18, '2025-01-17 09:15:00', '王芳'),
+			(4, '碧螺春', '绿茶', '华东', 880.00, 22, '2025-01-18 11:45:00', '张伟'),
+			(5, '大红袍', '乌龙茶', '华南', 3200.00, 16, '2025-01-19 16:00:00', '陈明'),
+			(6, '白毫银针', '白茶', '华北', 4500.00, 10, '2025-01-20 13:30:00', '李娜'),
+			(7, '黄山毛峰', '绿茶', '华东', 680.00, 28, '2025-01-21 10:00:00', '王芳'),
+			(8, '凤凰单丛', '乌龙茶', '华南', 1560.00, 20, '2025-01-22 15:45:00', '赵军'),
+			(9, '祁门红茶', '红茶', '华东', 1120.00, 26, '2025-01-23 09:30:00', '张伟'),
+			(10, '六安瓜片', '绿茶', '华东', 760.00, 30, '2025-01-24 14:00:00', '陈明'),
+			(11, '正山小种', '红茶', '华北', 1880.00, 14, '2025-01-25 11:15:00', '赵军'),
+			(12, '安溪铁观音', '乌龙茶', '华南', 1080.00, 22, '2025-01-26 16:30:00', '李娜'),
+			(13, '信阳毛尖', '绿茶', '华中', 920.00, 25, '2025-01-27 10:45:00', '王芳'),
+			(14, '福鼎白茶', '白茶', '华东', 2800.00, 12, '2025-01-28 13:00:00', '赵军'),
+			(15, '茉莉花茶', '花茶', '华北', 560.00, 35, '2025-01-29 15:15:00', '陈明')`,
+	}
+	for _, statement := range appStatements {
+		if err := db.Exec(statement).Error; err != nil {
+			// Non-fatal: the dataease_demo table is the authoritative source
+			logger.Warn("Failed to create tea_sales in app DB", zap.Error(err))
 		}
 	}
 
@@ -260,10 +309,18 @@ func ensureDemoDashboardFolder(db *gorm.DB, now int64) (*visualization.DataVisua
 	return &out, nil
 }
 
-func ensureDemoDashboard(db *gorm.DB, folderID int64, now int64) (*visualization.DataVisualizationInfo, error) {
+func ensureDemoDashboard(db *gorm.DB, folderID int64, chartViewIDs []int64, now int64) (*visualization.DataVisualizationInfo, error) {
 	var out visualization.DataVisualizationInfo
 	nodeType := "panel"
 	vizType := "dashboard"
+	componentData := "[]"
+	if len(chartViewIDs) > 0 {
+		componentDataJSON, err := buildDemoDashboardComponentData(chartViewIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build demo dashboard component data: %w", err)
+		}
+		componentData = componentDataJSON
+	}
 	result := db.Where("name = ? AND pid = ? AND node_type = ? AND type = ? AND delete_flag = 0", "Tea Sales Dashboard", folderID, nodeType, vizType).First(&out)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		canvasStyle := `{"width":1920,"height":1080,"scale":100,"scaleWidth":1920,"scaleHeight":1080,"dashboard":{"gap":"yes","gapSize":5,"matrixBase":4},"themeId":"10001","color":"#ffffff","dashboardAdaptor":"view","dashboardThemeColor":"light","fontFamily":"","fontSize":14,"componentGap":"yes","component":{}}`
@@ -276,7 +333,7 @@ func ensureDemoDashboard(db *gorm.DB, folderID int64, now int64) (*visualization
 			Level:           ptrInt(1),
 			Sort:            ptrInt(0),
 			CanvasStyleData: ptrString(canvasStyle),
-			ComponentData:   ptrString("[]"),
+			ComponentData:   ptrString(componentData),
 			MobileLayout:    ptrBool(false),
 			CreateTime:      ptrInt64(now),
 			UpdateTime:      ptrInt64(now),
@@ -290,6 +347,13 @@ func ensureDemoDashboard(db *gorm.DB, folderID int64, now int64) (*visualization
 		}
 	} else if result.Error != nil {
 		return nil, fmt.Errorf("failed to query demo dashboard: %w", result.Error)
+	} else if len(chartViewIDs) > 0 && (out.ComponentData == nil || *out.ComponentData != componentData) {
+		out.ComponentData = ptrString(componentData)
+		out.UpdateTime = ptrInt64(now)
+		out.UpdateBy = ptrString("system")
+		if err := db.Model(&out).Select("component_data", "update_time", "update_by").Updates(&out).Error; err != nil {
+			return nil, fmt.Errorf("failed to update demo dashboard component data: %w", err)
+		}
 	}
 	return &out, nil
 }
@@ -316,7 +380,7 @@ func ensureTeaSalesTable(db *gorm.DB, datasourceID, datasetGroupID int64) (*data
 	return &out, nil
 }
 
-func ensureTeaSalesFields(db *gorm.DB, datasourceID, datasetGroupID, datasetTableID int64) error {
+func ensureTeaSalesFields(db *gorm.DB, datasourceID, datasetGroupID, datasetTableID int64) (map[string]int64, error) {
 	fields := []dataset.CoreDatasetTableField{
 		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "id", "q", "BIGINT", 2),
 		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "product_name", "d", "LONGTEXT", 0),
@@ -328,19 +392,358 @@ func ensureTeaSalesFields(db *gorm.DB, datasourceID, datasetGroupID, datasetTabl
 		newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID, "salesperson", "d", "LONGTEXT", 0),
 	}
 
+	fieldIDs := make(map[string]int64, len(fields))
 	for _, field := range fields {
-		result := db.Where("dataset_table_id = ? AND origin_name = ?", datasetTableID, *field.OriginName).First(&dataset.CoreDatasetTableField{})
+		var existing dataset.CoreDatasetTableField
+		result := db.Where("dataset_table_id = ? AND origin_name = ?", datasetTableID, *field.OriginName).First(&existing)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			fieldCopy := field
 			if err := db.Create(&fieldCopy).Error; err != nil {
-				return fmt.Errorf("failed to create demo dataset field %s: %w", *field.OriginName, err)
+				return nil, fmt.Errorf("failed to create demo dataset field %s: %w", *field.OriginName, err)
 			}
+			fieldIDs[*field.OriginName] = fieldCopy.ID
 		} else if result.Error != nil {
-			return fmt.Errorf("failed to query demo dataset field %s: %w", *field.OriginName, result.Error)
+			return nil, fmt.Errorf("failed to query demo dataset field %s: %w", *field.OriginName, result.Error)
+		} else {
+			fieldIDs[*field.OriginName] = existing.ID
 		}
 	}
 
-	return nil
+	return fieldIDs, nil
+}
+
+func ensureDemoChartViews(db *gorm.DB, dashboardID, datasetGroupID, datasetTableID int64, fieldIDs map[string]int64, now int64) ([]int64, error) {
+	chartConfigs := []demoChartViewConfig{
+		{
+			Title:       "Sales by Category",
+			Type:        "bar",
+			XAxis:       []chartViewField{newChartViewField(fieldIDs, "category", 0, "d", "", "")},
+			YAxis:       []chartViewField{newChartViewField(fieldIDs, "sales_amount", 2, "q", "SUM", "")},
+			CustomStyle: demoChartCustomStyle,
+		},
+		{
+			Title:       "Sales by Region",
+			Type:        "pie",
+			XAxis:       []chartViewField{newChartViewField(fieldIDs, "region", 0, "d", "", "")},
+			YAxis:       []chartViewField{newChartViewField(fieldIDs, "sales_amount", 2, "q", "SUM", "")},
+			CustomStyle: demoChartCustomStyle,
+		},
+		{
+			Title:       "Sales Trend",
+			Type:        "line",
+			XAxis:       []chartViewField{newChartViewField(fieldIDs, "sale_date", 1, "d", "", "")},
+			YAxis:       []chartViewField{newChartViewField(fieldIDs, "sales_amount", 2, "q", "SUM", "")},
+			CustomStyle: demoChartCustomStyle,
+		},
+		{
+			Title: "Product Details",
+			Type:  "table-info",
+			XAxis: []chartViewField{
+				newChartViewField(fieldIDs, "product_name", 0, "d", "", ""),
+				newChartViewField(fieldIDs, "category", 0, "d", "", ""),
+				newChartViewField(fieldIDs, "region", 0, "d", "", ""),
+				newChartViewField(fieldIDs, "salesperson", 0, "d", "", ""),
+				newChartViewField(fieldIDs, "sale_date", 1, "d", "", ""),
+			},
+			YAxis: []chartViewField{
+				newChartViewField(fieldIDs, "sales_amount", 2, "q", "SUM", ""),
+				newChartViewField(fieldIDs, "quantity", 2, "q", "SUM", ""),
+			},
+			CustomStyle: demoTableCustomStyle,
+		},
+	}
+
+	chartIDs := make([]int64, 0, len(chartConfigs))
+	for _, cfg := range chartConfigs {
+		var existing chart.CoreChartView
+		result := db.Where("title = ? AND scene_id = ?", cfg.Title, dashboardID).First(&existing)
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			xAxis, err := marshalJSONString(cfg.XAxis)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal xAxis for chart %s: %w", cfg.Title, err)
+			}
+			yAxis, err := marshalJSONString(cfg.YAxis)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal yAxis for chart %s: %w", cfg.Title, err)
+			}
+
+			view := chart.CoreChartView{
+				Title:             ptrString(cfg.Title),
+				SceneID:           ptrInt64(dashboardID),
+				TableID:           ptrInt64(datasetTableID),
+				Type:              ptrString(cfg.Type),
+				Render:            ptrString("antv"),
+				ResultCount:       ptrInt(1000),
+				ResultMode:        ptrString("all"),
+				XAxis:             ptrString(xAxis),
+				YAxis:             ptrString(yAxis),
+				CustomAttr:        ptrString(demoChartCustomAttr),
+				CustomStyle:       ptrString(cfg.CustomStyle),
+				CustomFilter:      ptrString("{}"),
+				CreateBy:          ptrString("system"),
+				CreateTime:        ptrInt64(now),
+				UpdateTime:        ptrInt64(now),
+				DataFrom:          ptrString("dataset"),
+				XAxisExt:          ptrString("[]"),
+				YAxisExt:          ptrString("[]"),
+				ExtStack:          ptrString("[]"),
+				ExtBubble:         ptrString("[]"),
+				ExtLabel:          ptrString("[]"),
+				ExtTooltip:        ptrString("[]"),
+				DrillFields:       ptrString("[]"),
+				Senior:            ptrString("{}"),
+				Snapshot:          ptrString("{}"),
+				StylePriority:     ptrString("view"),
+				ChartType:         ptrString("private"),
+				IsPlugin:          ptrBool(false),
+				ViewFields:        ptrString("[]"),
+				RefreshViewEnable: ptrBool(false),
+				RefreshUnit:       ptrString("minute"),
+				RefreshTime:       ptrInt(5),
+				LinkageActive:     ptrBool(false),
+				JumpActive:        ptrBool(false),
+				Aggregate:         ptrBool(false),
+				ExtColor:          ptrString("[]"),
+				SortPriority:      ptrString("default"),
+			}
+
+			if err := db.Create(&view).Error; err != nil {
+				return nil, fmt.Errorf("failed to create demo chart view %s: %w", cfg.Title, err)
+			}
+			chartIDs = append(chartIDs, view.ID)
+		} else if result.Error != nil {
+			return nil, fmt.Errorf("failed to query demo chart view %s: %w", cfg.Title, result.Error)
+		} else {
+			chartIDs = append(chartIDs, existing.ID)
+		}
+	}
+
+	return chartIDs, nil
+}
+
+type chartViewField struct {
+	ID           string `json:"id"`
+	DataeaseName string `json:"dataeaseName"`
+	Name         string `json:"name"`
+	OriginName   string `json:"originName"`
+	DeType       int    `json:"deType"`
+	GroupType    string `json:"groupType"`
+	Summary      string `json:"summary,omitempty"`
+	Sort         string `json:"sort,omitempty"`
+}
+
+type demoChartViewConfig struct {
+	Title       string
+	Type        string
+	XAxis       []chartViewField
+	YAxis       []chartViewField
+	CustomStyle string
+}
+
+type demoDashboardComponent struct {
+	ID               string                        `json:"id"`
+	Component        string                        `json:"component"`
+	Name             string                        `json:"name"`
+	Label            string                        `json:"label"`
+	InnerType        string                        `json:"innerType"`
+	Render           string                        `json:"render"`
+	CanvasID         string                        `json:"canvasId"`
+	IsShow           bool                          `json:"isShow"`
+	Show             bool                          `json:"show"`
+	X                int                           `json:"x"`
+	Y                int                           `json:"y"`
+	SizeX            int                           `json:"sizeX"`
+	SizeY            int                           `json:"sizeY"`
+	Style            demoDashboardComponentStyle   `json:"style"`
+	PropValue        string                        `json:"propValue"`
+	CommonBackground demoDashboardBackground       `json:"commonBackground"`
+	Animations       []any                         `json:"animations"`
+	Events           demoDashboardEvents           `json:"events"`
+	Carousel         demoDashboardCarousel         `json:"carousel"`
+	MultiDimensional demoDashboardMultiDimensional `json:"multiDimensional"`
+	GroupStyle       map[string]any                `json:"groupStyle"`
+	IsLock           bool                          `json:"isLock"`
+	MaintainRadio    bool                          `json:"maintainRadio"`
+	AspectRatio      int                           `json:"aspectRatio"`
+	DashboardHidden  bool                          `json:"dashboardHidden"`
+	Category         string                        `json:"category"`
+	Dragging         bool                          `json:"dragging"`
+	Resizing         bool                          `json:"resizing"`
+	Linkage          demoDashboardLinkage          `json:"linkage"`
+	IsPlugin         bool                          `json:"isPlugin"`
+	State            string                        `json:"state"`
+	Editing          bool                          `json:"editing"`
+	CanvasActive     bool                          `json:"canvasActive"`
+	MatrixStyle      map[string]any                `json:"matrixStyle"`
+}
+
+type demoDashboardComponentStyle struct {
+	Left       int    `json:"left"`
+	Top        int    `json:"top"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	Rotate     int    `json:"rotate"`
+	Opacity    int    `json:"opacity"`
+	Adaptation string `json:"adaptation"`
+}
+
+type demoDashboardBackground struct {
+	BackgroundColorSelect bool                          `json:"backgroundColorSelect"`
+	BackgroundImageEnable bool                          `json:"backgroundImageEnable"`
+	BackgroundType        string                        `json:"backgroundType"`
+	InnerImage            string                        `json:"innerImage"`
+	BackgroundColor       string                        `json:"backgroundColor"`
+	InnerPadding          demoDashboardPadding          `json:"innerPadding"`
+	BorderRadius          demoDashboardBackgroundRadius `json:"borderRadius"`
+}
+
+type demoDashboardPadding struct {
+	Mode int `json:"mode"`
+	Top  int `json:"top"`
+}
+
+type demoDashboardBackgroundRadius struct {
+	Mode    int `json:"mode"`
+	TopLeft int `json:"topLeft"`
+}
+
+type demoDashboardEvents struct {
+	Checked bool                   `json:"checked"`
+	Type    string                 `json:"type"`
+	Jump    demoDashboardEventJump `json:"jump,omitempty"`
+}
+
+type demoDashboardEventJump struct {
+	Type string `json:"type"`
+}
+
+type demoDashboardCarousel struct {
+	Enable bool `json:"enable"`
+	Time   int  `json:"time"`
+}
+
+type demoDashboardMultiDimensional struct {
+	Enable bool `json:"enable"`
+	X      int  `json:"x"`
+	Y      int  `json:"y"`
+	Z      int  `json:"z"`
+}
+
+type demoDashboardLinkage struct {
+	Duration int                          `json:"duration"`
+	Data     []demoDashboardLinkageRecord `json:"data"`
+}
+
+type demoDashboardLinkageRecord struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Event string `json:"event"`
+	Style []any  `json:"style"`
+}
+
+type demoDashboardLayout struct {
+	Title string
+	Type  string
+	X     int
+	Y     int
+	SizeX int
+	SizeY int
+}
+
+const (
+	demoChartCustomAttr  = `{"basicStyle":{"alpha":100,"radius":80,"columnWidthRatio":0.6,"seriesColor":[]},"misc":{"nameFontColor":"#000000","valueFontColor":"#000000"},"label":{"show":false,"position":"top","color":"#000000","fontSize":12},"tooltip":{"show":true},"tableTotal":{"row":false,"col":false},"tableHeader":{"tableHeaderBgColor":"#64748b","tableHeaderFontColor":"#ffffff"},"tableCell":{"tableCellBgColor":"#ffffff","tableCellFontColor":"#000000"}}`
+	demoChartCustomStyle = `{"text":{"show":true,"fontSize":16,"color":"#000000","hPosition":"left","isItalic":false,"isBolder":true},"legend":{"show":true,"hPosition":"center","vPosition":"bottom","orient":"horizontal","color":"#000000","fontSize":12},"xAxis":{"show":true,"color":"#000000","fontSize":12,"axisLabel":{"color":"#000000","fontSize":12,"rotate":0},"splitLine":{"show":false,"style":"solid"}},"yAxis":{"show":true,"color":"#000000","fontSize":12,"axisLabel":{"color":"#000000","fontSize":12,"rotate":0},"splitLine":{"show":true,"style":"dashed"}}}`
+	demoTableCustomStyle = `{"text":{"show":true,"fontSize":16,"color":"#000000","hPosition":"left","isItalic":false,"isBolder":true}}`
+)
+
+func newChartViewField(fieldIDs map[string]int64, originName string, deType int, groupType, summary, sort string) chartViewField {
+	fieldID := fieldIDs[originName]
+	return chartViewField{
+		ID:           fmt.Sprintf("%d", fieldID),
+		DataeaseName: "f_" + originName,
+		Name:         originName,
+		OriginName:   originName,
+		DeType:       deType,
+		GroupType:    groupType,
+		Summary:      summary,
+		Sort:         sort,
+	}
+}
+
+func buildDemoDashboardComponentData(chartViewIDs []int64) (string, error) {
+	layouts := []demoDashboardLayout{
+		{Title: "Sales by Category", Type: "bar", X: 1, Y: 1, SizeX: 24, SizeY: 14},
+		{Title: "Sales by Region", Type: "pie", X: 25, Y: 1, SizeX: 24, SizeY: 14},
+		{Title: "Sales Trend", Type: "line", X: 1, Y: 15, SizeX: 24, SizeY: 14},
+		{Title: "Product Details", Type: "table-info", X: 25, Y: 15, SizeX: 24, SizeY: 14},
+	}
+
+	components := make([]demoDashboardComponent, 0, len(layouts))
+	for idx, layout := range layouts {
+		if idx >= len(chartViewIDs) {
+			break
+		}
+
+		components = append(components, demoDashboardComponent{
+			ID:        fmt.Sprintf("%d", chartViewIDs[idx]),
+			Component: "UserView",
+			Name:      layout.Title,
+			Label:     layout.Title,
+			InnerType: layout.Type,
+			Render:    "antv",
+			CanvasID:  "canvas-main",
+			IsShow:    true,
+			Show:      true,
+			X:         layout.X,
+			Y:         layout.Y,
+			SizeX:     layout.SizeX,
+			SizeY:     layout.SizeY,
+			Style: demoDashboardComponentStyle{
+				Left: 0, Top: 0, Width: 600, Height: 300, Rotate: 0, Opacity: 1, Adaptation: "adaptation",
+			},
+			PropValue: `{"textValue":"","urlList":[]}`,
+			CommonBackground: demoDashboardBackground{
+				BackgroundColorSelect: true,
+				BackgroundImageEnable: false,
+				BackgroundType:        "innerImage",
+				InnerImage:            "board/board_1.svg",
+				BackgroundColor:       "rgba(255,255,255,1)",
+				InnerPadding:          demoDashboardPadding{Mode: 0, Top: 12},
+				BorderRadius:          demoDashboardBackgroundRadius{Mode: 0, TopLeft: 0},
+			},
+			Animations:       []any{},
+			Events:           demoDashboardEvents{Checked: false, Type: "displayChange", Jump: demoDashboardEventJump{Type: "_blank"}},
+			Carousel:         demoDashboardCarousel{Enable: false, Time: 10},
+			MultiDimensional: demoDashboardMultiDimensional{Enable: false, X: 0, Y: 0, Z: 0},
+			GroupStyle:       map[string]any{},
+			IsLock:           false,
+			MaintainRadio:    false,
+			AspectRatio:      1,
+			DashboardHidden:  false,
+			Category:         "base",
+			Dragging:         false,
+			Resizing:         false,
+			Linkage: demoDashboardLinkage{
+				Duration: 0,
+				Data:     []demoDashboardLinkageRecord{{ID: "", Label: "", Event: "", Style: []any{}}},
+			},
+			IsPlugin:     false,
+			State:        "ready",
+			Editing:      false,
+			CanvasActive: false,
+			MatrixStyle:  map[string]any{},
+		})
+	}
+
+	return marshalJSONString(components)
+}
+
+func marshalJSONString(v any) (string, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func newDemoDatasetField(datasourceID, datasetGroupID, datasetTableID int64, originName, groupType, fieldType string, deType int) dataset.CoreDatasetTableField {

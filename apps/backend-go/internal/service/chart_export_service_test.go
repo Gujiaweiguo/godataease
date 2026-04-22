@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"dataease/backend/internal/domain/chart"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xuri/excelize/v2"
@@ -184,6 +186,7 @@ func TestChartExportService_InnerExportDetails(t *testing.T) {
 func TestChartExportService_InnerExportDetailsFromChart(t *testing.T) {
 	t.Run("transforms columns and rows", func(t *testing.T) {
 		repo := &fakeChartRepo{
+			byID: map[int64]*chart.CoreChartView{101: {ID: 101}},
 			data: map[int64]chartRegressionSample{
 				101: {
 					Name:        "export",
@@ -212,6 +215,7 @@ func TestChartExportService_InnerExportDetailsFromChart(t *testing.T) {
 
 	t.Run("multiple rows preserve column order", func(t *testing.T) {
 		repo := &fakeChartRepo{
+			byID: map[int64]*chart.CoreChartView{104: {ID: 104}},
 			data: map[int64]chartRegressionSample{
 				104: {
 					Name:    "ordered",
@@ -249,7 +253,10 @@ func TestChartExportService_InnerExportDetailsFromChart(t *testing.T) {
 	})
 
 	t.Run("empty rows still writes workbook", func(t *testing.T) {
-		repo := &fakeChartRepo{data: map[int64]chartRegressionSample{102: {Name: "empty", ChartID: 102, Rows: []map[string]interface{}{}, Total: 0}}}
+		repo := &fakeChartRepo{
+			byID: map[int64]*chart.CoreChartView{102: {ID: 102}},
+			data: map[int64]chartRegressionSample{102: {Name: "empty", ChartID: 102, Rows: []map[string]interface{}{}, Total: 0}},
+		}
 		svc := NewChartExportService(NewChartService(repo))
 
 		buf, err := svc.InnerExportDetailsFromChart(102, "Empty")
@@ -264,6 +271,7 @@ func TestChartExportService_InnerExportDetailsFromChart(t *testing.T) {
 
 	t.Run("missing column value writes blank", func(t *testing.T) {
 		repo := &fakeChartRepo{
+			byID: map[int64]*chart.CoreChartView{103: {ID: 103}},
 			data: map[int64]chartRegressionSample{
 				103: {
 					Name:    "sparse",

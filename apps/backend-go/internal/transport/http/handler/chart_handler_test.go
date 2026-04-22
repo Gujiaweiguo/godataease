@@ -48,6 +48,47 @@ func TestChartHandler_Data_InvalidJSON(t *testing.T) {
 	assert.Equal(t, "500000", resp.Code)
 }
 
+func TestChartHandler_Data_SuccessReturnsTopLevelConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	render := "antv"
+	chartType := "bar"
+	xAxis := `[{"id":"2","dataeaseName":"category","originName":"category","name":"分类"}]`
+	yAxis := `[{"id":"5","dataeaseName":"sales_amount","originName":"sales_amount","name":"销售额","summary":"sum"}]`
+	repo := &fakeBridgeChartRepo{
+		charts: map[int64]*chart.CoreChartView{5: {ID: 5, Render: &render, Type: &chartType, XAxis: &xAxis, YAxis: &yAxis}},
+	}
+	h := NewChartHandler(service.NewChartService(repo), nil)
+	r := gin.New()
+	r.POST("/chart/data", h.Data)
+
+	req := httptest.NewRequest("POST", "/chart/data", strings.NewReader(`{"id":5}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(0), resp["code"])
+	viewMap, ok := resp["data"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "antv", viewMap["render"])
+	assert.Equal(t, "bar", viewMap["type"])
+	_, hasXAxis := viewMap["xAxis"]
+	assert.True(t, hasXAxis)
+	chartData, hasData := viewMap["data"]
+	if hasData && chartData != nil {
+		dataMap, ok := chartData.(map[string]interface{})
+		require.True(t, ok)
+		points, exists := dataMap["data"]
+		if exists {
+			pointList, ok := points.([]interface{})
+			require.True(t, ok)
+			assert.Len(t, pointList, 0)
+		}
+	}
+}
+
 func TestChartHandler_GetChart_InvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := &ChartHandler{}

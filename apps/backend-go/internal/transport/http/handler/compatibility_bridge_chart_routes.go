@@ -16,12 +16,12 @@ import (
 )
 
 func registerChartCompatRoutes(r gin.IRouter, chartHandler *ChartHandler, datasetHandler *DatasetHandler, permMiddleware *middleware.PermissionMiddleware) {
-	registerChartDataCompatRoutes(r.Group("/chartData"), chartHandler, datasetHandler, permMiddleware)
+	RegisterChartDataCompatRoutes(r.Group("/chartData"), chartHandler, datasetHandler, permMiddleware)
 	registerChartGroupCompatRoutes(r.Group("/chart"), chartHandler, permMiddleware)
 	registerDatasetFieldCompatRoutes(r.Group("/datasetField"), chartHandler, datasetHandler)
 }
 
-func registerChartDataCompatRoutes(chartDataGroup *gin.RouterGroup, chartHandler *ChartHandler, datasetHandler *DatasetHandler, permMiddleware *middleware.PermissionMiddleware) {
+func RegisterChartDataCompatRoutes(chartDataGroup *gin.RouterGroup, chartHandler *ChartHandler, datasetHandler *DatasetHandler, permMiddleware *middleware.PermissionMiddleware) {
 	if permMiddleware != nil {
 		chartDataGroup.POST("/getData", permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), chartHandler.Data)
 	} else {

@@ -56,16 +56,35 @@ type ChartQueryRequest struct {
 }
 
 type ChartDataRequest struct {
-	ID          int64  `json:"id" binding:"required"`
-	ResultCount *int   `json:"resultCount"`
-	ResultMode  string `json:"resultMode"`
+	ID          int64                  `json:"id" binding:"required"`
+	ResultCount *int                   `json:"resultCount"`
+	ResultMode  string                 `json:"resultMode"`
+	Payload     map[string]interface{} `json:"-"`
 }
 
 type ChartDataResponse struct {
-	ChartID int64                    `json:"chartId"`
-	Columns []string                 `json:"columns"`
-	Rows    []map[string]interface{} `json:"rows"`
-	Total   int64                    `json:"total"`
+	ChartID      int64                    `json:"chartId,omitempty"`
+	Columns      []string                 `json:"columns,omitempty"`
+	Rows         []map[string]interface{} `json:"rows,omitempty"`
+	Total        int64                    `json:"total,omitempty"`
+	Data         []ChartDataPoint         `json:"data,omitempty"`
+	Fields       []map[string]interface{} `json:"fields,omitempty"`
+	TableRow     []map[string]interface{} `json:"tableRow,omitempty"`
+	SourceFields []map[string]interface{} `json:"sourceFields,omitempty"`
+}
+
+type ChartDataPoint struct {
+	Field         string               `json:"field,omitempty"`
+	Name          string               `json:"name,omitempty"`
+	Category      string               `json:"category,omitempty"`
+	Value         float64              `json:"value"`
+	DimensionList []ChartDataFieldItem `json:"dimensionList,omitempty"`
+	QuotaList     []ChartDataFieldItem `json:"quotaList,omitempty"`
+}
+
+type ChartDataFieldItem struct {
+	ID    string      `json:"id"`
+	Value interface{} `json:"value,omitempty"`
 }
 
 type ChartField struct {
