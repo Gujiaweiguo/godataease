@@ -53,7 +53,7 @@ defineExpose({
 })
 onMounted(async () => {
   const key = 'xpack-model-distributed'
-  let distributed = false
+  let distributed: any = false
   if (wsCache.get(key) === null) {
     const res = await xpackModelApi()
     const resData = isNull(res.data) ? 'null' : res.data
@@ -61,6 +61,10 @@ onMounted(async () => {
     distributed = res.data
   } else {
     distributed = wsCache.get(key)
+  }
+  // Normalize wsCache serialization: 'false' string should be boolean false
+  if (distributed === 'false' || distributed === 0) {
+    distributed = false
   }
   if (isNull(distributed)) {
     setTimeout(() => {
@@ -85,10 +89,15 @@ onMounted(async () => {
       if (!(window as any).tinymce) {
         ;(window as any).tinymce = tinymce
       }
-      loadDistributed().then(async res => {
-        new Function(res.data)()
-        useEmitt().emitter.emit('load-xpack')
-      })
+      loadDistributed()
+        .then(async res => {
+          new Function(res.data)()
+          useEmitt().emitter.emit('load-xpack')
+        })
+        .catch(() => {
+          emits('loadFail')
+          showNolic()
+        })
     }
   } else {
     emits('loadFail')
