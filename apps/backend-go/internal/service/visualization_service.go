@@ -8,6 +8,7 @@ import (
 
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
+	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
@@ -361,7 +362,7 @@ func (s *VisualizationService) RecoverToPublished(id int64, updateBy string) (*v
 	return s.repo.GetByID(id)
 }
 
-func (s *VisualizationService) ViewDetailList(dvID int64) ([]map[string]interface{}, error) {
+func (s *VisualizationService) ViewDetailList(dvID int64) ([]chart.CoreChartView, error) {
 	return s.repo.GetChartViewsBySceneID(dvID)
 }
 

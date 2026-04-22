@@ -3,6 +3,7 @@ package repository
 import (
 	"time"
 
+	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/visualization"
 
 	"gorm.io/gorm"
@@ -137,9 +138,9 @@ func (r *VisualizationRepository) CountByNameAndPID(name string, pid *int64, exc
 	return count, err
 }
 
-func (r *VisualizationRepository) GetChartViewsBySceneID(sceneID int64) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	err := r.db.Table("core_chart_view").Where("scene_id = ?", sceneID).Find(&results).Error
+func (r *VisualizationRepository) GetChartViewsBySceneID(sceneID int64) ([]chart.CoreChartView, error) {
+	var results []chart.CoreChartView
+	err := r.db.Where("scene_id = ?", sceneID).Find(&results).Error
 	return results, err
 }
 
