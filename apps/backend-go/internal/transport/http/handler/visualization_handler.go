@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -41,16 +43,25 @@ func (h *VisualizationHandler) FindByID(c *gin.Context) {
 		return
 	}
 
+	var canvasViewInfo map[string]interface{}
+	chartViews, err := h.service.ViewDetailList(req.ID.Int64())
+	if err != nil {
+		// Non-fatal: log and continue with empty canvasViewInfo
+		canvasViewInfo = map[string]interface{}{}
+	} else {
+		canvasViewInfo = buildCanvasViewInfo(chartViews)
+	}
+
 	// Enrich response with fields the frontend canvas expects.
 	// The raw DataVisualizationInfo lacks watermarkInfo, canvasViewInfo,
 	// weight, creatorName, etc. that initCanvasDataPrepare() requires.
-	enriched := buildEnrichedVisualizationResponse(result)
+	enriched := buildEnrichedVisualizationResponse(result, canvasViewInfo)
 	response.Success(c, enriched)
 }
 
 // buildEnrichedVisualizationResponse wraps the raw domain model into a
 // map containing all fields the frontend's initCanvasDataPrepare expects.
-func buildEnrichedVisualizationResponse(v *visualization.DataVisualizationInfo) map[string]interface{} {
+func buildEnrichedVisualizationResponse(v *visualization.DataVisualizationInfo, canvasViewInfo map[string]interface{}) map[string]interface{} {
 	var mobileLayout bool
 	if v.MobileLayout != nil {
 		mobileLayout = *v.MobileLayout
@@ -79,13 +90,60 @@ func buildEnrichedVisualizationResponse(v *visualization.DataVisualizationInfo) 
 		"watermarkInfo":       map[string]interface{}{"id": "1", "settingContent": "{}"},
 		"weight":              9,
 		"ext":                 map[string]interface{}{},
-		"canvasViewInfo":      map[string]interface{}{},
+		"canvasViewInfo":      canvasViewInfo,
 		"creatorName":         "admin",
 		"updateName":          "admin",
 		"createTime":          createTime,
 		"updateTime":          updateTime,
 	}
 	return resp
+}
+
+func buildCanvasViewInfo(chartViews []chart.CoreChartView) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, view := range chartViews {
+		// Serialize via JSON to get camelCase keys from struct tags
+		jsonBytes, err := json.Marshal(view)
+		if err != nil {
+			continue
+		}
+		var viewMap map[string]interface{}
+		if err := json.Unmarshal(jsonBytes, &viewMap); err != nil {
+			continue
+		}
+		parseJSONStrings(viewMap)
+
+		viewID := ""
+		if id, ok := viewMap["id"]; ok {
+			switch v := id.(type) {
+			case float64:
+				viewID = strconv.FormatInt(int64(v), 10)
+			case string:
+				viewID = v
+			}
+		}
+		if viewID != "" {
+			result[viewID] = viewMap
+		}
+	}
+	return result
+}
+
+// parseJSONStrings converts JSON-encoded string values into their actual
+// object/array representations so the frontend receives parsed objects
+// rather than JSON strings.
+func parseJSONStrings(m map[string]interface{}) {
+	for key, val := range m {
+		if str, ok := val.(string); ok {
+			str = strings.TrimSpace(str)
+			if strings.HasPrefix(str, "{") || strings.HasPrefix(str, "[") {
+				var parsed interface{}
+				if err := json.Unmarshal([]byte(str), &parsed); err == nil {
+					m[key] = parsed
+				}
+			}
+		}
+	}
 }
 
 func (h *VisualizationHandler) List(c *gin.Context) {

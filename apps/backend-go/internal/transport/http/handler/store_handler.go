@@ -116,12 +116,14 @@ func (h *StoreHandler) Query(c *gin.Context) {
 	response.Success(c, rows)
 }
 
-func RegisterStoreRoutes(r gin.IRouter, h *StoreHandler) {
+func RegisterStoreRoutes(r gin.IRouter, h *StoreHandler, skipQuery bool) {
 	g := r.Group("/store")
 	{
 		g.POST("/execute", h.Execute)
 		g.GET("/favorited/:id", h.Favorited)
-		g.POST("/query", h.Query)
+		if !skipQuery {
+			g.POST("/query", h.Query)
+		}
 	}
 }
 

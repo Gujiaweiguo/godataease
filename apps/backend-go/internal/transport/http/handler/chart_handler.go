@@ -6,10 +6,13 @@ import (
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/middleware"
+	"encoding/json"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type ChartHandler struct {
@@ -38,25 +41,142 @@ func (h *ChartHandler) Query(c *gin.Context) {
 }
 
 func (h *ChartHandler) Data(c *gin.Context) {
-	var req chart.ChartDataRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var reqMap map[string]interface{}
+	if err := c.ShouldBindBodyWith(&reqMap, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
+	}
+
+	id, ok := chartDataIDFromMap(reqMap)
+	if !ok || id <= 0 {
+		response.Error(c, "500000", "Invalid request: chart id is required")
+		return
+	}
+	req := &chart.ChartDataRequest{ID: id, Payload: reqMap}
+	if resultCount, ok := chartDataResultCountFromMap(reqMap); ok {
+		req.ResultCount = &resultCount
+	}
+	if resultMode, ok := reqMap["resultMode"].(string); ok {
+		req.ResultMode = resultMode
 	}
 
 	userID := int64(middleware.GetUserID(c))
 	var result *chart.ChartDataResponse
 	var err error
 	if userID > 0 {
-		result, err = h.service.QueryDataWithPermission(&req, userID)
+		result, err = h.service.QueryDataWithPermission(req, userID)
 	} else {
-		result, err = h.service.QueryData(&req)
+		result, err = h.service.QueryData(req)
 	}
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
-	response.Success(c, result)
+
+	viewMap := make(map[string]interface{})
+	view, viewErr := h.service.Query(&chart.ChartQueryRequest{ID: id})
+	if viewErr == nil && view != nil {
+		mergeChartViewIntoMap(viewMap, view)
+	}
+	for key, value := range reqMap {
+		viewMap[key] = value
+	}
+	// Computed chart data goes as nested "data" inside the view config
+	viewMap["data"] = result
+	c.JSON(200, gin.H{
+		"code": 0,
+		"msg":  "success",
+		"data": viewMap,
+	})
+}
+
+func chartDataIDFromMap(body map[string]interface{}) (int64, bool) {
+	if body == nil {
+		return 0, false
+	}
+	switch value := body["id"].(type) {
+	case float64:
+		return int64(value), true
+	case int64:
+		return value, true
+	case int:
+		return int64(value), true
+	case string:
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
+}
+
+func chartDataResultCountFromMap(body map[string]interface{}) (int, bool) {
+	if body == nil {
+		return 0, false
+	}
+	switch value := body["resultCount"].(type) {
+	case float64:
+		return int(value), true
+	case int:
+		return value, true
+	case int64:
+		return int(value), true
+	case string:
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
+}
+
+func mergeChartViewIntoMap(target map[string]interface{}, view *chart.CoreChartView) {
+	if target == nil || view == nil {
+		return
+	}
+	raw, err := json.Marshal(view)
+	if err != nil {
+		return
+	}
+	var mapped map[string]interface{}
+	if err = json.Unmarshal(raw, &mapped); err != nil {
+		return
+	}
+	for key, value := range mapped {
+		target[key] = decodeChartViewJSONField(key, value)
+	}
+}
+
+func decodeChartViewJSONField(key string, value interface{}) interface{} {
+	raw, ok := value.(string)
+	if !ok {
+		return value
+	}
+	if !isChartViewJSONField(key) {
+		return value
+	}
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return value
+	}
+	var decoded interface{}
+	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
+		return value
+	}
+	return decoded
+}
+
+func isChartViewJSONField(key string) bool {
+	switch key {
+	case "xAxis", "yAxis", "customAttr", "customStyle", "customFilter", "xAxisExt", "yAxisExt", "extStack", "extBubble", "extLabel", "extTooltip", "customAttrMobile", "customStyleMobile", "drillFields", "senior", "snapshot", "viewFields", "extColor", "sortPriority":
+		return true
+	default:
+		return false
+	}
 }
 
 // CheckSameDataSet handles GET /chart/checkSameDataSet/:viewIdSource/:viewIdTarget

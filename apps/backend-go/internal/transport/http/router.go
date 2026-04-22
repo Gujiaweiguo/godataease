@@ -510,7 +510,6 @@ func (r *Router) registerRootRoutes() {
 	handler.RegisterLinkJumpRoutes(r.engine.Group(""), r.linkJumpHandler)
 	handler.RegisterOuterParamsRoutes(r.engine.Group(""), r.outerParamsHandler)
 	handler.RegisterVisualizationBackgroundRoutes(r.engine.Group(""), r.visualizationBackgroundHandler)
-	handler.RegisterStoreRoutes(r.engine.Group(""), r.storeHandler)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, r.userHandler, r.orgHandler, r.datasourceHandler, r.datasetHandler, nil, nil)
 	handler.RegisterCompatibilityBridgeRoutes(r.engine, nil, nil, nil, nil, r.chartHandler, r.permMiddleware)
 	handler.RegisterFrontendCompatRoutes(r.engine, protected, r.frontendCompatHandler)
@@ -534,6 +533,8 @@ func (r *Router) registerAPIRoutes() {
 	auditAPI := api
 	exportAPI := api
 	menuWriteAPI := api
+	storeAPI := api
+	chartDataAPI := api
 	if r.app != nil && r.app.Config != nil {
 		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
 			Secret: r.app.Config.JWT.Secret,
@@ -590,6 +591,14 @@ func (r *Router) registerAPIRoutes() {
 		protectedMenuWriteAPI := r.engine.Group("/api")
 		protectedMenuWriteAPI.Use(middleware.Auth(jwtInstance))
 		menuWriteAPI = protectedMenuWriteAPI
+
+		protectedStoreAPI := r.engine.Group("/api")
+		protectedStoreAPI.Use(middleware.Auth(jwtInstance))
+		storeAPI = protectedStoreAPI
+
+		protectedChartDataAPI := r.engine.Group("/api")
+		protectedChartDataAPI.Use(middleware.Auth(jwtInstance))
+		chartDataAPI = protectedChartDataAPI
 	}
 	{
 		api.GET("/ping", func(c *gin.Context) {
@@ -621,6 +630,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterCompatibilityBridgeRoutes(datasetAPI, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
 		handler.RegisterCompatibilityBridgeRoutes(datasetDe2API, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware)
 		r.registerChartRoutes(api)
+		handler.RegisterChartDataCompatRoutes(chartDataAPI.Group("/chartData"), r.chartHandler, r.datasetHandler, r.permMiddleware)
 		r.registerVisualizationRoutes(visualizationAPI)
 		r.registerVisualizationDe2DetailRoute(visualizationDe2API)
 		handler.RegisterWatermarkRoutes(api, r.watermarkHandler)
@@ -640,6 +650,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)
+		handler.RegisterStoreRoutes(storeAPI, r.storeHandler, true)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceAPI, nil, nil, r.datasourceHandler, nil, nil, nil)
 		api.GET("/panel/view/getComponentInfo/:dvId", r.visualHandler.GetComponentInfo)
 		handler.RegisterCompatibilityBridgeRoutes(api, r.userHandler, r.orgHandler, nil, nil, nil, r.permMiddleware)
@@ -820,18 +831,6 @@ func (r *Router) registerChartRoutes(api *gin.RouterGroup) {
 		chartGroup.POST("/copyField/:id/:chartId", r.chartHandler.CopyField)
 		chartGroup.POST("/deleteField/:id", r.chartHandler.DeleteField)
 		chartGroup.POST("/deleteFieldByChart/:chartId", r.chartHandler.DeleteFieldByChart)
-	}
-	chartDataGroup := api.Group("/chartData")
-	{
-		if r.permMiddleware != nil {
-			chartDataGroup.POST("/getData", r.permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), r.chartHandler.Data)
-		} else {
-			chartDataGroup.POST("/getData", r.chartHandler.Data)
-		}
-		chartDataGroup.POST("/getFieldData/:fieldId/:fieldType", r.chartHandler.GetFieldData)
-		chartDataGroup.POST("/getDrillFieldData/:fieldId", r.chartHandler.GetDrillFieldData)
-		chartDataGroup.POST("/innerExportDetails", r.chartHandler.InnerExportDetails)
-		chartDataGroup.POST("/innerExportDataSetDetails", r.chartHandler.InnerExportDataSetDetails)
 	}
 	datasetFieldGroup := api.Group("/datasetField")
 	{
