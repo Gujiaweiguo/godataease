@@ -1048,8 +1048,8 @@ func TestChartService_QueryDataWithPermissionFallback(t *testing.T) {
 		data: map[int64]chartRegressionSample{
 			5: {
 				ChartID: 5,
-				Rows: []map[string]interface{}{{"category": "绿茶", "sales_amount": 100.0}},
-				Total: 1,
+				Rows:    []map[string]interface{}{{"category": "绿茶", "sales_amount": 100.0}},
+				Total:   1,
 			},
 		},
 	}
@@ -1074,8 +1074,8 @@ func TestChartService_QueryDataWithoutAxesFallsBackToRows(t *testing.T) {
 		data: map[int64]chartRegressionSample{
 			9: {
 				ChartID: 9,
-				Rows: []map[string]interface{}{{"category": "绿茶", "sales_amount": 100.0}},
-				Total: 1,
+				Rows:    []map[string]interface{}{{"category": "绿茶", "sales_amount": 100.0}},
+				Total:   1,
 			},
 		},
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -307,6 +308,8 @@ type seriesGroup struct {
 	metrics    map[string]*metricAccumulator
 }
 
+const summaryCount = "count"
+
 type metricAccumulator struct {
 	summary string
 	sum     float64
@@ -317,7 +320,7 @@ type metricAccumulator struct {
 }
 
 func (m *metricAccumulator) add(value interface{}, countOnly bool) {
-	if countOnly || m.summary == "count" {
+	if countOnly || m.summary == summaryCount {
 		m.count++
 		return
 	}
@@ -343,7 +346,7 @@ func (m *metricAccumulator) add(value interface{}, countOnly bool) {
 
 func (m *metricAccumulator) value() float64 {
 	switch m.summary {
-	case "count", "count_distinct", "countdistinct":
+	case summaryCount, "count_distinct", "countdistinct":
 		return float64(m.count)
 	case "avg", "average":
 		if m.count == 0 {
@@ -435,7 +438,7 @@ func fieldIDString(field map[string]interface{}) string {
 }
 
 func isCountField(field map[string]interface{}) bool {
-	return strings.TrimSpace(anyToString(field["dataeaseName"])) == "*" || strings.EqualFold(strings.TrimSpace(anyToString(field["summary"])), "count") && preferredFieldKey(field) == "*"
+	return strings.TrimSpace(anyToString(field["dataeaseName"])) == "*" || strings.EqualFold(strings.TrimSpace(anyToString(field["summary"])), summaryCount) && preferredFieldKey(field) == "*"
 }
 
 func cloneRows(rows []map[string]interface{}) []map[string]interface{} {
@@ -503,26 +506,6 @@ func toFloat64(v interface{}) (float64, bool) {
 		return value, true
 	case float32:
 		return float64(value), true
-	case int:
-		return float64(value), true
-	case int8:
-		return float64(value), true
-	case int16:
-		return float64(value), true
-	case int32:
-		return float64(value), true
-	case int64:
-		return float64(value), true
-	case uint:
-		return float64(value), true
-	case uint8:
-		return float64(value), true
-	case uint16:
-		return float64(value), true
-	case uint32:
-		return float64(value), true
-	case uint64:
-		return float64(value), true
 	case json.Number:
 		n, err := value.Float64()
 		if err != nil {
@@ -535,6 +518,18 @@ func toFloat64(v interface{}) (float64, bool) {
 			return 0, false
 		}
 		return n, true
+	default:
+		return intLikeToFloat(value)
+	}
+}
+
+func intLikeToFloat(v interface{}) (float64, bool) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(rv.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(rv.Uint()), true
 	default:
 		return 0, false
 	}
@@ -849,7 +844,7 @@ func countChartField(datasetGroupID int64) chart.ChartField {
 		ExtField:       1,
 		Checked:        true,
 		Desensitized:   false,
-		Summary:        "count",
+		Summary:        summaryCount,
 	}
 }
 
@@ -869,7 +864,7 @@ func convertToChartField(field *dataset.CoreDatasetTableField) chart.ChartField 
 	}
 	summary := "sum"
 	if field.ID == -1 || deType == 0 || deType == 1 || deType == 7 {
-		summary = "count"
+		summary = summaryCount
 	}
 	return chart.ChartField{
 		ID:             field.ID,
