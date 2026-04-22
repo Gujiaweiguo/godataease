@@ -55,6 +55,8 @@ func TestChartServiceIntegration_QueryAndQueryData(t *testing.T) {
 		Title:   chartSvcStringPtr("Sales by Region"),
 		TableID: &dsTable.ID,
 		Type:    chartSvcStringPtr("bar"),
+		XAxis:   chartSvcStringPtr(`[{"id":"1","dataeaseName":"region","originName":"region","name":"Region"}]`),
+		YAxis:   chartSvcStringPtr(`[{"id":"2","dataeaseName":"amount","originName":"amount","name":"Amount","summary":"sum"}]`),
 	}).Error
 	assert.NoError(t, err)
 
@@ -77,6 +79,9 @@ func TestChartServiceIntegration_QueryAndQueryData(t *testing.T) {
 	assert.Len(t, dataResp.Rows, 2)
 	assert.Contains(t, dataResp.Columns, "region")
 	assert.Contains(t, dataResp.Columns, "amount")
+	assert.Len(t, dataResp.Data, 2)
+	assert.Equal(t, "East", dataResp.Data[0].Category)
+	assert.Equal(t, 100.0, dataResp.Data[0].Value)
 }
 
 func TestChartServiceIntegration_SaveFromMap(t *testing.T) {
@@ -270,6 +275,11 @@ func TestChartServiceIntegration_QueryDataWithPermission_AppliesRowAndColumnRule
 	assert.NoError(t, err)
 
 	err = testDB.Create(&chart.CoreChartView{Title: chartSvcStringPtr("Sales by Region Governed"), TableID: &dsTable.ID, Type: chartSvcStringPtr("bar")}).Error
+	assert.NoError(t, err)
+	err = testDB.Model(&chart.CoreChartView{}).Where("title = ?", "Sales by Region Governed").Updates(map[string]interface{}{
+		"x_axis": `[{"id":"1","dataeaseName":"region","originName":"region","name":"Region"}]`,
+		"y_axis": `[{"id":"2","dataeaseName":"amount","originName":"amount","name":"Amount","summary":"sum"}]`,
+	}).Error
 	assert.NoError(t, err)
 	var view chart.CoreChartView
 	err = testDB.Where("title = ?", "Sales by Region Governed").First(&view).Error

@@ -267,7 +267,7 @@ func TestChartQueryData_RegressionSamples(t *testing.T) {
 		data: make(map[int64]chartRegressionSample),
 	}
 	for _, sample := range set.Samples {
-		repo.byID[sample.ChartID] = &chart.CoreChartView{ID: sample.ChartID}
+		repo.byID[sample.ChartID] = &chart.CoreChartView{ID: sample.ChartID, Type: chartStringPtr("table-info")}
 		repo.data[sample.ChartID] = sample
 	}
 
@@ -302,8 +302,91 @@ func TestChartQueryData_RegressionSamples(t *testing.T) {
 			if !reflect.DeepEqual(resp.Rows, expectedRows) {
 				t.Fatalf("unexpected rows: got=%v want=%v", resp.Rows, expectedRows)
 			}
+			if !reflect.DeepEqual(resp.TableRow, expectedRows) {
+				t.Fatalf("unexpected tableRow: got=%v want=%v", resp.TableRow, expectedRows)
+			}
 		})
 	}
+}
+
+func TestChartQueryData_BuildsSeriesDataFromPayload(t *testing.T) {
+	repo := &fakeChartRepo{
+		byID: map[int64]*chart.CoreChartView{5: {ID: 5}},
+		data: map[int64]chartRegressionSample{
+			5: {
+				ChartID: 5,
+				Rows: []map[string]interface{}{
+					{"category": "绿茶", "sales_amount": 100.0},
+					{"category": "绿茶", "sales_amount": 2520.0},
+					{"category": "红茶", "sales_amount": 800.0},
+				},
+				Total: 3,
+			},
+		},
+	}
+
+	svc := NewChartService(repo)
+	resp, err := svc.QueryData(&chart.ChartDataRequest{
+		ID: 5,
+		Payload: map[string]interface{}{
+			"id":   5.0,
+			"type": "bar",
+			"xAxis": []interface{}{
+				map[string]interface{}{"id": "2", "dataeaseName": "category", "originName": "category", "name": "分类"},
+			},
+			"yAxis": []interface{}{
+				map[string]interface{}{"id": "5", "dataeaseName": "sales_amount", "originName": "sales_amount", "name": "销售额", "summary": "sum"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Data, 2)
+	assert.Equal(t, "绿茶", resp.Data[0].Category)
+	assert.Equal(t, 2620.0, resp.Data[0].Value)
+	assert.Equal(t, "2", resp.Data[0].DimensionList[0].ID)
+	assert.Equal(t, "5", resp.Data[0].QuotaList[0].ID)
+}
+
+func TestChartQueryData_BuildsTableInfoDataFromPayload(t *testing.T) {
+	repo := &fakeChartRepo{
+		byID: map[int64]*chart.CoreChartView{8: {ID: 8}},
+		data: map[int64]chartRegressionSample{
+			8: {
+				ChartID: 8,
+				Rows: []map[string]interface{}{
+					{"product_name": "龙井茶", "category": "绿茶", "sales_amount": 100.0},
+				},
+				Total: 1,
+			},
+		},
+	}
+
+	svc := NewChartService(repo)
+	resp, err := svc.QueryData(&chart.ChartDataRequest{
+		ID: 8,
+		Payload: map[string]interface{}{
+			"id":   8.0,
+			"type": "table-info",
+			"xAxis": []interface{}{
+				map[string]interface{}{"id": "4", "dataeaseName": "f_product_name", "originName": "product_name", "name": "产品"},
+			},
+			"yAxis": []interface{}{
+				map[string]interface{}{"id": "2", "dataeaseName": "f_category", "originName": "category", "name": "分类"},
+				map[string]interface{}{"id": "5", "dataeaseName": "f_sales_amount", "originName": "sales_amount", "name": "销售额"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Fields, 1)
+	require.Len(t, resp.SourceFields, 3)
+	require.Len(t, resp.TableRow, 1)
+	assert.Equal(t, "龙井茶", resp.TableRow[0]["f_product_name"])
+	assert.Equal(t, "绿茶", resp.TableRow[0]["f_category"])
+	assert.Equal(t, 100.0, resp.TableRow[0]["f_sales_amount"])
+}
+
+func chartStringPtr(v string) *string {
+	return &v
 }
 
 func TestChartListByDQ_SplitsAndCount(t *testing.T) {
