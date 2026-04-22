@@ -766,9 +766,10 @@ func (r *Router) registerVisualizationDe2DetailRoute(api *gin.RouterGroup) {
 	visualGroup := api.Group("/dataVisualization")
 	if r.permMiddleware != nil {
 		visualGroup.POST("/findById", r.permMiddleware.CheckVisualizationView(), r.visualHandler.FindByID)
-		return
+	} else {
+		visualGroup.POST("/findById", r.visualHandler.FindByID)
 	}
-	visualGroup.POST("/findById", r.visualHandler.FindByID)
+	visualGroup.POST("/tree", r.visualHandler.Tree)
 }
 
 func (r *Router) registerDatasetRoutes(api *gin.RouterGroup) {
