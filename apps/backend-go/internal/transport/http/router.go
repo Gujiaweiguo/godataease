@@ -665,6 +665,10 @@ func (r *Router) registerAPIRoutes() {
 			copilot.POST("/clearAll", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
 		}
 
+		api.GET("/DEXPack.umd.js", func(c *gin.Context) {
+			c.String(http.StatusNotFound, "not found")
+		})
+
 		api.POST("/login/platformLogin/:origin", func(c *gin.Context) {
 			c.JSON(200, gin.H{"code": "500000", "data": nil, "msg": "Platform login not supported"})
 		})
