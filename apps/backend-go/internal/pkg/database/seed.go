@@ -608,9 +608,9 @@ type demoDashboardBackgroundRadius struct {
 }
 
 type demoDashboardEvents struct {
-	Checked bool                      `json:"checked"`
-	Type    string                    `json:"type"`
-	Jump    demoDashboardEventJump    `json:"jump,omitempty"`
+	Checked bool                   `json:"checked"`
+	Type    string                 `json:"type"`
+	Jump    demoDashboardEventJump `json:"jump,omitempty"`
 }
 
 type demoDashboardEventJump struct {
