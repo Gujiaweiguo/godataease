@@ -967,3 +967,126 @@ func TestChartService_RemainingBranches(t *testing.T) {
 		assert.Equal(t, "update failed", err.Error())
 	})
 }
+
+func TestMetricAccumulatorBranches(t *testing.T) {
+	t.Run("add and value cover summary branches", func(t *testing.T) {
+		avgAcc := &metricAccumulator{summary: "avg"}
+		avgAcc.add(10.0, false)
+		avgAcc.add(20.0, false)
+		assert.Equal(t, 15.0, avgAcc.value())
+
+		averageEmpty := &metricAccumulator{summary: "average"}
+		assert.Equal(t, 0.0, averageEmpty.value())
+
+		minAcc := &metricAccumulator{summary: "min"}
+		minAcc.add(10.0, false)
+		minAcc.add(5.0, false)
+		assert.Equal(t, 5.0, minAcc.value())
+
+		minEmpty := &metricAccumulator{summary: "min"}
+		assert.Equal(t, 0.0, minEmpty.value())
+
+		maxAcc := &metricAccumulator{summary: "max"}
+		maxAcc.add(10.0, false)
+		maxAcc.add(25.0, false)
+		assert.Equal(t, 25.0, maxAcc.value())
+
+		maxEmpty := &metricAccumulator{summary: "max"}
+		assert.Equal(t, 0.0, maxEmpty.value())
+
+		countAcc := &metricAccumulator{summary: "count"}
+		countAcc.add("ignored", false)
+		countAcc.add(10, true)
+		assert.Equal(t, 2.0, countAcc.value())
+
+		countDistinctAcc := &metricAccumulator{summary: "count_distinct"}
+		countDistinctAcc.add("ignored", true)
+		assert.Equal(t, 1.0, countDistinctAcc.value())
+
+		countDistinctCompactAcc := &metricAccumulator{summary: "countdistinct"}
+		countDistinctCompactAcc.add("ignored", true)
+		assert.Equal(t, 1.0, countDistinctCompactAcc.value())
+
+		sumAcc := &metricAccumulator{summary: "sum"}
+		sumAcc.add("not-a-number", false)
+		sumAcc.add(4.0, false)
+		assert.Equal(t, 4.0, sumAcc.value())
+	})
+}
+
+func TestBoolFromAny(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{name: "bool true", input: true, want: true},
+		{name: "string true", input: "true", want: true},
+		{name: "string one", input: "1", want: true},
+		{name: "float non zero", input: float64(2), want: true},
+		{name: "int zero", input: 0, want: false},
+		{name: "json number one", input: json.Number("1"), want: true},
+		{name: "default false", input: struct{}{}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, boolFromAny(tt.input))
+		})
+	}
+}
+
+func TestChartService_QueryDataWithPermissionFallback(t *testing.T) {
+	render := "antv"
+	chartType := "bar"
+	xAxis := `[{"id":"2","dataeaseName":"category","originName":"category","name":"分类"}]`
+	yAxis := `[{"id":"5","dataeaseName":"sales_amount","originName":"sales_amount","name":"销售额","summary":"sum"}]`
+	repo := &fakeChartRepo{
+		byID: map[int64]*chart.CoreChartView{
+			5: {ID: 5, Render: &render, Type: &chartType, XAxis: &xAxis, YAxis: &yAxis},
+		},
+		data: map[int64]chartRegressionSample{
+			5: {
+				ChartID: 5,
+				Rows: []map[string]interface{}{{"category": "绿茶", "sales_amount": 100.0}},
+				Total: 1,
+			},
+		},
+	}
+	svc := NewChartService(repo)
+	resultCount := 10
+
+	resp, err := svc.QueryDataWithPermission(&chart.ChartDataRequest{ID: 5, ResultCount: &resultCount}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Len(t, resp.Data, 1)
+	assert.Equal(t, "绿茶", resp.Data[0].Name)
+	assert.Equal(t, 100.0, resp.Data[0].Value)
+}
+
+func TestChartService_QueryDataWithoutAxesFallsBackToRows(t *testing.T) {
+	render := "antv"
+	chartType := "bar"
+	repo := &fakeChartRepo{
+		byID: map[int64]*chart.CoreChartView{
+			9: {ID: 9, Render: &render, Type: &chartType},
+		},
+		data: map[int64]chartRegressionSample{
+			9: {
+				ChartID: 9,
+				Rows: []map[string]interface{}{{"category": "绿茶", "sales_amount": 100.0}},
+				Total: 1,
+			},
+		},
+	}
+	svc := NewChartService(repo)
+	resultCount := 10
+
+	resp, err := svc.QueryData(&chart.ChartDataRequest{ID: 9, ResultCount: &resultCount})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.Data)
+	assert.Len(t, resp.TableRow, 1)
+	assert.Equal(t, "绿茶", resp.TableRow[0]["category"])
+	assert.Equal(t, 100.0, resp.TableRow[0]["sales_amount"])
+}
