@@ -5,6 +5,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // OuterParamsHandler handles HTTP requests for dashboard external parameters.
@@ -36,7 +37,7 @@ func (h *OuterParamsHandler) QueryWithVisualizationId(c *gin.Context) {
 func (h *OuterParamsHandler) UpdateOuterParamsSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto service.OuterParamsDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

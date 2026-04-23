@@ -18,6 +18,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 const pkSeparator = "-pk_separator-"
@@ -45,7 +46,7 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 
 func (h *AuthHandler) LocalLogin(c *gin.Context) {
 	var dto auth.PwdLoginDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

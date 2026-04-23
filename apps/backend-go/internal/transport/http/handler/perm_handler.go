@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type PermHandler struct {
@@ -22,7 +23,7 @@ func NewPermHandler(permService *service.PermService) *PermHandler {
 
 func (h *PermHandler) ListPerms(c *gin.Context) {
 	var req permission.PermQueryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		req.Current = 1
 		req.Size = 10
 	}
@@ -38,7 +39,7 @@ func (h *PermHandler) ListPerms(c *gin.Context) {
 
 func (h *PermHandler) CreatePerm(c *gin.Context) {
 	var req permission.PermCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -54,7 +55,7 @@ func (h *PermHandler) CreatePerm(c *gin.Context) {
 
 func (h *PermHandler) UpdatePerm(c *gin.Context) {
 	var req permission.PermUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

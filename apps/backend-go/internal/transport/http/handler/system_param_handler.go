@@ -6,6 +6,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type SystemParamHandler struct {
@@ -27,7 +28,7 @@ func (h *SystemParamHandler) QueryBasic(c *gin.Context) {
 
 func (h *SystemParamHandler) SaveBasic(c *gin.Context) {
 	var req []system.SettingItem
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -59,7 +60,7 @@ func (h *SystemParamHandler) QueryOnlineMapByType(c *gin.Context) {
 
 func (h *SystemParamHandler) SaveOnlineMap(c *gin.Context) {
 	var req system.OnlineMapEditor
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -81,7 +82,7 @@ func (h *SystemParamHandler) QuerySQLBot(c *gin.Context) {
 
 func (h *SystemParamHandler) SaveSQLBot(c *gin.Context) {
 	var req system.SQLBotConfig
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

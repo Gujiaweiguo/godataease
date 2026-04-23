@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type datasourceTreeNode struct {
@@ -135,7 +136,7 @@ func sanitizeDatasourceResponse(ds *datasource.CoreDatasource, dsService *servic
 
 func parseTableRequest(c *gin.Context) (*datasource.TableRequest, bool) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return nil, false
 	}

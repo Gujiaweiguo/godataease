@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/pkg/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 func registerDatasourceCompatRoutes(
@@ -78,7 +79,7 @@ func registerDatasourceCompatDeleteRoutes(r gin.IRouter, datasourceHandler *Data
 
 func (h *DatasourceHandler) treeCompat(c *gin.Context) {
 	var req datasource.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -249,7 +250,7 @@ func (h *DatasourceHandler) updateCompat(c *gin.Context) {
 
 func (h *DatasourceHandler) moveCompat(c *gin.Context) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -272,7 +273,7 @@ func (h *DatasourceHandler) moveCompat(c *gin.Context) {
 
 func (h *DatasourceHandler) renameCompat(c *gin.Context) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -292,7 +293,7 @@ func (h *DatasourceHandler) renameCompat(c *gin.Context) {
 
 func (h *DatasourceHandler) createFolderCompat(c *gin.Context) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -324,7 +325,7 @@ func (h *DatasourceHandler) checkRepeatCompat(c *gin.Context) {
 
 func (h *DatasourceHandler) checkAPIDatasourceCompat(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -343,7 +344,7 @@ func (h *DatasourceHandler) loadRemoteFileCompat(c *gin.Context) {
 		Password     string `json:"passwd"`
 		DatasourceID int64  `json:"datasourceId"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -357,7 +358,7 @@ func (h *DatasourceHandler) loadRemoteFileCompat(c *gin.Context) {
 
 func (h *DatasourceHandler) syncAPITableCompat(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -371,7 +372,7 @@ func (h *DatasourceHandler) syncAPITableCompat(c *gin.Context) {
 
 func (h *DatasourceHandler) syncAPIDsCompat(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

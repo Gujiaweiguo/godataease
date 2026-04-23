@@ -10,6 +10,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type SyncHandler struct {
@@ -26,7 +27,7 @@ func (h *SyncHandler) SourceDatasourcePager(c *gin.Context) {
 		return
 	}
 	var req datasource.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !isEOFBindError(err) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -44,7 +45,7 @@ func (h *SyncHandler) TargetDatasourcePager(c *gin.Context) {
 		return
 	}
 	var req datasource.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !isEOFBindError(err) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -73,7 +74,7 @@ func (h *SyncHandler) LatestUse(c *gin.Context) {
 
 func (h *SyncHandler) ValidateDatasource(c *gin.Context) {
 	var req datasource.ValidateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -109,7 +110,7 @@ func (h *SyncHandler) GetSchemas(c *gin.Context) {
 
 func (h *SyncHandler) SaveDatasource(c *gin.Context) {
 	var req datasource.WriteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -136,7 +137,7 @@ func (h *SyncHandler) GetDatasource(c *gin.Context) {
 
 func (h *SyncHandler) UpdateDatasource(c *gin.Context) {
 	var req datasource.WriteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -162,7 +163,7 @@ func (h *SyncHandler) DeleteDatasource(c *gin.Context) {
 
 func (h *SyncHandler) BatchDeleteDatasource(c *gin.Context) {
 	var ids []string
-	if err := c.ShouldBindJSON(&ids); err != nil {
+	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -180,7 +181,7 @@ func (h *SyncHandler) BatchDeleteDatasource(c *gin.Context) {
 
 func (h *SyncHandler) GetDatasourceFields(c *gin.Context) {
 	var req syncmodule.SyncDatasourceFieldRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -220,7 +221,7 @@ func (h *SyncHandler) TaskPager(c *gin.Context) {
 		return
 	}
 	var req syncmodule.TaskGridRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !isEOFBindError(err) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -247,7 +248,7 @@ func (h *SyncHandler) GetTask(c *gin.Context) {
 
 func (h *SyncHandler) AddTask(c *gin.Context) {
 	var req syncmodule.TaskInfo
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -260,7 +261,7 @@ func (h *SyncHandler) AddTask(c *gin.Context) {
 
 func (h *SyncHandler) UpdateTask(c *gin.Context) {
 	var req syncmodule.TaskInfo
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -285,7 +286,7 @@ func (h *SyncHandler) RemoveTask(c *gin.Context) {
 
 func (h *SyncHandler) BatchDeleteTasks(c *gin.Context) {
 	var ids []string
-	if err := c.ShouldBindJSON(&ids); err != nil {
+	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -344,7 +345,7 @@ func (h *SyncHandler) TaskLogPager(c *gin.Context) {
 		return
 	}
 	var req syncmodule.TaskLogGridRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !isEOFBindError(err) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -388,7 +389,7 @@ func (h *SyncHandler) DeleteTaskLog(c *gin.Context) {
 
 func (h *SyncHandler) ClearTaskLog(c *gin.Context) {
 	var req syncmodule.TaskLog
-	if err := c.ShouldBindJSON(&req); err != nil && !isEOFBindError(err) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

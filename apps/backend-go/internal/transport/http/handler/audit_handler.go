@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type AuditHandler struct {
@@ -23,7 +24,7 @@ func NewAuditHandler(auditService *service.AuditService) *AuditHandler {
 
 func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
 	var req audit.AuditLogCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
@@ -139,7 +140,7 @@ type ExportRequest struct {
 
 func (h *AuditHandler) ExportAuditLogs(c *gin.Context) {
 	var req ExportRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
@@ -172,7 +173,7 @@ type RetentionRequest struct {
 
 func (h *AuditHandler) DeleteAuditLogsRetention(c *gin.Context) {
 	var req RetentionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		req.Days = 90
 	}
 
@@ -189,7 +190,7 @@ func (h *AuditHandler) DeleteAuditLogsRetention(c *gin.Context) {
 
 func (h *AuditHandler) RecordLoginFailure(c *gin.Context) {
 	var req audit.LoginFailureRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}

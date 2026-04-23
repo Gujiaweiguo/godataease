@@ -11,6 +11,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type StaticHandler struct {
@@ -149,7 +150,7 @@ func (h *StaticHandler) FindResourceAsBase64(c *gin.Context) {
 	var req struct {
 		ResourcePathList []string `json:"resourcePathList"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 )
 
@@ -33,7 +34,7 @@ type StoreQueryRequest struct {
 func (h *StoreHandler) Execute(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req StoreExecuteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -98,7 +99,7 @@ func (h *StoreHandler) Favorited(c *gin.Context) {
 func (h *StoreHandler) Query(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req StoreQueryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

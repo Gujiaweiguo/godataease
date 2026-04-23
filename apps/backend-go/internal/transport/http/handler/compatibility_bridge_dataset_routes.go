@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 func registerDatasetCompatRoutes(r gin.IRouter, datasetHandler *DatasetHandler, permMiddleware *middleware.PermissionMiddleware) {
@@ -177,7 +178,7 @@ func registerDatasetDataCompatRoutes(g *gin.RouterGroup, datasetHandler *Dataset
 	g.POST("/previewData", datasetHandler.Preview)
 	g.POST("/getDatasetTotal", func(c *gin.Context) {
 		var body map[string]interface{}
-		if err := c.ShouldBindJSON(&body); err != nil {
+		if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}
@@ -195,7 +196,7 @@ func registerDatasetDataCompatRoutes(g *gin.RouterGroup, datasetHandler *Dataset
 	})
 	g.POST("/previewSql", func(c *gin.Context) {
 		var req dataset.SQLPreviewRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}

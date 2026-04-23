@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type DatasourceHandler struct {
@@ -21,7 +22,7 @@ func NewDatasourceHandler(service *service.DatasourceService) *DatasourceHandler
 
 func (h *DatasourceHandler) List(c *gin.Context) {
 	var req datasource.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -37,7 +38,7 @@ func (h *DatasourceHandler) List(c *gin.Context) {
 
 func (h *DatasourceHandler) Validate(c *gin.Context) {
 	var req datasource.ValidateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -71,7 +72,7 @@ func (h *DatasourceHandler) ValidateByID(c *gin.Context) {
 
 func (h *DatasourceHandler) Tree(c *gin.Context) {
 	var req datasource.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -272,7 +273,7 @@ func (h *DatasourceHandler) PreviewData(c *gin.Context) {
 
 func (h *DatasourceHandler) SyncApiTable(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -288,7 +289,7 @@ func (h *DatasourceHandler) SyncApiTable(c *gin.Context) {
 
 func (h *DatasourceHandler) SyncApiDs(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -309,7 +310,7 @@ func (h *DatasourceHandler) LoadRemoteFile(c *gin.Context) {
 		Password     string `json:"passwd"`
 		DatasourceID int64  `json:"datasourceId"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -430,7 +431,7 @@ func (h *DatasourceHandler) CreateFolder(c *gin.Context) {
 
 func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 	var req map[string]string
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

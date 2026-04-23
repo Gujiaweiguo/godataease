@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 const embeddedDefaultUpdateBy = "system"
@@ -52,7 +53,7 @@ func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
 
 func (h *EmbeddedHandler) Create(c *gin.Context) {
 	var req embedded.EmbeddedCreator
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -69,7 +70,7 @@ func (h *EmbeddedHandler) Create(c *gin.Context) {
 
 func (h *EmbeddedHandler) Edit(c *gin.Context) {
 	var req embedded.EmbeddedEditor
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -103,7 +104,7 @@ func (h *EmbeddedHandler) BatchDelete(c *gin.Context) {
 	var req struct {
 		Ids []int64 `json:"ids" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -123,7 +124,7 @@ func (h *EmbeddedHandler) BatchDelete(c *gin.Context) {
 
 func (h *EmbeddedHandler) Reset(c *gin.Context) {
 	var req embedded.EmbeddedResetRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -149,7 +150,7 @@ func (h *EmbeddedHandler) DomainList(c *gin.Context) {
 
 func (h *EmbeddedHandler) InitIframe(c *gin.Context) {
 	var req embedded.EmbeddedOrigin
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

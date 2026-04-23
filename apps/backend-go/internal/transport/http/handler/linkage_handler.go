@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type LinkageHandler struct {
@@ -20,7 +21,7 @@ func NewLinkageHandler(service *service.LinkageService) *LinkageHandler {
 func (h *LinkageHandler) GetViewLinkageGather(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -35,7 +36,7 @@ func (h *LinkageHandler) GetViewLinkageGather(c *gin.Context) {
 func (h *LinkageHandler) GetViewLinkageGatherArray(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -50,7 +51,7 @@ func (h *LinkageHandler) GetViewLinkageGatherArray(c *gin.Context) {
 func (h *LinkageHandler) SaveLinkage(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -81,7 +82,7 @@ func (h *LinkageHandler) GetVisualizationAllLinkageInfo(c *gin.Context) {
 func (h *LinkageHandler) UpdateLinkageActive(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -96,7 +97,7 @@ func (h *LinkageHandler) UpdateLinkageActive(c *gin.Context) {
 func (h *LinkageHandler) RemoveLinkage(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

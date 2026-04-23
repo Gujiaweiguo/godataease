@@ -8,6 +8,7 @@ import (
 	transportmiddleware "dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type resourceGovernanceService interface {
@@ -46,7 +47,7 @@ func (h *ResourceGovernanceHandler) BackfillResources(c *gin.Context) {
 	}
 
 	var req resourceGovernanceBackfillRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

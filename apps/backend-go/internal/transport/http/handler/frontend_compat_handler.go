@@ -14,6 +14,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type FrontendCompatHandler struct {
@@ -154,7 +155,7 @@ func (h *FrontendCompatHandler) loadRuntimeMenus(c *gin.Context) ([]*menu.MenuVO
 
 func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
 	var requestMap map[string]interface{}
-	if err := c.ShouldBindJSON(&requestMap); err != nil {
+	if err := c.ShouldBindBodyWith(&requestMap, binding.JSON); err != nil {
 		requestMap = make(map[string]interface{})
 	}
 

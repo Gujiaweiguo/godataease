@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +27,7 @@ func NewDatasetHandler(dsSvc *service.DatasetService, chartSvc *service.ChartSer
 
 func (h *DatasetHandler) Tree(c *gin.Context) {
 	var req dataset.TreeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -42,7 +43,7 @@ func (h *DatasetHandler) Tree(c *gin.Context) {
 
 func (h *DatasetHandler) Fields(c *gin.Context) {
 	var req dataset.FieldsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -58,7 +59,7 @@ func (h *DatasetHandler) Fields(c *gin.Context) {
 
 func (h *DatasetHandler) Preview(c *gin.Context) {
 	var req dataset.PreviewRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -74,7 +75,7 @@ func (h *DatasetHandler) Preview(c *gin.Context) {
 
 func (h *DatasetHandler) PreviewWithPermission(c *gin.Context) {
 	var req dataset.PreviewRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -284,7 +285,7 @@ func (h *DatasetHandler) BarInfo(c *gin.Context) {
 func (h *DatasetHandler) GetDatasetTotal(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -304,7 +305,7 @@ func (h *DatasetHandler) GetDatasetTotal(c *gin.Context) {
 func (h *DatasetHandler) PreviewSQL(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req dataset.SQLPreviewRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -403,7 +404,7 @@ func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
 func (h *DatasetHandler) SaveField(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var field dataset.CoreDatasetTableField
-	if err := c.ShouldBindJSON(&field); err != nil {
+	if err := c.ShouldBindBodyWith(&field, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -468,7 +469,7 @@ func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
 	var req struct {
 		DsIds []int64 `json:"dsIds"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -509,7 +510,7 @@ func (h *DatasetHandler) DetailWithPerm(c *gin.Context) {
 func (h *DatasetHandler) ExportDataset(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req dataset.ExportDatasetRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

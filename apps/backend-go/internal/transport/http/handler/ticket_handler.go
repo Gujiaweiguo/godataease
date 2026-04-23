@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type TicketHandler struct {
@@ -19,7 +20,7 @@ func NewTicketHandler(service *service.TicketService) *TicketHandler {
 
 func (h *TicketHandler) Create(c *gin.Context) {
 	var req ticket.TicketCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

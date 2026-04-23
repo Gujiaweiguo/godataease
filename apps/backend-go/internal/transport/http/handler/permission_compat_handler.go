@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type PermissionCompatHandler struct {
@@ -121,7 +122,7 @@ func (h *PermissionCompatHandler) MenuPermission(c *gin.Context) {
 
 func (h *PermissionCompatHandler) SaveMenuPer(c *gin.Context) {
 	var req menuSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -167,7 +168,7 @@ func (h *PermissionCompatHandler) BusiPermission(c *gin.Context) {
 
 func (h *PermissionCompatHandler) SaveBusiPer(c *gin.Context) {
 	var req permissionSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -225,7 +226,7 @@ func (h *PermissionCompatHandler) BusiResource(c *gin.Context) {
 
 func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 	var req targetPermissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -257,7 +258,7 @@ func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 
 func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
 	var req businessTargetPermissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -282,7 +283,7 @@ func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
 
 func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
 	var req userPerspectiveCompatRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -325,7 +326,7 @@ func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
 
 func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 	var req targetPermissionSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -362,7 +363,7 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 
 func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 	var req targetPermissionSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

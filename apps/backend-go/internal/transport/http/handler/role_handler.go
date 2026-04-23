@@ -10,6 +10,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type RoleHandler struct {
@@ -65,7 +66,7 @@ func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
 
 func (h *RoleHandler) Page(c *gin.Context) {
 	var req role.RolePageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -81,7 +82,7 @@ func (h *RoleHandler) Page(c *gin.Context) {
 
 func (h *RoleHandler) Create(c *gin.Context) {
 	var req role.RoleCreator
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -99,7 +100,7 @@ func (h *RoleHandler) Create(c *gin.Context) {
 
 func (h *RoleHandler) Edit(c *gin.Context) {
 	var req role.RoleEditor
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -182,7 +183,7 @@ func (h *RoleHandler) getCreateBy(c *gin.Context) string {
 // MountUser 绑定用户到角色
 func (h *RoleHandler) MountUser(c *gin.Context) {
 	var req role.MountUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -205,7 +206,7 @@ func (h *RoleHandler) MountUser(c *gin.Context) {
 // MountExternalUser 绑定组织外用户
 func (h *RoleHandler) MountExternalUser(c *gin.Context) {
 	var req role.MountExternalUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -226,7 +227,7 @@ func (h *RoleHandler) MountExternalUser(c *gin.Context) {
 // UnmountUser 解绑用户
 func (h *RoleHandler) UnmountUser(c *gin.Context) {
 	var req role.UnmountUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -250,7 +251,7 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 // BeforeUnmountInfo 解绑前检查
 func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 	var req role.UnmountUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -289,7 +290,7 @@ func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
 // OptionForUser 用户可选角色
 func (h *RoleHandler) OptionForUser(c *gin.Context) {
 	var req role.RoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -311,7 +312,7 @@ func (h *RoleHandler) OptionForUser(c *gin.Context) {
 // SelectedForUser 用户已选角色
 func (h *RoleHandler) SelectedForUser(c *gin.Context) {
 	var req role.RoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

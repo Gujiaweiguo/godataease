@@ -762,7 +762,7 @@ func (m *PermissionMiddleware) CheckBatchExportPermission(resourceType string) g
 		var req struct {
 			ResourceIDs []int64 `json:"resourceIds"`
 		}
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 			response.BadRequest(c, "invalid request")
 			c.Abort()
 			return
@@ -796,7 +796,7 @@ func (m *PermissionMiddleware) CheckDatasetDataPermission() gin.HandlerFunc {
 			var req struct {
 				DatasetGroupID int64 `json:"datasetGroupId"`
 			}
-			if err := c.ShouldBindJSON(&req); err == nil && req.DatasetGroupID > 0 {
+			if err := c.ShouldBindBodyWith(&req, binding.JSON); err == nil && req.DatasetGroupID > 0 {
 				datasetIDStr = strconv.FormatInt(req.DatasetGroupID, 10)
 			}
 		}

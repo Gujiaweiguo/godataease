@@ -12,6 +12,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type UserHandler struct {
@@ -63,7 +64,7 @@ func (h *UserHandler) SetAuthService(authService *service.AuthService) {
 
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	var req user.UserQueryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -86,7 +87,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req user.UserCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -109,7 +110,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	var req user.UserUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -278,7 +279,7 @@ func (h *UserHandler) SwitchOrg(c *gin.Context) {
 
 func (h *UserHandler) SwitchLanguage(c *gin.Context) {
 	var req user.LangSwitchRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -452,7 +453,7 @@ func (h *UserHandler) SwitchEnable(c *gin.Context) {
 	}
 
 	var req user.UserUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type ExportHandler struct {
@@ -65,7 +66,7 @@ func (h *ExportHandler) Delete(c *gin.Context) {
 
 func (h *ExportHandler) DeleteBatch(c *gin.Context) {
 	var req export.DeleteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "invalid request")
 		return
 	}
