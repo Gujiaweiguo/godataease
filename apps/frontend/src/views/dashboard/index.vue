@@ -145,9 +145,15 @@ const onMobileConfig = () => {
 const loadFinish = ref(false)
 const newWindowFromDiv = ref(false)
 let p: ((value?: unknown) => void) | null = null
+let xpackLoaded = false
+const waitXpackLoaded = new Promise(resolve => {
+  p = resolve
+})
 const XpackLoaded = () => {
+  xpackLoaded = true
   if (p) {
     p(true)
+    p = null
   }
 }
 
@@ -216,9 +222,9 @@ onMounted(async () => {
   if (window.location.hash.includes('#/dashboard')) {
     newWindowFromDiv.value = true
   }
-  await new Promise(resolve => {
-    p = resolve
-  })
+  if (!xpackLoaded) {
+    await waitXpackLoaded
+  }
   loadFinish.value = true
   useEmitt({
     name: 'mobileConfig',
@@ -254,7 +260,7 @@ onMounted(async () => {
         // do init
       })
     }
-  } else if (opt && opt === 'create') {
+  } else if ((opt && opt === 'create') || (!resourceId && !opt)) {
     dataInitState.value = false
     let watermarkBaseInfo: { settingContent?: string } | null = null
     try {
@@ -302,9 +308,6 @@ onMounted(async () => {
       // preOpt
       canvasStyleData.value.component.chartTitle.color = '#000000'
     })
-  } else {
-    let url = '#/panel/index'
-    window.open(url, '_self')
   }
 })
 

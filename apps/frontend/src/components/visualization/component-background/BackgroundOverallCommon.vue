@@ -495,10 +495,13 @@ const reUpload = e => {
   })
 }
 
-const queryBackground = () => {
-  queryVisualizationBackground().then(response => {
-    state.BackgroundShowMap = response.data
-  })
+const queryBackground = async () => {
+  try {
+    const response = await queryVisualizationBackground()
+    state.BackgroundShowMap = response?.data || {}
+  } catch (e) {
+    state.BackgroundShowMap = {}
+  }
 }
 
 const init = () => {
