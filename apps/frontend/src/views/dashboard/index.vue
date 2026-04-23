@@ -39,6 +39,7 @@ import eventBus from '@/utils/eventBus'
 import { useI18n } from '@/hooks/web/useI18n'
 import DashboardHiddenComponent from '@/components/dashboard/DashboardHiddenComponent.vue'
 import { recoverToPublished } from '@/api/visualization/dataVisualization'
+import { createAsyncLoadGate, shouldInitializeDashboardCreate } from '@/utils/dashboardInit'
 const embeddedStore = useEmbedded()
 const { wsCache } = useCache()
 const canvasCacheOutRef = ref(null)
@@ -144,17 +145,9 @@ const onMobileConfig = () => {
 
 const loadFinish = ref(false)
 const newWindowFromDiv = ref(false)
-let p: ((value?: unknown) => void) | null = null
-let xpackLoaded = false
-const waitXpackLoaded = new Promise(resolve => {
-  p = resolve
-})
+const xpackLoadGate = createAsyncLoadGate()
 const XpackLoaded = () => {
-  xpackLoaded = true
-  if (p) {
-    p(true)
-    p = null
-  }
+  xpackLoadGate.markLoaded()
 }
 
 const doUseCache = flag => {
@@ -222,8 +215,8 @@ onMounted(async () => {
   if (window.location.hash.includes('#/dashboard')) {
     newWindowFromDiv.value = true
   }
-  if (!xpackLoaded) {
-    await waitXpackLoaded
+  if (!xpackLoadGate.isLoaded()) {
+    await xpackLoadGate.wait
   }
   loadFinish.value = true
   useEmitt({
@@ -260,7 +253,7 @@ onMounted(async () => {
         // do init
       })
     }
-  } else if ((opt && opt === 'create') || (!resourceId && !opt)) {
+  } else if (shouldInitializeDashboardCreate(resourceId, opt)) {
     dataInitState.value = false
     let watermarkBaseInfo: { settingContent?: string } | null = null
     try {
