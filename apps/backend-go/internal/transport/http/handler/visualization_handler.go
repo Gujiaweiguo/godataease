@@ -148,7 +148,7 @@ func parseJSONStrings(m map[string]interface{}) {
 
 func (h *VisualizationHandler) List(c *gin.Context) {
 	var req visualization.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -185,7 +185,7 @@ const (
 
 func (h *VisualizationHandler) Tree(c *gin.Context) {
 	var req treeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -350,7 +350,7 @@ func validateTreeNodes(nodes []treeNode) error {
 
 func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
 	var req visualization.SaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -398,7 +398,7 @@ func (h *VisualizationHandler) UpdateCheckVersion(c *gin.Context) {
 
 func (h *VisualizationHandler) Copy(c *gin.Context) {
 	var req visualization.CopyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -413,7 +413,7 @@ func (h *VisualizationHandler) Copy(c *gin.Context) {
 
 func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
 	var req visualization.CanvasChangeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -427,7 +427,7 @@ func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
 
 func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
 	var req visualization.UpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -442,7 +442,7 @@ func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
 
 func (h *VisualizationHandler) UpdateBase(c *gin.Context) {
 	var req visualization.UpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -456,7 +456,7 @@ func (h *VisualizationHandler) UpdateBase(c *gin.Context) {
 
 func (h *VisualizationHandler) Move(c *gin.Context) {
 	var req visualization.MoveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -470,7 +470,7 @@ func (h *VisualizationHandler) Move(c *gin.Context) {
 
 func (h *VisualizationHandler) UpdatePublishStatus(c *gin.Context) {
 	var req visualization.UpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -485,7 +485,7 @@ func (h *VisualizationHandler) UpdatePublishStatus(c *gin.Context) {
 
 func (h *VisualizationHandler) RecoverToPublished(c *gin.Context) {
 	var req visualization.DetailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -516,7 +516,7 @@ func (h *VisualizationHandler) DeleteLogic(c *gin.Context) {
 
 func (h *VisualizationHandler) NameCheck(c *gin.Context) {
 	var req visualization.NameCheckRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -576,7 +576,7 @@ func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
 
 func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
 	var req visualization.AppCanvasNameCheckRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -594,7 +594,7 @@ func (h *VisualizationHandler) GetComponentInfo(c *gin.Context) {
 
 func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
 	var req visualization.Export2AppCheckRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -624,7 +624,7 @@ func (h *VisualizationHandler) ExportLogImg(c *gin.Context) {
 
 func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 	var req visualization.ExportLogRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -655,7 +655,7 @@ func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 
 func (h *VisualizationHandler) Decompression(c *gin.Context) {
 	var req visualization.DecompressionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
