@@ -531,6 +531,7 @@ func (r *Router) registerAPIRoutes() {
 	visualizationDe2API := r.engine.Group("/de2api")
 	visualizationAPI := api
 	auditAPI := api
+	watermarkAPI := api
 	exportAPI := api
 	menuWriteAPI := api
 	storeAPI := api
@@ -584,6 +585,10 @@ func (r *Router) registerAPIRoutes() {
 		protectedAuditAPI.Use(middleware.Auth(jwtInstance))
 		auditAPI = protectedAuditAPI
 
+		protectedWatermarkAPI := r.engine.Group("/api")
+		protectedWatermarkAPI.Use(middleware.Auth(jwtInstance))
+		watermarkAPI = protectedWatermarkAPI
+
 		protectedExportAPI := r.engine.Group("/api")
 		protectedExportAPI.Use(middleware.Auth(jwtInstance))
 		exportAPI = protectedExportAPI
@@ -633,7 +638,8 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterChartDataCompatRoutes(chartDataAPI.Group("/chartData"), r.chartHandler, r.datasetHandler, r.permMiddleware)
 		r.registerVisualizationRoutes(visualizationAPI)
 		r.registerVisualizationDe2DetailRoute(visualizationDe2API)
-		handler.RegisterWatermarkRoutes(api, r.watermarkHandler)
+		handler.RegisterVisualizationBackgroundRoutes(api, r.visualizationBackgroundHandler)
+		handler.RegisterWatermarkRoutes(watermarkAPI, r.watermarkHandler)
 		handler.RegisterSystemParamRoutes(api, r.systemParamHandler)
 		handler.RegisterSystemVariableRoutes(api, r.systemVariableHandler)
 		handler.RegisterLicenseRoutes(api, r.licenseHandler)
