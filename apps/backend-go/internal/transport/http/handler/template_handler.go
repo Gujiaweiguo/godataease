@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type TemplateHandler struct {
@@ -19,7 +20,7 @@ func NewTemplateHandler(service *service.TemplateService) *TemplateHandler {
 
 func (h *TemplateHandler) Create(c *gin.Context) {
 	var req template.TemplateCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -69,7 +70,7 @@ func (h *TemplateHandler) Get(c *gin.Context) {
 
 func (h *TemplateHandler) List(c *gin.Context) {
 	var req template.TemplateListRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -85,7 +86,7 @@ func (h *TemplateHandler) List(c *gin.Context) {
 
 func (h *TemplateHandler) Update(c *gin.Context) {
 	var req template.TemplateUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -194,7 +195,7 @@ func (h *TemplateHandler) NameCheck(c *gin.Context) {
 		ID      string `json:"id"`
 		OptType string `json:"optType"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -215,7 +216,7 @@ func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
 		TemplateNames []string `json:"templateNames"`
 		TemplateArray []string `json:"templateArray"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -236,7 +237,7 @@ func (h *TemplateHandler) BatchDelete(c *gin.Context) {
 	var req struct {
 		IDs []int64 `json:"ids"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type WatermarkHandler struct {
@@ -41,7 +42,7 @@ func (h *WatermarkHandler) Save(c *gin.Context) {
 	}
 
 	var req visualization.WatermarkSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

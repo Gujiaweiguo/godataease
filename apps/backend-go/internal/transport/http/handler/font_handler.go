@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +55,7 @@ func (h *FontHandler) List(c *gin.Context) {
 func (h *FontHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto FontDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -84,7 +85,7 @@ func (h *FontHandler) Create(c *gin.Context) {
 func (h *FontHandler) Edit(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto FontDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

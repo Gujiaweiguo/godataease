@@ -6,6 +6,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type MsgCenterHandler struct {
@@ -27,7 +28,7 @@ func (h *MsgCenterHandler) Count(c *gin.Context) {
 
 func (h *MsgCenterHandler) List(c *gin.Context) {
 	var req msgcenter.ListRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -36,7 +37,7 @@ func (h *MsgCenterHandler) List(c *gin.Context) {
 
 func (h *MsgCenterHandler) Read(c *gin.Context) {
 	var req msgcenter.ReadRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -53,7 +54,7 @@ func (h *MsgCenterHandler) Read(c *gin.Context) {
 
 func (h *MsgCenterHandler) ReadBatch(c *gin.Context) {
 	var req msgcenter.ReadBatchRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

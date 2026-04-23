@@ -27,7 +27,7 @@ func NewChartHandler(svc *service.ChartService, dsSvc *service.DatasetService) *
 
 func (h *ChartHandler) Query(c *gin.Context) {
 	var req chart.ChartQueryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -217,7 +217,7 @@ func (h *ChartHandler) SaveFromMap(c *gin.Context) {
 	defer recoverServicePanic(c)
 
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -379,7 +379,7 @@ func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
 	defer recoverServicePanic(c)
 
 	var req service.ExportChartRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

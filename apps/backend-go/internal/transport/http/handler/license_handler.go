@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type LicenseHandler struct {
@@ -21,7 +22,7 @@ func NewLicenseHandler(service *service.LicenseService) *LicenseHandler {
 
 func (h *LicenseHandler) Validate(c *gin.Context) {
 	var req license.LicenseRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -36,7 +37,7 @@ func (h *LicenseHandler) Validate(c *gin.Context) {
 
 func (h *LicenseHandler) Update(c *gin.Context) {
 	var req license.LicenseRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

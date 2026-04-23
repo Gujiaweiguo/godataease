@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type MenuHandler struct {
@@ -64,7 +65,7 @@ type CreateMenuRequest struct {
 
 func (h *MenuHandler) Create(c *gin.Context) {
 	var req CreateMenuRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -117,7 +118,7 @@ type UpdateMenuRequest struct {
 
 func (h *MenuHandler) Update(c *gin.Context) {
 	var req UpdateMenuRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -175,7 +176,7 @@ type UpdateSortRequest struct {
 
 func (h *MenuHandler) UpdateSort(c *gin.Context) {
 	var req UpdateSortRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -195,7 +196,7 @@ type UpdateHiddenRequest struct {
 
 func (h *MenuHandler) UpdateHidden(c *gin.Context) {
 	var req UpdateHiddenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -12,6 +12,7 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"gorm.io/gorm"
 )
 
@@ -63,7 +64,7 @@ func RegisterChartDataCompatRoutes(chartDataGroup *gin.RouterGroup, chartHandler
 	})
 	chartDataGroup.POST("/innerExportDetails", func(c *gin.Context) {
 		var req service.ExportChartRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}
@@ -81,7 +82,7 @@ func RegisterChartDataCompatRoutes(chartDataGroup *gin.RouterGroup, chartHandler
 	})
 	chartDataGroup.POST("/innerExportDataSetDetails", func(c *gin.Context) {
 		var req service.ExportChartRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}
@@ -179,7 +180,7 @@ func makeCheckSameDataSetHandler(chartHandler *ChartHandler) gin.HandlerFunc {
 func makeChartSaveHandler(chartHandler *ChartHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body map[string]interface{}
-		if err := c.ShouldBindJSON(&body); err != nil {
+		if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}
@@ -309,7 +310,7 @@ func registerDatasetFieldCompatRoutes(datasetFieldGroup *gin.RouterGroup, chartH
 	}
 	datasetFieldGroup.POST("/save", func(c *gin.Context) {
 		var field dataset.CoreDatasetTableField
-		if err := c.ShouldBindJSON(&field); err != nil {
+		if err := c.ShouldBindBodyWith(&field, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}
@@ -385,7 +386,7 @@ func registerDatasetFieldEnumRoutes(datasetFieldGroup *gin.RouterGroup, datasetH
 		var req struct {
 			DsIds []int64 `json:"dsIds"`
 		}
-		if err := c.ShouldBindJSON(&req); err != nil {
+		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 			response.Error(c, "500000", "Invalid request: "+err.Error())
 			return
 		}

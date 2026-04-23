@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type OrgHandler struct {
@@ -22,7 +23,7 @@ func NewOrgHandler(orgService *service.OrgService) *OrgHandler {
 
 func (h *OrgHandler) CreateOrg(c *gin.Context) {
 	var req org.OrgCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -38,7 +39,7 @@ func (h *OrgHandler) CreateOrg(c *gin.Context) {
 
 func (h *OrgHandler) UpdateOrg(c *gin.Context) {
 	var req org.OrgUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -153,7 +154,7 @@ func (h *OrgHandler) CheckOrgName(c *gin.Context) {
 
 func (h *OrgHandler) UpdateOrgStatus(c *gin.Context) {
 	var req org.OrgStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

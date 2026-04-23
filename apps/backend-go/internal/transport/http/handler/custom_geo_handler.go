@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type CustomGeoHandler struct {
@@ -52,7 +53,7 @@ func (h *CustomGeoHandler) SaveGeoArea(c *gin.Context) {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "400000", err.Error())
 		return
 	}
@@ -100,7 +101,7 @@ func (h *CustomGeoHandler) SaveGeoSubArea(c *gin.Context) {
 		Scope     string `json:"scope"`
 		GeoAreaID string `json:"geoAreaId"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "400000", err.Error())
 		return
 	}

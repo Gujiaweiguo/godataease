@@ -15,7 +15,7 @@ import (
 
 func parseDatasetWriteRequest(c *gin.Context, requireName bool) (*dataset.WriteRequest, bool) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return nil, false
 	}
@@ -114,7 +114,7 @@ func dedupeDatasetIDs(ids []int64) []int64 {
 
 func parseEnumValueRequest(c *gin.Context) (*dataset.EnumValueRequest, bool) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return nil, false
 	}
@@ -150,7 +150,7 @@ func parseEnumValueRequest(c *gin.Context) (*dataset.EnumValueRequest, bool) {
 
 func parseMultFieldValuesRequest(c *gin.Context) (*dataset.MultFieldValuesRequest, bool) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return nil, false
 	}
@@ -187,7 +187,7 @@ func parseMultFieldValuesRequest(c *gin.Context) (*dataset.MultFieldValuesReques
 
 func parseEnumFieldID(c *gin.Context) (int64, bool) {
 	var body map[string]interface{}
-	if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) {
+	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return 0, false
 	}

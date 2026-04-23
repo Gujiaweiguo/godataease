@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type RoleMenuHandler struct {
@@ -36,7 +37,7 @@ func (h *RoleMenuHandler) GetRoleMenuAuth(c *gin.Context) {
 
 func (h *RoleMenuHandler) SaveRoleMenuAuth(c *gin.Context) {
 	var req service.SaveRoleMenuRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type ShareHandler struct {
@@ -19,7 +20,7 @@ func NewShareHandler(service *service.ShareService) *ShareHandler {
 
 func (h *ShareHandler) Create(c *gin.Context) {
 	var req share.ShareCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -42,7 +43,7 @@ func (h *ShareHandler) Create(c *gin.Context) {
 
 func (h *ShareHandler) Validate(c *gin.Context) {
 	var req share.ShareValidateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -139,7 +140,7 @@ func (h *ShareHandler) Switcher(c *gin.Context) {
 
 func (h *ShareHandler) EditUUID(c *gin.Context) {
 	var req share.ShareEditUUIDRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -155,7 +156,7 @@ func (h *ShareHandler) EditUUID(c *gin.Context) {
 
 func (h *ShareHandler) EditExp(c *gin.Context) {
 	var req share.ShareEditExpRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -170,7 +171,7 @@ func (h *ShareHandler) EditExp(c *gin.Context) {
 
 func (h *ShareHandler) EditPwd(c *gin.Context) {
 	var req share.ShareEditPwdRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -185,7 +186,7 @@ func (h *ShareHandler) EditPwd(c *gin.Context) {
 
 func (h *ShareHandler) CreateTicket(c *gin.Context) {
 	var req share.TicketCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -201,7 +202,7 @@ func (h *ShareHandler) CreateTicket(c *gin.Context) {
 
 func (h *ShareHandler) ValidateTicket(c *gin.Context) {
 	var req share.TicketValidateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type SystemVariableHandler struct {
@@ -20,7 +21,7 @@ func NewSystemVariableHandler(service *service.SystemVariableService) *SystemVar
 
 func (h *SystemVariableHandler) Create(c *gin.Context) {
 	var req system.SysVariable
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -34,7 +35,7 @@ func (h *SystemVariableHandler) Create(c *gin.Context) {
 
 func (h *SystemVariableHandler) Edit(c *gin.Context) {
 	var req system.SysVariable
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -75,7 +76,7 @@ func (h *SystemVariableHandler) Delete(c *gin.Context) {
 
 func (h *SystemVariableHandler) Query(c *gin.Context) {
 	var req system.SysVariableQueryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -89,7 +90,7 @@ func (h *SystemVariableHandler) Query(c *gin.Context) {
 
 func (h *SystemVariableHandler) CreateValue(c *gin.Context) {
 	var req system.SysVariableValue
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -103,7 +104,7 @@ func (h *SystemVariableHandler) CreateValue(c *gin.Context) {
 
 func (h *SystemVariableHandler) EditValue(c *gin.Context) {
 	var req system.SysVariableValue
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -154,7 +155,7 @@ func (h *SystemVariableHandler) SelectedValuePage(c *gin.Context) {
 		return
 	}
 	var req system.SysVariableValueQueryRequest
-	if err = c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -168,7 +169,7 @@ func (h *SystemVariableHandler) SelectedValuePage(c *gin.Context) {
 
 func (h *SystemVariableHandler) BatchDeleteValues(c *gin.Context) {
 	var ids []int64
-	if err := c.ShouldBindJSON(&ids); err != nil {
+	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type DataPermissionHandler struct {
@@ -54,7 +55,7 @@ func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
 
 func (h *DataPermissionHandler) SaveRowPermission(c *gin.Context) {
 	var req service.RowPermissionForm
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -68,7 +69,7 @@ func (h *DataPermissionHandler) SaveRowPermission(c *gin.Context) {
 
 func (h *DataPermissionHandler) DeleteRowPermission(c *gin.Context) {
 	var req service.DeletePermissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -96,7 +97,7 @@ func (h *DataPermissionHandler) ColumnPermissionPager(c *gin.Context) {
 
 func (h *DataPermissionHandler) SaveColumnPermission(c *gin.Context) {
 	var req service.ColumnPermissionForm
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -110,7 +111,7 @@ func (h *DataPermissionHandler) SaveColumnPermission(c *gin.Context) {
 
 func (h *DataPermissionHandler) DeleteColumnPermission(c *gin.Context) {
 	var req service.DeletePermissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // LinkJumpHandler handles HTTP requests for chart-to-dashboard jump navigation.
@@ -62,7 +63,7 @@ func (h *LinkJumpHandler) QueryWithViewId(c *gin.Context) {
 func (h *LinkJumpHandler) UpdateJumpSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto service.LinkJumpDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -77,7 +78,7 @@ func (h *LinkJumpHandler) UpdateJumpSet(c *gin.Context) {
 func (h *LinkJumpHandler) QueryTargetVisualizationJumpInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkJumpRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -128,7 +129,7 @@ func (h *LinkJumpHandler) ViewTableDetailList(c *gin.Context) {
 func (h *LinkJumpHandler) UpdateJumpSetActive(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkJumpRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
@@ -144,7 +145,7 @@ func (h *LinkJumpHandler) UpdateJumpSetActive(c *gin.Context) {
 func (h *LinkJumpHandler) RemoveJumpSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto service.LinkJumpDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}

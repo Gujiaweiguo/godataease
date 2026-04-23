@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type EngineHandler struct {
@@ -28,7 +29,7 @@ func (h *EngineHandler) GetEngine(c *gin.Context) {
 
 func (h *EngineHandler) Validate(c *gin.Context) {
 	var req engine.ValidateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
