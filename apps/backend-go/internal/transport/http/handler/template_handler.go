@@ -317,14 +317,24 @@ func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
 // BatchDelete deletes multiple templates
 func (h *TemplateHandler) BatchDelete(c *gin.Context) {
 	var req struct {
-		IDs []int64 `json:"ids"`
+		IDs         []int64  `json:"ids"`
+		TemplateIDs []string `json:"templateIds"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
-	for _, id := range req.IDs {
-		_ = h.service.DeleteTemplate(id)
+	deleteIDs := append([]int64{}, req.IDs...)
+	for _, rawID := range req.TemplateIDs {
+		if parsedID, err := strconv.ParseInt(rawID, 10, 64); err == nil && parsedID > 0 {
+			deleteIDs = append(deleteIDs, parsedID)
+		}
+	}
+	for _, id := range deleteIDs {
+		if err := h.service.DeleteTemplate(id); err != nil {
+			response.InternalError(c, "Failed to batch delete templates: "+err.Error())
+			return
+		}
 	}
 	response.Success(c, nil)
 }
