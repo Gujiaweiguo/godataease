@@ -26,22 +26,7 @@ func (h *TemplateHandler) Create(c *gin.Context) {
 		return
 	}
 
-	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
-		if id, ok := uid.(int64); ok {
-			userID = id
-		}
-	}
-
-	createBy := ""
-	if uid, exists := c.Get("userName"); exists {
-		if name, ok := uid.(string); ok {
-			createBy = name
-		}
-	}
-	if createBy == "" {
-		createBy = strconv.FormatInt(userID, 10)
-	}
+	createBy := templateCreateBy(c)
 
 	result, err := h.service.CreateTemplate(&req, createBy)
 	if err != nil {
@@ -59,22 +44,7 @@ func (h *TemplateHandler) Save(c *gin.Context) {
 		return
 	}
 
-	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
-		if id, ok := uid.(int64); ok {
-			userID = id
-		}
-	}
-
-	createBy := ""
-	if uid, exists := c.Get("userName"); exists {
-		if name, ok := uid.(string); ok {
-			createBy = name
-		}
-	}
-	if createBy == "" {
-		createBy = strconv.FormatInt(userID, 10)
-	}
+	createBy := templateCreateBy(c)
 
 	result, err := h.service.SaveTemplate(&req, createBy)
 	if err != nil {
@@ -83,6 +53,23 @@ func (h *TemplateHandler) Save(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+func templateCreateBy(c *gin.Context) string {
+	userID := int64(0)
+	if uid, exists := c.Get("userId"); exists {
+		if id, ok := uid.(int64); ok {
+			userID = id
+		}
+	}
+
+	if uid, exists := c.Get("userName"); exists {
+		if name, ok := uid.(string); ok && name != "" {
+			return name
+		}
+	}
+
+	return strconv.FormatInt(userID, 10)
 }
 
 func (h *TemplateHandler) Get(c *gin.Context) {
