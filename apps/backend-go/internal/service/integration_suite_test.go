@@ -170,6 +170,13 @@ func TestMain(m *testing.M) {
     )`).Error; err != nil {
 		log.Fatalf("Failed to create core_visualization_template table: %v", err)
 	}
+	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS visualization_template_category_map (
+    id VARCHAR(64) PRIMARY KEY,
+    category_id VARCHAR(64),
+    template_id VARCHAR(64)
+    )`).Error; err != nil {
+		log.Fatalf("Failed to create visualization_template_category_map table: %v", err)
+	}
 	if err = testDB.Exec(`CREATE TABLE IF NOT EXISTS core_ticket (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     uuid VARCHAR(255),
