@@ -1,6 +1,8 @@
-export const shouldInitializeDashboardCreate = (resourceId?: unknown, opt?: unknown) => {
+export const shouldInitializeCreateRoute = (resourceId?: unknown, opt?: unknown) => {
   return opt === 'create' || (!resourceId && !opt)
 }
+
+export const shouldInitializeDashboardCreate = shouldInitializeCreateRoute
 
 export const createAsyncLoadGate = () => {
   let loaded = false
