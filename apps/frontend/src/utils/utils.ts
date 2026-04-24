@@ -298,10 +298,28 @@ export const getActiveCategories = contents => {
   const result = ['最近使用']
   if (contents) {
     contents.forEach(item => {
-      if (item.showFlag) {
+      if (item.showFlag === false) {
+        return
+      }
+
+      if (Array.isArray(item.categories)) {
         item.categories.forEach(category => {
-          result.push(category.name)
+          if (category?.name) {
+            result.push(category.name)
+          }
         })
+      }
+
+      if (Array.isArray(item.categoryNames)) {
+        item.categoryNames.forEach(categoryName => {
+          if (categoryName) {
+            result.push(categoryName)
+          }
+        })
+      }
+
+      if (item.category?.label) {
+        result.push(item.category.label)
       }
     })
   }

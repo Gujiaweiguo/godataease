@@ -27,6 +27,7 @@ func (s *TemplateService) CreateTemplate(req *template.TemplateCreateRequest, cr
 	t := &template.Template{
 		Name:          req.Name,
 		Pid:           req.Pid,
+		Level:         req.Level,
 		DvType:        req.DvType,
 		NodeType:      req.NodeType,
 		CreateBy:      createBy,
@@ -56,6 +57,24 @@ func (s *TemplateService) GetTemplate(id int64) (*template.Template, error) {
 }
 
 func (s *TemplateService) ListTemplates(req *template.TemplateListRequest) (*template.TemplateListResponse, error) {
+	if strings.TrimSpace(req.CategoryID) != "" {
+		categoryID := strings.TrimSpace(req.CategoryID)
+		list, err := s.repo.ListByCategory(categoryID, req.DvType)
+		if err != nil {
+			return nil, err
+		}
+
+		total, err := s.repo.CountByCategory(categoryID, req.DvType)
+		if err != nil {
+			return nil, err
+		}
+
+		return &template.TemplateListResponse{
+			List:  list,
+			Total: total,
+		}, nil
+	}
+
 	var pid int64
 	if req.Pid != "" {
 		p, err := strconv.ParseInt(req.Pid, 10, 64)
@@ -78,6 +97,58 @@ func (s *TemplateService) ListTemplates(req *template.TemplateListRequest) (*tem
 		List:  list,
 		Total: total,
 	}, nil
+}
+
+func (s *TemplateService) SaveTemplate(req *template.TemplateSaveRequest, createBy string) (*template.Template, error) {
+	if req.ID > 0 {
+		updated, err := s.UpdateTemplate(&template.TemplateUpdateRequest{
+			ID:            req.ID,
+			Name:          req.Name,
+			Snapshot:      req.Snapshot,
+			TemplateStyle: req.TemplateStyle,
+			TemplateData:  req.TemplateData,
+			DynamicData:   req.DynamicData,
+			AppData:       req.AppData,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if req.NodeType != template.NodeTypeFolder && len(req.Categories) > 0 {
+			if err := s.repo.SyncTemplateCategories(req.ID, req.Categories); err != nil {
+				return nil, err
+			}
+			if firstCategoryID, err := strconv.ParseInt(req.Categories[0], 10, 64); err == nil && firstCategoryID > 0 {
+				if err := s.repo.UpdateTemplatePid(req.ID, firstCategoryID); err != nil {
+					return nil, err
+				}
+				updated.Pid = firstCategoryID
+			}
+		}
+		return updated, nil
+	}
+
+	created, err := s.CreateTemplate(&template.TemplateCreateRequest{
+		Name:          req.Name,
+		Pid:           req.Pid,
+		Level:         req.Level,
+		DvType:        req.DvType,
+		NodeType:      req.NodeType,
+		Snapshot:      req.Snapshot,
+		TemplateType:  req.TemplateType,
+		TemplateStyle: req.TemplateStyle,
+		TemplateData:  req.TemplateData,
+		DynamicData:   req.DynamicData,
+		AppData:       req.AppData,
+	}, createBy)
+	if err != nil {
+		return nil, err
+	}
+	if req.NodeType != template.NodeTypeFolder && len(req.Categories) > 0 {
+		if err := s.repo.SyncTemplateCategories(created.ID, req.Categories); err != nil {
+			return nil, err
+		}
+	}
+	return created, nil
 }
 
 func (s *TemplateService) UpdateTemplate(req *template.TemplateUpdateRequest) (*template.Template, error) {
@@ -172,4 +243,57 @@ func (s *TemplateService) CategoryTemplateNameCheck(name string, categories []st
 		return checkResultNone, nil
 	}
 	return checkResultExistAll, nil
+}
+
+func (s *TemplateService) ListCategories(level string, templateType string) ([]template.Template, error) {
+	parsedLevel := 0
+	if strings.TrimSpace(level) != "" {
+		if value, err := strconv.Atoi(level); err == nil {
+			parsedLevel = value
+		}
+	}
+	return s.repo.ListCategories(parsedLevel, templateType)
+}
+
+func (s *TemplateService) FindCategoriesByTemplateIDs(templateIDs []string) ([]string, error) {
+	return s.repo.FindCategoryIDsByTemplateIDs(templateIDs)
+}
+
+func (s *TemplateService) BatchUpdateCategories(templateIDs []string, categories []string) error {
+	if len(templateIDs) == 0 || len(categories) == 0 {
+		return nil
+	}
+	firstCategoryID, err := strconv.ParseInt(categories[0], 10, 64)
+	if err != nil || firstCategoryID <= 0 {
+		firstCategoryID = 0
+	}
+	for _, rawID := range templateIDs {
+		templateID, parseErr := strconv.ParseInt(rawID, 10, 64)
+		if parseErr != nil || templateID <= 0 {
+			continue
+		}
+		if err := s.repo.SyncTemplateCategories(templateID, categories); err != nil {
+			return err
+		}
+		if firstCategoryID > 0 {
+			if err := s.repo.UpdateTemplatePid(templateID, firstCategoryID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *TemplateService) DeleteCategory(categoryID string) (bool, error) {
+	count, err := s.repo.CountByCategory(categoryID, "")
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return false, nil
+	}
+	if err := s.repo.DeleteCategory(categoryID); err != nil {
+		return false, err
+	}
+	return true, nil
 }

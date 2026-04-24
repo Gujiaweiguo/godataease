@@ -312,6 +312,196 @@ func TestTemplateService_CategoryTemplateNameCheck(t *testing.T) {
 	assert.Equal(t, "none", result)
 }
 
+func TestTemplateService_ListTemplates_ByCategory(t *testing.T) {
+	svc, db := setupTemplateServiceRepoTest(t)
+	categoryA := createTemplateFixture(t, svc, "Category A")
+	categoryA.NodeType = "folder"
+	categoryA.TemplateType = "self"
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", categoryA.ID).Updates(map[string]interface{}{
+		"node_type":     "folder",
+		"template_type": "self",
+		"level":         0,
+	}).Error)
+	categoryB := createTemplateFixture(t, svc, "Category B")
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", categoryB.ID).Updates(map[string]interface{}{
+		"node_type":     "folder",
+		"template_type": "self",
+		"level":         0,
+	}).Error)
+	templateA := createTemplateFixture(t, svc, "Template A")
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", templateA.ID).Update("pid", categoryA.ID).Error)
+	templateB := createTemplateFixture(t, svc, "Template B")
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", templateB.ID).Update("pid", categoryB.ID).Error)
+	require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-a", CategoryID: strconv.FormatInt(categoryA.ID, 10), TemplateID: strconv.FormatInt(templateA.ID, 10)}).Error)
+
+	resp, err := svc.ListTemplates(&template.TemplateListRequest{CategoryID: strconv.FormatInt(categoryA.ID, 10), DvType: "dashboard"})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, int64(1), resp.Total)
+	require.Len(t, resp.List, 1)
+	assert.Equal(t, templateA.ID, resp.List[0].ID)
+}
+
+func TestTemplateService_SaveTemplate(t *testing.T) {
+	t.Run("create with categories", func(t *testing.T) {
+		svc, db := setupTemplateServiceRepoTest(t)
+		category := createTemplateFixture(t, svc, "Save Category")
+		require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", category.ID).Updates(map[string]interface{}{
+			"node_type":     "folder",
+			"template_type": "self",
+			"level":         0,
+		}).Error)
+
+		created, err := svc.SaveTemplate(&template.TemplateSaveRequest{
+			Name:          "Saved Template",
+			Pid:           category.ID,
+			Level:         1,
+			DvType:        "dashboard",
+			NodeType:      "template",
+			TemplateType:  "self",
+			TemplateStyle: `{"layout":1}`,
+			TemplateData:  `[]`,
+			DynamicData:   `{}`,
+			AppData:       `{}`,
+			Categories:    []string{strconv.FormatInt(category.ID, 10)},
+		}, "tester")
+		require.NoError(t, err)
+		require.NotNil(t, created)
+
+		categoryIDs, err := svc.FindCategoriesByTemplateIDs([]string{strconv.FormatInt(created.ID, 10)})
+		require.NoError(t, err)
+		assert.Equal(t, []string{strconv.FormatInt(category.ID, 10)}, categoryIDs)
+	})
+
+	t.Run("update syncs category and pid", func(t *testing.T) {
+		svc, db := setupTemplateServiceRepoTest(t)
+		categoryA := createTemplateFixture(t, svc, "Category A")
+		categoryB := createTemplateFixture(t, svc, "Category B")
+		for _, category := range []*template.Template{categoryA, categoryB} {
+			require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", category.ID).Updates(map[string]interface{}{
+				"node_type":     "folder",
+				"template_type": "self",
+				"level":         0,
+			}).Error)
+		}
+		created := createTemplateFixture(t, svc, "Template To Update")
+		require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-old", CategoryID: strconv.FormatInt(categoryA.ID, 10), TemplateID: strconv.FormatInt(created.ID, 10)}).Error)
+
+		updated, err := svc.SaveTemplate(&template.TemplateSaveRequest{
+			ID:            created.ID,
+			Name:          "Template Updated",
+			NodeType:      "template",
+			TemplateStyle: `{}`,
+			TemplateData:  `[]`,
+			DynamicData:   `{}`,
+			AppData:       `{}`,
+			Categories:    []string{strconv.FormatInt(categoryB.ID, 10)},
+		}, "tester")
+		require.NoError(t, err)
+		require.NotNil(t, updated)
+		assert.Equal(t, categoryB.ID, updated.Pid)
+
+		categoryIDs, err := svc.FindCategoriesByTemplateIDs([]string{strconv.FormatInt(created.ID, 10)})
+		require.NoError(t, err)
+		assert.Equal(t, []string{strconv.FormatInt(categoryB.ID, 10)}, categoryIDs)
+	})
+}
+
+func TestTemplateService_ListCategories(t *testing.T) {
+	svc, db := setupTemplateServiceRepoTest(t)
+	folderA := createTemplateFixture(t, svc, "Folder A")
+	folderB := createTemplateFixture(t, svc, "Folder B")
+	leaf := createTemplateFixture(t, svc, "Leaf")
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", folderA.ID).Updates(map[string]interface{}{
+		"node_type":     "folder",
+		"template_type": "self",
+		"level":         0,
+	}).Error)
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", folderB.ID).Updates(map[string]interface{}{
+		"node_type":     "folder",
+		"template_type": "system",
+		"level":         1,
+	}).Error)
+	require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", leaf.ID).Update("node_type", "template").Error)
+
+	result, err := svc.ListCategories("0", "self")
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, folderA.ID, result[0].ID)
+}
+
+func TestTemplateService_FindCategoriesByTemplateIDs(t *testing.T) {
+	svc, db := setupTemplateServiceRepoTest(t)
+	tpl := createTemplateFixture(t, svc, "Find Category Template")
+	require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-find", CategoryID: "cat-find", TemplateID: strconv.FormatInt(tpl.ID, 10)}).Error)
+
+	result, err := svc.FindCategoriesByTemplateIDs([]string{strconv.FormatInt(tpl.ID, 10)})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"cat-find"}, result)
+}
+
+func TestTemplateService_BatchUpdateCategories(t *testing.T) {
+	svc, db := setupTemplateServiceRepoTest(t)
+	categoryA := createTemplateFixture(t, svc, "Batch Category A")
+	categoryB := createTemplateFixture(t, svc, "Batch Category B")
+	for _, category := range []*template.Template{categoryA, categoryB} {
+		require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", category.ID).Updates(map[string]interface{}{
+			"node_type":     "folder",
+			"template_type": "self",
+			"level":         0,
+		}).Error)
+	}
+	tpl1 := createTemplateFixture(t, svc, "Batch Template 1")
+	tpl2 := createTemplateFixture(t, svc, "Batch Template 2")
+	require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-b1", CategoryID: strconv.FormatInt(categoryA.ID, 10), TemplateID: strconv.FormatInt(tpl1.ID, 10)}).Error)
+
+	err := svc.BatchUpdateCategories(
+		[]string{strconv.FormatInt(tpl1.ID, 10), strconv.FormatInt(tpl2.ID, 10)},
+		[]string{strconv.FormatInt(categoryB.ID, 10)},
+	)
+	require.NoError(t, err)
+
+	result, err := svc.ListTemplates(&template.TemplateListRequest{CategoryID: strconv.FormatInt(categoryB.ID, 10), DvType: "dashboard"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), result.Total)
+}
+
+func TestTemplateService_DeleteCategory(t *testing.T) {
+	t.Run("refuses non-empty category", func(t *testing.T) {
+		svc, db := setupTemplateServiceRepoTest(t)
+		category := createTemplateFixture(t, svc, "Delete Category")
+		require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", category.ID).Updates(map[string]interface{}{
+			"node_type":     "folder",
+			"template_type": "self",
+			"level":         0,
+		}).Error)
+		tpl := createTemplateFixture(t, svc, "Delete Category Template")
+		require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", tpl.ID).Update("pid", category.ID).Error)
+		require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-delete", CategoryID: strconv.FormatInt(category.ID, 10), TemplateID: strconv.FormatInt(tpl.ID, 10)}).Error)
+
+		deleted, err := svc.DeleteCategory(strconv.FormatInt(category.ID, 10))
+		require.NoError(t, err)
+		assert.False(t, deleted)
+	})
+
+	t.Run("deletes empty category", func(t *testing.T) {
+		svc, db := setupTemplateServiceRepoTest(t)
+		category := createTemplateFixture(t, svc, "Empty Category")
+		require.NoError(t, db.Model(&testCoreVisualizationTemplate{}).Where("id = ?", category.ID).Updates(map[string]interface{}{
+			"node_type":     "folder",
+			"template_type": "self",
+			"level":         0,
+		}).Error)
+
+		deleted, err := svc.DeleteCategory(strconv.FormatInt(category.ID, 10))
+		require.NoError(t, err)
+		assert.True(t, deleted)
+
+		_, loadErr := svc.GetTemplate(category.ID)
+		require.Error(t, loadErr)
+	})
+}
+
 func TestTemplateService_DeleteTemplate(t *testing.T) {
 	t.Run("not found returns nil", func(t *testing.T) {
 		svc, _ := setupTemplateServiceRepoTest(t)

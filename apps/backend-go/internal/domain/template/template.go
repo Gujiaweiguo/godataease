@@ -2,6 +2,8 @@ package template
 
 import "time"
 
+const NodeTypeFolder = "folder"
+
 // Template represents a visualization template
 type Template struct {
 	ID            int64      `json:"id"`
@@ -40,16 +42,34 @@ type TemplateListResponse struct {
 
 // TemplateCreateRequest represents request to create a template
 type TemplateCreateRequest struct {
-	Name          string `json:"name" binding:"required"`
-	Pid           int64  `json:"pid"`
-	DvType        string `json:"dvType"`
-	NodeType      string `json:"nodeType"`
-	Snapshot      string `json:"snapshot"`
-	TemplateType  string `json:"templateType"`
-	TemplateStyle string `json:"templateStyle"`
-	TemplateData  string `json:"templateData"`
-	DynamicData   string `json:"dynamicData"`
-	AppData       string `json:"appData"`
+	Name          string   `json:"name" binding:"required"`
+	Pid           int64    `json:"pid"`
+	Level         int      `json:"level"`
+	DvType        string   `json:"dvType"`
+	NodeType      string   `json:"nodeType"`
+	Snapshot      string   `json:"snapshot"`
+	TemplateType  string   `json:"templateType"`
+	TemplateStyle string   `json:"templateStyle"`
+	TemplateData  string   `json:"templateData"`
+	DynamicData   string   `json:"dynamicData"`
+	AppData       string   `json:"appData"`
+	Categories    []string `json:"categories"`
+}
+
+type TemplateSaveRequest struct {
+	ID            int64    `json:"id"`
+	Name          string   `json:"name" binding:"required"`
+	Pid           int64    `json:"pid"`
+	Level         int      `json:"level"`
+	DvType        string   `json:"dvType"`
+	NodeType      string   `json:"nodeType"`
+	Snapshot      string   `json:"snapshot"`
+	TemplateType  string   `json:"templateType"`
+	TemplateStyle string   `json:"templateStyle"`
+	TemplateData  string   `json:"templateData"`
+	DynamicData   string   `json:"dynamicData"`
+	AppData       string   `json:"appData"`
+	Categories    []string `json:"categories"`
 }
 
 // TemplateUpdateRequest represents request to update a template

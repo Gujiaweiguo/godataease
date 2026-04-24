@@ -20,6 +20,7 @@ import (
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/domain/visualization"
 	applogger "dataease/backend/internal/pkg/logger"
+	"time"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -138,8 +139,12 @@ func AutoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	if err := db.AutoMigrate(&coreVisualizationTemplateMigrate{}); err != nil {
+		return err
+	}
+
 	applogger.Info("Database migration completed",
-		zap.Int("tables", len(models)+1),
+		zap.Int("tables", len(models)+2),
 	)
 
 	return nil
@@ -154,3 +159,24 @@ type coreSysSettingMigrate struct {
 }
 
 func (coreSysSettingMigrate) TableName() string { return "core_sys_setting" }
+
+type coreVisualizationTemplateMigrate struct {
+	ID            int64      `gorm:"column:id;primaryKey;autoIncrement"`
+	Name          string     `gorm:"column:name;size:255"`
+	Pid           int64      `gorm:"column:pid;index"`
+	Level         int        `gorm:"column:level"`
+	DvType        string     `gorm:"column:dv_type;size:50"`
+	NodeType      string     `gorm:"column:node_type;size:50"`
+	CreateBy      string     `gorm:"column:create_by;size:255"`
+	CreateTime    *time.Time `gorm:"column:create_time"`
+	Snapshot      string     `gorm:"column:snapshot;type:longtext"`
+	TemplateType  string     `gorm:"column:template_type;size:50"`
+	TemplateStyle string     `gorm:"column:template_style;type:longtext"`
+	TemplateData  string     `gorm:"column:template_data;type:longtext"`
+	DynamicData   string     `gorm:"column:dynamic_data;type:longtext"`
+	AppData       string     `gorm:"column:app_data;type:longtext"`
+	UseCount      int        `gorm:"column:use_count;default:0"`
+	Version       int        `gorm:"column:version;default:3"`
+}
+
+func (coreVisualizationTemplateMigrate) TableName() string { return "core_visualization_template" }

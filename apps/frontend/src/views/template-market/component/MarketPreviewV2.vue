@@ -265,15 +265,17 @@ watch(
 const initMarketTemplate = () => {
   searchMarketPreview()
     .then(rsp => {
-      state.baseUrl = rsp.data.baseUrl
-      state.marketTemplatePreviewShowList = rsp.data.contents
+      state.networkStatus = true
+      state.baseUrl = rsp.data.baseUrl || state.baseUrl
+      state.marketTemplatePreviewShowList = rsp.data.contents || []
       state.hasResult = true
-      state.categories = rsp.data.categories
+      state.categories = rsp.data.categories || []
       initTemplateShow()
       const activeCategoriesShow = getActiveCategories(state.marketTemplatePreviewShowList)
-      state.categories = rsp.data.categories.filter(category =>
+      state.categories = state.categories.filter(category =>
         activeCategoriesShow.has(category.label)
       )
+      state.marketTabs = state.categories.map(category => category.label)
       activeCategories.value = deepCopy(state.categories)
       if (props.previewId) {
         state.marketTemplatePreviewShowList.forEach(categoryTemplates => {
@@ -350,7 +352,7 @@ const asideActiveChange = prop => {
 
 const extFilterActiveChange = () => {
   state.extFilterActive = !state.extFilterActive
-  state.marketActiveTab = state.marketTabs[0]
+  state.marketActiveTab = state.marketTabs?.[0] || null
 }
 const closePreview = () => {
   emits('closePreview')

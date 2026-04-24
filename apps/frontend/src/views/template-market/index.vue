@@ -346,6 +346,9 @@ const categoriesComputed = computed(() => {
 })
 
 const curTemplateImg = computed(() => {
+  if (!state.curTemplate?.thumbnail) {
+    return ''
+  }
   if (
     state.curTemplate.thumbnail.indexOf('http') > -1 ||
     state.curTemplate.thumbnail.indexOf('static-resource') > -1
@@ -418,15 +421,18 @@ const closePreview = () => {
 const initMarketTemplate = async () => {
   await searchMarket()
     .then(rsp => {
-      state.baseUrl = rsp.data.baseUrl
-      state.currentMarketTemplateShowList = rsp.data.contents
+      state.networkStatus = true
+      state.baseUrl = rsp.data.baseUrl || state.baseUrl
+      state.currentMarketTemplateShowList = rsp.data.contents || []
+      state.marketTabs = []
+      state.marketActiveTab = null
       initStyle()
       initTemplateShow()
       const activeCategories = getActiveCategories(state.currentMarketTemplateShowList)
-      state.marketTabs = rsp.data.categories.filter(category =>
+      state.marketTabs = (rsp.data.categories || []).filter(category =>
         activeCategories.has(category.label)
       )
-      state.marketActiveTab = state.marketTabs[1].label
+      state.marketActiveTab = state.marketTabs[1]?.label || state.marketTabs[0]?.label || null
     })
     .catch(err => {
       console.error('searchMarket:', err)
@@ -437,6 +443,9 @@ const initMarketTemplate = async () => {
 const initStyle = () => {
   nextTick(() => {
     const tree = document.querySelector('.custom-market-tree')
+    if (!tree?.firstElementChild || tree.querySelector('.custom-line')) {
+      return
+    }
     // 创建横线元素
     const line = document.createElement('hr')
     line.classList.add('custom-line')
@@ -487,7 +496,9 @@ const apply = () => {
     templateId: state.dvCreateForm.templateId
   }
   state.curApplyTemplate.recentUseTime = Date.now()
-  state.curApplyTemplate.categoryNames.push(t('work_branch.recent'))
+  if (!state.curApplyTemplate.categoryNames.includes(t('work_branch.recent'))) {
+    state.curApplyTemplate.categoryNames.push(t('work_branch.recent'))
+  }
   const baseUrl =
     (['dataV', 'SCREEN'].includes(state.dvCreateForm.nodeType)
       ? '#/dvCanvas?opt=create&createType=template'
@@ -534,6 +545,7 @@ const initOpenHandler = newWindow => {
 }
 
 const initTemplateShow = () => {
+  state.hasResult = false
   let tempHasResult = false
   state.currentMarketTemplateShowList.forEach(template => {
     template.showFlag = templateShow(template)
@@ -541,9 +553,7 @@ const initTemplateShow = () => {
       tempHasResult = true
     }
   })
-  if (state.currentMarketTemplateShowList.length > 0) {
-    state.hasResult = tempHasResult
-  }
+  state.hasResult = tempHasResult
 }
 
 const templateShow = templateItem => {
