@@ -4,6 +4,7 @@ import (
 	"dataease/backend/internal/domain/template"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +46,39 @@ func (h *TemplateHandler) Create(c *gin.Context) {
 	result, err := h.service.CreateTemplate(&req, createBy)
 	if err != nil {
 		response.InternalError(c, "Failed to create template: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *TemplateHandler) Save(c *gin.Context) {
+	var req template.TemplateSaveRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	userID := int64(0)
+	if uid, exists := c.Get("userId"); exists {
+		if id, ok := uid.(int64); ok {
+			userID = id
+		}
+	}
+
+	createBy := ""
+	if uid, exists := c.Get("userName"); exists {
+		if name, ok := uid.(string); ok {
+			createBy = name
+		}
+	}
+	if createBy == "" {
+		createBy = strconv.FormatInt(userID, 10)
+	}
+
+	result, err := h.service.SaveTemplate(&req, createBy)
+	if err != nil {
+		response.InternalError(c, "Failed to save template: "+err.Error())
 		return
 	}
 
@@ -118,9 +152,34 @@ func (h *TemplateHandler) Delete(c *gin.Context) {
 
 // Java-compatible stub handlers
 
-// ListCategories returns empty array (stub for Java compatibility)
 func (h *TemplateHandler) ListCategories(c *gin.Context) {
-	response.Success(c, []interface{}{})
+	if h.service == nil {
+		response.Success(c, []interface{}{})
+		return
+	}
+
+	var req struct {
+		Level        string `json:"level" form:"level"`
+		TemplateType string `json:"templateType" form:"templateType"`
+	}
+	var err error
+	if c.Request.Method == http.MethodGet {
+		err = c.ShouldBindQuery(&req)
+	} else {
+		err = c.ShouldBindBodyWith(&req, binding.JSON)
+	}
+	if err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.service.ListCategories(req.Level, req.TemplateType)
+	if err != nil {
+		response.InternalError(c, "Failed to list categories: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
 }
 
 // DeleteWithCategory handles delete with optional categoryId param (Java compatibility)
@@ -158,34 +217,57 @@ func (h *TemplateHandler) SearchTemplates(c *gin.Context) {
 }
 
 func (h *TemplateHandler) SearchTemplateMarket(c *gin.Context) {
-	response.Success(c, map[string]interface{}{
-		"baseUrl":    "",
-		"contents":   []interface{}{},
-		"categories": []interface{}{},
-	})
+	if h.service == nil {
+		response.Success(c, map[string]interface{}{
+			"baseUrl":    "",
+			"contents":   []interface{}{},
+			"categories": []interface{}{},
+		})
+		return
+	}
+
+	response.Success(c, h.buildTemplateMarketResponse(false))
 }
 
 func (h *TemplateHandler) SearchTemplateMarketRecommend(c *gin.Context) {
-	response.Success(c, map[string]interface{}{
-		"baseUrl":    "",
-		"contents":   []interface{}{},
-		"categories": []interface{}{},
-	})
+	if h.service == nil {
+		response.Success(c, map[string]interface{}{
+			"baseUrl":    "",
+			"contents":   []interface{}{},
+			"categories": []interface{}{},
+		})
+		return
+	}
+
+	response.Success(c, h.buildTemplateMarketResponse(false))
 }
 
 func (h *TemplateHandler) SearchTemplateMarketPreview(c *gin.Context) {
-	response.Success(c, map[string]interface{}{
-		"baseUrl":    "",
-		"contents":   []interface{}{},
-		"categories": []interface{}{},
-	})
+	if h.service == nil {
+		response.Success(c, map[string]interface{}{
+			"baseUrl":    "",
+			"contents":   []interface{}{},
+			"categories": []interface{}{},
+		})
+		return
+	}
+
+	response.Success(c, h.buildTemplateMarketResponse(true))
 }
 
 // DeleteCategory deletes a template category by ID
 func (h *TemplateHandler) DeleteCategory(c *gin.Context) {
 	idStr := c.Param("id")
-	_ = idStr // Stub — delete category and unmap templates
-	response.Success(c, nil)
+	deleted, err := h.service.DeleteCategory(idStr)
+	if err != nil {
+		response.InternalError(c, "Failed to delete category: "+err.Error())
+		return
+	}
+	if deleted {
+		response.Success(c, "success")
+		return
+	}
+	response.Success(c, "failed")
 }
 
 // NameCheck checks if a template name already exists
@@ -249,14 +331,35 @@ func (h *TemplateHandler) BatchDelete(c *gin.Context) {
 
 // BatchUpdate updates multiple templates (e.g., move category)
 func (h *TemplateHandler) BatchUpdate(c *gin.Context) {
-	// Stub — batch update not yet implemented
+	var req struct {
+		TemplateIDs []string `json:"templateIds"`
+		Categories  []string `json:"categories"`
+	}
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.service.BatchUpdateCategories(req.TemplateIDs, req.Categories); err != nil {
+		response.InternalError(c, "Failed to batch update templates: "+err.Error())
+		return
+	}
 	response.Success(c, nil)
 }
 
-// FindCategoriesByTemplateIds finds categories for given template IDs
 func (h *TemplateHandler) FindCategoriesByTemplateIds(c *gin.Context) {
-	// Return empty since categories are not fully implemented
-	response.Success(c, []interface{}{})
+	var req struct {
+		TemplateArray []string `json:"templateArray"`
+	}
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	result, err := h.service.FindCategoriesByTemplateIDs(req.TemplateArray)
+	if err != nil {
+		response.InternalError(c, "Failed to find template categories: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
@@ -274,7 +377,7 @@ func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 	templateManage := r.Group("/templateManage")
 	{
 		templateManage.POST("/templateList", h.List)                         // alias for /template/list
-		templateManage.POST("/save", h.Create)                               // alias for /template/create
+		templateManage.POST("/save", h.Save)                                 // Java-compatible save (create/update)
 		templateManage.GET("/findOne/:id", h.Get)                            // alias for /template/get/:id
 		templateManage.POST("/delete/:id/:categoryId", h.DeleteWithCategory) // Java-compatible delete
 		templateManage.POST("/find", h.List)                                 // alias for /template/list
@@ -297,4 +400,88 @@ func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 		templateMarket.GET("/categories", h.ListCategories) // stub - returns empty array
 		templateMarket.GET("/categoriesObject", h.ListCategories)
 	}
+}
+
+func (h *TemplateHandler) buildTemplateMarketResponse(groupByCategory bool) map[string]interface{} {
+	categories, err := h.service.ListCategories("0", "self")
+	if err != nil || len(categories) == 0 {
+		return map[string]interface{}{
+			"baseUrl":    "",
+			"contents":   []interface{}{},
+			"categories": []interface{}{},
+		}
+	}
+
+	categoryItems := make([]map[string]interface{}, 0, len(categories))
+	flatContents := make([]map[string]interface{}, 0)
+	groupedContents := make([]map[string]interface{}, 0, len(categories))
+	for _, category := range categories {
+		categoryItems = append(categoryItems, map[string]interface{}{
+			"id":     category.ID,
+			"label":  category.Name,
+			"source": "manage",
+		})
+
+		templates, listErr := h.service.ListTemplates(&template.TemplateListRequest{CategoryID: strconv.FormatInt(category.ID, 10)})
+		if listErr != nil {
+			continue
+		}
+
+		categoryGroup := make([]map[string]interface{}, 0, len(templates.List))
+		for _, item := range templates.List {
+			marketItem := map[string]interface{}{
+				"id":            item.ID,
+				"title":         item.Name,
+				"name":          item.Name,
+				"thumbnail":     item.Snapshot,
+				"templateType":  marketTemplateType(item.DvType),
+				"source":        "manage",
+				"classify":      "template",
+				"categoryNames": []string{category.Name},
+				"metas":         map[string]interface{}{},
+			}
+			flatContents = append(flatContents, marketItem)
+			categoryGroup = append(categoryGroup, marketItem)
+		}
+
+		if groupByCategory {
+			groupedContents = append(groupedContents, map[string]interface{}{
+				"category": map[string]interface{}{
+					"id":     category.ID,
+					"label":  category.Name,
+					"source": "manage",
+				},
+				"contents": categoryGroup,
+			})
+		}
+	}
+
+	contents := make([]interface{}, 0)
+	if groupByCategory {
+		for _, item := range groupedContents {
+			contents = append(contents, item)
+		}
+	} else {
+		for _, item := range flatContents {
+			contents = append(contents, item)
+		}
+	}
+
+	categoryResult := make([]interface{}, 0, len(categoryItems))
+	for _, item := range categoryItems {
+		categoryResult = append(categoryResult, item)
+	}
+
+	return map[string]interface{}{
+		"baseUrl":    "",
+		"contents":   contents,
+		"categories": categoryResult,
+	}
+}
+
+func marketTemplateType(dvType string) string {
+	if dvType == "dataV" {
+		return "SCREEN"
+	}
+	return "PANEL"
 }

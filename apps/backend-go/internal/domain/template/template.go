@@ -42,6 +42,7 @@ type TemplateListResponse struct {
 type TemplateCreateRequest struct {
 	Name          string `json:"name" binding:"required"`
 	Pid           int64  `json:"pid"`
+	Level         int    `json:"level"`
 	DvType        string `json:"dvType"`
 	NodeType      string `json:"nodeType"`
 	Snapshot      string `json:"snapshot"`
@@ -50,6 +51,23 @@ type TemplateCreateRequest struct {
 	TemplateData  string `json:"templateData"`
 	DynamicData   string `json:"dynamicData"`
 	AppData       string `json:"appData"`
+	Categories    []string `json:"categories"`
+}
+
+type TemplateSaveRequest struct {
+	ID            int64    `json:"id"`
+	Name          string   `json:"name" binding:"required"`
+	Pid           int64    `json:"pid"`
+	Level         int      `json:"level"`
+	DvType        string   `json:"dvType"`
+	NodeType      string   `json:"nodeType"`
+	Snapshot      string   `json:"snapshot"`
+	TemplateType  string   `json:"templateType"`
+	TemplateStyle string   `json:"templateStyle"`
+	TemplateData  string   `json:"templateData"`
+	DynamicData   string   `json:"dynamicData"`
+	AppData       string   `json:"appData"`
+	Categories    []string `json:"categories"`
 }
 
 // TemplateUpdateRequest represents request to update a template
