@@ -13,6 +13,7 @@ import { useI18n } from '@/hooks/web/useI18n'
 import { XpackComponent } from '@/components/plugin'
 import { propTypes } from '@/utils/propTypes'
 import { setTitle } from '@/utils/utils'
+import { createAsyncLoadGate } from '@/utils/dashboardInit'
 import EmptyBackground from '../../components/empty-background/src/EmptyBackground.vue'
 import { filterEnumMapSync } from '@/utils/componentUtils'
 import CanvasOptBar from '@/components/visualization/CanvasOptBar.vue'
@@ -164,12 +165,12 @@ const loadCanvasDataAsync = async (dvId, dvType) => {
   }
 }
 
-let p: ((value: boolean) => void) | null = null
-const XpackLoaded = () => p?.(true)
+const xpackLoadGate = createAsyncLoadGate()
+const XpackLoaded = () => xpackLoadGate.markLoaded()
 onMounted(async () => {
-  await new Promise<void>(resolve => {
-    p = () => resolve()
-  })
+  if (!xpackLoadGate.isLoaded()) {
+    await xpackLoadGate.wait
+  }
   dvMainStore.setMobileInPc(true)
   dvMainStore.setInMobile(true)
   const dvId = embeddedStore.dvId || router.currentRoute.value.query.dvId

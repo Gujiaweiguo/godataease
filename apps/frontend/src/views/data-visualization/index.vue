@@ -45,6 +45,7 @@ import ChartStyleBatchSet from '@/views/chart/components/editor/editor-style/Cha
 import CustomTabsSort from '@/custom-component/de-tabs/CustomTabsSort.vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { recoverToPublished } from '@/api/visualization/dataVisualization'
+import { createAsyncLoadGate, shouldInitializeCreateRoute } from '@/utils/dashboardInit'
 import {
   changeComponentSizeWithScale
   } from '@/utils/changeComponentsSizeWithScale'
@@ -397,11 +398,9 @@ const winMsgWebParamsHandle = msgInfo => {
 
 const loadFinish = ref(false)
 const newWindowFromDiv = ref(false)
-let p: ((value?: unknown) => void) | null = null
+const xpackLoadGate = createAsyncLoadGate()
 const XpackLoaded = () => {
-  if (p) {
-    p(true)
-  }
+  xpackLoadGate.markLoaded()
 }
 onMounted(async () => {
   if (embeddedStore.getToken) {
@@ -424,9 +423,9 @@ onMounted(async () => {
   if (window.location.hash.includes('#/dvCanvas')) {
     newWindowFromDiv.value = true
   }
-  await new Promise(resolve => {
-    p = resolve
-  })
+  if (!xpackLoadGate.isLoaded()) {
+    await xpackLoadGate.wait
+  }
   loadFinish.value = true
   window.addEventListener('blur', releaseAttachKey)
   window.addEventListener('message', winMsgHandle)
@@ -463,7 +462,7 @@ onMounted(async () => {
         // do init
       })
     }
-  } else if (opt && opt === 'create') {
+  } else if (shouldInitializeCreateRoute(dvId, opt)) {
     state.canvasInitStatus = false
     let watermarkBaseInfo: { settingContent?: string } | null = null
     try {
@@ -513,9 +512,6 @@ onMounted(async () => {
         eventBus.emit('save')
       }
     })
-  } else {
-    let url = '#/screen/index'
-    window.open(url, '_self')
   }
   initScroll()
   useEmitt({
