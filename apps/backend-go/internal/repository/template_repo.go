@@ -98,7 +98,7 @@ func (r *TemplateRepository) List(pid int64, dvType string) ([]template.Template
 
 func (r *TemplateRepository) ListCategories(level int, templateType string) ([]template.Template, error) {
 	var records []coreVisualizationTemplate
-	query := r.db.Model(&coreVisualizationTemplate{}).Where("node_type = ?", "folder")
+	query := r.db.Model(&coreVisualizationTemplate{}).Where("node_type = ?", template.NodeTypeFolder)
 	if level >= 0 {
 		query = query.Where("level = ?", level)
 	}
@@ -307,7 +307,7 @@ func (r *TemplateRepository) UpdateTemplatePid(templateID int64, pid int64) erro
 }
 
 func (r *TemplateRepository) categoryScopedQuery(categoryID string, dvType string) *gorm.DB {
-	query := r.db.Model(&coreVisualizationTemplate{}).Where("node_type <> ?", "folder")
+	query := r.db.Model(&coreVisualizationTemplate{}).Where("node_type <> ?", template.NodeTypeFolder)
 	if dvType != "" {
 		query = query.Where("dv_type = ?", dvType)
 	}

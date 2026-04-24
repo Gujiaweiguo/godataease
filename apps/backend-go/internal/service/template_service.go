@@ -113,7 +113,7 @@ func (s *TemplateService) SaveTemplate(req *template.TemplateSaveRequest, create
 		if err != nil {
 			return nil, err
 		}
-		if req.NodeType != "folder" && len(req.Categories) > 0 {
+		if req.NodeType != template.NodeTypeFolder && len(req.Categories) > 0 {
 			if err := s.repo.SyncTemplateCategories(req.ID, req.Categories); err != nil {
 				return nil, err
 			}
@@ -143,7 +143,7 @@ func (s *TemplateService) SaveTemplate(req *template.TemplateSaveRequest, create
 	if err != nil {
 		return nil, err
 	}
-	if req.NodeType != "folder" && len(req.Categories) > 0 {
+	if req.NodeType != template.NodeTypeFolder && len(req.Categories) > 0 {
 		if err := s.repo.SyncTemplateCategories(created.ID, req.Categories); err != nil {
 			return nil, err
 		}
