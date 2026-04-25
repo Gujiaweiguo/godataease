@@ -288,6 +288,10 @@ func (s *ExcelService) LoadRemoteFile(req *RemoteExcelRequest) (*datasource.Exce
 
 // downloadFile downloads a file from remote URL
 func (s *ExcelService) downloadFile(url, userName, password string) (*http.Response, error) {
+	if err := marketTemplateURLValidator(url); err != nil {
+		return nil, fmt.Errorf("invalid download URL: %w", err)
+	}
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -297,7 +301,11 @@ func (s *ExcelService) downloadFile(url, userName, password string) (*http.Respo
 		req.SetBasicAuth(userName, password)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout:       30 * time.Second,
+		Transport:     marketTemplateHTTPClient.Transport,
+		CheckRedirect: marketTemplateHTTPClient.CheckRedirect,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file: %w", err)
@@ -307,6 +315,8 @@ func (s *ExcelService) downloadFile(url, userName, password string) (*http.Respo
 		resp.Body.Close()
 		return nil, fmt.Errorf("failed to download file: status %d", resp.StatusCode)
 	}
+
+	resp.Body = io.NopCloser(io.LimitReader(resp.Body, marketTemplateMaxResponseBytes+1))
 
 	return resp, nil
 }
