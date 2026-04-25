@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -23,6 +24,16 @@ type VisualizationService struct {
 	templateService        *TemplateService
 	templateExtendDataRepo *repository.TemplateExtendDataRepository
 	auditService           *AuditService
+}
+
+type marketTemplateDTO struct {
+	Name            string          `json:"name"`
+	DvType          string          `json:"dvType"`
+	Version         int             `json:"version"`
+	CanvasStyleData json.RawMessage `json:"canvasStyleData"`
+	ComponentData   json.RawMessage `json:"componentData"`
+	DynamicData     json.RawMessage `json:"dynamicData"`
+	AppData         json.RawMessage `json:"appData"`
 }
 
 const (
@@ -623,7 +634,17 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		version = 3
 
 	case newFromMarketTemplate:
-		return nil, fmt.Errorf("new_market_template is not yet supported: templateUrl=%s", req.TemplateURL)
+		tmpl, err := fetchMarketTemplate(req.TemplateURL)
+		if err != nil {
+			return nil, err
+		}
+		templateStyle = normalizeJSONPayload(tmpl.CanvasStyleData)
+		templateData = normalizeJSONPayload(tmpl.ComponentData)
+		dynamicData = normalizeJSONPayload(tmpl.DynamicData)
+		appDataStr = normalizeJSONPayload(tmpl.AppData)
+		name = tmpl.Name
+		dvType = tmpl.DvType
+		version = tmpl.Version
 
 	default:
 		return nil, fmt.Errorf("unsupported newFrom: %s", req.NewFrom)
@@ -671,6 +692,44 @@ func processAppData(appDataStr string, newDvID int64) string {
 		return appDataStr
 	}
 	return strings.ReplaceAll(appDataStr, fmt.Sprintf("%d", baseInfo.ID), fmt.Sprintf("%d", newDvID))
+}
+
+func fetchMarketTemplate(templateURL string) (*marketTemplateDTO, error) {
+	if strings.TrimSpace(templateURL) == "" {
+		return nil, fmt.Errorf("templateUrl is required for new_market_template")
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(templateURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch market template: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("market template fetch returned status %d", resp.StatusCode)
+	}
+
+	var tmpl marketTemplateDTO
+	if err := json.NewDecoder(resp.Body).Decode(&tmpl); err != nil {
+		return nil, fmt.Errorf("failed to parse market template JSON: %w", err)
+	}
+
+	return &tmpl, nil
+}
+
+func normalizeJSONPayload(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return ""
+	}
+
+	var plain string
+	if err := json.Unmarshal(raw, &plain); err == nil {
+		return plain
+	}
+
+	return trimmed
 }
 
 func (s *VisualizationService) processDynamicData(dynamicData string, newDvID int64, templateData *string, appDataStr *string, hasAppData bool) (map[string]map[string]interface{}, error) {
