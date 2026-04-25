@@ -3,7 +3,12 @@
 package service
 
 import (
+	"encoding/json"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
@@ -15,6 +20,126 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestVisualizationServiceIntegration_SSRFSafetyHelpers(t *testing.T) {
+	t.Run("blocks private and loopback IPs", func(t *testing.T) {
+		assert.True(t, isBlockedIP(net.ParseIP("127.0.0.1")))
+		assert.True(t, isBlockedIP(net.ParseIP("10.0.0.1")))
+		assert.True(t, isBlockedIP(net.ParseIP("169.254.169.254")))
+		assert.False(t, isBlockedIP(net.ParseIP("8.8.8.8")))
+	})
+
+	t.Run("rejects invalid market template URLs", func(t *testing.T) {
+		require.Error(t, validateMarketTemplateURL("file:///etc/passwd"))
+		require.Error(t, validateMarketTemplateURL("http://127.0.0.1:8080/template.json"))
+		require.Error(t, validateMarketTemplateURL("https:///template.json"))
+	})
+
+	t.Run("allows public IP market template URLs", func(t *testing.T) {
+		require.NoError(t, validateMarketTemplateURL("https://8.8.8.8/template.json"))
+	})
+
+	t.Run("check redirect blocks excessive hops and blocked targets", func(t *testing.T) {
+		client := newMarketTemplateHTTPClient()
+		req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/template.json", nil)
+		require.NoError(t, err)
+
+		via := []*http.Request{{}, {}, {}}
+		err = client.CheckRedirect(req, via)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "too many redirects")
+
+		err = client.CheckRedirect(req, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "blocked")
+	})
+
+	t.Run("dial context rejects malformed and blocked addresses", func(t *testing.T) {
+		client := newMarketTemplateHTTPClient()
+		transport, ok := client.Transport.(*http.Transport)
+		require.True(t, ok)
+
+		_, err := transport.DialContext(t.Context(), "tcp", "bad-addr")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid address")
+
+		_, err = transport.DialContext(t.Context(), "tcp", "127.0.0.1:80")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "blocked")
+	})
+
+	t.Run("normalizes raw and quoted JSON payloads", func(t *testing.T) {
+		rawObject := json.RawMessage(`{"bg":"dark"}`)
+		assert.Equal(t, `{"bg":"dark"}`, normalizeJSONPayload(rawObject))
+
+		quoted := json.RawMessage(`"{\"bg\":\"light\"}"`)
+		assert.Equal(t, `{"bg":"light"}`, normalizeJSONPayload(quoted))
+
+		nullPayload := json.RawMessage(`null`)
+		assert.Equal(t, "", normalizeJSONPayload(nullPayload))
+	})
+}
+
+func TestVisualizationServiceIntegration_FetchMarketTemplateLimits(t *testing.T) {
+	originalClient := marketTemplateHTTPClient
+	originalValidator := marketTemplateURLValidator
+	marketTemplateHTTPClient = &http.Client{Timeout: 10 * time.Second}
+	marketTemplateURLValidator = func(string) error { return nil }
+	t.Cleanup(func() {
+		marketTemplateHTTPClient = originalClient
+		marketTemplateURLValidator = originalValidator
+	})
+
+	t.Run("decodes fetched market template payload", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"Integration Market Template","dvType":"dashboard","version":3,"canvasStyleData":{"bg":"dark"},"componentData":[{"id":"view_market_1"}]}`))
+		}))
+		defer server.Close()
+
+		tmpl, err := fetchMarketTemplate(server.URL)
+		require.NoError(t, err)
+		require.NotNil(t, tmpl)
+		assert.Equal(t, "Integration Market Template", tmpl.Name)
+		assert.Equal(t, "dashboard", tmpl.DvType)
+		assert.Equal(t, 3, tmpl.Version)
+	})
+
+	t.Run("rejects oversized market template response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(make([]byte, marketTemplateMaxResponseBytes+1))
+		}))
+		defer server.Close()
+
+		_, err := fetchMarketTemplate(server.URL)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds")
+	})
+
+	t.Run("rejects non-200 market template response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		defer server.Close()
+
+		_, err := fetchMarketTemplate(server.URL)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "status")
+	})
+
+	t.Run("rejects invalid market template JSON", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":`))
+		}))
+		defer server.Close()
+
+		_, err := fetchMarketTemplate(server.URL)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parse")
+	})
+}
 
 func TestVisualizationServiceIntegration_Save(t *testing.T) {
 	cleanupTables(&visualization.DataVisualizationInfo{})

@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -698,9 +699,11 @@ func fetchMarketTemplate(templateURL string) (*marketTemplateDTO, error) {
 	if strings.TrimSpace(templateURL) == "" {
 		return nil, fmt.Errorf("templateUrl is required for new_market_template")
 	}
+	if err := marketTemplateURLValidator(templateURL); err != nil {
+		return nil, err
+	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(templateURL)
+	resp, err := marketTemplateHTTPClient.Get(templateURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch market template: %w", err)
 	}
@@ -710,8 +713,16 @@ func fetchMarketTemplate(templateURL string) (*marketTemplateDTO, error) {
 		return nil, fmt.Errorf("market template fetch returned status %d", resp.StatusCode)
 	}
 
+	body, err := io.ReadAll(io.LimitReader(resp.Body, marketTemplateMaxResponseBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read market template response: %w", err)
+	}
+	if int64(len(body)) > marketTemplateMaxResponseBytes {
+		return nil, fmt.Errorf("market template response exceeds %d bytes", marketTemplateMaxResponseBytes)
+	}
+
 	var tmpl marketTemplateDTO
-	if err := json.NewDecoder(resp.Body).Decode(&tmpl); err != nil {
+	if err := json.Unmarshal(body, &tmpl); err != nil {
 		return nil, fmt.Errorf("failed to parse market template JSON: %w", err)
 	}
 
