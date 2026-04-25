@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/datasource"
 
@@ -109,6 +110,18 @@ func createTestWorkbook(t *testing.T, sheets map[string][][]string) []byte {
 	return buf.Bytes()
 }
 
+func bypassExcelSSRFProtection(t *testing.T) {
+	t.Helper()
+	originalClient := marketTemplateHTTPClient
+	originalValidator := marketTemplateURLValidator
+	marketTemplateHTTPClient = &http.Client{Timeout: 10 * time.Second}
+	marketTemplateURLValidator = func(string) error { return nil }
+	t.Cleanup(func() {
+		marketTemplateHTTPClient = originalClient
+		marketTemplateURLValidator = originalValidator
+	})
+}
+
 func TestExcelService_ParseCSVAndFieldType(t *testing.T) {
 	svc := NewExcelService()
 
@@ -159,6 +172,7 @@ func TestExcelService_FormatFileSize(t *testing.T) {
 
 func TestExcelService_DownloadFile(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 
 	okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -185,6 +199,7 @@ func TestExcelService_DownloadFile(t *testing.T) {
 
 func TestExcelService_UploadFileAndLoadRemoteFile(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 
 	csvContent := "name,amount\nAlice,100\nBob,200\n"
 	tmp, err := os.CreateTemp("", "excel-upload-*.csv")
@@ -385,8 +400,29 @@ func TestExcelService_DownloadFile_RequestCreationError(t *testing.T) {
 	}
 }
 
+func TestExcelService_DownloadFile_BlockedSSRF(t *testing.T) {
+	svc := NewExcelService()
+
+	blockedURLs := []string{
+		"http://127.0.0.1:8080/secret.csv",
+		"http://169.254.169.254/latest/meta-data/",
+		"file:///etc/passwd",
+	}
+
+	for _, rawURL := range blockedURLs {
+		_, err := svc.downloadFile(rawURL, "", "")
+		if err == nil {
+			t.Fatalf("expected error for blocked URL %s", rawURL)
+		}
+		if !strings.Contains(err.Error(), "invalid download URL") && !strings.Contains(err.Error(), "scheme") && !strings.Contains(err.Error(), "blocked") {
+			t.Fatalf("expected SSRF-related error for %s, got %v", rawURL, err)
+		}
+	}
+}
+
 func TestExcelService_LoadRemoteFile_WithAuth(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 
 	csvContent := "name,value\ntest,123\n"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -416,6 +452,7 @@ func TestExcelService_LoadRemoteFile_WithAuth(t *testing.T) {
 
 func TestExcelService_LoadRemoteFile_DownloadError(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 
 	// Test with server that returns 500
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -466,6 +503,7 @@ func TestExcelService_ParseExcelFile_InvalidXLSXReturnsError(t *testing.T) {
 
 func TestExcelService_LoadRemoteFile_ParseError(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("not-an-excel-file"))
@@ -480,6 +518,7 @@ func TestExcelService_LoadRemoteFile_ParseError(t *testing.T) {
 
 func TestExcelService_LoadRemoteFile_FiltersSheetsWithoutFields(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 	workbook := createTestWorkbook(t, map[string][][]string{
 		"Valid": {{"name", "value"}, {"alice", "1"}},
 		"Blank": {{"", ""}, {"x", "y"}},
@@ -603,6 +642,7 @@ func TestExcelService_UploadFile_AssignsSheetMetadataAndPersistsSavedPath(t *tes
 
 func TestExcelService_LoadRemoteFile_AssignsRemoteSheetMetadataAndNASize(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("name,value\nremote,1\n"))
@@ -708,6 +748,7 @@ func TestExcelService_ParseCSV_InvalidCSVReturnsWrappedError(t *testing.T) {
 
 func TestExcelService_LoadRemoteFile_EmptyRemoteCSVReturnsNoSheets(t *testing.T) {
 	svc := NewExcelService()
+	bypassExcelSSRFProtection(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(""))

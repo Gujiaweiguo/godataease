@@ -442,6 +442,7 @@ func TestDatasourceService_PreviewAndExcelWrappers(t *testing.T) {
 
 	t.Run("load remote file delegates to excel service", func(t *testing.T) {
 		svc, _ := setupDatasourceServiceRepoTest(t)
+		bypassExcelSSRFProtection(t)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("name,amount\nAlice,100\nBob,200\n"))
 		}))
