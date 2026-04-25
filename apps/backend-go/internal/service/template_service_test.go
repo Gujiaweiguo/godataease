@@ -539,6 +539,46 @@ func TestTemplateService_DeleteTemplate(t *testing.T) {
 	})
 }
 
+func TestTemplateService_DeleteWithCategory(t *testing.T) {
+	t.Run("removes only target category when other links remain", func(t *testing.T) {
+		svc, db := setupTemplateServiceRepoTest(t)
+		categoryA := createTemplateFixture(t, svc, "Category A")
+		categoryB := createTemplateFixture(t, svc, "Category B")
+		tpl := createTemplateFixture(t, svc, "Category Scoped Template")
+
+		require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-a", CategoryID: strconv.FormatInt(categoryA.ID, 10), TemplateID: strconv.FormatInt(tpl.ID, 10)}).Error)
+		require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-b", CategoryID: strconv.FormatInt(categoryB.ID, 10), TemplateID: strconv.FormatInt(tpl.ID, 10)}).Error)
+
+		require.NoError(t, svc.DeleteWithCategory(tpl.ID, strconv.FormatInt(categoryA.ID, 10)))
+
+		loaded, err := svc.GetTemplate(tpl.ID)
+		require.NoError(t, err)
+		assert.NotNil(t, loaded)
+
+		var maps []testVisualizationTemplateCategoryMap
+		require.NoError(t, db.Order("category_id asc").Find(&maps).Error)
+		require.Len(t, maps, 1)
+		assert.Equal(t, strconv.FormatInt(categoryB.ID, 10), maps[0].CategoryID)
+	})
+
+	t.Run("deletes template when last category is removed", func(t *testing.T) {
+		svc, db := setupTemplateServiceRepoTest(t)
+		category := createTemplateFixture(t, svc, "Only Category")
+		tpl := createTemplateFixture(t, svc, "Single Category Template")
+		require.NoError(t, db.Create(&testVisualizationTemplateCategoryMap{ID: "map-single", CategoryID: strconv.FormatInt(category.ID, 10), TemplateID: strconv.FormatInt(tpl.ID, 10)}).Error)
+
+		require.NoError(t, svc.DeleteWithCategory(tpl.ID, strconv.FormatInt(category.ID, 10)))
+
+		loaded, err := svc.GetTemplate(tpl.ID)
+		require.Error(t, err)
+		assert.Nil(t, loaded)
+
+		var mapCount int64
+		require.NoError(t, db.Model(&testVisualizationTemplateCategoryMap{}).Where("template_id = ?", strconv.FormatInt(tpl.ID, 10)).Count(&mapCount).Error)
+		assert.Zero(t, mapCount)
+	})
+}
+
 func TestTemplateService_IncrementUseCount(t *testing.T) {
 	svc, _ := setupTemplateServiceRepoTest(t)
 	created, err := svc.CreateTemplate(&template.TemplateCreateRequest{Name: "Counter", Pid: 0, DvType: "dashboard", NodeType: "leaf"}, "tester")

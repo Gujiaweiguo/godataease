@@ -195,6 +195,22 @@ func (s *TemplateService) DeleteTemplate(id int64) error {
 	return s.repo.Delete(id)
 }
 
+func (s *TemplateService) DeleteWithCategory(id int64, categoryID string) error {
+	if strings.TrimSpace(categoryID) == "" || categoryID == "0" {
+		return s.DeleteTemplate(id)
+	}
+
+	remaining, err := s.repo.UnlinkCategory(id, categoryID)
+	if err != nil {
+		return err
+	}
+	if remaining > 0 {
+		return nil
+	}
+
+	return s.repo.Delete(id)
+}
+
 func (s *TemplateService) IncrementUseCount(id int64) error {
 	return s.repo.IncrementUseCount(id)
 }

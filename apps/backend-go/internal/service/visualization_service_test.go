@@ -1,6 +1,8 @@
 package service
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"dataease/backend/internal/domain/audit"
@@ -693,11 +695,22 @@ func TestVisualizationService_Decompression(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported newFrom")
 	})
 
-	t.Run("new_market_template returns clear error", func(t *testing.T) {
+	t.Run("new_market_template fetches remote template payload", func(t *testing.T) {
 		svc, _, _ := setupVisualizationServiceRepoTest(t)
-		_, err := svc.Decompression(&visualization.DecompressionRequest{NewFrom: "new_market_template", TemplateURL: "http://example.com/t.json"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not yet supported")
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"Market Template","dvType":"dashboard","version":3,"canvasStyleData":{"bg":"black"},"componentData":[{"id":"view_market_1"}],"dynamicData":{"view_market_1":{"title":"Remote Chart","type":"bar","tableId":9}},"appData":{"visualizationInfo":{"id":1}}}`))
+		}))
+		defer server.Close()
+
+		resp, err := svc.Decompression(&visualization.DecompressionRequest{NewFrom: "new_market_template", TemplateURL: server.URL})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, "Market Template", resp.Name)
+		assert.Equal(t, "dashboard", resp.Type)
+		assert.Equal(t, 3, resp.Version)
+		assert.Contains(t, resp.CanvasStyleData, `"bg":"black"`)
+		assert.Len(t, resp.CanvasViewInfo, 1)
 	})
 
 	t.Run("new_inner_template without templateId returns error", func(t *testing.T) {

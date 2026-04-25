@@ -169,7 +169,7 @@ func (h *TemplateHandler) ListCategories(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// DeleteWithCategory handles delete with optional categoryId param (Java compatibility)
+// DeleteWithCategory handles delete scoped to a category when categoryId is present (Java compatibility)
 func (h *TemplateHandler) DeleteWithCategory(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -177,8 +177,8 @@ func (h *TemplateHandler) DeleteWithCategory(c *gin.Context) {
 		response.Error(c, "500000", "Invalid template ID")
 		return
 	}
-	// categoryId is ignored for now, just delete by id
-	if err := h.service.DeleteTemplate(id); err != nil {
+	categoryID := c.Param("categoryId")
+	if err := h.service.DeleteWithCategory(id, categoryID); err != nil {
 		response.InternalError(c, "Failed to delete template: "+err.Error())
 		return
 	}
