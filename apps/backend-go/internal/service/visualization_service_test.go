@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/permission"
@@ -697,6 +698,15 @@ func TestVisualizationService_Decompression(t *testing.T) {
 
 	t.Run("new_market_template fetches remote template payload", func(t *testing.T) {
 		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		originalClient := marketTemplateHTTPClient
+		originalValidator := marketTemplateURLValidator
+		marketTemplateHTTPClient = &http.Client{Timeout: 10 * time.Second}
+		marketTemplateURLValidator = func(string) error { return nil }
+		t.Cleanup(func() {
+			marketTemplateHTTPClient = originalClient
+			marketTemplateURLValidator = originalValidator
+		})
+
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"name":"Market Template","dvType":"dashboard","version":3,"canvasStyleData":{"bg":"black"},"componentData":[{"id":"view_market_1"}],"dynamicData":{"view_market_1":{"title":"Remote Chart","type":"bar","tableId":9}},"appData":{"visualizationInfo":{"id":1}}}`))
@@ -711,6 +721,27 @@ func TestVisualizationService_Decompression(t *testing.T) {
 		assert.Equal(t, 3, resp.Version)
 		assert.Contains(t, resp.CanvasStyleData, `"bg":"black"`)
 		assert.Len(t, resp.CanvasViewInfo, 1)
+	})
+
+	t.Run("new_market_template rejects oversized response", func(t *testing.T) {
+		originalClient := marketTemplateHTTPClient
+		originalValidator := marketTemplateURLValidator
+		marketTemplateHTTPClient = &http.Client{Timeout: 10 * time.Second}
+		marketTemplateURLValidator = func(string) error { return nil }
+		t.Cleanup(func() {
+			marketTemplateHTTPClient = originalClient
+			marketTemplateURLValidator = originalValidator
+		})
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(make([]byte, marketTemplateMaxResponseBytes+1))
+		}))
+		defer server.Close()
+
+		_, err := fetchMarketTemplate(server.URL)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds")
 	})
 
 	t.Run("new_inner_template without templateId returns error", func(t *testing.T) {
