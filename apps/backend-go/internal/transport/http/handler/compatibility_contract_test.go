@@ -168,6 +168,59 @@ func TestTemplateManageBatchDeleteSupportsTemplateIDs(t *testing.T) {
 	assert.Equal(t, int64(0), mapCount)
 }
 
+func TestTemplateManageDeleteWithCategoryUnlinksSpecificCategory(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE core_visualization_template (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT,
+		pid INTEGER,
+		level INTEGER,
+		dv_type TEXT,
+		node_type TEXT,
+		create_by TEXT,
+		create_time DATETIME,
+		snapshot TEXT,
+		template_type TEXT,
+		template_style TEXT,
+		template_data TEXT,
+		dynamic_data TEXT,
+		app_data TEXT,
+		use_count INTEGER,
+		version INTEGER
+	)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE visualization_template_category_map (
+		id TEXT PRIMARY KEY,
+		category_id TEXT,
+		template_id TEXT
+	)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO core_visualization_template (id, name, pid, dv_type, node_type, create_by, use_count, version) VALUES (1, 'Delete Me Carefully', 0, 'dashboard', 'leaf', 'tester', 0, 3)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO visualization_template_category_map (id, category_id, template_id) VALUES ('map-1', 'cat-1', '1')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO visualization_template_category_map (id, category_id, template_id) VALUES ('map-2', 'cat-2', '1')`).Error)
+
+	templateHandler := NewTemplateHandler(service.NewTemplateService(repository.NewTemplateRepository(db)))
+	r := gin.New()
+	RegisterTemplateRoutes(r, templateHandler)
+
+	req := httptest.NewRequest(http.MethodPost, "/templateManage/delete/1/cat-1", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp["code"])
+
+	var templateCount int64
+	require.NoError(t, db.Table("core_visualization_template").Count(&templateCount).Error)
+	assert.Equal(t, int64(1), templateCount)
+
+	var mapCount int64
+	require.NoError(t, db.Table("visualization_template_category_map").Where("template_id = ?", "1").Count(&mapCount).Error)
+	assert.Equal(t, int64(1), mapCount)
+}
+
 func TestNegativePathUnauthorizedAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtInstance := testJWT()
