@@ -302,6 +302,21 @@ func (r *TemplateRepository) DeleteCategory(categoryID string) error {
 	})
 }
 
+func (r *TemplateRepository) UnlinkCategory(templateID int64, categoryID string) (int64, error) {
+	templateIDStr := strconv.FormatInt(templateID, 10)
+	var remaining int64
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("template_id = ? AND category_id = ?", templateIDStr, categoryID).Delete(&auto.VisualizationTemplateCategoryMap{}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&auto.VisualizationTemplateCategoryMap{}).Where("template_id = ?", templateIDStr).Count(&remaining).Error
+	})
+	if err != nil {
+		return 0, err
+	}
+	return remaining, nil
+}
+
 func (r *TemplateRepository) UpdateTemplatePid(templateID int64, pid int64) error {
 	return r.db.Model(&coreVisualizationTemplate{}).Where("id = ?", templateID).Update("pid", pid).Error
 }
