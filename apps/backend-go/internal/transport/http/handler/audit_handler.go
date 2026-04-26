@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"dataease/backend/internal/domain/audit"
@@ -221,7 +224,53 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(filePath, "audit_logs."+c.Query("format"))
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		response.BadRequest(c, "Invalid file path")
+		return
+	}
+	tempDir, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		response.InternalError(c, "Failed to resolve export directory")
+		return
+	}
+	if absPath != tempDir && !strings.HasPrefix(absPath, tempDir+string(os.PathSeparator)) {
+		response.BadRequest(c, "Invalid file path")
+		return
+	}
+
+	baseName := filepath.Base(absPath)
+	if !strings.HasPrefix(baseName, "audit_logs_") {
+		response.BadRequest(c, "Invalid file path")
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(baseName))
+	if ext != ".csv" && ext != ".json" {
+		response.BadRequest(c, "Invalid export format")
+		return
+	}
+	format := strings.TrimPrefix(ext, ".")
+	if requested := strings.TrimSpace(c.Query("format")); requested != "" && requested != format {
+		response.BadRequest(c, "Invalid export format")
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			response.NotFound(c, "Export file not found")
+			return
+		}
+		response.InternalError(c, "Failed to access export file")
+		return
+	}
+	if info.IsDir() {
+		response.BadRequest(c, "Invalid file path")
+		return
+	}
+
+	c.FileAttachment(absPath, "audit_logs."+format)
 }
 
 func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler) {
