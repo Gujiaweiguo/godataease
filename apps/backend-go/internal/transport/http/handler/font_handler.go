@@ -232,16 +232,26 @@ func (h *FontHandler) Download(c *gin.Context) {
 		response.Error(c, "500000", "Invalid file name")
 		return
 	}
+	cleanName := filepath.Clean(fileName)
+	if cleanName != fileName || strings.Contains(cleanName, "..") {
+		response.Error(c, "500000", "Invalid file name")
+		return
+	}
 	fontDir := os.Getenv("FONT_DIR")
 	if fontDir == "" {
 		fontDir = defaultFontDir
 	}
-	filePath := filepath.Join(fontDir, fileName)
+	fontDir = filepath.Clean(fontDir)
+	filePath := filepath.Join(fontDir, cleanName)
+	if !strings.HasPrefix(filePath, fontDir+string(os.PathSeparator)) && filePath != fontDir {
+		response.Error(c, "500000", "Invalid file name")
+		return
+	}
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		response.Error(c, "500000", "Font file not found")
 		return
 	}
-	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Header("Content-Disposition", "attachment; filename="+cleanName)
 	c.File(filePath)
 }
 
@@ -254,6 +264,12 @@ func RegisterFontRoutes(r gin.IRouter, h *FontHandler) {
 		g.POST("/delete/:id", h.Delete)
 		g.POST("/uploadFile", h.UploadFile)
 		g.GET("/defaultFont", h.DefaultFont)
+	}
+}
+
+func RegisterFontDownloadRoute(r gin.IRouter, h *FontHandler) {
+	g := r.Group("/typeface")
+	{
 		g.GET("/download/:file", h.Download)
 	}
 }
