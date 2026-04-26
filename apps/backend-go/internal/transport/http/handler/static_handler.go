@@ -166,7 +166,12 @@ func (h *StaticHandler) FindResourceAsBase64(c *gin.Context) {
 		if idx := strings.LastIndex(path, "/"); idx >= 0 {
 			fileName = path[idx+1:]
 		}
-		filePath := filepath.Join(staticDir, fileName)
+		cleanName := filepath.Clean(fileName)
+		if cleanName != fileName || strings.Contains(cleanName, "..") {
+			result[path] = ""
+			continue
+		}
+		filePath := filepath.Join(staticDir, cleanName)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			result[path] = ""

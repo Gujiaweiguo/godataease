@@ -536,6 +536,8 @@ func (r *Router) registerAPIRoutes() {
 	menuWriteAPI := api
 	storeAPI := api
 	chartDataAPI := api
+	staticAPI := api
+	fontAPI := api
 	if r.app != nil && r.app.Config != nil {
 		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
 			Secret: r.app.Config.JWT.Secret,
@@ -604,6 +606,14 @@ func (r *Router) registerAPIRoutes() {
 		protectedChartDataAPI := r.engine.Group("/api")
 		protectedChartDataAPI.Use(middleware.Auth(jwtInstance))
 		chartDataAPI = protectedChartDataAPI
+
+		protectedStaticAPI := r.engine.Group("/api")
+		protectedStaticAPI.Use(middleware.Auth(jwtInstance))
+		staticAPI = protectedStaticAPI
+
+		protectedFontAPI := r.engine.Group("/api")
+		protectedFontAPI.Use(middleware.Auth(jwtInstance))
+		fontAPI = protectedFontAPI
 	}
 	{
 		api.GET("/ping", func(c *gin.Context) {
@@ -648,9 +658,10 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterTicketRoutes(api, r.ticketHandler)
 		handler.RegisterGeoRoutes(api, r.geoHandler)
 		handler.RegisterCustomGeoRoutes(api, r.customGeoHandler)
-		handler.RegisterStaticRoutes(api, r.staticHandler)
+		handler.RegisterStaticRoutes(staticAPI, r.staticHandler)
 		handler.RegisterSubjectRoutes(api, r.subjectHandler)
-		handler.RegisterFontRoutes(api, r.fontHandler)
+		handler.RegisterFontRoutes(fontAPI, r.fontHandler)
+		handler.RegisterFontDownloadRoute(api, r.fontHandler)
 		handler.RegisterPdfTemplateRoutes(api, r.pdfTemplateHandler)
 		handler.RegisterExportRoutes(exportAPI, r.exportHandler)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
