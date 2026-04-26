@@ -849,12 +849,36 @@ func parseHostPort(cfg *datasource.ConnectionConfig) (string, int) {
 }
 
 func pingTCP(host string, port int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ipAddrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return fmt.Errorf("failed to resolve %s: %w", host, err)
+	}
+	if len(ipAddrs) == 0 {
+		return fmt.Errorf("failed to resolve %s: no IPs resolved", host)
+	}
+	for _, ipAddr := range ipAddrs {
+		if isBlockedPingIP(ipAddr.IP) {
+			return fmt.Errorf("refusing to probe blocked address %s for host %s", ipAddr.IP.String(), host)
+		}
+	}
+
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), timeout)
 	if err != nil {
 		return fmt.Errorf("failed to connect %s:%d: %w", host, port, err)
 	}
 	_ = conn.Close()
 	return nil
+}
+
+func isBlockedPingIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified() ||
+		ip.IsMulticast()
 }
 
 func (s *DatasourceService) UploadFile(file multipart.File, header *multipart.FileHeader, datasourceID int64, editType int) (*datasource.ExcelFileData, error) {

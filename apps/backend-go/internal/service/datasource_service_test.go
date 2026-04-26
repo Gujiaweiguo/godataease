@@ -139,6 +139,26 @@ func TestDatasourceServiceHelpers_PingTCPTimeout(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to connect")
 }
 
+func TestDatasourceServiceHelpers_PingTCPBlockedTargets(t *testing.T) {
+	t.Run("loopback host is rejected", func(t *testing.T) {
+		err := pingTCP("127.0.0.1", 3306, time.Second)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "refusing to probe blocked address")
+	})
+
+	t.Run("localhost is rejected", func(t *testing.T) {
+		err := pingTCP("localhost", 3306, time.Second)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "refusing to probe blocked address")
+	})
+
+	t.Run("private address remains allowed to reach connect path", func(t *testing.T) {
+		err := pingTCP("192.168.1.10", 81, time.Millisecond)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to connect")
+	})
+}
+
 func TestDatasourceServiceHelpers_NormalizedPID(t *testing.T) {
 	assert.Equal(t, int64(0), normalizedPID(nil))
 
