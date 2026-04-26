@@ -19,6 +19,19 @@ import (
 
 const defaultFontDir = "/opt/dataease2.0/data/font/"
 
+var allowedFontDownloadExtensions = map[string]struct{}{
+	".ttf":   {},
+	".otf":   {},
+	".woff":  {},
+	".woff2": {},
+}
+
+func isAllowedFontDownloadExtension(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	_, ok := allowedFontDownloadExtensions[ext]
+	return ok
+}
+
 type FontHandler struct {
 	repo *repository.TypefaceRepository
 }
@@ -244,6 +257,10 @@ func (h *FontHandler) Download(c *gin.Context) {
 	fontDir = filepath.Clean(fontDir)
 	filePath := filepath.Join(fontDir, cleanName)
 	if !strings.HasPrefix(filePath, fontDir+string(os.PathSeparator)) && filePath != fontDir {
+		response.Error(c, "500000", "Invalid file name")
+		return
+	}
+	if !isAllowedFontDownloadExtension(cleanName) {
 		response.Error(c, "500000", "Invalid file name")
 		return
 	}
