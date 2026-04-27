@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -42,6 +43,47 @@ func TestStaticHandler_FindResourceAsBase64_PathValidation(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "000000", resp.Code)
 	assert.Equal(t, "", resp.Data["../../etc/passwd"])
+
+	t.Run("rejects too many resource paths", func(t *testing.T) {
+		paths := make([]string, 0, maxStaticResourcePathCount+1)
+		for i := 0; i < maxStaticResourcePathCount+1; i++ {
+			paths = append(paths, fmt.Sprintf("safe-%d.png", i))
+		}
+		payload, err := json.Marshal(map[string][]string{"resourcePathList": paths})
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/staticResource/findResourceAsBase64", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), `"code":"500000"`)
+	})
+
+	t.Run("skips oversized file with empty result", func(t *testing.T) {
+		staticDir := t.TempDir()
+		t.Setenv("STATIC_RESOURCE_DIR", staticDir)
+
+		bigPath := filepath.Join(staticDir, "big.png")
+		oversized := bytes.Repeat([]byte("a"), maxStaticResourceFileBytes+1)
+		require.NoError(t, os.WriteFile(bigPath, oversized, 0o644))
+
+		body := `{"resourcePathList":["big.png"]}`
+		req := httptest.NewRequest(http.MethodPost, "/staticResource/findResourceAsBase64", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Code string            `json:"code"`
+			Data map[string]string `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, "000000", resp.Code)
+		assert.Equal(t, "", resp.Data["big.png"])
+	})
 }
 
 func TestStaticHandler_Upload_FileIDPathValidation(t *testing.T) {
