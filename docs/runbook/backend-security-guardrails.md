@@ -77,6 +77,8 @@
 
 - 审计导出下载：`AuditHandler.DownloadExportFile`
 - 字体文件下载：`FontHandler.Download`
+- 字体文件删除：`FontHandler.Delete`
+- 静态资源上传：`StaticHandler.Upload`
 - 静态资源 Base64 读取：`StaticHandler.FindResourceAsBase64`
 
 ### 当前策略
@@ -93,7 +95,9 @@
 - `AuditHandler.DownloadExportFile` 只允许下载：
   - `os.TempDir()` 下
   - 名字符合 `audit_logs_*.csv|json`
-- `FontHandler.Download` 允许公开下载，但必须经过严格路径校验
+- `FontHandler.Download` 允许公开下载，但必须经过严格路径校验，并限制为允许的字体扩展名（当前：`ttf/otf/woff/woff2`）
+- `FontHandler.Delete` 在删除磁盘文件前，必须重新校验 `FileTransName` 是否仍落在 `FONT_DIR` 下；若记录被污染导致路径非法，则跳过文件删除，但仍继续删除数据库记录
+- `StaticHandler.Upload` 对 `fileId` 做 `filepath.Clean()` / `..` 拒绝 / 绝对路径拒绝 / 路径分隔符拒绝，并校验最终写入路径仍在 `STATIC_RESOURCE_DIR` 下
 - `StaticHandler.FindResourceAsBase64` 先从输入路径中提取 basename，再做 `filepath.Clean()` / `..` 拒绝；对非法路径返回空字符串，不泄露目录结构
 
 ## 4. 路由鉴权边界
@@ -117,9 +121,6 @@
 
 ## 5. 仍待跟进的低优先级项
 
-- `font download` 增加更严格的扩展名白名单
-- `font delete` 增加纵深路径校验（当前 `FileTransName` 来自数据库，若记录被污染，仍可能逃逸到字体目录之外）
-- `static upload` 的 `fileId` 增加路径约束
 - `audit service` 把硬编码 `/tmp` 统一成 `os.TempDir()`
 - `FindResourceAsBase64` 增加文件大小/数量限制
 
@@ -141,3 +142,4 @@
 | 日期 | 变更内容 |
 |------|----------|
 | 2026-04-26 | 初始版本，覆盖 SSRF、防止任意文件读取、datasource ping 边界与路由鉴权约定 |
+| 2026-04-27 | 补充 font download 扩展名白名单、font delete 纵深路径校验与 static upload fileId 路径约束 |
