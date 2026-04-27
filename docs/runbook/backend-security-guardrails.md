@@ -95,10 +95,13 @@
 - `AuditHandler.DownloadExportFile` 只允许下载：
   - `os.TempDir()` 下
   - 名字符合 `audit_logs_*.csv|json`
+- `AuditService.ExportAuditLogs` 生成导出文件时，也必须和下载侧使用同一临时目录来源（当前统一为 `os.TempDir()`），避免“写到一处、按另一处校验”的不一致
 - `FontHandler.Download` 允许公开下载，但必须经过严格路径校验，并限制为允许的字体扩展名（当前：`ttf/otf/woff/woff2`）
 - `FontHandler.Delete` 在删除磁盘文件前，必须重新校验 `FileTransName` 是否仍落在 `FONT_DIR` 下；若记录被污染导致路径非法，则跳过文件删除，但仍继续删除数据库记录
 - `StaticHandler.Upload` 对 `fileId` 做 `filepath.Clean()` / `..` 拒绝 / 绝对路径拒绝 / 路径分隔符拒绝，并校验最终写入路径仍在 `STATIC_RESOURCE_DIR` 下
-- `StaticHandler.FindResourceAsBase64` 先从输入路径中提取 basename，再做 `filepath.Clean()` / `..` 拒绝；对非法路径返回空字符串，不泄露目录结构
+- `StaticHandler.FindResourceAsBase64` 先从输入路径中提取 basename，再做 `filepath.Clean()` / `..` 拒绝；对非法路径返回空字符串，不泄露目录结构。同时增加请求数量上限和单文件大小上限：
+  - 超过请求数量上限时整单拒绝（当前上限：`200`）
+  - 单个文件超过大小上限时，仅该项返回空字符串，保留部分成功语义（当前上限：`10MB`）
 
 ## 4. 路由鉴权边界
 
@@ -121,8 +124,7 @@
 
 ## 5. 仍待跟进的低优先级项
 
-- `audit service` 把硬编码 `/tmp` 统一成 `os.TempDir()`
-- `FindResourceAsBase64` 增加文件大小/数量限制
+- 暂无已知低优先级安全尾项；后续如新增本地文件访问能力，继续沿用本 runbook 约束自查
 
 ## 6. 开发检查清单
 
@@ -143,3 +145,4 @@
 |------|----------|
 | 2026-04-26 | 初始版本，覆盖 SSRF、防止任意文件读取、datasource ping 边界与路由鉴权约定 |
 | 2026-04-27 | 补充 font download 扩展名白名单、font delete 纵深路径校验与 static upload fileId 路径约束 |
+| 2026-04-27 | 补充 audit export 的 `os.TempDir()` 一致性约束，以及 `FindResourceAsBase64` 的数量/大小限制 |
