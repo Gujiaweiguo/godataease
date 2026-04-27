@@ -18,6 +18,23 @@ type StaticHandler struct {
 	service *service.StaticService
 }
 
+func resolveSafeStaticUploadPath(staticDir, fileID, ext string) (string, bool) {
+	if fileID == "" {
+		return "", false
+	}
+	cleanID := filepath.Clean(fileID)
+	if cleanID != fileID || strings.Contains(cleanID, "..") || filepath.IsAbs(cleanID) || strings.ContainsAny(fileID, `/\\`) {
+		return "", false
+	}
+	staticDir = filepath.Clean(staticDir)
+	fileName := cleanID + ext
+	destPath := filepath.Join(staticDir, fileName)
+	if !strings.HasPrefix(destPath, staticDir+string(os.PathSeparator)) && destPath != staticDir {
+		return "", false
+	}
+	return destPath, true
+}
+
 func NewStaticHandler(service *service.StaticService) *StaticHandler {
 	return &StaticHandler{service: service}
 }
@@ -135,8 +152,11 @@ func (h *StaticHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	fileName := fileID + ext
-	destPath := filepath.Join(staticDir, fileName)
+	destPath, ok := resolveSafeStaticUploadPath(staticDir, fileID, ext)
+	if !ok {
+		response.Error(c, "500000", "Invalid fileId")
+		return
+	}
 	if err := os.WriteFile(destPath, content, 0644); err != nil {
 		response.Error(c, "500000", "Failed to save file: "+err.Error())
 		return
