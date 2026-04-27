@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -168,17 +169,17 @@ func (s *AuditService) ExportAuditLogs(ids []int64, format string) (string, erro
 
 	switch format {
 	case "csv":
-		filePath = fmt.Sprintf("/tmp/audit_logs_%s.csv", timestamp)
+		filePath = filepath.Join(os.TempDir(), fmt.Sprintf("audit_logs_%s.csv", timestamp))
 		if err := s.exportToCSV(logs, filePath); err != nil {
 			return "", err
 		}
 	case "json":
-		filePath = fmt.Sprintf("/tmp/audit_logs_%s.json", timestamp)
+		filePath = filepath.Join(os.TempDir(), fmt.Sprintf("audit_logs_%s.json", timestamp))
 		if err := s.exportToJSON(logs, filePath); err != nil {
 			return "", err
 		}
 	default:
-		filePath = fmt.Sprintf("/tmp/audit_logs_%s.csv", timestamp)
+		filePath = filepath.Join(os.TempDir(), fmt.Sprintf("audit_logs_%s.csv", timestamp))
 		if err := s.exportToCSV(logs, filePath); err != nil {
 			return "", err
 		}
