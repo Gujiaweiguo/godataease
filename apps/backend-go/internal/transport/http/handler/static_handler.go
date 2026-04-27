@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,6 +18,11 @@ import (
 type StaticHandler struct {
 	service *service.StaticService
 }
+
+const (
+	maxStaticResourcePathCount = 200
+	maxStaticResourceFileBytes = 10 << 20
+)
 
 func resolveSafeStaticUploadPath(staticDir, fileID, ext string) (string, bool) {
 	if fileID == "" {
@@ -174,6 +180,10 @@ func (h *StaticHandler) FindResourceAsBase64(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	if len(req.ResourcePathList) > maxStaticResourcePathCount {
+		response.Error(c, "500000", fmt.Sprintf("too many files requested (max %d)", maxStaticResourcePathCount))
+		return
+	}
 
 	staticDir := os.Getenv("STATIC_RESOURCE_DIR")
 	if staticDir == "" {
@@ -192,8 +202,18 @@ func (h *StaticHandler) FindResourceAsBase64(c *gin.Context) {
 			continue
 		}
 		filePath := filepath.Join(staticDir, cleanName)
-		content, err := os.ReadFile(filePath)
+		file, err := os.Open(filePath)
 		if err != nil {
+			result[path] = ""
+			continue
+		}
+		content, err := io.ReadAll(io.LimitReader(file, maxStaticResourceFileBytes+1))
+		_ = file.Close()
+		if err != nil {
+			result[path] = ""
+			continue
+		}
+		if len(content) > maxStaticResourceFileBytes {
 			result[path] = ""
 			continue
 		}
