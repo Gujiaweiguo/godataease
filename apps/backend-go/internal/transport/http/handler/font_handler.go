@@ -32,6 +32,25 @@ func isAllowedFontDownloadExtension(name string) bool {
 	return ok
 }
 
+func resolveSafeFontFilePath(fontDir, fileName string) (string, bool) {
+	if fileName == "" {
+		return "", false
+	}
+	cleanName := filepath.Clean(fileName)
+	if cleanName != fileName || strings.Contains(cleanName, "..") || filepath.IsAbs(cleanName) {
+		return "", false
+	}
+	fontDir = filepath.Clean(fontDir)
+	filePath := filepath.Join(fontDir, cleanName)
+	if !strings.HasPrefix(filePath, fontDir+string(os.PathSeparator)) && filePath != fontDir {
+		return "", false
+	}
+	if !isAllowedFontDownloadExtension(cleanName) {
+		return "", false
+	}
+	return filePath, true
+}
+
 type FontHandler struct {
 	repo *repository.TypefaceRepository
 }
@@ -145,9 +164,11 @@ func (h *FontHandler) Delete(c *gin.Context) {
 	if font.FileTransName != "" {
 		fontDir := os.Getenv("FONT_DIR")
 		if fontDir == "" {
-			fontDir = "/opt/dataease2.0/data/font/"
+			fontDir = defaultFontDir
 		}
-		_ = os.Remove(filepath.Join(fontDir, font.FileTransName))
+		if filePath, ok := resolveSafeFontFilePath(fontDir, font.FileTransName); ok {
+			_ = os.Remove(filePath)
+		}
 	}
 	if err := h.repo.DeleteFont(id); err != nil {
 		response.Error(c, "500000", "Failed to delete font: "+err.Error())
