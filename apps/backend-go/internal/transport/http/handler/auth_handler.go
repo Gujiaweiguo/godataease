@@ -12,10 +12,12 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	"dataease/backend/internal/domain/auth"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -26,7 +28,10 @@ const pkSeparator = "-pk_separator-"
 const (
 	defaultAdminCredential   = "admin"
 	defaultBuiltInCredential = "dataease"
+	loginRateLimitRequests   = 10
 )
+
+const loginRateLimitWindow = time.Minute
 
 var (
 	cryptoOnce       sync.Once
@@ -105,13 +110,15 @@ func (h *AuthHandler) Model(c *gin.Context) {
 }
 
 func RegisterAuthRoutes(engine *gin.Engine, h *AuthHandler) {
-	engine.POST("/login/localLogin", h.LocalLogin)
+	loginGroup := engine.Group("")
+	loginGroup.Use(middleware.RateLimit("login", loginRateLimitRequests, loginRateLimitWindow, middleware.ClientIPKey))
+	loginGroup.POST("/login/localLogin", h.LocalLogin)
+	loginGroup.POST("/api/login/localLogin", h.LocalLogin)
 	engine.GET("/login/refresh", h.Refresh)
 	engine.GET("/logout", h.Logout)
 	engine.GET("/dekey", h.Dekey)
 	engine.GET("/symmetricKey", h.SymmetricKey)
 	engine.GET("/model", h.Model)
-	engine.POST("/api/login/localLogin", h.LocalLogin)
 	engine.GET("/api/login/refresh", h.Refresh)
 	engine.GET("/api/logout", h.Logout)
 	engine.GET("/api/dekey", h.Dekey)

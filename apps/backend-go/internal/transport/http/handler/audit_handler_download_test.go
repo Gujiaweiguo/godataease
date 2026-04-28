@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,7 @@ func TestAuditHandler_DownloadExportFile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewAuditHandler(nil)
 	r := gin.New()
-	r.GET("/audit/download", h.DownloadExportFile)
+	RegisterAuditRoutes(r.Group(""), h)
 
 	t.Run("rejects missing path", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/audit/download", nil)
@@ -81,5 +82,26 @@ func TestAuditHandler_DownloadExportFile(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Header().Get("Content-Disposition"), "audit_logs.csv")
 		assert.Contains(t, w.Body.String(), "id,action")
+	})
+
+	t.Run("rate limits export and download routes", func(t *testing.T) {
+		for i := 0; i < auditExportRateLimitRequests; i++ {
+			req := httptest.NewRequest(http.MethodPost, "/audit/export", strings.NewReader("{"))
+			req.RemoteAddr = "203.0.113.40:1234"
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Contains(t, w.Body.String(), `"code":"10001"`)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/audit/download?path=/etc/passwd&format=csv", nil)
+		req.RemoteAddr = "203.0.113.40:1234"
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
+		assert.Contains(t, w.Body.String(), `"code":"429001"`)
 	})
 }
