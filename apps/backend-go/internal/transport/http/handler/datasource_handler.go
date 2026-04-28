@@ -4,9 +4,11 @@ import (
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 	"errors"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -15,6 +17,10 @@ import (
 type DatasourceHandler struct {
 	service *service.DatasourceService
 }
+
+const datasourceValidateRateLimitWindow = time.Minute
+
+const datasourceValidateRateLimitRequests = 30
 
 func NewDatasourceHandler(service *service.DatasourceService) *DatasourceHandler {
 	return &DatasourceHandler{service: service}
@@ -447,11 +453,18 @@ func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	dsGroup := r.Group("/ds")
+	validateGroup := dsGroup.Group("")
+	validateGroup.Use(middleware.RateLimit(
+		"datasource-validate",
+		datasourceValidateRateLimitRequests,
+		datasourceValidateRateLimitWindow,
+		middleware.AuthenticatedUserKey,
+	))
 	{
 		dsGroup.POST("/list", h.List)
 		dsGroup.POST("/tree", h.Tree)
-		dsGroup.POST("/validate", h.Validate)
-		dsGroup.GET("/validate/:id", h.ValidateByID)
+		validateGroup.POST("/validate", h.Validate)
+		validateGroup.GET("/validate/:id", h.ValidateByID)
 		dsGroup.GET("/:id", h.Get)
 		dsGroup.GET("/hidePw/:id", h.HidePw)
 		dsGroup.GET("/simple/:id", h.GetSimpleDs)
