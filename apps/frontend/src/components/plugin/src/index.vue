@@ -52,54 +52,59 @@ defineExpose({
   invokeMethod
 })
 onMounted(async () => {
-  const key = 'xpack-model-distributed'
-  let distributed: any = false
-  if (wsCache.get(key) === null) {
-    const res = await xpackModelApi()
-    const resData = isNull(res.data) ? 'null' : res.data
-    wsCache.set('xpack-model-distributed', resData)
-    distributed = res.data
-  } else {
-    distributed = wsCache.get(key)
-  }
-  // Normalize wsCache serialization: 'false' string should be boolean false
-  if (distributed === 'false' || distributed === 0) {
-    distributed = false
-  }
-  if (isNull(distributed)) {
-    setTimeout(() => {
-      emits('loadFail')
-      loading.value = false
-    }, 1000)
-    return
-  }
-  if (distributed) {
-    if (window['DEXPack']) {
-      const xpack = await window['DEXPack'].mapping[attrs.jsname]
-      plugin.value = xpack.default
-    } else if (!(window as any)._de_xpack_not_loaded) {
-      ;(window as any)._de_xpack_not_loaded = true
-      ;(window as any)['VueDe'] = Vue
-      ;(window as any)['AxiosDe'] = axios
-      ;(window as any)['PiniaDe'] = Pinia
-      ;(window as any)['vueRouterDe'] = router
-      ;(window as any)['MittAllDe'] = useEmitt().emitter.all
-      ;(window as any)['I18nDe'] = i18n
-      ;(window as any)['EchartsDE'] = echarts
-      if (!(window as any).tinymce) {
-        ;(window as any).tinymce = tinymce
-      }
-      loadDistributed()
-        .then(async res => {
-          new Function(res.data)()
-          useEmitt().emitter.emit('load-xpack')
-        })
-        .catch(() => {
-          emits('loadFail')
-          showNolic()
-        })
+  try {
+    const key = 'xpack-model-distributed'
+    let distributed: any = false
+    if (wsCache.get(key) === null) {
+      const res = await xpackModelApi()
+      const resData = isNull(res.data) ? 'null' : res.data
+      wsCache.set('xpack-model-distributed', resData)
+      distributed = res.data
+    } else {
+      distributed = wsCache.get(key)
     }
-  } else {
+    // Normalize wsCache serialization: 'false' string should be boolean false
+    if (distributed === 'false' || distributed === 0) {
+      distributed = false
+    }
+    if (isNull(distributed)) {
+      setTimeout(() => {
+        emits('loadFail')
+        loading.value = false
+      }, 1000)
+      return
+    }
+    if (distributed) {
+      if (window['DEXPack']) {
+        const xpack = await window['DEXPack'].mapping[attrs.jsname]
+        plugin.value = xpack.default
+      } else if (!(window as any)._de_xpack_not_loaded) {
+        ;(window as any)._de_xpack_not_loaded = true
+        ;(window as any)['VueDe'] = Vue
+        ;(window as any)['AxiosDe'] = axios
+        ;(window as any)['PiniaDe'] = Pinia
+        ;(window as any)['vueRouterDe'] = router
+        ;(window as any)['MittAllDe'] = useEmitt().emitter.all
+        ;(window as any)['I18nDe'] = i18n
+        ;(window as any)['EchartsDE'] = echarts
+        if (!(window as any).tinymce) {
+          ;(window as any).tinymce = tinymce
+        }
+        loadDistributed()
+          .then(async res => {
+            new Function(res.data)()
+            useEmitt().emitter.emit('load-xpack')
+          })
+          .catch(() => {
+            emits('loadFail')
+            showNolic()
+          })
+      }
+    } else {
+      emits('loadFail')
+      showNolic()
+    }
+  } catch {
     emits('loadFail')
     showNolic()
   }

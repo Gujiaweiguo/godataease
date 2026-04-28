@@ -6,6 +6,7 @@ import { useCache } from '@/hooks/web/useCache'
 import colorFunctions from 'less/lib/less/functions/color.js'
 import colorTree from 'less/lib/less/tree/color.js'
 import { useEmbedded } from '@/store/modules/embedded'
+import { isBootstrapSessionValid } from '@/utils/authBootstrap'
 import { setTitle } from '@/utils/utils'
 
 const embeddedStore = useEmbedded()
@@ -213,38 +214,49 @@ export const useAppearanceStore = defineStore('appearanceStore', {
       if (this.loaded) {
         return
       }
-      defaultFont().then(res => {
-        const fontList = Array.isArray(res) ? res : res ? [res] : []
-        const [font] = fontList
-        setDefaultFont(
-          `${
-            embeddedStore.baseUrl
-              ? (embeddedStore.baseUrl + basePath).replace('/./', '/')
-              : basePath
-          }/typeface/download/${font?.fileTransName}`,
-          font?.name,
-          font?.fileTransName
-        )
-        function setDefaultFont(url, name, fileTransName) {
-          let fontStyleElement = document.querySelector('#de-custom_font')
-          if (!fontStyleElement) {
-            fontStyleElement = document.createElement('style')
-            fontStyleElement.setAttribute('id', 'de-custom_font')
-            document.querySelector('head').appendChild(fontStyleElement)
-          }
-          fontStyleElement.innerHTML =
-            name && fileTransName
-              ? `@font-face {
-                font-family: '${name}';
-                src: url(${url});
-                font-weight: normal;
-                font-style: normal;
-                }`
-              : ''
-          document.documentElement.style.setProperty('--de-custom_font', `${name}`)
-          document.documentElement.style.setProperty('--van-base-font', `${name}`)
-        }
+      const hasValidSession = isBootstrapSessionValid({
+        token: wsCache.get('user.token'),
+        exp: wsCache.get('user.exp'),
+        isDesktop: wsCache.get('app.desktop')
       })
+      if (hasValidSession) {
+        defaultFont()
+          .then(res => {
+            const fontList = Array.isArray(res) ? res : res ? [res] : []
+            const [font] = fontList
+            setDefaultFont(
+              `${
+                embeddedStore.baseUrl
+                  ? (embeddedStore.baseUrl + basePath).replace('/./', '/')
+                  : basePath
+              }/typeface/download/${font?.fileTransName}`,
+              font?.name,
+              font?.fileTransName
+            )
+            function setDefaultFont(url, name, fileTransName) {
+              let fontStyleElement = document.querySelector('#de-custom_font')
+              if (!fontStyleElement) {
+                fontStyleElement = document.createElement('style')
+                fontStyleElement.setAttribute('id', 'de-custom_font')
+                document.querySelector('head').appendChild(fontStyleElement)
+              }
+              fontStyleElement.innerHTML =
+                name && fileTransName
+                  ? `@font-face {
+                    font-family: '${name}';
+                    src: url(${url});
+                    font-weight: normal;
+                    font-style: normal;
+                    }`
+                  : ''
+              document.documentElement.style.setProperty('--de-custom_font', `${name}`)
+              document.documentElement.style.setProperty('--van-base-font', `${name}`)
+            }
+          })
+          .catch(() => {
+            // Ignore non-critical font bootstrap failures.
+          })
+      }
       if (!isDataEaseBi) {
         document.title = ''
       }

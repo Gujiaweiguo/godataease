@@ -247,10 +247,12 @@ router.beforeEach(async (to, from, next) => {
     }
   }
   await appearanceStore.setAppearance()
-  await appearanceStore.setFontList()
-  const defaultSort = await getDefaultSettings()
-  wsCache.set('TreeSort-backend', defaultSort['basic.defaultSort'] ?? '1')
-  wsCache.set('open-backend', defaultSort['basic.defaultOpen'] ?? '0')
+  if (hasValidSession) {
+    await appearanceStore.setFontList()
+    const defaultSort = await getDefaultSettings()
+    wsCache.set('TreeSort-backend', defaultSort['basic.defaultSort'] ?? '1')
+    wsCache.set('open-backend', defaultSort['basic.defaultOpen'] ?? '0')
+  }
   if (hasValidSession && !to.path.startsWith('/de-link/')) {
     try {
       if (!userStore.getUid) {
@@ -330,7 +332,6 @@ router.beforeEach(async (to, from, next) => {
       whiteList.includes(to.path) ||
       to.path.startsWith('/de-link/')
     ) {
-      await appearanceStore.setFontList()
       permissionStore.setCurrentPath(to.path)
       next()
     } else {
