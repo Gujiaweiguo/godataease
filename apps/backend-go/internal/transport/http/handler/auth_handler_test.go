@@ -141,6 +141,35 @@ func TestAuthHandler_LocalLogin_InvalidJSON(t *testing.T) {
 	assert.Equal(t, "500000", resp.Code)
 }
 
+func TestRegisterAuthRoutes_RateLimitsLocalLogin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewAuthHandler(service.NewAuthService(nil, nil, nil, nil))
+	r := gin.New()
+	RegisterAuthRoutes(r, h)
+
+	for i := 0; i < loginRateLimitRequests; i++ {
+		req := httptest.NewRequest("POST", "/login/localLogin", strings.NewReader("{"))
+		req.RemoteAddr = "192.0.2.25:8080"
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, 200, w.Code)
+		assert.Contains(t, w.Body.String(), `"code":"500000"`)
+	}
+
+	req := httptest.NewRequest("POST", "/api/login/localLogin", strings.NewReader("{"))
+	req.RemoteAddr = "192.0.2.25:8080"
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 429, w.Code)
+	var resp bridgeCodeResp
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "429001", resp.Code)
+}
+
 func TestDecryptCredentialIfNeeded(t *testing.T) {
 	NewAuthHandler(nil)
 
