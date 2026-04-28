@@ -10,6 +10,7 @@ import (
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -18,6 +19,10 @@ import (
 type AuditHandler struct {
 	auditService *service.AuditService
 }
+
+const auditExportRateLimitWindow = time.Minute
+
+const auditExportRateLimitRequests = 10
 
 func NewAuditHandler(auditService *service.AuditService) *AuditHandler {
 	return &AuditHandler{
@@ -275,14 +280,21 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 
 func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler) {
 	auditGroup := r.Group("/audit")
+	exportGroup := auditGroup.Group("")
+	exportGroup.Use(middleware.RateLimit(
+		"audit-export",
+		auditExportRateLimitRequests,
+		auditExportRateLimitWindow,
+		middleware.AuthenticatedUserKey,
+	))
 	{
 		auditGroup.POST("/log", h.CreateAuditLog)
 		auditGroup.GET("/list", h.QueryAuditLogs)
 		auditGroup.GET("/:id", h.GetAuditLogByID)
 		auditGroup.GET("/user/:userId", h.GetAuditLogsByUserID)
-		auditGroup.POST("/export", h.ExportAuditLogs)
+		exportGroup.POST("/export", h.ExportAuditLogs)
 		auditGroup.DELETE("/retention", h.DeleteAuditLogsRetention)
 		auditGroup.POST("/login-failure", h.RecordLoginFailure)
-		auditGroup.GET("/download", h.DownloadExportFile)
+		exportGroup.GET("/download", h.DownloadExportFile)
 	}
 }
