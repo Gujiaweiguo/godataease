@@ -38,42 +38,47 @@ const invokeMethod = param => {
 }
 
 onMounted(async () => {
-  const key = 'xpack-model-distributed'
-  let distributed = false
-  if (wsCache.get(key) === null) {
-    const res = await xpackModelApi()
-    wsCache.set('xpack-model-distributed', isNull(res.data) ? 'null' : res.data)
-    distributed = res.data
-  } else {
-    distributed = wsCache.get(key)
-  }
-  if (isNull(distributed)) {
-    setTimeout(() => {
-      emits('loadFail')
-      loading.value = false
-    }, 1000)
-    return
-  }
-  if (distributed) {
-    const moduleName = getModuleName()
-    if (window[moduleName]) {
-      const xpack = await window[moduleName].mapping[attrs.jsname]
-      plugin.value = xpack.default
+  try {
+    const key = 'xpack-model-distributed'
+    let distributed = false
+    if (wsCache.get(key) === null) {
+      const res = await xpackModelApi()
+      wsCache.set('xpack-model-distributed', isNull(res.data) ? 'null' : res.data)
+      distributed = res.data
     } else {
-      window['VueDe'] = Vue
-      window['AxiosDe'] = axios
-      window['PiniaDe'] = Pinia
-      window['vueRouterDe'] = router
-      window['MittAllDe'] = useEmitt().emitter.all
-      window['I18nDe'] = i18n
-      const url = `/xpackComponent/pluginStaticInfo/${moduleName}`
-      request.get({ url }).then(async res => {
-        new Function(res.data || res)()
+      distributed = wsCache.get(key)
+    }
+    if (isNull(distributed)) {
+      setTimeout(() => {
+        emits('loadFail')
+        loading.value = false
+      }, 1000)
+      return
+    }
+    if (distributed) {
+      const moduleName = getModuleName()
+      if (window[moduleName]) {
         const xpack = await window[moduleName].mapping[attrs.jsname]
         plugin.value = xpack.default
-      })
+      } else {
+        window['VueDe'] = Vue
+        window['AxiosDe'] = axios
+        window['PiniaDe'] = Pinia
+        window['vueRouterDe'] = router
+        window['MittAllDe'] = useEmitt().emitter.all
+        window['I18nDe'] = i18n
+        const url = `/xpackComponent/pluginStaticInfo/${moduleName}`
+        request.get({ url }).then(async res => {
+          new Function(res.data || res)()
+          const xpack = await window[moduleName].mapping[attrs.jsname]
+          plugin.value = xpack.default
+        })
+      }
+    } else {
+      emits('loadFail')
+      showNolic()
     }
-  } else {
+  } catch {
     emits('loadFail')
     showNolic()
   }
