@@ -2166,7 +2166,7 @@ func TestDatasourceCanonicalUpdatePreservesLargeIntegerID(t *testing.T) {
 	h := NewDatasourceHandler(service.NewDatasourceService(repository.NewDatasourceRepository(db)))
 	r := gin.New()
 	api := r.Group("/api")
-	RegisterDatasourceRoutes(api, h)
+	RegisterDatasourceRoutes(api, h, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/ds/update", strings.NewReader(`{"id":985188400292302861,"name":"qa-canonical-ds-folder-2-renamed"}`))
 	req.Header.Set("Content-Type", "application/json")

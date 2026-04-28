@@ -20,6 +20,8 @@ type AuditHandler struct {
 	auditService *service.AuditService
 }
 
+const auditMenuPath = "/system/audit"
+
 const auditExportRateLimitWindow = time.Minute
 
 const auditExportRateLimitRequests = 10
@@ -278,9 +280,16 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 	c.FileAttachment(absPath, "audit_logs."+format)
 }
 
-func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler) {
+func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
+	var menuAuthMiddleware *middleware.MenuAuthMiddleware
+	if len(menuAuthMiddlewares) > 0 {
+		menuAuthMiddleware = menuAuthMiddlewares[0]
+	}
 	auditGroup := r.Group("/audit")
 	exportGroup := auditGroup.Group("")
+	if menuAuthMiddleware != nil {
+		exportGroup.Use(menuAuthMiddleware.RequireMenuAuth(auditMenuPath))
+	}
 	exportGroup.Use(middleware.RateLimit(
 		"audit-export",
 		auditExportRateLimitRequests,

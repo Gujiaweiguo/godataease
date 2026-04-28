@@ -37,9 +37,13 @@ import (
 //	  /chartData/*          — chart data compatibility (C3 migrate to canonical)
 //	  /chart/*              — chart CRUD compatibility (C3 migrate to canonical)
 //	  /datasetField/*       — dataset field compatibility (C3 migrate to canonical)
-func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler, permMiddleware *middleware.PermissionMiddleware) {
+func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
+	var menuAuthMiddleware *middleware.MenuAuthMiddleware
+	if len(menuAuthMiddlewares) > 0 {
+		menuAuthMiddleware = menuAuthMiddlewares[0]
+	}
 	if datasourceHandler != nil {
-		registerDatasourceCompatRoutes(r, datasourceHandler, bridgeGetCurrentUserID, bridgeGetCurrentUsername)
+		registerDatasourceCompatRoutes(r, datasourceHandler, permMiddleware, menuAuthMiddleware, bridgeGetCurrentUserID, bridgeGetCurrentUsername)
 	}
 
 	if datasetHandler != nil {

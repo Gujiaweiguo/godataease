@@ -129,6 +129,25 @@ func TestRegisterRoutes_DatasourceCanonicalAndCompatibilityContracts(t *testing.
 			router.Engine().ServeHTTP(w, req)
 
 			if w.Code != 200 {
+				if tt.path == "/api/ds/validate" || tt.path == "/api/datasource/validate" || tt.path == "/de2api/datasource/validate" {
+					if w.Code != 403 {
+						t.Fatalf("expected status 403 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+					}
+					var resp struct {
+						Code string `json:"code"`
+						Msg  string `json:"msg"`
+					}
+					if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+						t.Fatalf("unmarshal response for %s failed: %v", tt.path, err)
+					}
+					if resp.Code != "70001" {
+						t.Fatalf("expected code 70001 for %s, got %s", tt.path, resp.Code)
+					}
+					if !strings.Contains(resp.Msg, "No role assigned") {
+						t.Fatalf("expected missing role message for %s, got %q", tt.path, resp.Msg)
+					}
+					return
+				}
 				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
 			}
 
@@ -230,8 +249,8 @@ func TestRegisterRoutes_DatasourceValidateByIDCanonicalRouteReturnsExplicitFailu
 
 	router.Engine().ServeHTTP(w, req)
 
-	if w.Code != 200 {
-		t.Fatalf("expected status 200, got %d with body %s", w.Code, w.Body.String())
+	if w.Code != 401 {
+		t.Fatalf("expected status 401, got %d with body %s", w.Code, w.Body.String())
 	}
 
 	var resp struct {
@@ -242,11 +261,11 @@ func TestRegisterRoutes_DatasourceValidateByIDCanonicalRouteReturnsExplicitFailu
 		t.Fatalf("unmarshal response failed: %v; body=%s", err, w.Body.String())
 	}
 
-	if resp.Code != "500000" {
-		t.Fatalf("expected code 500000, got %s", resp.Code)
+	if resp.Code != "20001" {
+		t.Fatalf("expected code 20001, got %s", resp.Code)
 	}
-	if !strings.Contains(resp.Msg, "Invalid datasource ID") {
-		t.Fatalf("expected invalid datasource id message, got %q", resp.Msg)
+	if !strings.Contains(resp.Msg, "authentication required") {
+		t.Fatalf("expected authentication required message, got %q", resp.Msg)
 	}
 }
 
@@ -422,7 +441,7 @@ func TestRegisterRoutes_DatasourceCheckAPIDatasourceRoutesReturnExplicitEnvelope
 	}
 }
 
-func TestRegisterRoutes_DatasourceValidateSuccessEnvelopeAcrossAliases(t *testing.T) {
+func TestRegisterRoutes_DatasourceValidateAliasesRequireAuthorizationWithoutRoleContext(t *testing.T) {
 	router := NewRouter(nil, nil)
 	router.RegisterRoutes()
 
@@ -443,8 +462,8 @@ func TestRegisterRoutes_DatasourceValidateSuccessEnvelopeAcrossAliases(t *testin
 
 			router.Engine().ServeHTTP(w, req)
 
-			if w.Code != 200 {
-				t.Fatalf("expected status 200 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
+			if w.Code != 403 {
+				t.Fatalf("expected status 403 for %s, got %d with body %s", tt.path, w.Code, w.Body.String())
 			}
 
 			var resp struct {
@@ -456,14 +475,11 @@ func TestRegisterRoutes_DatasourceValidateSuccessEnvelopeAcrossAliases(t *testin
 				t.Fatalf("unmarshal response for %s failed: %v", tt.path, err)
 			}
 
-			if resp.Code != "000000" {
-				t.Fatalf("expected code 000000 for %s, got %s", tt.path, resp.Code)
+			if resp.Code != "70001" {
+				t.Fatalf("expected code 70001 for %s, got %s", tt.path, resp.Code)
 			}
-			if resp.Msg != "success" {
-				t.Fatalf("expected msg success for %s, got %q", tt.path, resp.Msg)
-			}
-			if resp.Data["status"] != "Success" {
-				t.Fatalf("expected datasource validation status Success for %s, got %#v", tt.path, resp.Data["status"])
+			if !strings.Contains(resp.Msg, "No role assigned") {
+				t.Fatalf("expected missing role message for %s, got %q", tt.path, resp.Msg)
 			}
 		})
 	}
