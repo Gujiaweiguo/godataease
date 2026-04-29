@@ -390,13 +390,205 @@ func (r *ResourcePermissionRepository) GetResourcePermissionIDs(resourceID int64
 
 // CheckPermissionConsistency 检查双视角权限一致性
 func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
-	// 当前实现返回一致结果，后续可以添加详细的一致性检查
-	return &permission.PermissionConsistencyResult{
+	result := &permission.PermissionConsistencyResult{
 		Consistent:      true,
-		UserCount:       0,
-		ResourceCount:   0,
 		Inconsistencies: []*permission.PermissionInconsistencyVO{},
-	}, nil
+	}
+
+	var userCount int64
+	if err := r.db.Table("sys_user").Where("del_flag = 0").Count(&userCount).Error; err != nil {
+		return nil, err
+	}
+	result.UserCount = int(userCount)
+
+	if userCount > 10000 {
+		result.Inconsistencies = []*permission.PermissionInconsistencyVO{{
+			Description: fmt.Sprintf("permission consistency check skipped: active user count %d exceeds limit 10000", userCount),
+		}}
+		return result, nil
+	}
+
+	governedTypes := []string{
+		permission.ResourceTypeDashboard,
+		permission.ResourceTypeScreen,
+		permission.ResourceTypeDataset,
+		permission.ResourceTypeDatasource,
+	}
+	prefixClauses := make([]string, 0, len(governedTypes))
+	prefixArgs := make([]interface{}, 0, len(governedTypes))
+	for _, resourceType := range governedTypes {
+		prefixClauses = append(prefixClauses, "p.perm_key LIKE ?")
+		prefixArgs = append(prefixArgs, resourcePermKeyPrefix(resourceType)+"%")
+	}
+	prefixFilter := strings.Join(prefixClauses, " OR ")
+
+	type userPermRow struct {
+		UserID  int64  `gorm:"column:user_id"`
+		PermKey string `gorm:"column:perm_key"`
+	}
+
+	userViewSQL := fmt.Sprintf(`
+		SELECT effective.user_id, effective.perm_key
+		FROM (
+			SELECT sup.user_id AS user_id, p.perm_key AS perm_key
+			FROM sys_user_perm sup
+			JOIN sys_user u ON u.user_id = sup.user_id AND u.del_flag = 0
+			JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0
+			WHERE sup.status = 1 AND sup.del_flag = 0 AND (%s)
+			UNION
+			SELECT sur.user_id AS user_id, p.perm_key AS perm_key
+			FROM sys_user_role sur
+			JOIN sys_user u ON u.user_id = sur.user_id AND u.del_flag = 0
+			JOIN sys_role_perm srp ON srp.role_id = sur.role_id
+			JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0
+			WHERE %s
+		) AS effective
+		GROUP BY effective.user_id, effective.perm_key
+	`, prefixFilter, prefixFilter)
+	unionArgs := append(append([]interface{}{}, prefixArgs...), prefixArgs...)
+	var userViewRows []userPermRow
+	if err := r.db.Raw(userViewSQL, unionArgs...).Scan(&userViewRows).Error; err != nil {
+		return nil, err
+	}
+
+	userView := make(map[string]bool, len(userViewRows))
+	for _, row := range userViewRows {
+		if row.UserID <= 0 || strings.TrimSpace(row.PermKey) == "" {
+			continue
+		}
+		userView[fmt.Sprintf("%d:%s", row.UserID, row.PermKey)] = true
+	}
+
+	type resourceRow struct {
+		ResourceID   int64  `gorm:"column:resource_id"`
+		ResourceType string `gorm:"column:resource_type"`
+	}
+	var resources []resourceRow
+	if err := r.db.Model(&permission.SysResource{}).
+		Select("resource_id, resource_type").
+		Where("resource_type IN ?", governedTypes).
+		Find(&resources).Error; err != nil {
+		return nil, err
+	}
+	result.ResourceCount = len(resources)
+
+	resourceView := make(map[string]bool)
+	resourceMeta := make(map[string]resourceRow)
+	for _, resourceEntry := range resources {
+		var permIDs []int64
+		if err := r.db.Model(&permission.SysResourcePerm{}).
+			Where("resource_id = ?", resourceEntry.ResourceID).
+			Pluck("perm_id", &permIDs).Error; err != nil {
+			return nil, err
+		}
+		if len(permIDs) == 0 {
+			continue
+		}
+
+		var directRows []userPermRow
+		if err := r.db.Table("sys_user_perm sup").
+			Select("DISTINCT sup.user_id, p.perm_key").
+			Joins("JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0").
+			Joins("JOIN sys_user u ON u.user_id = sup.user_id AND u.del_flag = 0").
+			Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_id IN ?", permIDs).
+			Find(&directRows).Error; err != nil {
+			return nil, err
+		}
+		for _, row := range directRows {
+			key := fmt.Sprintf("%d:%s", row.UserID, row.PermKey)
+			resourceView[key] = true
+			if _, exists := resourceMeta[key]; !exists {
+				resourceMeta[key] = resourceEntry
+			}
+		}
+
+		var roleRows []userPermRow
+		if err := r.db.Table("sys_role_perm srp").
+			Select("DISTINCT sur.user_id, p.perm_key").
+			Joins("JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0").
+			Joins("JOIN sys_user_role sur ON sur.role_id = srp.role_id").
+			Joins("JOIN sys_user u ON u.user_id = sur.user_id AND u.del_flag = 0").
+			Where("p.perm_id IN ?", permIDs).
+			Find(&roleRows).Error; err != nil {
+			return nil, err
+		}
+		for _, row := range roleRows {
+			key := fmt.Sprintf("%d:%s", row.UserID, row.PermKey)
+			resourceView[key] = true
+			if _, exists := resourceMeta[key]; !exists {
+				resourceMeta[key] = resourceEntry
+			}
+		}
+	}
+
+	inconsistencies := make([]*permission.PermissionInconsistencyVO, 0)
+	for key := range userView {
+		if resourceView[key] {
+			continue
+		}
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		var userID int64
+		if _, err := fmt.Sscanf(parts[0], "%d", &userID); err != nil {
+			continue
+		}
+		resourceType := ""
+		permParts := strings.SplitN(parts[1], ":", 2)
+		if len(permParts) > 0 {
+			resourceType = permParts[0]
+		}
+		inconsistencies = append(inconsistencies, &permission.PermissionInconsistencyVO{
+			UserID:       userID,
+			ResourceID:   0,
+			ResourceType: resourceType,
+			UserView:     "granted",
+			ResourceView: "missing",
+			Description:  fmt.Sprintf("user %d has %s in user view but resource view is missing", userID, parts[1]),
+		})
+	}
+
+	for key := range resourceView {
+		if userView[key] {
+			continue
+		}
+		parts := strings.SplitN(key, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		var userID int64
+		if _, err := fmt.Sscanf(parts[0], "%d", &userID); err != nil {
+			continue
+		}
+		meta := resourceMeta[key]
+		resourceID := int64(0)
+		if meta.ResourceID > 0 && strings.TrimSpace(meta.ResourceType) != "" {
+			resourceID = meta.ResourceID - scopedResourceID(meta.ResourceType, 0)
+			if resourceID < 0 {
+				resourceID = 0
+			}
+		}
+		resourceType := meta.ResourceType
+		if resourceType == "" {
+			permParts := strings.SplitN(parts[1], ":", 2)
+			if len(permParts) > 0 {
+				resourceType = permParts[0]
+			}
+		}
+		inconsistencies = append(inconsistencies, &permission.PermissionInconsistencyVO{
+			UserID:       userID,
+			ResourceID:   resourceID,
+			ResourceType: resourceType,
+			UserView:     "missing",
+			ResourceView: "granted",
+			Description:  fmt.Sprintf("user %d has %s in resource view but user view is missing", userID, parts[1]),
+		})
+	}
+
+	result.Inconsistencies = inconsistencies
+	result.Consistent = len(inconsistencies) == 0
+	return result, nil
 }
 
 func resourcePermKeyPrefix(resourceType string) string {
