@@ -366,6 +366,10 @@ func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 		response.Error(c, "500000", "Invalid dataset ID")
 		return
 	}
+	if h == nil || h.chartService == nil {
+		response.Success(c, []chart.ChartField{})
+		return
+	}
 	userID := int64(middleware.GetUserID(c))
 	var result *chart.ChartFieldListResponse
 	if userID > 0 {
@@ -385,6 +389,10 @@ func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
 	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid dataset ID")
+		return
+	}
+	if h == nil || h.chartService == nil {
+		response.Success(c, []chart.ChartField{})
 		return
 	}
 	userID := int64(middleware.GetUserID(c))
@@ -408,6 +416,10 @@ func (h *DatasetHandler) SaveField(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	if h == nil || h.service == nil {
+		response.Error(c, "500000", "dataset service unavailable")
+		return
+	}
 	result, err := h.service.SaveField(&field)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -418,6 +430,10 @@ func (h *DatasetHandler) SaveField(c *gin.Context) {
 
 func (h *DatasetHandler) GetFieldFunctions(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h == nil || h.service == nil {
+		response.Success(c, []service.FunctionCategory{})
+		return
+	}
 	result := h.service.GetFieldFunctions()
 	response.Success(c, result)
 }
@@ -426,6 +442,10 @@ func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
 	defer recoverServicePanic(c)
 	req, ok := parseMultFieldValuesRequest(c)
 	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Success(c, []string{})
 		return
 	}
 	result, err := h.service.GetFieldEnum(req)
@@ -446,6 +466,10 @@ func (h *DatasetHandler) CopilotFields(c *gin.Context) {
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
 		response.Unauthorized(c, "authentication required")
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, "500000", "dataset service unavailable")
 		return
 	}
 	result, err := h.service.CopilotFields(datasetID, userID)
@@ -471,6 +495,10 @@ func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Success(c, []dataset.CoreDatasetTableField{})
 		return
 	}
 	result, err := h.service.ListFieldsByDsIds(req.DsIds)
