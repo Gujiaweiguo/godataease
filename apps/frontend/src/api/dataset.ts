@@ -250,12 +250,6 @@ export const getDatasetDetails = async (id): Promise<Dataset> => {
   })
 }
 
-export const tableUpdate = async (data): Promise<IResponse> => {
-  return request.post({ url: '/dataset/table/update', data }).then(res => {
-    return res?.data
-  })
-}
-
 export const getPreviewSql = async (data): Promise<IResponse> => {
   return request.post({ url: '/dataset/previewSql', data }).then(res => {
     return res?.data
