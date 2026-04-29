@@ -3,9 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 const hoisted = vi.hoisted(() => ({
   queryRoleApi: vi.fn(),
-  menuTreeApi: vi.fn(),
-  roleMenuAuthApi: vi.fn(),
-  roleMenuAuthSaveApi: vi.fn(),
+  menuTargetPerApi: vi.fn(),
+  menuTargetPerSaveApi: vi.fn(),
   messageSuccess: vi.fn(),
   messageError: vi.fn(),
   messageWarning: vi.fn()
@@ -13,9 +12,8 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/api/auth', () => ({
   queryRoleApi: hoisted.queryRoleApi,
-  menuTreeApi: hoisted.menuTreeApi,
-  roleMenuAuthApi: hoisted.roleMenuAuthApi,
-  roleMenuAuthSaveApi: hoisted.roleMenuAuthSaveApi
+  menuTargetPerApi: hoisted.menuTargetPerApi,
+  menuTargetPerSaveApi: hoisted.menuTargetPerSaveApi
 }))
 
 vi.mock('element-plus-secondary', () => ({
@@ -28,25 +26,44 @@ vi.mock('element-plus-secondary', () => ({
 
 import MenuPermission from '../../../../src/views/system/permission/MenuPermission.vue'
 
-describe('MenuPermission canonical role-menu api rollout', () => {
+describe('MenuPermission unified permission compat API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     hoisted.queryRoleApi.mockResolvedValue({
       code: '000000',
       data: { list: [{ roleId: 1, roleName: '管理员' }] }
     })
-    hoisted.menuTreeApi.mockResolvedValue({
+    hoisted.menuTargetPerApi.mockResolvedValue({
       code: '000000',
-      data: [{ id: 10, name: '系统管理', children: [] }]
+      data: { menuTree: [{ id: 10, name: '系统管理', children: [] }], menuIds: [] }
     })
-    hoisted.roleMenuAuthApi.mockResolvedValue({
+    hoisted.menuTargetPerSaveApi.mockResolvedValue({ code: '000000' })
+  })
+
+  it('loads menu tree on mount via menuTargetPerApi with roleId 0', async () => {
+    mount(MenuPermission, {
+      global: {
+        stubs: {
+          'el-select': true,
+          'el-option': true,
+          'el-tree': true,
+          'el-button': true,
+          'el-empty': true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(hoisted.menuTargetPerApi).toHaveBeenCalledWith({ roleId: 0 })
+  })
+
+  it('loads role menu permissions on role selection and saves via compat API', async () => {
+    hoisted.menuTargetPerApi.mockResolvedValue({
       code: '000000',
       data: { menuTree: [{ id: 10, name: '系统管理', children: [] }], menuIds: [10] }
     })
-    hoisted.roleMenuAuthSaveApi.mockResolvedValue({ code: '000000' })
-  })
 
-  it('uses roleMenu auth apis for role load/save while preserving initial tree load', async () => {
     const wrapper = mount(MenuPermission, {
       global: {
         stubs: {
@@ -61,19 +78,16 @@ describe('MenuPermission canonical role-menu api rollout', () => {
 
     await flushPromises()
 
-    expect(hoisted.menuTreeApi).toHaveBeenCalledTimes(1)
-    expect(hoisted.roleMenuAuthApi).not.toHaveBeenCalled()
-
     const setupState = (wrapper.vm as any).$.setupState
     setupState.selectedRoleId = 1
     await setupState.handleRoleChange()
 
-    expect(hoisted.roleMenuAuthApi).toHaveBeenCalledWith(1)
+    expect(hoisted.menuTargetPerApi).toHaveBeenCalledWith({ roleId: 1 })
 
     setupState.selectedMenuIds = [10]
     await setupState.handleSave()
 
-    expect(hoisted.roleMenuAuthSaveApi).toHaveBeenCalledWith({ roleId: 1, menuIds: [10] })
+    expect(hoisted.menuTargetPerSaveApi).toHaveBeenCalledWith({ roleId: 1, menuIds: [10] })
     expect(hoisted.messageSuccess).toHaveBeenCalled()
   })
 })
