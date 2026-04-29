@@ -41,7 +41,7 @@ describe('MenuPermission unified permission compat API', () => {
   })
 
   it('loads menu tree on mount via menuTargetPerApi with roleId 0', async () => {
-    const wrapper = mount(MenuPermission, {
+    mount(MenuPermission, {
       global: {
         stubs: {
           'el-select': true,
