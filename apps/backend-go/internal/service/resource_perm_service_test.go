@@ -41,6 +41,7 @@ type mockResourcePermRepo struct {
 	userResourcesErr error
 	resourceUsersErr error
 	consistencyErr   error
+	consistencyResult *permission.PermissionConsistencyResult
 	applyGroupCalls  int
 	registerCalls    int
 	replaceCalls     int
@@ -74,8 +75,8 @@ func (m *mockResourcePermRepo) GetPermByKey(permKey string) (*permission.SysPerm
 	if perm, ok := m.permKeys[permKey]; ok {
 		return perm, nil
 	}
-	if idx := strings.Index(permKey, ":"); idx >= 0 {
-		if perm, ok := m.permKeys[permKey[idx+1:]]; ok {
+	if _, suffix, found := strings.Cut(permKey, ":"); found {
+		if perm, ok := m.permKeys[suffix]; ok {
 			return perm, nil
 		}
 	}
@@ -220,6 +221,9 @@ func (m *mockResourcePermRepo) GetResourcePermissionIDs(resourceID int64, resour
 func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
 	if m.consistencyErr != nil {
 		return nil, m.consistencyErr
+	}
+	if m.consistencyResult != nil {
+		return m.consistencyResult, nil
 	}
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
 }
@@ -368,6 +372,130 @@ func TestCheckManagePermission(t *testing.T) {
 
 	if !svc.CheckManagePermission(8, permission.ResourceTypeScreen, 600) {
 		t.Error("CheckManagePermission should return true")
+	}
+}
+
+func TestCheckPermissionConsistency_ConsistentState(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	expected := &permission.PermissionConsistencyResult{
+		Consistent:      true,
+		UserCount:       3,
+		ResourceCount:   5,
+		Inconsistencies: []*permission.PermissionInconsistencyVO{},
+	}
+	mockRepo.consistencyResult = expected
+	svc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+
+	result, err := svc.CheckPermissionConsistency()
+	if err != nil {
+		t.Fatalf("CheckPermissionConsistency failed: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected delegated result pointer to pass through")
+	}
+	if !result.Consistent {
+		t.Fatalf("expected consistent result")
+	}
+	if result.UserCount != 3 || result.ResourceCount != 5 {
+		t.Fatalf("unexpected counts: users=%d resources=%d", result.UserCount, result.ResourceCount)
+	}
+	if len(result.Inconsistencies) != 0 {
+		t.Fatalf("expected no inconsistencies, got %d", len(result.Inconsistencies))
+	}
+}
+
+func TestCheckPermissionConsistency_DivergentState(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	expectedInconsistencies := []*permission.PermissionInconsistencyVO{{
+		UserID:       42,
+		ResourceID:   1001,
+		ResourceType: permission.ResourceTypeDashboard,
+		UserView:     "granted",
+		ResourceView: "missing",
+		Description:  "user 42 has dashboard:view in user view but resource view is missing",
+	}}
+	expected := &permission.PermissionConsistencyResult{
+		Consistent:      false,
+		UserCount:       8,
+		ResourceCount:   2,
+		Inconsistencies: expectedInconsistencies,
+	}
+	mockRepo.consistencyResult = expected
+	svc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+
+	result, err := svc.CheckPermissionConsistency()
+	if err != nil {
+		t.Fatalf("CheckPermissionConsistency failed: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected delegated result pointer to pass through")
+	}
+	if result.Consistent {
+		t.Fatalf("expected inconsistent result")
+	}
+	if len(result.Inconsistencies) != 1 {
+		t.Fatalf("expected 1 inconsistency, got %d", len(result.Inconsistencies))
+	}
+	if result.Inconsistencies[0] != expectedInconsistencies[0] {
+		t.Fatalf("expected inconsistency details to pass through")
+	}
+}
+
+func TestCheckPermissionConsistency_EmptySystem(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	expected := &permission.PermissionConsistencyResult{
+		Consistent:      true,
+		UserCount:       0,
+		ResourceCount:   0,
+		Inconsistencies: []*permission.PermissionInconsistencyVO{},
+	}
+	mockRepo.consistencyResult = expected
+	svc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+
+	result, err := svc.CheckPermissionConsistency()
+	if err != nil {
+		t.Fatalf("CheckPermissionConsistency failed: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected delegated result pointer to pass through")
+	}
+	if !result.Consistent || result.UserCount != 0 || result.ResourceCount != 0 {
+		t.Fatalf("unexpected empty system result: %+v", result)
+	}
+	if len(result.Inconsistencies) != 0 {
+		t.Fatalf("expected no inconsistencies, got %d", len(result.Inconsistencies))
+	}
+}
+
+func TestCheckPermissionConsistency_SkipsLargeUserBase(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	expectedInconsistencies := []*permission.PermissionInconsistencyVO{{
+		Description: "permission consistency check skipped: active user count 10001 exceeds limit 10000",
+	}}
+	expected := &permission.PermissionConsistencyResult{
+		Consistent:      true,
+		UserCount:       10001,
+		ResourceCount:   0,
+		Inconsistencies: expectedInconsistencies,
+	}
+	mockRepo.consistencyResult = expected
+	svc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}})
+
+	result, err := svc.CheckPermissionConsistency()
+	if err != nil {
+		t.Fatalf("CheckPermissionConsistency failed: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected delegated result pointer to pass through")
+	}
+	if !result.Consistent {
+		t.Fatalf("expected skip result to remain consistent")
+	}
+	if result.UserCount != 10001 {
+		t.Fatalf("expected skipped user count 10001, got %d", result.UserCount)
+	}
+	if len(result.Inconsistencies) != 1 || result.Inconsistencies[0].Description != expectedInconsistencies[0].Description {
+		t.Fatalf("expected skip inconsistency description to pass through")
 	}
 }
 
