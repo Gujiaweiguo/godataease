@@ -52,9 +52,9 @@ func (m *mockDatasourcePermRepo) CheckRolePermission(int64, int64) (bool, error)
 	return m.hasPermission, nil
 }
 func (m *mockDatasourcePermRepo) GrantPermToUser(int64, int64, string) error { return nil }
-func (m *mockDatasourcePermRepo) RevokePermFromUser(int64, int64) error       { return nil }
-func (m *mockDatasourcePermRepo) GrantPermToRole(int64, int64) error          { return nil }
-func (m *mockDatasourcePermRepo) RevokePermFromRole(int64, int64) error       { return nil }
+func (m *mockDatasourcePermRepo) RevokePermFromUser(int64, int64) error      { return nil }
+func (m *mockDatasourcePermRepo) GrantPermToRole(int64, int64) error         { return nil }
+func (m *mockDatasourcePermRepo) RevokePermFromRole(int64, int64) error      { return nil }
 func (m *mockDatasourcePermRepo) GetUserResources(int64, string) ([]*permission.UserResourcePermVO, error) {
 	return []*permission.UserResourcePermVO{}, nil
 }
