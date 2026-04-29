@@ -645,7 +645,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterCompatibilityBridgeRoutes(datasetAPI, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware, r.menuAuthMiddleware)
 		handler.RegisterCompatibilityBridgeRoutes(datasetDe2API, nil, nil, nil, r.datasetHandler, nil, r.permMiddleware, r.menuAuthMiddleware)
 		r.registerChartRoutes(api)
-		handler.RegisterChartDataCompatRoutes(chartDataAPI.Group("/chartData"), r.chartHandler, r.datasetHandler, r.permMiddleware)
+		handler.RegisterChartDataRoutes(chartDataAPI.Group("/chartData"), r.chartHandler, r.permMiddleware)
 		r.registerVisualizationRoutes(visualizationAPI)
 		r.registerVisualizationDe2DetailRoute(visualizationDe2API)
 		handler.RegisterVisualizationBackgroundRoutes(api, r.visualizationBackgroundHandler)

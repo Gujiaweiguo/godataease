@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"net/url"
 	"strconv"
 
 	"dataease/backend/internal/domain/chart"
@@ -22,82 +21,8 @@ func registerChartCompatRoutes(r gin.IRouter, chartHandler *ChartHandler, datase
 	registerDatasetFieldCompatRoutes(r.Group("/datasetField"), chartHandler, datasetHandler)
 }
 
-func RegisterChartDataCompatRoutes(chartDataGroup *gin.RouterGroup, chartHandler *ChartHandler, datasetHandler *DatasetHandler, permMiddleware *middleware.PermissionMiddleware) {
-	if permMiddleware != nil {
-		chartDataGroup.POST("/getData", permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), chartHandler.Data)
-	} else {
-		chartDataGroup.POST("/getData", chartHandler.Data)
-	}
-	chartDataGroup.POST("/getFieldData/:fieldId/:fieldType", func(c *gin.Context) {
-		fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
-		if err != nil {
-			response.Error(c, "500000", "Invalid field ID")
-			return
-		}
-		if datasetHandler == nil {
-			response.Success(c, []string{})
-			return
-		}
-		result, err := datasetHandler.service.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{fieldID}, ResultMode: 1})
-		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, result)
-	})
-	chartDataGroup.POST("/getDrillFieldData/:fieldId", func(c *gin.Context) {
-		fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
-		if err != nil {
-			response.Error(c, "500000", "Invalid field ID")
-			return
-		}
-		if datasetHandler == nil {
-			response.Success(c, []string{})
-			return
-		}
-		result, err := datasetHandler.service.GetFieldEnumDs(fieldID)
-		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, result)
-	})
-	chartDataGroup.POST("/innerExportDetails", func(c *gin.Context) {
-		var req service.ExportChartRequest
-		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-			response.Error(c, "500000", "Invalid request: "+err.Error())
-			return
-		}
-		buf, err := chartHandler.exportService.InnerExportDetails(&req)
-		if err != nil {
-			response.Error(c, "500000", "Failed to export: "+err.Error())
-			return
-		}
-		filename := service.GenerateExcelFilename(req.ViewName)
-		c.Header("Content-Description", "File Transfer")
-		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-		c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
-		c.Header("Content-Transfer-Encoding", "binary")
-		c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
-	})
-	chartDataGroup.POST("/innerExportDataSetDetails", func(c *gin.Context) {
-		var req service.ExportChartRequest
-		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-			response.Error(c, "500000", "Invalid request: "+err.Error())
-			return
-		}
-		buf, err := chartHandler.exportService.InnerExportDetails(&req)
-		if err != nil {
-			response.Error(c, "500000", "Failed to export: "+err.Error())
-			return
-		}
-		filename := service.GenerateExcelFilename(req.ViewName)
-		c.Header("Content-Description", "File Transfer")
-		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-		c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
-		c.Header("Content-Transfer-Encoding", "binary")
-		c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
-	})
+func RegisterChartDataCompatRoutes(chartDataGroup *gin.RouterGroup, chartHandler *ChartHandler, _ *DatasetHandler, permMiddleware *middleware.PermissionMiddleware) {
+	RegisterChartDataRoutes(chartDataGroup, chartHandler, permMiddleware)
 }
 
 func registerChartGroupCompatRoutes(chartGroup *gin.RouterGroup, chartHandler *ChartHandler, permMiddleware *middleware.PermissionMiddleware) {

@@ -349,6 +349,10 @@ func (h *ChartHandler) GetFieldData(c *gin.Context) {
 		response.Error(c, "500000", "Invalid field ID")
 		return
 	}
+	if h.datasetService == nil {
+		response.Success(c, []string{})
+		return
+	}
 	result, err := h.datasetService.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{fieldID}, ResultMode: 1})
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -364,6 +368,10 @@ func (h *ChartHandler) GetDrillFieldData(c *gin.Context) {
 	fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
 	if err != nil {
 		response.Error(c, "500000", "Invalid field ID")
+		return
+	}
+	if h.datasetService == nil {
+		response.Success(c, []string{})
 		return
 	}
 	result, err := h.datasetService.GetFieldEnumDs(fieldID)
@@ -401,4 +409,17 @@ func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
 // InnerExportDataSetDetails handles POST /chartData/innerExportDataSetDetails
 func (h *ChartHandler) InnerExportDataSetDetails(c *gin.Context) {
 	h.InnerExportDetails(c)
+}
+
+// RegisterChartDataRoutes registers canonical chartData routes.
+func RegisterChartDataRoutes(chartDataGroup *gin.RouterGroup, h *ChartHandler, permMiddleware *middleware.PermissionMiddleware) {
+	if permMiddleware != nil {
+		chartDataGroup.POST("/getData", permMiddleware.CheckChartDataView(), middleware.RowPermissionMiddleware(), h.Data)
+	} else {
+		chartDataGroup.POST("/getData", h.Data)
+	}
+	chartDataGroup.POST("/getFieldData/:fieldId/:fieldType", h.GetFieldData)
+	chartDataGroup.POST("/getDrillFieldData/:fieldId", h.GetDrillFieldData)
+	chartDataGroup.POST("/innerExportDetails", h.InnerExportDetails)
+	chartDataGroup.POST("/innerExportDataSetDetails", h.InnerExportDataSetDetails)
 }
