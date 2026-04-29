@@ -7,6 +7,7 @@ import (
 
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/pkg/response"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -15,22 +16,32 @@ import (
 func registerDatasourceCompatRoutes(
 	r gin.IRouter,
 	datasourceHandler *DatasourceHandler,
+	permMiddleware *middleware.PermissionMiddleware,
+	menuAuthMiddleware *middleware.MenuAuthMiddleware,
 	getCurrentUserID func(*gin.Context) int64,
 	getCurrentUsername func(*gin.Context) string,
 ) {
 	datasourceGroup := r.Group("/datasource")
-	registerDatasourceCompatReadRoutes(datasourceGroup, datasourceHandler)
+	registerDatasourceCompatReadRoutes(datasourceGroup, datasourceHandler, permMiddleware, menuAuthMiddleware)
 	registerDatasourceCompatUserRoutes(datasourceGroup, datasourceHandler, getCurrentUserID, getCurrentUsername)
 	registerDatasourceCompatWriteRoutes(datasourceGroup, datasourceHandler)
 	registerDatasourceCompatFileRoutes(datasourceGroup, datasourceHandler)
 	registerDatasourceCompatDeleteRoutes(datasourceGroup, datasourceHandler)
 }
 
-func registerDatasourceCompatReadRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler) {
+func registerDatasourceCompatReadRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddleware *middleware.MenuAuthMiddleware) {
 	r.POST("/list", datasourceHandler.List)
 	r.POST("/tree", datasourceHandler.treeCompat)
-	r.POST("/validate", datasourceHandler.Validate)
-	r.GET("/validate/:id", datasourceHandler.validateByIDCompat)
+	if menuAuthMiddleware != nil {
+		r.POST("/validate", menuAuthMiddleware.RequireMenuAuth(datasourceMenuPath), datasourceHandler.Validate)
+	} else {
+		r.POST("/validate", datasourceHandler.Validate)
+	}
+	if permMiddleware != nil {
+		r.GET("/validate/:id", permMiddleware.CheckDatasourceView(), datasourceHandler.validateByIDCompat)
+	} else {
+		r.GET("/validate/:id", datasourceHandler.validateByIDCompat)
+	}
 	r.POST("/types", datasourceTypesCompat)
 	r.POST("/getTables", datasourceHandler.getTablesCompat)
 	r.POST("/getTableStatus", datasourceHandler.getTableStatusCompat)

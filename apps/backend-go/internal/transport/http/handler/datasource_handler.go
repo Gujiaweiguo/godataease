@@ -18,6 +18,8 @@ type DatasourceHandler struct {
 	service *service.DatasourceService
 }
 
+const datasourceMenuPath = "/datasource"
+
 const datasourceValidateRateLimitWindow = time.Minute
 
 const datasourceValidateRateLimitRequests = 30
@@ -451,7 +453,11 @@ func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
+func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
+	var menuAuthMiddleware *middleware.MenuAuthMiddleware
+	if len(menuAuthMiddlewares) > 0 {
+		menuAuthMiddleware = menuAuthMiddlewares[0]
+	}
 	dsGroup := r.Group("/ds")
 	validateGroup := dsGroup.Group("")
 	validateGroup.Use(middleware.RateLimit(
@@ -463,8 +469,16 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler) {
 	{
 		dsGroup.POST("/list", h.List)
 		dsGroup.POST("/tree", h.Tree)
-		validateGroup.POST("/validate", h.Validate)
-		validateGroup.GET("/validate/:id", h.ValidateByID)
+		if menuAuthMiddleware != nil {
+			validateGroup.POST("/validate", menuAuthMiddleware.RequireMenuAuth(datasourceMenuPath), h.Validate)
+		} else {
+			validateGroup.POST("/validate", h.Validate)
+		}
+		if permMiddleware != nil {
+			validateGroup.GET("/validate/:id", permMiddleware.CheckDatasourceView(), h.ValidateByID)
+		} else {
+			validateGroup.GET("/validate/:id", h.ValidateByID)
+		}
 		dsGroup.GET("/:id", h.Get)
 		dsGroup.GET("/hidePw/:id", h.HidePw)
 		dsGroup.GET("/simple/:id", h.GetSimpleDs)
