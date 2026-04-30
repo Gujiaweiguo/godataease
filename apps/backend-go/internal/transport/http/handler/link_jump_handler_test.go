@@ -2,17 +2,20 @@ package handler
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
@@ -28,10 +31,16 @@ const (
 	linkJumpTargetTableID    int64 = 3002
 	linkJumpSourceFieldID    int64 = 4001
 	linkJumpTargetFieldID    int64 = 4002
+	linkJumpOuterFieldID     int64 = 4003
 	linkJumpSeedJumpID       int64 = 5001
 	linkJumpSeedJumpInfoID   int64 = 6001
 	linkJumpSeedTargetInfoID int64 = 7001
+	linkJumpOuterParamID     int64 = 8001
+	linkJumpOuterParamInfoID int64 = 9001
+	linkJumpSQLiteDriverName       = "sqlite3_link_jump_handler_test"
 )
+
+var linkJumpSQLiteDriverOnce sync.Once
 
 type linkJumpHandlerTestEnv struct {
 	r  *gin.Engine
@@ -48,8 +57,9 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
+	registerLinkJumpSQLiteDriver(t)
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Dialector{DriverName: linkJumpSQLiteDriverName, DSN: dsn}, &gorm.Config{})
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
@@ -116,7 +126,59 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		copy_from INTEGER,
 		copy_id INTEGER,
 		target_type TEXT
-	)`)
+	)`) 
+	linkJumpMustExec(t, db, `CREATE TABLE visualization_link_jump (
+		id INTEGER PRIMARY KEY,
+		source_dv_id INTEGER,
+		source_view_id INTEGER,
+		link_jump_info TEXT,
+		checked INTEGER,
+		copy_from INTEGER,
+		copy_id INTEGER
+	)`) 
+	linkJumpMustExec(t, db, `CREATE TABLE visualization_link_jump_info (
+		id INTEGER PRIMARY KEY,
+		link_jump_id INTEGER,
+		link_type TEXT,
+		jump_type TEXT,
+		target_dv_id INTEGER,
+		source_field_id INTEGER,
+		content TEXT,
+		checked INTEGER,
+		attach_params INTEGER,
+		copy_from INTEGER,
+		copy_id INTEGER,
+		window_size TEXT
+	)`) 
+	linkJumpMustExec(t, db, `CREATE TABLE visualization_link_jump_target_view_info (
+		target_id INTEGER PRIMARY KEY,
+		link_jump_info_id INTEGER,
+		source_field_active_id INTEGER,
+		target_view_id TEXT,
+		target_field_id TEXT,
+		copy_from INTEGER,
+		copy_id INTEGER,
+		target_type TEXT
+	)`) 
+	linkJumpMustExec(t, db, `CREATE TABLE visualization_outer_params (
+		id INTEGER PRIMARY KEY,
+		params_id INTEGER,
+		visualization_id INTEGER,
+		target_view_id INTEGER,
+		target_field_id INTEGER,
+		copy_from INTEGER,
+		copy_id INTEGER
+	)`) 
+	linkJumpMustExec(t, db, `CREATE TABLE visualization_outer_params_info (
+		id INTEGER PRIMARY KEY,
+		params_info_id INTEGER,
+		params_id INTEGER,
+		param_name TEXT,
+		source_view_id INTEGER,
+		source_field_id INTEGER,
+		copy_from INTEGER,
+		copy_id INTEGER
+	)`) 
 
 	linkJumpSeedBaseData(t, db)
 
@@ -128,6 +190,32 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 	RegisterLinkJumpRoutes(r.Group("/api"), h)
 
 	return &linkJumpHandlerTestEnv{r: r, db: db}
+}
+
+func registerLinkJumpSQLiteDriver(t *testing.T) {
+	t.Helper()
+
+	linkJumpSQLiteDriverOnce.Do(func() {
+		sql.Register(linkJumpSQLiteDriverName, &sqlite3.SQLiteDriver{ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+			if err := conn.RegisterFunc("CONCAT", func(args ...any) string {
+				var builder strings.Builder
+				for _, arg := range args {
+					_, _ = fmt.Fprint(&builder, arg)
+				}
+				return builder.String()
+			}, true); err != nil {
+				return err
+			}
+
+			return conn.RegisterFunc("LOCATE", func(substr any, str any) int {
+				index := strings.Index(fmt.Sprint(str), fmt.Sprint(substr))
+				if index < 0 {
+					return 0
+				}
+				return index + 1
+			}, true)
+		}})
+	})
 }
 
 func linkJumpMustExec(t *testing.T, db *gorm.DB, sql string, args ...any) {
@@ -145,11 +233,14 @@ func linkJumpSeedBaseData(t *testing.T, db *gorm.DB) {
 
 	linkJumpMustExec(t, db, `INSERT INTO core_dataset_table_field (id, dataset_group_id, origin_name, name, de_type, type) VALUES (?, ?, ?, ?, ?, ?)`, linkJumpSourceFieldID, linkJumpSourceTableID, "province", "Province", 0, "STRING")
 	linkJumpMustExec(t, db, `INSERT INTO core_dataset_table_field (id, dataset_group_id, origin_name, name, de_type, type) VALUES (?, ?, ?, ?, ?, ?)`, linkJumpTargetFieldID, linkJumpTargetTableID, "city", "City", 0, "STRING")
+	linkJumpMustExec(t, db, `INSERT INTO core_dataset_table_field (id, dataset_group_id, origin_name, name, de_type, type) VALUES (?, ?, ?, ?, ?, ?)`, linkJumpOuterFieldID, linkJumpTargetTableID, "area", "Area", 0, "STRING")
 
 	linkJumpMustExec(t, db, `INSERT INTO data_visualization_info (id, type, component_data) VALUES (?, ?, ?)`, linkJumpSourceDvID, "dashboard", "[]")
-	linkJumpMustExec(t, db, `INSERT INTO data_visualization_info (id, type, component_data) VALUES (?, ?, ?)`, linkJumpTargetDvID, "dashboard", "[]")
+	linkJumpMustExec(t, db, `INSERT INTO data_visualization_info (id, type, component_data) VALUES (?, ?, ?)`, linkJumpTargetDvID, "dashboard", "[2002]")
 
 	linkJumpSeedSnapshotJump(t, db, "seed-jump", 1)
+	linkJumpSeedRuntimeJump(t, db, "seed-jump", 1)
+	linkJumpSeedOuterParams(t, db)
 }
 
 func linkJumpSeedSnapshotJump(t *testing.T, db *gorm.DB, linkJumpInfo string, checked int) {
@@ -158,6 +249,21 @@ func linkJumpSeedSnapshotJump(t *testing.T, db *gorm.DB, linkJumpInfo string, ch
 	linkJumpMustExec(t, db, `INSERT INTO snapshot_visualization_link_jump (id, source_dv_id, source_view_id, link_jump_info, checked, copy_from, copy_id) VALUES (?, ?, ?, ?, ?, ?, ?)`, linkJumpSeedJumpID, linkJumpSourceDvID, linkJumpSourceViewID, linkJumpInfo, checked, 0, 0)
 	linkJumpMustExec(t, db, `INSERT INTO snapshot_visualization_link_jump_info (id, link_jump_id, link_type, jump_type, target_dv_id, source_field_id, content, checked, attach_params, copy_from, copy_id, window_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, linkJumpSeedJumpInfoID, linkJumpSeedJumpID, "inner", "_blank", linkJumpTargetDvID, linkJumpSourceFieldID, "", 1, 1, 0, 0, "middle")
 	linkJumpMustExec(t, db, `INSERT INTO snapshot_visualization_link_jump_target_view_info (target_id, link_jump_info_id, source_field_active_id, target_view_id, target_field_id, copy_from, copy_id, target_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, linkJumpSeedTargetInfoID, linkJumpSeedJumpInfoID, linkJumpSourceFieldID, fmt.Sprintf("%d", linkJumpTargetViewID), fmt.Sprintf("%d", linkJumpTargetFieldID), 0, 0, "view")
+}
+
+func linkJumpSeedOuterParams(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	linkJumpMustExec(t, db, `INSERT INTO visualization_outer_params (id, params_id, visualization_id, target_view_id, target_field_id, copy_from, copy_id) VALUES (?, ?, ?, ?, ?, ?, ?)`, linkJumpOuterParamID, linkJumpOuterParamID, linkJumpTargetDvID, linkJumpTargetViewID, linkJumpOuterFieldID, 0, 0)
+	linkJumpMustExec(t, db, `INSERT INTO visualization_outer_params_info (id, params_info_id, params_id, param_name, source_view_id, source_field_id, copy_from, copy_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, linkJumpOuterParamInfoID, linkJumpOuterParamInfoID, linkJumpOuterParamID, "areaParam", linkJumpSourceViewID, linkJumpSourceFieldID, 0, 0)
+}
+
+func linkJumpSeedRuntimeJump(t *testing.T, db *gorm.DB, linkJumpInfo string, checked int) {
+	t.Helper()
+
+	linkJumpMustExec(t, db, `INSERT INTO visualization_link_jump (id, source_dv_id, source_view_id, link_jump_info, checked, copy_from, copy_id) VALUES (?, ?, ?, ?, ?, ?, ?)`, linkJumpSeedJumpID, linkJumpSourceDvID, linkJumpSourceViewID, linkJumpInfo, checked, 0, 0)
+	linkJumpMustExec(t, db, `INSERT INTO visualization_link_jump_info (id, link_jump_id, link_type, jump_type, target_dv_id, source_field_id, content, checked, attach_params, copy_from, copy_id, window_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, linkJumpSeedJumpInfoID, linkJumpSeedJumpID, "inner", "_blank", linkJumpTargetDvID, linkJumpSourceFieldID, "", 1, 1, 0, 0, "middle")
+	linkJumpMustExec(t, db, `INSERT INTO visualization_link_jump_target_view_info (target_id, link_jump_info_id, source_field_active_id, target_view_id, target_field_id, copy_from, copy_id, target_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, linkJumpSeedTargetInfoID, linkJumpSeedJumpInfoID, linkJumpSourceFieldID, fmt.Sprintf("%d", linkJumpTargetViewID), fmt.Sprintf("%d", linkJumpTargetFieldID), 0, 0, "filter")
 }
 
 func performLinkJumpJSONRequest(t *testing.T, r *gin.Engine, method string, path string, body any) *httptest.ResponseRecorder {
@@ -327,6 +433,76 @@ func TestLinkJumpHandler_QueryVisualizationJumpInfo(t *testing.T) {
 	assert.Equal(t, linkJumpTargetDvID, info.TargetDvID)
 	require.Len(t, info.TargetViewInfoList, 1)
 	assert.Equal(t, fmt.Sprintf("%d", linkJumpTargetViewID), info.TargetViewInfoList[0].TargetViewID)
+}
+
+func TestLinkJumpHandler_QueryTargetVisualizationJumpInfo(t *testing.T) {
+	env := setupLinkJumpHandlerTestEnv(t)
+	sourceFieldID := linkJumpSourceFieldID
+	body := service.LinkJumpRequest{
+		SourceDvID:    linkJumpSourceDvID,
+		SourceViewID:  linkJumpSourceViewID,
+		SourceFieldID: &sourceFieldID,
+		TargetDvID:    linkJumpTargetDvID,
+		TargetViewID:  linkJumpTargetViewID,
+		ResourceTable: "visualization",
+	}
+	mappedRepo := repository.NewLinkJumpRepository(env.db.MapColumns(map[string]string{"sourceInfo": "source_info", "targetInfo": "target_info"}))
+	mappedSvc := service.NewLinkJumpService(mappedRepo)
+	mappedHandler := NewLinkJumpHandler(mappedSvc)
+	r := gin.New()
+	RegisterLinkJumpRoutes(r.Group("/api"), mappedHandler)
+
+	path := fmt.Sprintf("/api/linkJump/queryTargetVisualizationJumpInfo?dvId=%d&targetDvId=%d&target_dv_id=%d&sourceDvId=%d&source_dv_id=%d&sourceViewId=%d&source_view_id=%d", linkJumpTargetDvID, linkJumpTargetDvID, linkJumpTargetDvID, linkJumpSourceDvID, linkJumpSourceDvID, linkJumpSourceViewID, linkJumpSourceViewID)
+	w := performLinkJumpJSONRequest(t, r, http.MethodPost, path, body)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	resp := decodeLinkJumpResp(t, w.Body.Bytes())
+	assert.Equal(t, "000000", resp.Code)
+
+	var data map[string][]string
+	require.NoError(t, json.Unmarshal(resp.Data, &data))
+	require.Len(t, data, 1)
+	assert.Equal(t, []string{fmt.Sprintf("%d#%d", linkJumpTargetViewID, linkJumpTargetFieldID)}, data[fmt.Sprintf("%d#%d#%d", linkJumpSourceViewID, linkJumpSourceFieldID, linkJumpSourceFieldID)])
+}
+
+func TestLinkJumpHandler_ViewTableDetailList(t *testing.T) {
+	env := setupLinkJumpHandlerTestEnv(t)
+
+	w := performLinkJumpJSONRequest(t, env.r, http.MethodGet, fmt.Sprintf("/api/linkJump/viewTableDetailList/%d", linkJumpTargetDvID), nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	resp := decodeLinkJumpResp(t, w.Body.Bytes())
+	assert.Equal(t, "000000", resp.Code)
+
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(resp.Data, &data))
+	assert.Equal(t, fmt.Sprintf("[%d]", linkJumpTargetViewID), data["componentData"])
+
+	componentView, ok := data["componentView"].([]any)
+	require.True(t, ok)
+	require.Len(t, componentView, 1)
+	viewGroup, ok := componentView[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(linkJumpTargetViewID), viewGroup["id"])
+	assert.Equal(t, "Target Chart", viewGroup["title"])
+	assert.Equal(t, "table", viewGroup["type"])
+	assert.Equal(t, float64(linkJumpTargetDvID), viewGroup["dvId"])
+
+	tableFields, ok := viewGroup["tableFields"].([]any)
+	require.True(t, ok)
+	require.Len(t, tableFields, 2)
+	fieldNames := []string{tableFields[0].(map[string]any)["name"].(string), tableFields[1].(map[string]any)["name"].(string)}
+	assert.Equal(t, []string{"Area", "City"}, fieldNames)
+
+	outParamsJumpInfo, ok := data["outParamsJumpInfo"].([]any)
+	require.True(t, ok)
+	require.Len(t, outParamsJumpInfo, 1)
+	outParam, ok := outParamsJumpInfo[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, fmt.Sprintf("%d", linkJumpOuterParamInfoID), outParam["id"])
+	assert.Equal(t, "outerParams", outParam["type"])
+	assert.Equal(t, "areaParam", outParam["name"])
+	assert.Equal(t, "areaParam", outParam["title"])
 }
 
 func TestLinkJumpHandler_UpdateJumpSetActive(t *testing.T) {
