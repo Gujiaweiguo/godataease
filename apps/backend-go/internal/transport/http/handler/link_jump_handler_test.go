@@ -126,7 +126,7 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		copy_from INTEGER,
 		copy_id INTEGER,
 		target_type TEXT
-	)`) 
+	)`)
 	linkJumpMustExec(t, db, `CREATE TABLE visualization_link_jump (
 		id INTEGER PRIMARY KEY,
 		source_dv_id INTEGER,
@@ -135,7 +135,7 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		checked INTEGER,
 		copy_from INTEGER,
 		copy_id INTEGER
-	)`) 
+	)`)
 	linkJumpMustExec(t, db, `CREATE TABLE visualization_link_jump_info (
 		id INTEGER PRIMARY KEY,
 		link_jump_id INTEGER,
@@ -149,7 +149,7 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		copy_from INTEGER,
 		copy_id INTEGER,
 		window_size TEXT
-	)`) 
+	)`)
 	linkJumpMustExec(t, db, `CREATE TABLE visualization_link_jump_target_view_info (
 		target_id INTEGER PRIMARY KEY,
 		link_jump_info_id INTEGER,
@@ -159,7 +159,7 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		copy_from INTEGER,
 		copy_id INTEGER,
 		target_type TEXT
-	)`) 
+	)`)
 	linkJumpMustExec(t, db, `CREATE TABLE visualization_outer_params (
 		id INTEGER PRIMARY KEY,
 		params_id INTEGER,
@@ -168,7 +168,7 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		target_field_id INTEGER,
 		copy_from INTEGER,
 		copy_id INTEGER
-	)`) 
+	)`)
 	linkJumpMustExec(t, db, `CREATE TABLE visualization_outer_params_info (
 		id INTEGER PRIMARY KEY,
 		params_info_id INTEGER,
@@ -178,7 +178,7 @@ func setupLinkJumpHandlerTestEnv(t *testing.T) *linkJumpHandlerTestEnv {
 		source_field_id INTEGER,
 		copy_from INTEGER,
 		copy_id INTEGER
-	)`) 
+	)`)
 
 	linkJumpSeedBaseData(t, db)
 
