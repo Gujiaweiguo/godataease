@@ -144,10 +144,6 @@ func int64PtrForDatasourceHandler(v int64) *int64 {
 	return &v
 }
 
-func stringPtrForDatasourceHandler(v string) *string {
-	return &v
-}
-
 func TestDatasourceHandler_List_SuccessPagination(t *testing.T) {
 	env := setupDatasourceHandlerTestEnv(t)
 	seedDatasourceRecord(t, env.db, &datasource.CoreDatasource{ID: 1, PID: int64PtrForDatasourceHandler(0), Name: "ds-1", Type: "MySQL"})
