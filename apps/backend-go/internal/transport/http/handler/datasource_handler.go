@@ -453,6 +453,44 @@ func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) ShowFinishPage(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	userID := getCurrentUserID(c)
+	result, err := h.service.ShowFinishPage(userID)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *DatasourceHandler) SetShowFinishPage(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	userID := getCurrentUserID(c)
+	if err := h.service.SetShowFinishPage(userID); err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *DatasourceHandler) LatestUse(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
+	username := getCurrentUsername(c)
+	result, err := h.service.LatestTypes(username)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
 	var menuAuthMiddleware *middleware.MenuAuthMiddleware
 	if len(menuAuthMiddlewares) > 0 {
@@ -501,35 +539,9 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMidd
 				{"type": "Excel", "name": "Excel"},
 			})
 		})
-		dsGroup.GET("/showFinishPage", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
-			userID := getCurrentUserID(c)
-			result, err := h.service.ShowFinishPage(userID)
-			if err != nil {
-				response.Error(c, "500000", "Failed: "+err.Error())
-				return
-			}
-			response.Success(c, result)
-		})
-		dsGroup.POST("/showFinishPage", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
-			userID := getCurrentUserID(c)
-			if err := h.service.SetShowFinishPage(userID); err != nil {
-				response.Error(c, "500000", "Failed: "+err.Error())
-				return
-			}
-			response.Success(c, nil)
-		})
-		dsGroup.POST("/latestUse", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
-			username := getCurrentUsername(c)
-			result, err := h.service.LatestTypes(username)
-			if err != nil {
-				response.Error(c, "500000", "Failed: "+err.Error())
-				return
-			}
-			response.Success(c, result)
-		})
+		dsGroup.GET("/showFinishPage", h.ShowFinishPage)
+		dsGroup.POST("/showFinishPage", h.SetShowFinishPage)
+		dsGroup.POST("/latestUse", h.LatestUse)
 		dsGroup.POST("/tables", h.Tables)
 		dsGroup.POST("/tableStatus", h.TableStatus)
 		dsGroup.POST("/tableField", h.TableField)

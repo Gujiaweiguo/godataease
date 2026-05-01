@@ -43,7 +43,7 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 		menuAuthMiddleware = menuAuthMiddlewares[0]
 	}
 	if datasourceHandler != nil {
-		registerDatasourceCompatRoutes(r, datasourceHandler, permMiddleware, menuAuthMiddleware, bridgeGetCurrentUserID, bridgeGetCurrentUsername)
+		registerDatasourceCompatRoutes(r, datasourceHandler, permMiddleware, menuAuthMiddleware)
 	}
 
 	if datasetHandler != nil {
@@ -88,29 +88,4 @@ func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *Or
 			orgGroup.GET("/children/:parentId", org.GetChildOrgs)
 		}
 	}
-}
-
-func bridgeGetCurrentUserID(c *gin.Context) int64 {
-	if uid, exists := c.Get("user_id"); exists {
-		switch v := uid.(type) {
-		case int64:
-			return v
-		case uint64:
-			return int64(v)
-		case int:
-			return int64(v)
-		case float64:
-			return int64(v)
-		}
-	}
-	return 1
-}
-
-func bridgeGetCurrentUsername(c *gin.Context) string {
-	if username, exists := c.Get("username"); exists {
-		if s, ok := username.(string); ok {
-			return s
-		}
-	}
-	return defaultAdminCredential
 }
