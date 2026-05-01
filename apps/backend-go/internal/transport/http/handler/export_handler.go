@@ -30,11 +30,13 @@ func NewExportHandler(
 }
 
 func (h *ExportHandler) ExportTasks(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result := h.service.ExportTasks()
 	response.Success(c, result)
 }
 
 func (h *ExportHandler) Pager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	status := c.Param("status")
 	goPage := 1
 	pageSize := 10
@@ -50,6 +52,7 @@ func (h *ExportHandler) Pager(c *gin.Context) {
 }
 
 func (h *ExportHandler) Delete(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if id == "" {
 		response.BadRequest(c, "id is required")
@@ -65,6 +68,7 @@ func (h *ExportHandler) Delete(c *gin.Context) {
 }
 
 func (h *ExportHandler) DeleteBatch(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req export.DeleteRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "invalid request")
@@ -80,6 +84,7 @@ func (h *ExportHandler) DeleteBatch(c *gin.Context) {
 }
 
 func (h *ExportHandler) DeleteAll(c *gin.Context) {
+	defer recoverServicePanic(c)
 	exportFromType := c.Param("type")
 
 	if err := h.service.DeleteAll(exportFromType); err != nil {
@@ -91,6 +96,7 @@ func (h *ExportHandler) DeleteAll(c *gin.Context) {
 }
 
 func (h *ExportHandler) Download(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if id == "" {
 		response.BadRequest(c, "id is required")
@@ -124,6 +130,7 @@ func (h *ExportHandler) Download(c *gin.Context) {
 }
 
 func (h *ExportHandler) GenerateDownloadURI(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if id == "" {
 		response.BadRequest(c, "id is required")
@@ -211,6 +218,7 @@ func normalizeExportResourceType(raw string) string {
 }
 
 func (h *ExportHandler) Retry(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if id == "" {
 		response.BadRequest(c, "id is required")
@@ -226,6 +234,7 @@ func (h *ExportHandler) Retry(c *gin.Context) {
 }
 
 func (h *ExportHandler) ExportLimit(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result := h.service.ExportLimit()
 	response.Success(c, result.Limit)
 }

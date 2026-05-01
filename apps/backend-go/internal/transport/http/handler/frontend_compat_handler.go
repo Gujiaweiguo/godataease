@@ -101,6 +101,7 @@ func NewFrontendCompatHandler(
 }
 
 func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
+	defer recoverServicePanic(c)
 	locale := requestLocale(c, h.loadUserByID)
 	menus, err := h.loadRuntimeMenus(c)
 	if err != nil {
@@ -117,6 +118,7 @@ func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
 }
 
 func (h *FrontendCompatHandler) GetMenuResource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	locale := requestLocale(c, h.loadUserByID)
 	menus, err := h.loadRuntimeMenus(c)
 	if err != nil {
@@ -154,6 +156,7 @@ func (h *FrontendCompatHandler) loadRuntimeMenus(c *gin.Context) ([]*menu.MenuVO
 }
 
 func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var requestMap map[string]interface{}
 	if err := c.ShouldBindBodyWith(&requestMap, binding.JSON); err != nil {
 		requestMap = make(map[string]interface{})
@@ -237,15 +240,18 @@ func (h *FrontendCompatHandler) buildVisualizationInteractiveTree(
 }
 
 func (h *FrontendCompatHandler) FindTargetUrl(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result := make(map[string]string)
 	response.Success(c, result)
 }
 
 func (h *FrontendCompatHandler) QueryStore(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, []map[string]any{})
 }
 
 func (h *FrontendCompatHandler) GetXpackContent(c *gin.Context) {
+	defer recoverServicePanic(c)
 	c.JSON(501, gin.H{
 		"code": "501000",
 		"msg":  "Not Implemented: xpackComponent requires enterprise license",
@@ -253,6 +259,7 @@ func (h *FrontendCompatHandler) GetXpackContent(c *gin.Context) {
 }
 
 func (h *FrontendCompatHandler) GetXpackPluginStaticInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	c.JSON(501, gin.H{
 		"code": "501000",
 		"msg":  "Not Implemented: xpackComponent requires enterprise license",
@@ -260,6 +267,7 @@ func (h *FrontendCompatHandler) GetXpackPluginStaticInfo(c *gin.Context) {
 }
 
 func (h *FrontendCompatHandler) GetWebSocketInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	c.JSON(200, gin.H{
 		"websocket":     false,
 		"origins":       []string{"*:*"},
@@ -270,6 +278,7 @@ func (h *FrontendCompatHandler) GetWebSocketInfo(c *gin.Context) {
 
 // StubEmptyData returns an empty success response for stubbed frontend compat routes.
 func (h *FrontendCompatHandler) StubEmptyData(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, map[string]interface{}{})
 }
 

@@ -16,6 +16,7 @@ func NewMapHandler(service *service.MapService) *MapHandler {
 }
 
 func (h *MapHandler) GetWorldTree(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.GetWorldTree()
 	if err != nil {
 		response.Error(c, "500000", err.Error())

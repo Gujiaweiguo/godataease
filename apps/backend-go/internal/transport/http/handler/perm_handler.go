@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -22,6 +20,7 @@ func NewPermHandler(permService *service.PermService) *PermHandler {
 }
 
 func (h *PermHandler) ListPerms(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req permission.PermQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		req.Current = 1
@@ -38,6 +37,7 @@ func (h *PermHandler) ListPerms(c *gin.Context) {
 }
 
 func (h *PermHandler) CreatePerm(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req permission.PermCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -54,6 +54,7 @@ func (h *PermHandler) CreatePerm(c *gin.Context) {
 }
 
 func (h *PermHandler) UpdatePerm(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req permission.PermUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -70,14 +71,13 @@ func (h *PermHandler) UpdatePerm(c *gin.Context) {
 }
 
 func (h *PermHandler) DeletePerm(c *gin.Context) {
-	permIDStr := c.Param("id")
-	permID, err := strconv.ParseInt(permIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid permission ID")
+	defer recoverServicePanic(c)
+	permID, ok := parseIDParamMsg(c, "id", "Invalid permission ID")
+	if !ok {
 		return
 	}
 
-	err = h.permService.DeletePerm(permID)
+	err := h.permService.DeletePerm(permID)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return

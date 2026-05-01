@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 
@@ -64,10 +62,8 @@ func (h *LinkageHandler) SaveLinkage(c *gin.Context) {
 
 func (h *LinkageHandler) GetVisualizationAllLinkageInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvIDStr := c.Param("dvId")
-	dvID, err := strconv.ParseInt(dvIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	if !ok {
 		return
 	}
 	resourceTable := c.Param("resourceTable")

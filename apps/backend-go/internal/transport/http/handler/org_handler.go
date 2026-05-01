@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -22,6 +20,7 @@ func NewOrgHandler(orgService *service.OrgService) *OrgHandler {
 }
 
 func (h *OrgHandler) CreateOrg(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req org.OrgCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -38,6 +37,7 @@ func (h *OrgHandler) CreateOrg(c *gin.Context) {
 }
 
 func (h *OrgHandler) UpdateOrg(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req org.OrgUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -54,10 +54,9 @@ func (h *OrgHandler) UpdateOrg(c *gin.Context) {
 }
 
 func (h *OrgHandler) DeleteOrg(c *gin.Context) {
-	orgIDStr := c.Param("orgId")
-	orgID, err := strconv.ParseInt(orgIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid organization ID")
+	defer recoverServicePanic(c)
+	orgID, ok := parseIDParamMsg(c, "orgId", "Invalid organization ID")
+	if !ok {
 		return
 	}
 
@@ -90,7 +89,7 @@ func (h *OrgHandler) DeleteOrg(c *gin.Context) {
 	// 获取 IP 地址
 	ipAddress := c.ClientIP()
 
-	err = h.orgService.DeleteOrg(orgID, operatorID, operatorName, ipAddress)
+	err := h.orgService.DeleteOrg(orgID, operatorID, operatorName, ipAddress)
 	if err != nil {
 		response.Error(c, "500000", err.Error())
 		return
@@ -100,6 +99,7 @@ func (h *OrgHandler) DeleteOrg(c *gin.Context) {
 }
 
 func (h *OrgHandler) ListOrgs(c *gin.Context) {
+	defer recoverServicePanic(c)
 	orgs, err := h.orgService.ListOrgs()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -110,10 +110,9 @@ func (h *OrgHandler) ListOrgs(c *gin.Context) {
 }
 
 func (h *OrgHandler) GetOrgByID(c *gin.Context) {
-	orgIDStr := c.Param("orgId")
-	orgID, err := strconv.ParseInt(orgIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid organization ID")
+	defer recoverServicePanic(c)
+	orgID, ok := parseIDParamMsg(c, "orgId", "Invalid organization ID")
+	if !ok {
 		return
 	}
 
@@ -127,6 +126,7 @@ func (h *OrgHandler) GetOrgByID(c *gin.Context) {
 }
 
 func (h *OrgHandler) GetOrgTree(c *gin.Context) {
+	defer recoverServicePanic(c)
 	tree, err := h.orgService.GetOrgTree()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -137,6 +137,7 @@ func (h *OrgHandler) GetOrgTree(c *gin.Context) {
 }
 
 func (h *OrgHandler) CheckOrgName(c *gin.Context) {
+	defer recoverServicePanic(c)
 	orgName := c.Query("orgName")
 	if orgName == "" {
 		response.Error(c, "500000", "orgName is required")
@@ -153,6 +154,7 @@ func (h *OrgHandler) CheckOrgName(c *gin.Context) {
 }
 
 func (h *OrgHandler) UpdateOrgStatus(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req org.OrgStatusRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -169,10 +171,9 @@ func (h *OrgHandler) UpdateOrgStatus(c *gin.Context) {
 }
 
 func (h *OrgHandler) GetChildOrgs(c *gin.Context) {
-	parentIDStr := c.Param("parentId")
-	parentID, err := strconv.ParseInt(parentIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid parent ID")
+	defer recoverServicePanic(c)
+	parentID, ok := parseIDParamMsg(c, "parentId", "Invalid parent ID")
+	if !ok {
 		return
 	}
 

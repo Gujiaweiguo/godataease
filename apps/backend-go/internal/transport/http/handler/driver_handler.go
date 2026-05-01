@@ -3,7 +3,6 @@ package handler
 import (
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +16,7 @@ func NewDriverHandler(service *service.DriverService) *DriverHandler {
 }
 
 func (h *DriverHandler) List(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.List()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -26,6 +26,7 @@ func (h *DriverHandler) List(c *gin.Context) {
 }
 
 func (h *DriverHandler) ListByType(c *gin.Context) {
+	defer recoverServicePanic(c)
 	dsType := c.Param("dsType")
 	result, err := h.service.ListByType(dsType)
 	if err != nil {
@@ -36,10 +37,9 @@ func (h *DriverHandler) ListByType(c *gin.Context) {
 }
 
 func (h *DriverHandler) GetByID(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
 		return
 	}
 	result, err := h.service.GetByID(id)
@@ -51,10 +51,9 @@ func (h *DriverHandler) GetByID(c *gin.Context) {
 }
 
 func (h *DriverHandler) ListDriverJars(c *gin.Context) {
-	driverIDStr := c.Param("driverId")
-	driverID, err := strconv.ParseInt(driverIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid driver id")
+	defer recoverServicePanic(c)
+	driverID, ok := parseIDParamMsg(c, "driverId", "Invalid driver id")
+	if !ok {
 		return
 	}
 	result, err := h.service.ListDriverJars(driverID)

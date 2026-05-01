@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/pkg/response"
@@ -21,6 +19,7 @@ func NewCustomGeoHandler(repo *repository.CustomGeoRepository) *CustomGeoHandler
 }
 
 func (h *CustomGeoHandler) ListGeoAreas(c *gin.Context) {
+	defer recoverServicePanic(c)
 	areas, err := h.repo.ListGeoAreas()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -30,6 +29,7 @@ func (h *CustomGeoHandler) ListGeoAreas(c *gin.Context) {
 }
 
 func (h *CustomGeoHandler) GetGeoArea(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	subAreas, err := h.repo.GetGeoArea(id)
 	if err != nil {
@@ -40,6 +40,7 @@ func (h *CustomGeoHandler) GetGeoArea(c *gin.Context) {
 }
 
 func (h *CustomGeoHandler) DeleteGeoArea(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if err := h.repo.DeleteGeoArea(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -49,6 +50,7 @@ func (h *CustomGeoHandler) DeleteGeoArea(c *gin.Context) {
 }
 
 func (h *CustomGeoHandler) SaveGeoArea(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
@@ -81,10 +83,9 @@ func (h *CustomGeoHandler) SaveGeoArea(c *gin.Context) {
 }
 
 func (h *CustomGeoHandler) DeleteGeoSubArea(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "invalid id")
+	if !ok {
 		return
 	}
 	if err := h.repo.DeleteGeoSubArea(id); err != nil {
@@ -95,6 +96,7 @@ func (h *CustomGeoHandler) DeleteGeoSubArea(c *gin.Context) {
 }
 
 func (h *CustomGeoHandler) SaveGeoSubArea(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		ID        int64  `json:"id"`
 		Name      string `json:"name"`
@@ -131,6 +133,7 @@ func (h *CustomGeoHandler) SaveGeoSubArea(c *gin.Context) {
 }
 
 func (h *CustomGeoHandler) ListSubAreaOptions(c *gin.Context) {
+	defer recoverServicePanic(c)
 	areas, err := h.repo.ListAreaOptions()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())

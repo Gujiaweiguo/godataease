@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 
@@ -22,10 +20,8 @@ func NewLinkJumpHandler(service *service.LinkJumpService) *LinkJumpHandler {
 // GetTableFieldWithViewID returns dataset fields for a chart view.
 func (h *LinkJumpHandler) GetTableFieldWithViewID(c *gin.Context) {
 	defer recoverServicePanic(c)
-	viewIDStr := c.Param("viewId")
-	viewID, err := strconv.ParseInt(viewIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid viewId")
+	viewID, ok := parseIDParamMsg(c, "viewId", "Invalid viewId")
+	if !ok {
 		return
 	}
 	result, err := h.service.GetTableFieldWithViewID(viewID)
@@ -39,16 +35,12 @@ func (h *LinkJumpHandler) GetTableFieldWithViewID(c *gin.Context) {
 // QueryWithViewId returns the jump config for a specific view in a dashboard.
 func (h *LinkJumpHandler) QueryWithViewId(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvIDStr := c.Param("dvId")
-	dvID, err := strconv.ParseInt(dvIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	if !ok {
 		return
 	}
-	viewIDStr := c.Param("viewId")
-	viewID, err := strconv.ParseInt(viewIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid viewId")
+	viewID, ok := parseIDParamMsg(c, "viewId", "Invalid viewId")
+	if !ok {
 		return
 	}
 	result, err := h.service.QueryWithViewId(dvID, viewID)
@@ -93,10 +85,8 @@ func (h *LinkJumpHandler) QueryTargetVisualizationJumpInfo(c *gin.Context) {
 // QueryVisualizationJumpInfo returns all active jump info for a dashboard.
 func (h *LinkJumpHandler) QueryVisualizationJumpInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvIDStr := c.Param("dvId")
-	dvID, err := strconv.ParseInt(dvIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	if !ok {
 		return
 	}
 	resourceTable := c.Param("resourceTable")
@@ -111,10 +101,8 @@ func (h *LinkJumpHandler) QueryVisualizationJumpInfo(c *gin.Context) {
 // ViewTableDetailList returns chart views with field details for a dashboard.
 func (h *LinkJumpHandler) ViewTableDetailList(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvIDStr := c.Param("dvId")
-	dvID, err := strconv.ParseInt(dvIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	if !ok {
 		return
 	}
 	result, err := h.service.ViewTableDetailList(dvID)

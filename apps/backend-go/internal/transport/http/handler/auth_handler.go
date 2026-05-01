@@ -50,6 +50,7 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 }
 
 func (h *AuthHandler) LocalLogin(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var dto auth.PwdLoginDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -69,11 +70,13 @@ func (h *AuthHandler) LocalLogin(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	defer recoverServicePanic(c)
 	h.authService.Logout()
 	response.Success(c, nil)
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.authService == nil {
 		response.Error(c, "500000", "auth service is not configured")
 		return
@@ -98,14 +101,17 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 func (h *AuthHandler) Dekey(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, dekeyPayload)
 }
 
 func (h *AuthHandler) SymmetricKey(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, symmetricKeyBase)
 }
 
 func (h *AuthHandler) Model(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, false)
 }
 
@@ -209,7 +215,7 @@ func randomAlphaNum(n int) string {
 	const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	b := make([]byte, n)
 	max := big.NewInt(int64(len(chars)))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		idx, err := rand.Int(rand.Reader, max)
 		if err != nil {
 			panic(err)

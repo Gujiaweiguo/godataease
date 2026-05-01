@@ -179,10 +179,5 @@ func parseDatasourceIDParam(c *gin.Context) (int64, bool) {
 }
 
 func parseDatasourceIDFromParam(c *gin.Context, param string) (int64, bool) {
-	id, err := strconv.ParseInt(c.Param(param), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
-		return 0, false
-	}
-	return id, true
+	return parseIDParamMsg(c, param, "Invalid datasource ID")
 }

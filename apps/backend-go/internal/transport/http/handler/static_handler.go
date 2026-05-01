@@ -46,6 +46,8 @@ func NewStaticHandler(service *service.StaticService) *StaticHandler {
 }
 
 func (h *StaticHandler) ListResources(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	result, err := h.service.ListResources()
 	if err != nil {
 		response.Error(c, "500000", err.Error())
@@ -55,6 +57,8 @@ func (h *StaticHandler) ListResources(c *gin.Context) {
 }
 
 func (h *StaticHandler) GetResource(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	id := c.Param("id")
 	result, err := h.service.GetResource(id)
 	if err != nil {
@@ -65,6 +69,8 @@ func (h *StaticHandler) GetResource(c *gin.Context) {
 }
 
 func (h *StaticHandler) ListStores(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	result, err := h.service.ListStores()
 	if err != nil {
 		response.Error(c, "500000", err.Error())
@@ -74,6 +80,8 @@ func (h *StaticHandler) ListStores(c *gin.Context) {
 }
 
 func (h *StaticHandler) ListTypefaces(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	result, err := h.service.ListTypefaces()
 	if err != nil {
 		response.Error(c, "500000", err.Error())
@@ -84,6 +92,8 @@ func (h *StaticHandler) ListTypefaces(c *gin.Context) {
 
 // ListFont returns font list for frontend compatibility
 func (h *StaticHandler) ListFont(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	result, err := h.service.ListTypefaces()
 	if err != nil {
 		response.Error(c, "500000", err.Error())
@@ -94,6 +104,8 @@ func (h *StaticHandler) ListFont(c *gin.Context) {
 
 // DefaultFont returns default font for frontend compatibility
 func (h *StaticHandler) DefaultFont(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	result, err := h.service.ListTypefaces()
 	if err != nil {
 		response.Error(c, "500000", err.Error())
@@ -109,6 +121,7 @@ func (h *StaticHandler) DefaultFont(c *gin.Context) {
 
 // XpackModel returns xpack model status
 func (h *StaticHandler) XpackModel(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, false)
 }
 

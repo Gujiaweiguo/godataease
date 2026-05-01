@@ -8,7 +8,6 @@ import (
 	"dataease/backend/internal/transport/http/middleware"
 	"errors"
 	"net/url"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -26,6 +25,8 @@ func NewDatasetHandler(dsSvc *service.DatasetService, chartSvc *service.ChartSer
 }
 
 func (h *DatasetHandler) Tree(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	var req dataset.TreeRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -42,6 +43,8 @@ func (h *DatasetHandler) Tree(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Fields(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	var req dataset.FieldsRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -58,6 +61,8 @@ func (h *DatasetHandler) Fields(c *gin.Context) {
 }
 
 func (h *DatasetHandler) Preview(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	var req dataset.PreviewRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -74,6 +79,8 @@ func (h *DatasetHandler) Preview(c *gin.Context) {
 }
 
 func (h *DatasetHandler) PreviewWithPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	var req dataset.PreviewRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -169,11 +176,11 @@ func (h *DatasetHandler) Move(c *gin.Context) {
 
 func (h *DatasetHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	if err = h.service.Delete(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -183,11 +190,11 @@ func (h *DatasetHandler) Delete(c *gin.Context) {
 
 func (h *DatasetHandler) PerDelete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := h.service.PerDelete(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -198,11 +205,11 @@ func (h *DatasetHandler) PerDelete(c *gin.Context) {
 
 func (h *DatasetHandler) GetDetail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := buildDatasetDetail(h, id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -213,11 +220,11 @@ func (h *DatasetHandler) GetDetail(c *gin.Context) {
 
 func (h *DatasetHandler) Details(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := buildDatasetDetail(h, id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -259,11 +266,11 @@ func (h *DatasetHandler) GetSQLParams(c *gin.Context) {
 
 func (h *DatasetHandler) BarInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	group, err := h.service.GetGroupByID(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed to get dataset: "+err.Error())
@@ -361,11 +368,11 @@ func (h *DatasetHandler) EnumValue(c *gin.Context) {
 
 func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 	defer recoverServicePanic(c)
-	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "datasetId", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	if h == nil || h.chartService == nil {
 		response.Success(c, []chart.ChartField{})
 		return
@@ -386,11 +393,11 @@ func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 
 func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
 	defer recoverServicePanic(c)
-	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "datasetId", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	if h == nil || h.chartService == nil {
 		response.Success(c, []chart.ChartField{})
 		return
@@ -458,11 +465,11 @@ func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
 
 func (h *DatasetHandler) CopilotFields(c *gin.Context) {
 	defer recoverServicePanic(c)
-	datasetID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
+	var err error
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
 		response.Unauthorized(c, "authentication required")
@@ -589,11 +596,11 @@ func (h *DatasetHandler) GetFieldTree(c *gin.Context) {
 // DeleteDatasetField handles POST /datasetField/delete/:id
 func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid field ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid field ID")
+	if !ok {
 		return
 	}
+	var err error
 	if h.service != nil {
 		err = h.service.DeleteField(id)
 	} else if h.chartService != nil {
@@ -612,11 +619,11 @@ func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
 // DeleteDatasetFieldByChart handles POST /datasetField/deleteByChartId/:id
 func (h *DatasetHandler) DeleteDatasetFieldByChart(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid chart ID")
+	if !ok {
 		return
 	}
+	var err error
 	if h.service != nil {
 		err = h.service.DeleteFieldByChart(id)
 	} else if h.chartService != nil {

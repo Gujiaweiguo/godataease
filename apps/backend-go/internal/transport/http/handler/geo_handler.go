@@ -18,6 +18,7 @@ func NewGeoHandler(service *service.GeoService) *GeoHandler {
 }
 
 func (h *GeoHandler) ListAreas(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.ListAreas()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -27,6 +28,7 @@ func (h *GeoHandler) ListAreas(c *gin.Context) {
 }
 
 func (h *GeoHandler) GetArea(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	result, err := h.service.GetArea(id)
 	if err != nil {
@@ -37,6 +39,7 @@ func (h *GeoHandler) GetArea(c *gin.Context) {
 }
 
 func (h *GeoHandler) Save(c *gin.Context) {
+	defer recoverServicePanic(c)
 	code := c.PostForm("code")
 	name := c.PostForm("name")
 	pid := c.PostForm("pid")
@@ -67,6 +70,7 @@ func (h *GeoHandler) Save(c *gin.Context) {
 }
 
 func (h *GeoHandler) Delete(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if err := h.service.DeleteGeo(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())

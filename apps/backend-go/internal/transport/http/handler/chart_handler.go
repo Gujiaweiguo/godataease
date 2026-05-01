@@ -26,6 +26,8 @@ func NewChartHandler(svc *service.ChartService, dsSvc *service.DatasetService) *
 }
 
 func (h *ChartHandler) Query(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	var req chart.ChartQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -41,6 +43,8 @@ func (h *ChartHandler) Query(c *gin.Context) {
 }
 
 func (h *ChartHandler) Data(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	var reqMap map[string]interface{}
 	if err := c.ShouldBindBodyWith(&reqMap, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -183,16 +187,15 @@ func isChartViewJSONField(key string) bool {
 func (h *ChartHandler) CheckSameDataSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	sourceID, err := strconv.ParseInt(c.Param("viewIdSource"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid source chart ID")
+	sourceID, ok := parseIDParamMsg(c, "viewIdSource", "Invalid source chart ID")
+	if !ok {
 		return
 	}
-	targetID, err := strconv.ParseInt(c.Param("viewIdTarget"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid target chart ID")
+	targetID, ok := parseIDParamMsg(c, "viewIdTarget", "Invalid target chart ID")
+	if !ok {
 		return
 	}
+	var err error
 
 	source, err := h.service.Query(&chart.ChartQueryRequest{ID: sourceID})
 	if err != nil {
@@ -233,16 +236,15 @@ func (h *ChartHandler) SaveFromMap(c *gin.Context) {
 func (h *ChartHandler) ListByDQ(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	datasetGroupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	datasetGroupID, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	if !ok {
 		return
 	}
-	chartID, err := strconv.ParseInt(c.Param("chartId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+	chartID, ok := parseIDParamMsg(c, "chartId", "Invalid chart ID")
+	if !ok {
 		return
 	}
+	var err error
 
 	userID := int64(middleware.GetUserID(c))
 	var result *chart.ChartFieldListResponse
@@ -262,16 +264,15 @@ func (h *ChartHandler) ListByDQ(c *gin.Context) {
 func (h *ChartHandler) CopyField(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid field ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid field ID")
+	if !ok {
 		return
 	}
-	chartID, err := strconv.ParseInt(c.Param("chartId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+	chartID, ok := parseIDParamMsg(c, "chartId", "Invalid chart ID")
+	if !ok {
 		return
 	}
+	var err error
 	if err = h.service.CopyField(id, chartID); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -283,11 +284,11 @@ func (h *ChartHandler) CopyField(c *gin.Context) {
 func (h *ChartHandler) DeleteField(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid field ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid field ID")
+	if !ok {
 		return
 	}
+	var err error
 	if err = h.service.DeleteField(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -298,9 +299,8 @@ func (h *ChartHandler) DeleteField(c *gin.Context) {
 // DeleteFieldByChart handles POST /chart/deleteFieldByChart/:chartId
 func (h *ChartHandler) DeleteFieldByChart(c *gin.Context) {
 	defer recoverServicePanic(c)
-	chartID, err := strconv.ParseInt(c.Param("chartId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+	chartID, ok := parseIDParamMsg(c, "chartId", "Invalid chart ID")
+	if !ok {
 		return
 	}
 	if err := h.service.DeleteFieldByChart(chartID); err != nil {
@@ -312,11 +312,11 @@ func (h *ChartHandler) DeleteFieldByChart(c *gin.Context) {
 
 func (h *ChartHandler) GetChart(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid chart ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := h.service.Query(&chart.ChartQueryRequest{ID: id})
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -327,11 +327,11 @@ func (h *ChartHandler) GetChart(c *gin.Context) {
 
 func (h *ChartHandler) GetDetail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid chart ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := h.service.Query(&chart.ChartQueryRequest{ID: id})
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -344,11 +344,11 @@ func (h *ChartHandler) GetDetail(c *gin.Context) {
 func (h *ChartHandler) GetFieldData(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid field ID")
+	fieldID, ok := parseIDParamMsg(c, "fieldId", "Invalid field ID")
+	if !ok {
 		return
 	}
+	var err error
 	if h.datasetService == nil {
 		response.Success(c, []string{})
 		return
@@ -365,11 +365,11 @@ func (h *ChartHandler) GetFieldData(c *gin.Context) {
 func (h *ChartHandler) GetDrillFieldData(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	fieldID, err := strconv.ParseInt(c.Param("fieldId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid field ID")
+	fieldID, ok := parseIDParamMsg(c, "fieldId", "Invalid field ID")
+	if !ok {
 		return
 	}
+	var err error
 	if h.datasetService == nil {
 		response.Success(c, []string{})
 		return
@@ -408,6 +408,8 @@ func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
 
 // InnerExportDataSetDetails handles POST /chartData/innerExportDataSetDetails
 func (h *ChartHandler) InnerExportDataSetDetails(c *gin.Context) {
+	defer recoverServicePanic(c)
+
 	h.InnerExportDetails(c)
 }
 

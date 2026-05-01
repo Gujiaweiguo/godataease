@@ -13,7 +13,8 @@ func NewPdfTemplateHandler() *PdfTemplateHandler {
 }
 
 func (h *PdfTemplateHandler) QueryAll(c *gin.Context) {
-	response.Success(c, []interface{}{})
+	defer recoverServicePanic(c)
+	response.Success(c, []any{})
 }
 
 func RegisterPdfTemplateRoutes(r *gin.RouterGroup, h *PdfTemplateHandler) {

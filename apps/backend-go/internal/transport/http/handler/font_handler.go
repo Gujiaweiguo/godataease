@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -150,10 +149,8 @@ func (h *FontHandler) Edit(c *gin.Context) {
 
 func (h *FontHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	idStr := c.Param("id")
-	var id int64
-	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id <= 0 {
-		response.Error(c, "500000", "Invalid id")
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
 		return
 	}
 	font, err := h.repo.GetFontByID(id)

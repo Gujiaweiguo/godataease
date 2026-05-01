@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 
@@ -19,12 +17,12 @@ func NewRoleMenuHandler(roleMenuService *service.RoleMenuService) *RoleMenuHandl
 }
 
 func (h *RoleMenuHandler) GetRoleMenuAuth(c *gin.Context) {
-	idStr := c.Param("roleId")
-	roleID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid role ID")
+	defer recoverServicePanic(c)
+	roleID, ok := parseIDParamMsg(c, "roleId", "Invalid role ID")
+	if !ok {
 		return
 	}
+	var err error
 
 	result, err := h.roleMenuService.GetRoleMenuAuth(roleID)
 	if err != nil {
@@ -36,6 +34,7 @@ func (h *RoleMenuHandler) GetRoleMenuAuth(c *gin.Context) {
 }
 
 func (h *RoleMenuHandler) SaveRoleMenuAuth(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req service.SaveRoleMenuRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())

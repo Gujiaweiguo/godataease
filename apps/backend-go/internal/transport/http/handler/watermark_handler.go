@@ -21,6 +21,7 @@ func NewWatermarkHandler(service *service.WatermarkService) *WatermarkHandler {
 }
 
 func (h *WatermarkHandler) Find(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if getAuthenticatedUserID(c) == 0 {
 		response.Unauthorized(c, "authentication required")
 		return
@@ -35,6 +36,7 @@ func (h *WatermarkHandler) Find(c *gin.Context) {
 }
 
 func (h *WatermarkHandler) Save(c *gin.Context) {
+	defer recoverServicePanic(c)
 	userID := getAuthenticatedUserID(c)
 	if userID == 0 {
 		response.Unauthorized(c, "authentication required")

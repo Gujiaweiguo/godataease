@@ -17,15 +17,15 @@ func TestStoreHandler_ExecuteAndFavorited(t *testing.T) {
 	RegisterStoreRoutes(r, NewStoreHandler(nil), false)
 
 	t.Run("execute_invalid_body", func(t *testing.T) {
-		assertStoreHandlerErrorResponse(t, r, "POST", "/store/execute", "", "500000", "Invalid request")
+		assertStoreHandlerErrorResponse(t, r, "POST", "/store/execute", "", 200, "10001", "Invalid request")
 	})
 
 	t.Run("execute_unauthorized", func(t *testing.T) {
-		assertStoreHandlerErrorResponse(t, r, "POST", "/store/execute", `{"id":1,"type":"PANEL"}`, "500000", "Unauthorized")
+		assertStoreHandlerErrorResponse(t, r, "POST", "/store/execute", `{"id":1,"type":"PANEL"}`, 401, "20001", "Unauthorized")
 	})
 
 	t.Run("favorited_invalid_id", func(t *testing.T) {
-		assertStoreHandlerErrorResponse(t, r, "GET", "/store/favorited/abc", "", "500000", "Invalid id")
+		assertStoreHandlerErrorResponse(t, r, "GET", "/store/favorited/abc", "", 200, "10001", "Invalid id")
 	})
 
 	t.Run("favorited_no_user_returns_false", func(t *testing.T) {
@@ -39,7 +39,7 @@ func TestStoreHandler_Query(t *testing.T) {
 	RegisterStoreRoutes(r, NewStoreHandler(nil), false)
 
 	t.Run("query_invalid_body", func(t *testing.T) {
-		assertStoreHandlerErrorResponse(t, r, "POST", "/store/query", "", "500000", "Invalid request")
+		assertStoreHandlerErrorResponse(t, r, "POST", "/store/query", "", 200, "10001", "Invalid request")
 	})
 
 	t.Run("query_no_user_returns_empty_array", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestStoreHandler_QueryRouteRegistration(t *testing.T) {
 	})
 }
 
-func assertStoreHandlerErrorResponse(t *testing.T, r *gin.Engine, method, url, body, expectedCode, expectedMessage string) {
+func assertStoreHandlerErrorResponse(t *testing.T, r *gin.Engine, method, url, body string, expectedStatus int, expectedCode, expectedMessage string) {
 	t.Helper()
 
 	req := httptest.NewRequest(method, url, strings.NewReader(body))
@@ -88,7 +88,7 @@ func assertStoreHandlerErrorResponse(t *testing.T, r *gin.Engine, method, url, b
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, expectedStatus, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, expectedCode, resp["code"])

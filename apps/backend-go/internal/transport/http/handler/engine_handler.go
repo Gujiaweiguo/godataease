@@ -4,7 +4,6 @@ import (
 	"dataease/backend/internal/domain/engine"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -19,6 +18,7 @@ func NewEngineHandler(service *service.EngineService) *EngineHandler {
 }
 
 func (h *EngineHandler) GetEngine(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.GetEngine()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -28,6 +28,7 @@ func (h *EngineHandler) GetEngine(c *gin.Context) {
 }
 
 func (h *EngineHandler) Validate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req engine.ValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -42,10 +43,9 @@ func (h *EngineHandler) Validate(c *gin.Context) {
 }
 
 func (h *EngineHandler) ValidateByID(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
 		return
 	}
 	result, err := h.service.ValidateByID(id)
@@ -57,6 +57,7 @@ func (h *EngineHandler) ValidateByID(c *gin.Context) {
 }
 
 func (h *EngineHandler) SupportSetKey(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.SupportSetKey()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())

@@ -18,6 +18,7 @@ func NewMsgCenterHandler(service *service.MsgCenterService) *MsgCenterHandler {
 }
 
 func (h *MsgCenterHandler) Count(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req msgcenter.CountRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -27,6 +28,7 @@ func (h *MsgCenterHandler) Count(c *gin.Context) {
 }
 
 func (h *MsgCenterHandler) List(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req msgcenter.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -36,6 +38,7 @@ func (h *MsgCenterHandler) List(c *gin.Context) {
 }
 
 func (h *MsgCenterHandler) Read(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req msgcenter.ReadRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -53,6 +56,7 @@ func (h *MsgCenterHandler) Read(c *gin.Context) {
 }
 
 func (h *MsgCenterHandler) ReadBatch(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req msgcenter.ReadBatchRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())

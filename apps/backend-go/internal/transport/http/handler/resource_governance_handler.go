@@ -36,6 +36,7 @@ type resourceGovernanceBackfillRequest struct {
 }
 
 func (h *ResourceGovernanceHandler) BackfillResources(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Error(c, "500000", "Failed: resource governance service is unavailable")
 		return

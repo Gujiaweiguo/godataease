@@ -18,6 +18,7 @@ func NewSystemParamHandler(service *service.SystemParamService) *SystemParamHand
 }
 
 func (h *SystemParamHandler) QueryBasic(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.QueryBasic()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -27,6 +28,7 @@ func (h *SystemParamHandler) QueryBasic(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) SaveBasic(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req []system.SettingItem
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -40,6 +42,7 @@ func (h *SystemParamHandler) SaveBasic(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) QueryOnlineMap(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.QueryOnlineMap()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -49,6 +52,7 @@ func (h *SystemParamHandler) QueryOnlineMap(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) QueryOnlineMapByType(c *gin.Context) {
+	defer recoverServicePanic(c)
 	mapType := c.Param("type")
 	result, err := h.service.QueryOnlineMapByType(mapType)
 	if err != nil {
@@ -59,6 +63,7 @@ func (h *SystemParamHandler) QueryOnlineMapByType(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) SaveOnlineMap(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.OnlineMapEditor
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -72,6 +77,7 @@ func (h *SystemParamHandler) SaveOnlineMap(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) QuerySQLBot(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.QuerySQLBot()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -81,6 +87,7 @@ func (h *SystemParamHandler) QuerySQLBot(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) SaveSQLBot(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.SQLBotConfig
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -94,6 +101,7 @@ func (h *SystemParamHandler) SaveSQLBot(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) ShareBase(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.ShareBase()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -103,6 +111,7 @@ func (h *SystemParamHandler) ShareBase(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) RequestTimeOut(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.RequestTimeOut()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -112,6 +121,7 @@ func (h *SystemParamHandler) RequestTimeOut(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) DefaultSettings(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.DefaultSettings()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -121,6 +131,7 @@ func (h *SystemParamHandler) DefaultSettings(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) UI(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.UI()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -130,6 +141,7 @@ func (h *SystemParamHandler) UI(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) DefaultLogin(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.DefaultLogin()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -139,6 +151,7 @@ func (h *SystemParamHandler) DefaultLogin(c *gin.Context) {
 }
 
 func (h *SystemParamHandler) I18nOptions(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.I18nOptions()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
