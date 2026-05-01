@@ -13,35 +13,39 @@ func NewRelationHandler() *RelationHandler {
 }
 
 func (h *RelationHandler) GetDatasourceRelationship(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
-	response.Success(c, map[string]interface{}{
+	response.Success(c, map[string]any{
 		"id":           id,
 		"busiFlag":     "datasource",
-		"relationList": []interface{}{},
+		"relationList": []any{},
 	})
 }
 
 func (h *RelationHandler) GetDatasetRelationship(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
-	response.Success(c, map[string]interface{}{
+	response.Success(c, map[string]any{
 		"id":           id,
 		"busiFlag":     "dataset",
-		"relationList": []interface{}{},
+		"relationList": []any{},
 	})
 }
 
 func (h *RelationHandler) GetPanelRelationship(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
-	response.Success(c, map[string]interface{}{
+	response.Success(c, map[string]any{
 		"id":           id,
 		"busiFlag":     "dashboard",
-		"relationList": []interface{}{},
+		"relationList": []any{},
 	})
 }
 
 func (h *RelationHandler) CheckPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id := c.Param("id")
-	response.Success(c, map[string]interface{}{
+	response.Success(c, map[string]any{
 		"id":        id,
 		"editable":  true,
 		"creatable": true,

@@ -21,6 +21,7 @@ func NewLicenseHandler(service *service.LicenseService) *LicenseHandler {
 }
 
 func (h *LicenseHandler) Validate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req license.LicenseRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -36,6 +37,7 @@ func (h *LicenseHandler) Validate(c *gin.Context) {
 }
 
 func (h *LicenseHandler) Update(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req license.LicenseRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -51,10 +53,12 @@ func (h *LicenseHandler) Update(c *gin.Context) {
 }
 
 func (h *LicenseHandler) Version(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, h.service.Version())
 }
 
 func (h *LicenseHandler) Revert(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if err := h.service.Revert(); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -63,6 +67,7 @@ func (h *LicenseHandler) Revert(c *gin.Context) {
 }
 
 func (h *LicenseHandler) GetExpiryWarning(c *gin.Context) {
+	defer recoverServicePanic(c)
 	warning := h.service.GetExpiryWarning()
 	response.Success(c, warning)
 }

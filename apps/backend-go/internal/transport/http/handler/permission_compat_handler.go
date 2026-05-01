@@ -94,6 +94,7 @@ func parseRoleIDQuery(c *gin.Context) (int64, error) {
 }
 
 func (h *PermissionCompatHandler) MenuPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	menus, err := h.menuService.Query()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -121,6 +122,7 @@ func (h *PermissionCompatHandler) MenuPermission(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) SaveMenuPer(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req menuSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -139,6 +141,7 @@ func (h *PermissionCompatHandler) SaveMenuPer(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) BusiPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	roleID, err := parseRoleIDQuery(c)
 	if err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -167,6 +170,7 @@ func (h *PermissionCompatHandler) BusiPermission(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) SaveBusiPer(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req permissionSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -188,10 +192,12 @@ func (h *PermissionCompatHandler) SaveBusiPer(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) SaveRolePermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	h.SaveBusiPer(c)
 }
 
 func (h *PermissionCompatHandler) BusiResource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	flag := strings.TrimSpace(c.Param("flag"))
 	list, err := h.permService.ListPerms(&permission.PermQueryRequest{Current: 1, Size: 1000})
 	if err != nil {
@@ -225,6 +231,7 @@ func (h *PermissionCompatHandler) BusiResource(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req targetPermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -257,6 +264,7 @@ func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req businessTargetPermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -282,6 +290,7 @@ func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req userPerspectiveCompatRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -325,6 +334,7 @@ func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req targetPermissionSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -362,6 +372,7 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 }
 
 func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req targetPermissionSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())

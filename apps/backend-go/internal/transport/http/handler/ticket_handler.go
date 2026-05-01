@@ -19,6 +19,7 @@ func NewTicketHandler(service *service.TicketService) *TicketHandler {
 }
 
 func (h *TicketHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req ticket.TicketCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -35,6 +36,7 @@ func (h *TicketHandler) Create(c *gin.Context) {
 }
 
 func (h *TicketHandler) Validate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	ticketStr := c.Param("id")
 	if ticketStr == "" {
 		response.Error(c, "500000", "Ticket ID is required")
@@ -46,6 +48,7 @@ func (h *TicketHandler) Validate(c *gin.Context) {
 }
 
 func (h *TicketHandler) Delete(c *gin.Context) {
+	defer recoverServicePanic(c)
 	ticketStr := c.Param("id")
 	if ticketStr == "" {
 		response.Error(c, "500000", "Ticket ID is required")
@@ -62,6 +65,7 @@ func (h *TicketHandler) Delete(c *gin.Context) {
 }
 
 func (h *TicketHandler) List(c *gin.Context) {
+	defer recoverServicePanic(c)
 	uuid := c.Param("uuid")
 	pageStr := c.DefaultQuery("page", "1")
 	pageSizeStr := c.DefaultQuery("pageSize", "10")
@@ -80,6 +84,7 @@ func (h *TicketHandler) List(c *gin.Context) {
 }
 
 func (h *TicketHandler) TempTicket(c *gin.Context) {
+	defer recoverServicePanic(c)
 	ticketStr := h.service.TempTicket()
 	response.Success(c, ticketStr)
 }
