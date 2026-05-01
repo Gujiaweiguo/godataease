@@ -22,6 +22,7 @@ func NewEmbeddedHandler(service *service.EmbeddedService) *EmbeddedHandler {
 }
 
 func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
+	defer recoverServicePanic(c)
 	goPage, _ := strconv.Atoi(c.Param("goPage"))
 	pageSize, _ := strconv.Atoi(c.Param("pageSize"))
 	if goPage < 1 {
@@ -52,6 +53,7 @@ func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req embedded.EmbeddedCreator
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -69,6 +71,7 @@ func (h *EmbeddedHandler) Create(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) Edit(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req embedded.EmbeddedEditor
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -85,10 +88,9 @@ func (h *EmbeddedHandler) Edit(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid ID")
+	if !ok {
 		return
 	}
 
@@ -101,6 +103,7 @@ func (h *EmbeddedHandler) Delete(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) BatchDelete(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		Ids []int64 `json:"ids" binding:"required"`
 	}
@@ -123,6 +126,7 @@ func (h *EmbeddedHandler) BatchDelete(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) Reset(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req embedded.EmbeddedResetRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -139,6 +143,7 @@ func (h *EmbeddedHandler) Reset(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) DomainList(c *gin.Context) {
+	defer recoverServicePanic(c)
 	domains, err := h.service.GetDomainList()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -149,6 +154,7 @@ func (h *EmbeddedHandler) DomainList(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) InitIframe(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req embedded.EmbeddedOrigin
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -165,12 +171,14 @@ func (h *EmbeddedHandler) InitIframe(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) GetTokenArgs(c *gin.Context) {
+	defer recoverServicePanic(c)
 	userId, orgId := h.getCurrentUser(c)
 	result := h.service.GetTokenArgs(userId, orgId)
 	response.Success(c, result)
 }
 
 func (h *EmbeddedHandler) GetLimitCount(c *gin.Context) {
+	defer recoverServicePanic(c)
 	count := h.service.GetLimitCount()
 	response.Success(c, count)
 }

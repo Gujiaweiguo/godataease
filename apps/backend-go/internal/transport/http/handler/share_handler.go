@@ -4,7 +4,6 @@ import (
 	"dataease/backend/internal/domain/share"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -19,9 +18,10 @@ func NewShareHandler(service *service.ShareService) *ShareHandler {
 }
 
 func (h *ShareHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.ShareCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -42,9 +42,10 @@ func (h *ShareHandler) Create(c *gin.Context) {
 }
 
 func (h *ShareHandler) Validate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.ShareValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -58,10 +59,9 @@ func (h *ShareHandler) Validate(c *gin.Context) {
 }
 
 func (h *ShareHandler) Revoke(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid share ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid share ID")
+	if !ok {
 		return
 	}
 
@@ -82,10 +82,9 @@ func (h *ShareHandler) Revoke(c *gin.Context) {
 }
 
 func (h *ShareHandler) Status(c *gin.Context) {
-	resourceIDStr := c.Param("resourceId")
-	resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid resource ID")
+	defer recoverServicePanic(c)
+	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", "Invalid resource ID")
+	if !ok {
 		return
 	}
 
@@ -99,10 +98,9 @@ func (h *ShareHandler) Status(c *gin.Context) {
 }
 
 func (h *ShareHandler) Detail(c *gin.Context) {
-	resourceIDStr := c.Param("resourceId")
-	resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid resource ID")
+	defer recoverServicePanic(c)
+	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", "Invalid resource ID")
+	if !ok {
 		return
 	}
 
@@ -116,10 +114,9 @@ func (h *ShareHandler) Detail(c *gin.Context) {
 }
 
 func (h *ShareHandler) Switcher(c *gin.Context) {
-	resourceIDStr := c.Param("resourceId")
-	resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid resource ID")
+	defer recoverServicePanic(c)
+	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", "Invalid resource ID")
+	if !ok {
 		return
 	}
 
@@ -139,9 +136,10 @@ func (h *ShareHandler) Switcher(c *gin.Context) {
 }
 
 func (h *ShareHandler) EditUUID(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.ShareEditUUIDRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -155,9 +153,10 @@ func (h *ShareHandler) EditUUID(c *gin.Context) {
 }
 
 func (h *ShareHandler) EditExp(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.ShareEditExpRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -170,9 +169,10 @@ func (h *ShareHandler) EditExp(c *gin.Context) {
 }
 
 func (h *ShareHandler) EditPwd(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.ShareEditPwdRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -185,9 +185,10 @@ func (h *ShareHandler) EditPwd(c *gin.Context) {
 }
 
 func (h *ShareHandler) CreateTicket(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.TicketCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -201,9 +202,10 @@ func (h *ShareHandler) CreateTicket(c *gin.Context) {
 }
 
 func (h *ShareHandler) ValidateTicket(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req share.TicketValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 

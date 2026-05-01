@@ -20,6 +20,7 @@ func NewSystemVariableHandler(service *service.SystemVariableService) *SystemVar
 }
 
 func (h *SystemVariableHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.SysVariable
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -34,6 +35,7 @@ func (h *SystemVariableHandler) Create(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) Edit(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.SysVariable
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -48,9 +50,9 @@ func (h *SystemVariableHandler) Edit(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) Detail(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || id <= 0 {
-		response.Error(c, "500000", "Invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParam(c, "id")
+	if !ok {
 		return
 	}
 	result, err := h.service.Detail(id)
@@ -62,11 +64,12 @@ func (h *SystemVariableHandler) Detail(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || id <= 0 {
-		response.Error(c, "500000", "Invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParam(c, "id")
+	if !ok {
 		return
 	}
+	var err error
 	if err = h.service.Delete(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -75,6 +78,7 @@ func (h *SystemVariableHandler) Delete(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) Query(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.SysVariableQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -89,6 +93,7 @@ func (h *SystemVariableHandler) Query(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) CreateValue(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.SysVariableValue
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -103,6 +108,7 @@ func (h *SystemVariableHandler) CreateValue(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) EditValue(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req system.SysVariableValue
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -117,11 +123,12 @@ func (h *SystemVariableHandler) EditValue(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) DeleteValue(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || id <= 0 {
-		response.Error(c, "500000", "Invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParam(c, "id")
+	if !ok {
 		return
 	}
+	var err error
 	if err = h.service.DeleteValue(id); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -130,9 +137,9 @@ func (h *SystemVariableHandler) DeleteValue(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) SelectedValues(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || id <= 0 {
-		response.Error(c, "500000", "Invalid id")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParam(c, "id")
+	if !ok {
 		return
 	}
 	result, err := h.service.SelectedValues(id)
@@ -144,6 +151,7 @@ func (h *SystemVariableHandler) SelectedValues(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) SelectedValuePage(c *gin.Context) {
+	defer recoverServicePanic(c)
 	page, err := strconv.Atoi(c.Param("page"))
 	if err != nil || page <= 0 {
 		response.Error(c, "500000", "Invalid page")
@@ -168,6 +176,7 @@ func (h *SystemVariableHandler) SelectedValuePage(c *gin.Context) {
 }
 
 func (h *SystemVariableHandler) BatchDeleteValues(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var ids []int64
 	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())

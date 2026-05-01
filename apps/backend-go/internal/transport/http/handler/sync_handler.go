@@ -1,9 +1,6 @@
 package handler
 
 import (
-	"strconv"
-	"strings"
-
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/syncmodule"
 	"dataease/backend/internal/pkg/response"
@@ -22,6 +19,7 @@ func NewSyncHandler(service *service.SyncService) *SyncHandler {
 }
 
 func (h *SyncHandler) SourceDatasourcePager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	page, size, ok := parsePageParams(c)
 	if !ok {
 		return
@@ -40,6 +38,7 @@ func (h *SyncHandler) SourceDatasourcePager(c *gin.Context) {
 }
 
 func (h *SyncHandler) TargetDatasourcePager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	page, size, ok := parsePageParams(c)
 	if !ok {
 		return
@@ -58,6 +57,7 @@ func (h *SyncHandler) TargetDatasourcePager(c *gin.Context) {
 }
 
 func (h *SyncHandler) LatestUse(c *gin.Context) {
+	defer recoverServicePanic(c)
 	creator := ""
 	if username, exists := c.Get("username"); exists {
 		if s, ok := username.(string); ok {
@@ -73,6 +73,7 @@ func (h *SyncHandler) LatestUse(c *gin.Context) {
 }
 
 func (h *SyncHandler) ValidateDatasource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req datasource.ValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -87,6 +88,7 @@ func (h *SyncHandler) ValidateDatasource(c *gin.Context) {
 }
 
 func (h *SyncHandler) ValidateDatasourceByID(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -100,6 +102,7 @@ func (h *SyncHandler) ValidateDatasourceByID(c *gin.Context) {
 }
 
 func (h *SyncHandler) GetSchemas(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.GetSchemas()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -109,6 +112,7 @@ func (h *SyncHandler) GetSchemas(c *gin.Context) {
 }
 
 func (h *SyncHandler) SaveDatasource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req datasource.WriteRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -123,6 +127,7 @@ func (h *SyncHandler) SaveDatasource(c *gin.Context) {
 }
 
 func (h *SyncHandler) GetDatasource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -136,6 +141,7 @@ func (h *SyncHandler) GetDatasource(c *gin.Context) {
 }
 
 func (h *SyncHandler) UpdateDatasource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req datasource.WriteRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -150,6 +156,7 @@ func (h *SyncHandler) UpdateDatasource(c *gin.Context) {
 }
 
 func (h *SyncHandler) DeleteDatasource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -162,6 +169,7 @@ func (h *SyncHandler) DeleteDatasource(c *gin.Context) {
 }
 
 func (h *SyncHandler) BatchDeleteDatasource(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var ids []string
 	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -180,6 +188,7 @@ func (h *SyncHandler) BatchDeleteDatasource(c *gin.Context) {
 }
 
 func (h *SyncHandler) GetDatasourceFields(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req syncmodule.SyncDatasourceFieldRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -194,6 +203,7 @@ func (h *SyncHandler) GetDatasourceFields(c *gin.Context) {
 }
 
 func (h *SyncHandler) ListDatasourceByType(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.ListDatasourceByType(c.Param("type"))
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -203,6 +213,7 @@ func (h *SyncHandler) ListDatasourceByType(c *gin.Context) {
 }
 
 func (h *SyncHandler) ListDatasourceTables(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "dsId")
 	if !ok {
 		return
@@ -216,6 +227,7 @@ func (h *SyncHandler) ListDatasourceTables(c *gin.Context) {
 }
 
 func (h *SyncHandler) TaskPager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	page, size, ok := parsePageParams(c)
 	if !ok {
 		return
@@ -234,6 +246,7 @@ func (h *SyncHandler) TaskPager(c *gin.Context) {
 }
 
 func (h *SyncHandler) GetTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "taskId")
 	if !ok {
 		return
@@ -247,6 +260,7 @@ func (h *SyncHandler) GetTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) AddTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req syncmodule.TaskInfo
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -260,6 +274,7 @@ func (h *SyncHandler) AddTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) UpdateTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req syncmodule.TaskInfo
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -273,6 +288,7 @@ func (h *SyncHandler) UpdateTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) RemoveTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "taskId")
 	if !ok {
 		return
@@ -285,6 +301,7 @@ func (h *SyncHandler) RemoveTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) BatchDeleteTasks(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var ids []string
 	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -303,6 +320,7 @@ func (h *SyncHandler) BatchDeleteTasks(c *gin.Context) {
 }
 
 func (h *SyncHandler) ExecuteTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -316,6 +334,7 @@ func (h *SyncHandler) ExecuteTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) StartTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -328,6 +347,7 @@ func (h *SyncHandler) StartTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) StopTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -340,6 +360,7 @@ func (h *SyncHandler) StopTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) TaskLogPager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	page, size, ok := parsePageParams(c)
 	if !ok {
 		return
@@ -358,16 +379,16 @@ func (h *SyncHandler) TaskLogPager(c *gin.Context) {
 }
 
 func (h *SyncHandler) TaskLogDetail(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "logId")
 	if !ok {
 		return
 	}
-	fromLineNum, err := strconv.Atoi(c.Param("fromLineNum"))
-	if err != nil {
-		response.Error(c, "500000", "Invalid fromLineNum")
+	fromLineNum, ok := parseIDParamMsg(c, "fromLineNum", "Invalid fromLineNum")
+	if !ok {
 		return
 	}
-	result, err := h.service.TaskLogDetail(id, fromLineNum)
+	result, err := h.service.TaskLogDetail(id, int(fromLineNum))
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -376,6 +397,7 @@ func (h *SyncHandler) TaskLogDetail(c *gin.Context) {
 }
 
 func (h *SyncHandler) DeleteTaskLog(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "logId")
 	if !ok {
 		return
@@ -388,6 +410,7 @@ func (h *SyncHandler) DeleteTaskLog(c *gin.Context) {
 }
 
 func (h *SyncHandler) ClearTaskLog(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req syncmodule.TaskLog
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -401,6 +424,7 @@ func (h *SyncHandler) ClearTaskLog(c *gin.Context) {
 }
 
 func (h *SyncHandler) TerminateTask(c *gin.Context) {
+	defer recoverServicePanic(c)
 	id, ok := parseIDParam(c, "logId")
 	if !ok {
 		return
@@ -413,6 +437,7 @@ func (h *SyncHandler) TerminateTask(c *gin.Context) {
 }
 
 func (h *SyncHandler) ResourceCount(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.ResourceCount()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -422,6 +447,7 @@ func (h *SyncHandler) ResourceCount(c *gin.Context) {
 }
 
 func (h *SyncHandler) LogChartData(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.LogChartData()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -479,53 +505,4 @@ func RegisterSyncRoutes(r *gin.RouterGroup, h *SyncHandler) {
 			summaryGroup.POST("/logChartData", h.LogChartData)
 		}
 	}
-}
-
-func parsePageParams(c *gin.Context) (int, int, bool) {
-	page, err := strconv.Atoi(strings.TrimSpace(firstNonEmptyParam(c.Param("page"), c.Param("current"))))
-	if err != nil || page < 1 {
-		response.Error(c, "500000", "Invalid page")
-		return 0, 0, false
-	}
-	size, err := strconv.Atoi(strings.TrimSpace(firstNonEmptyParam(c.Param("limit"), c.Param("size"))))
-	if err != nil || size < 1 {
-		response.Error(c, "500000", "Invalid size")
-		return 0, 0, false
-	}
-	return page, size, true
-}
-
-func parseIDParam(c *gin.Context, key string) (int64, bool) {
-	value := strings.TrimSpace(c.Param(key))
-	id, err := strconv.ParseInt(value, 10, 64)
-	if err != nil || id <= 0 {
-		response.Error(c, "500000", "Invalid id")
-		return 0, false
-	}
-	return id, true
-}
-
-func parseIDList(values []string) ([]int64, error) {
-	result := make([]int64, 0, len(values))
-	for _, value := range values {
-		id, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-		if err != nil || id <= 0 {
-			return nil, strconv.ErrSyntax
-		}
-		result = append(result, id)
-	}
-	return result, nil
-}
-
-func isEOFBindError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "EOF")
-}
-
-func firstNonEmptyParam(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

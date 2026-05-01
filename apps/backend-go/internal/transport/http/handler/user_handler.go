@@ -63,6 +63,7 @@ func (h *UserHandler) SetAuthService(authService *service.AuthService) {
 }
 
 func (h *UserHandler) ListUsers(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req user.UserQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -86,6 +87,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 }
 
 func (h *UserHandler) CreateUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req user.UserCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -109,6 +111,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 }
 
 func (h *UserHandler) UpdateUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req user.UserUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -132,10 +135,9 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 }
 
 func (h *UserHandler) DeleteUser(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid user ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid user ID")
+	if !ok {
 		return
 	}
 	orgID, ok := requireCurrentOrg(c)
@@ -156,6 +158,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserOptions(c *gin.Context) {
+	defer recoverServicePanic(c)
 	orgID, ok := requireCurrentOrg(c)
 	if !ok {
 		return
@@ -172,6 +175,7 @@ func (h *UserHandler) GetUserOptions(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
 		response.Unauthorized(c, "invalid user context")
@@ -192,6 +196,7 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 }
 
 func (h *UserHandler) PersonInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
 		response.Unauthorized(c, "invalid user context")
@@ -209,6 +214,7 @@ func (h *UserHandler) PersonInfo(c *gin.Context) {
 }
 
 func (h *UserHandler) IPInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
 		response.Unauthorized(c, "invalid user context")
@@ -251,14 +257,14 @@ func (h *UserHandler) resolveWatermarkIdentity(userID int64, fallbackUsername st
 }
 
 func (h *UserHandler) SwitchOrg(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.switchOrg == nil {
 		response.Error(c, "500000", "org switcher is not configured")
 		return
 	}
 
-	targetOrgID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || targetOrgID <= 0 {
-		response.Error(c, "500000", "Invalid organization ID")
+	targetOrgID, ok := parseIDParamMsg(c, "id", "Invalid organization ID")
+	if !ok {
 		return
 	}
 
@@ -278,6 +284,7 @@ func (h *UserHandler) SwitchOrg(c *gin.Context) {
 }
 
 func (h *UserHandler) SwitchLanguage(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req user.LangSwitchRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -299,6 +306,7 @@ func (h *UserHandler) SwitchLanguage(c *gin.Context) {
 }
 
 func (h *UserHandler) DownloadExcelTemplate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userImportService == nil {
 		response.Error(c, "500000", "user import service is not configured")
 		return
@@ -318,6 +326,7 @@ func (h *UserHandler) DownloadExcelTemplate(c *gin.Context) {
 }
 
 func (h *UserHandler) BatchImportUsers(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userImportService == nil {
 		response.Error(c, "500000", "user import service is not configured")
 		return
@@ -356,6 +365,7 @@ func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 }
 
 func (h *UserHandler) DownloadErrorRecord(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userImportService == nil {
 		response.Error(c, "500000", "user import service is not configured")
 		return
@@ -381,6 +391,7 @@ func (h *UserHandler) DownloadErrorRecord(c *gin.Context) {
 }
 
 func (h *UserHandler) ClearErrorRecord(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userImportService == nil {
 		response.Error(c, "500000", "user import service is not configured")
 		return
@@ -401,6 +412,7 @@ func (h *UserHandler) ClearErrorRecord(c *gin.Context) {
 }
 
 func (h *UserHandler) GetDefaultPassword(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userService == nil {
 		response.Error(c, "500000", "user service is not configured")
 		return
@@ -410,6 +422,7 @@ func (h *UserHandler) GetDefaultPassword(c *gin.Context) {
 }
 
 func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userService == nil {
 		response.Error(c, "500000", "user service is not configured")
 		return
@@ -447,6 +460,7 @@ func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 }
 
 func (h *UserHandler) SwitchEnable(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.userService == nil {
 		response.Error(c, "500000", "user service is not configured")
 		return

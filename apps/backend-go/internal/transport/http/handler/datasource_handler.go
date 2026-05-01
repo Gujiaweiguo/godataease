@@ -29,6 +29,8 @@ func NewDatasourceHandler(service *service.DatasourceService) *DatasourceHandler
 }
 
 func (h *DatasourceHandler) List(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req datasource.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -45,6 +47,8 @@ func (h *DatasourceHandler) List(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Validate(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req datasource.ValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -63,12 +67,12 @@ func (h *DatasourceHandler) Validate(c *gin.Context) {
 func (h *DatasourceHandler) ValidateByID(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 
+	var err error
 	result, err := h.service.ValidateByID(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -79,6 +83,8 @@ func (h *DatasourceHandler) ValidateByID(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Tree(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req datasource.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -95,12 +101,14 @@ func (h *DatasourceHandler) Tree(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Get(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	defer recoverDatasourceServicePanic(c)
+
+	id, ok := parseIDParamMsg(c, "id", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 
+	var err error
 	result, err := h.service.GetByID(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -113,12 +121,12 @@ func (h *DatasourceHandler) Get(c *gin.Context) {
 func (h *DatasourceHandler) HidePw(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 
+	var err error
 	result, err := h.service.GetByID(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -131,12 +139,12 @@ func (h *DatasourceHandler) HidePw(c *gin.Context) {
 func (h *DatasourceHandler) GetSimpleDs(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 
+	var err error
 	result, err := h.service.GetByID(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -147,6 +155,8 @@ func (h *DatasourceHandler) GetSimpleDs(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Save(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	req, ok := parseDatasourceWriteRequest(c, true)
 	if !ok {
 		return
@@ -162,6 +172,8 @@ func (h *DatasourceHandler) Save(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Update(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	req, ok := parseDatasourceWriteRequest(c, true)
 	if !ok {
 		return
@@ -177,9 +189,10 @@ func (h *DatasourceHandler) Update(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	defer recoverDatasourceServicePanic(c)
+
+	id, ok := parseIDParamMsg(c, "id", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 
@@ -194,12 +207,12 @@ func (h *DatasourceHandler) Delete(c *gin.Context) {
 func (h *DatasourceHandler) PerDelete(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	id, ok := parseIDParamMsg(c, "id", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 
+	var err error
 	result, err := h.service.PerDelete(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -210,6 +223,8 @@ func (h *DatasourceHandler) PerDelete(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Tables(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	req, ok := parseTableRequest(c)
 	if !ok {
 		return
@@ -225,6 +240,8 @@ func (h *DatasourceHandler) Tables(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) TableStatus(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	req, ok := parseTableRequest(c)
 	if !ok {
 		return
@@ -240,6 +257,8 @@ func (h *DatasourceHandler) TableStatus(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) Schema(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	result, err := h.service.GetSchema()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -250,6 +269,8 @@ func (h *DatasourceHandler) Schema(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) TableField(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	req, ok := parseTableRequest(c)
 	if !ok {
 		return
@@ -265,6 +286,8 @@ func (h *DatasourceHandler) TableField(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) PreviewData(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	req, ok := parseTableRequest(c)
 	if !ok {
 		return
@@ -280,6 +303,8 @@ func (h *DatasourceHandler) PreviewData(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) SyncApiTable(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req map[string]string
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -296,6 +321,8 @@ func (h *DatasourceHandler) SyncApiTable(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) SyncApiDs(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req map[string]string
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -312,6 +339,8 @@ func (h *DatasourceHandler) SyncApiDs(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) LoadRemoteFile(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req struct {
 		URL          string `json:"url"`
 		UserName     string `json:"userName"`
@@ -333,6 +362,8 @@ func (h *DatasourceHandler) LoadRemoteFile(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) UploadFile(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
@@ -446,6 +477,8 @@ func (h *DatasourceHandler) CreateFolder(c *gin.Context) {
 }
 
 func (h *DatasourceHandler) CheckAPIDatasource(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+
 	var req map[string]string
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -512,9 +545,8 @@ func (h *DatasourceHandler) Types(c *gin.Context) {
 
 func (h *DatasourceHandler) ListSyncRecord(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
-	dsID, err := strconv.ParseInt(c.Param("dsId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid datasource ID")
+	dsID, ok := parseIDParamMsg(c, "dsId", "Invalid datasource ID")
+	if !ok {
 		return
 	}
 	page, _ := strconv.Atoi(c.Param("page"))
@@ -525,6 +557,7 @@ func (h *DatasourceHandler) ListSyncRecord(c *gin.Context) {
 	if limit < 1 {
 		limit = 10
 	}
+	var err error
 	result, err := h.service.ListSyncRecord(dsID, page, limit)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())

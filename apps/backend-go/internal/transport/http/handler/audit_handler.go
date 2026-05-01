@@ -33,6 +33,7 @@ func NewAuditHandler(auditService *service.AuditService) *AuditHandler {
 }
 
 func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req audit.AuditLogCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -49,10 +50,9 @@ func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
 }
 
 func (h *AuditHandler) GetAuditLogByID(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid audit log ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid audit log ID")
+	if !ok {
 		return
 	}
 
@@ -66,10 +66,9 @@ func (h *AuditHandler) GetAuditLogByID(c *gin.Context) {
 }
 
 func (h *AuditHandler) GetAuditLogsByUserID(c *gin.Context) {
-	userIDStr := c.Param("userId")
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid user ID")
+	defer recoverServicePanic(c)
+	userID, ok := parseIDParamMsgBadRequest(c, "userId", "Invalid user ID")
+	if !ok {
 		return
 	}
 
@@ -86,6 +85,7 @@ func (h *AuditHandler) GetAuditLogsByUserID(c *gin.Context) {
 }
 
 func (h *AuditHandler) QueryAuditLogs(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var query audit.AuditLogQuery
 
 	if userIDStr := c.Query("userId"); userIDStr != "" {
@@ -149,6 +149,7 @@ type ExportRequest struct {
 }
 
 func (h *AuditHandler) ExportAuditLogs(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req ExportRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -182,6 +183,7 @@ type RetentionRequest struct {
 }
 
 func (h *AuditHandler) DeleteAuditLogsRetention(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req RetentionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		req.Days = 90
@@ -199,6 +201,7 @@ func (h *AuditHandler) DeleteAuditLogsRetention(c *gin.Context) {
 }
 
 func (h *AuditHandler) RecordLoginFailure(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req audit.LoginFailureRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -225,6 +228,7 @@ func (h *AuditHandler) RecordLoginFailure(c *gin.Context) {
 }
 
 func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
+	defer recoverServicePanic(c)
 	filePath := c.Query("path")
 	if filePath == "" {
 		response.BadRequest(c, "File path is required")

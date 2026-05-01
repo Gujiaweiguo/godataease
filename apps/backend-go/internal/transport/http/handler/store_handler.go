@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"strconv"
 	"time"
 
 	"dataease/backend/internal/domain/auto"
@@ -35,24 +34,24 @@ func (h *StoreHandler) Execute(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req StoreExecuteRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	userID := getUserID(c)
 	if userID <= 0 {
-		response.Error(c, "500000", "Unauthorized")
+		response.Unauthorized(c, "Unauthorized")
 		return
 	}
 
 	favorited, err := h.repo.IsFavorited(req.ID, userID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to check favorite: "+err.Error())
+		response.InternalError(c, "Failed to check favorite: "+err.Error())
 		return
 	}
 
 	if favorited {
 		if err := h.repo.DeleteFavorite(req.ID, userID); err != nil {
-			response.Error(c, "500000", "Failed to remove favorite: "+err.Error())
+			response.InternalError(c, "Failed to remove favorite: "+err.Error())
 			return
 		}
 	} else {
@@ -65,7 +64,7 @@ func (h *StoreHandler) Execute(c *gin.Context) {
 			Time:         time.Now().UnixMilli(),
 		}
 		if err := h.repo.CreateFavorite(store); err != nil {
-			response.Error(c, "500000", "Failed to add favorite: "+err.Error())
+			response.InternalError(c, "Failed to add favorite: "+err.Error())
 			return
 		}
 	}
@@ -74,11 +73,8 @@ func (h *StoreHandler) Execute(c *gin.Context) {
 
 func (h *StoreHandler) Favorited(c *gin.Context) {
 	defer recoverServicePanic(c)
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	_ = err
-	if id <= 0 {
-		response.Error(c, "500000", "Invalid id")
+	id, ok := parseIDParamBadRequest(c, "id")
+	if !ok {
 		return
 	}
 	userID := getUserID(c)
@@ -88,7 +84,7 @@ func (h *StoreHandler) Favorited(c *gin.Context) {
 	}
 	favorited, err := h.repo.IsFavorited(id, userID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to check favorite: "+err.Error())
+		response.InternalError(c, "Failed to check favorite: "+err.Error())
 		return
 	}
 	response.Success(c, favorited)
@@ -98,7 +94,7 @@ func (h *StoreHandler) Query(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req StoreQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	userID := getUserID(c)
@@ -109,7 +105,7 @@ func (h *StoreHandler) Query(c *gin.Context) {
 	resourceType := resourceTypeFromString(req.Type)
 	rows, err := h.repo.QueryFavorites(userID, resourceType, req.Keyword)
 	if err != nil {
-		response.Error(c, "500000", "Failed to query favorites: "+err.Error())
+		response.InternalError(c, "Failed to query favorites: "+err.Error())
 		return
 	}
 	response.Success(c, rows)

@@ -20,9 +20,10 @@ func NewTemplateHandler(service *service.TemplateService) *TemplateHandler {
 }
 
 func (h *TemplateHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req template.TemplateCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -38,9 +39,10 @@ func (h *TemplateHandler) Create(c *gin.Context) {
 }
 
 func (h *TemplateHandler) Save(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req template.TemplateSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -73,10 +75,9 @@ func templateCreateBy(c *gin.Context) string {
 }
 
 func (h *TemplateHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid template ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid template ID")
+	if !ok {
 		return
 	}
 
@@ -90,9 +91,10 @@ func (h *TemplateHandler) Get(c *gin.Context) {
 }
 
 func (h *TemplateHandler) List(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req template.TemplateListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -106,9 +108,10 @@ func (h *TemplateHandler) List(c *gin.Context) {
 }
 
 func (h *TemplateHandler) Update(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req template.TemplateUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -122,10 +125,9 @@ func (h *TemplateHandler) Update(c *gin.Context) {
 }
 
 func (h *TemplateHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid template ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid template ID")
+	if !ok {
 		return
 	}
 
@@ -140,6 +142,7 @@ func (h *TemplateHandler) Delete(c *gin.Context) {
 // Java-compatible stub handlers
 
 func (h *TemplateHandler) ListCategories(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, []interface{}{})
 		return
@@ -156,7 +159,7 @@ func (h *TemplateHandler) ListCategories(c *gin.Context) {
 		err = c.ShouldBindBodyWith(&req, binding.JSON)
 	}
 	if err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -171,10 +174,9 @@ func (h *TemplateHandler) ListCategories(c *gin.Context) {
 
 // DeleteWithCategory handles delete scoped to a category when categoryId is present (Java compatibility)
 func (h *TemplateHandler) DeleteWithCategory(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid template ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid template ID")
+	if !ok {
 		return
 	}
 	categoryID := c.Param("categoryId")
@@ -187,10 +189,11 @@ func (h *TemplateHandler) DeleteWithCategory(c *gin.Context) {
 
 // SearchTemplates handles GET search (alias for List)
 func (h *TemplateHandler) SearchTemplates(c *gin.Context) {
+	defer recoverServicePanic(c)
 	// For GET requests, use query params instead of JSON body
 	var req template.TemplateListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -204,6 +207,7 @@ func (h *TemplateHandler) SearchTemplates(c *gin.Context) {
 }
 
 func (h *TemplateHandler) SearchTemplateMarket(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, map[string]interface{}{
 			"baseUrl":    "",
@@ -217,6 +221,7 @@ func (h *TemplateHandler) SearchTemplateMarket(c *gin.Context) {
 }
 
 func (h *TemplateHandler) SearchTemplateMarketRecommend(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, map[string]interface{}{
 			"baseUrl":    "",
@@ -230,6 +235,7 @@ func (h *TemplateHandler) SearchTemplateMarketRecommend(c *gin.Context) {
 }
 
 func (h *TemplateHandler) SearchTemplateMarketPreview(c *gin.Context) {
+	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, map[string]interface{}{
 			"baseUrl":    "",
@@ -244,6 +250,7 @@ func (h *TemplateHandler) SearchTemplateMarketPreview(c *gin.Context) {
 
 // DeleteCategory deletes a template category by ID
 func (h *TemplateHandler) DeleteCategory(c *gin.Context) {
+	defer recoverServicePanic(c)
 	idStr := c.Param("id")
 	deleted, err := h.service.DeleteCategory(idStr)
 	if err != nil {
@@ -259,13 +266,14 @@ func (h *TemplateHandler) DeleteCategory(c *gin.Context) {
 
 // NameCheck checks if a template name already exists
 func (h *TemplateHandler) NameCheck(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		Name    string `json:"name"`
 		ID      string `json:"id"`
 		OptType string `json:"optType"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.NameCheck(req.OptType, req.Name, req.ID)
@@ -278,6 +286,7 @@ func (h *TemplateHandler) NameCheck(c *gin.Context) {
 
 // CategoryTemplateNameCheck checks category-template name uniqueness
 func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		Name          string   `json:"name"`
 		CategoryID    string   `json:"categoryId"`
@@ -286,7 +295,7 @@ func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
 		TemplateArray []string `json:"templateArray"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	categories := req.Categories
@@ -303,12 +312,13 @@ func (h *TemplateHandler) CategoryTemplateNameCheck(c *gin.Context) {
 
 // BatchDelete deletes multiple templates
 func (h *TemplateHandler) BatchDelete(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		IDs         []int64  `json:"ids"`
 		TemplateIDs []string `json:"templateIds"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	deleteIDs := append([]int64{}, req.IDs...)
@@ -328,12 +338,13 @@ func (h *TemplateHandler) BatchDelete(c *gin.Context) {
 
 // BatchUpdate updates multiple templates (e.g., move category)
 func (h *TemplateHandler) BatchUpdate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		TemplateIDs []string `json:"templateIds"`
 		Categories  []string `json:"categories"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.BatchUpdateCategories(req.TemplateIDs, req.Categories); err != nil {
@@ -344,11 +355,12 @@ func (h *TemplateHandler) BatchUpdate(c *gin.Context) {
 }
 
 func (h *TemplateHandler) FindCategoriesByTemplateIds(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req struct {
 		TemplateArray []string `json:"templateArray"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.FindCategoriesByTemplateIDs(req.TemplateArray)

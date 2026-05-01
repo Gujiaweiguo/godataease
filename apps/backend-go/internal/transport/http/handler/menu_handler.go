@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -20,6 +18,7 @@ func NewMenuHandler(service *service.MenuService) *MenuHandler {
 }
 
 func (h *MenuHandler) Query(c *gin.Context) {
+	defer recoverServicePanic(c)
 	result, err := h.service.Query()
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -64,6 +63,7 @@ type CreateMenuRequest struct {
 }
 
 func (h *MenuHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req CreateMenuRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -117,6 +117,7 @@ type UpdateMenuRequest struct {
 }
 
 func (h *MenuHandler) Update(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req UpdateMenuRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -154,10 +155,9 @@ func (h *MenuHandler) Update(c *gin.Context) {
 }
 
 func (h *MenuHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid menu ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid menu ID")
+	if !ok {
 		return
 	}
 
@@ -175,6 +175,7 @@ type UpdateSortRequest struct {
 }
 
 func (h *MenuHandler) UpdateSort(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req UpdateSortRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -195,6 +196,7 @@ type UpdateHiddenRequest struct {
 }
 
 func (h *MenuHandler) UpdateHidden(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req UpdateHiddenRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -210,12 +212,12 @@ func (h *MenuHandler) UpdateHidden(c *gin.Context) {
 }
 
 func (h *MenuHandler) Detail(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid menu ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid menu ID")
+	if !ok {
 		return
 	}
+	var err error
 
 	result, err := h.service.GetByID(id)
 	if err != nil {

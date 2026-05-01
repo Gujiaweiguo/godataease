@@ -19,6 +19,7 @@ func NewDataPermissionHandler(service *service.DataPermissionAdminService) *Data
 }
 
 func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
 	if !ok {
 		return
@@ -33,15 +34,15 @@ func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
 }
 
 func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
+	defer recoverServicePanic(c)
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
 	if !ok {
 		return
 	}
 
 	targetType := c.Param("targetType")
-	targetID, err := strconv.ParseInt(c.Param("targetId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid target ID")
+	targetID, ok := parseIDParamMsg(c, "targetId", "Invalid target ID")
+	if !ok {
 		return
 	}
 
@@ -54,6 +55,7 @@ func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
 }
 
 func (h *DataPermissionHandler) SaveRowPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req service.RowPermissionForm
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -68,6 +70,7 @@ func (h *DataPermissionHandler) SaveRowPermission(c *gin.Context) {
 }
 
 func (h *DataPermissionHandler) DeleteRowPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req service.DeletePermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -82,6 +85,7 @@ func (h *DataPermissionHandler) DeleteRowPermission(c *gin.Context) {
 }
 
 func (h *DataPermissionHandler) ColumnPermissionPager(c *gin.Context) {
+	defer recoverServicePanic(c)
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
 	if !ok {
 		return
@@ -96,6 +100,7 @@ func (h *DataPermissionHandler) ColumnPermissionPager(c *gin.Context) {
 }
 
 func (h *DataPermissionHandler) SaveColumnPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req service.ColumnPermissionForm
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -110,6 +115,7 @@ func (h *DataPermissionHandler) SaveColumnPermission(c *gin.Context) {
 }
 
 func (h *DataPermissionHandler) DeleteColumnPermission(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req service.DeletePermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -141,9 +147,8 @@ func RegisterDataPermissionRoutes(r *gin.RouterGroup, h *DataPermissionHandler) 
 }
 
 func parseDatasetPagerParams(c *gin.Context) (int64, int, int, bool) {
-	datasetID, err := strconv.ParseInt(c.Param("datasetId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "datasetId", "Invalid dataset ID")
+	if !ok {
 		return 0, 0, 0, false
 	}
 

@@ -22,6 +22,7 @@ func NewRoleHandler(service *service.RoleService) *RoleHandler {
 }
 
 func (h *RoleHandler) Query(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RoleQueryRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -38,6 +39,7 @@ func (h *RoleHandler) Query(c *gin.Context) {
 }
 
 func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RoleQueryRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -65,6 +67,7 @@ func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
 }
 
 func (h *RoleHandler) Page(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RolePageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -81,6 +84,7 @@ func (h *RoleHandler) Page(c *gin.Context) {
 }
 
 func (h *RoleHandler) Create(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RoleCreator
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -99,6 +103,7 @@ func (h *RoleHandler) Create(c *gin.Context) {
 }
 
 func (h *RoleHandler) Edit(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RoleEditor
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -116,10 +121,9 @@ func (h *RoleHandler) Edit(c *gin.Context) {
 }
 
 func (h *RoleHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid role ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid role ID")
+	if !ok {
 		return
 	}
 
@@ -132,12 +136,12 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 }
 
 func (h *RoleHandler) Detail(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid role ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid role ID")
+	if !ok {
 		return
 	}
+	var err error
 
 	result, err := h.service.GetRoleByID(id)
 	if err != nil {
@@ -149,12 +153,12 @@ func (h *RoleHandler) Detail(c *gin.Context) {
 }
 
 func (h *RoleHandler) QueryWithOrgID(c *gin.Context) {
-	oidStr := c.Param("oid")
-	oid, err := strconv.ParseInt(oidStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid org ID")
+	defer recoverServicePanic(c)
+	oid, ok := parseIDParamMsg(c, "oid", "Invalid org ID")
+	if !ok {
 		return
 	}
+	var err error
 
 	keyword := c.Query("keyword")
 	result, err := h.service.QueryRolesByOrgID(oid, keyword)
@@ -182,6 +186,7 @@ func (h *RoleHandler) getCreateBy(c *gin.Context) string {
 
 // MountUser 绑定用户到角色
 func (h *RoleHandler) MountUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.MountUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -205,6 +210,7 @@ func (h *RoleHandler) MountUser(c *gin.Context) {
 
 // MountExternalUser 绑定组织外用户
 func (h *RoleHandler) MountExternalUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.MountExternalUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -226,6 +232,7 @@ func (h *RoleHandler) MountExternalUser(c *gin.Context) {
 
 // UnmountUser 解绑用户
 func (h *RoleHandler) UnmountUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.UnmountUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -250,6 +257,7 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 
 // BeforeUnmountInfo 解绑前检查
 func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.UnmountUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -271,6 +279,7 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 
 // SearchExternalUser 搜索组织外用户
 func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	keyword := c.Param("keyword")
 	excludeOrgID := middleware.GetOrgID(c)
 	if excludeOrgID <= 0 {
@@ -289,6 +298,7 @@ func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
 
 // OptionForUser 用户可选角色
 func (h *RoleHandler) OptionForUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RoleRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -311,6 +321,7 @@ func (h *RoleHandler) OptionForUser(c *gin.Context) {
 
 // SelectedForUser 用户已选角色
 func (h *RoleHandler) SelectedForUser(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req role.RoleRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())

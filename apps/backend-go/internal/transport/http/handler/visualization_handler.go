@@ -27,6 +27,7 @@ func NewVisualizationHandler(service *service.VisualizationService) *Visualizati
 }
 
 func (h *VisualizationHandler) FindByID(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.DetailRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -147,6 +148,7 @@ func parseJSONStrings(m map[string]interface{}) {
 }
 
 func (h *VisualizationHandler) List(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -184,6 +186,7 @@ const (
 )
 
 func (h *VisualizationHandler) Tree(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req treeRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -349,6 +352,7 @@ func validateTreeNodes(nodes []treeNode) error {
 }
 
 func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.SaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -365,11 +369,12 @@ func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) FindDvType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := h.service.FindDvType(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -379,11 +384,12 @@ func (h *VisualizationHandler) FindDvType(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) UpdateCheckVersion(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid ID")
+	if !ok {
 		return
 	}
+	var err error
 	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(id)})
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -397,6 +403,7 @@ func (h *VisualizationHandler) UpdateCheckVersion(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) Copy(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.CopyRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -412,6 +419,7 @@ func (h *VisualizationHandler) Copy(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.CanvasChangeRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -426,6 +434,7 @@ func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -441,6 +450,7 @@ func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) UpdateBase(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -455,6 +465,7 @@ func (h *VisualizationHandler) UpdateBase(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) Move(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.MoveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -469,6 +480,7 @@ func (h *VisualizationHandler) Move(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) UpdatePublishStatus(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -484,6 +496,7 @@ func (h *VisualizationHandler) UpdatePublishStatus(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) RecoverToPublished(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.DetailRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -499,15 +512,14 @@ func (h *VisualizationHandler) RecoverToPublished(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) DeleteLogic(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid ID")
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamMsg(c, "id", "Invalid ID")
+	if !ok {
 		return
 	}
 
 	updateBy := h.getUpdateBy(c)
-	if err = h.service.DeleteLogic(id, updateBy); err != nil {
+	if err := h.service.DeleteLogic(id, updateBy); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
@@ -515,6 +527,7 @@ func (h *VisualizationHandler) DeleteLogic(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) NameCheck(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.NameCheckRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -543,9 +556,9 @@ func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
 }
 
 func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
-	dvID, err := strconv.ParseInt(c.Param("dvId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dvId")
+	defer recoverServicePanic(c)
+	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	if !ok {
 		return
 	}
 	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(dvID)})
@@ -561,9 +574,9 @@ func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
-	dvID, err := strconv.ParseInt(c.Param("dvId"), 10, 64)
-	if err != nil {
-		response.Error(c, "500000", "Invalid dvId")
+	defer recoverServicePanic(c)
+	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	if !ok {
 		return
 	}
 	result, err := h.service.ViewDetailList(dvID)
@@ -575,6 +588,7 @@ func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.AppCanvasNameCheckRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -589,10 +603,12 @@ func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) GetComponentInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
 	response.Success(c, nil)
 }
 
 func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.Export2AppCheckRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
@@ -607,18 +623,22 @@ func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
 }
 
 func (h *VisualizationHandler) ExportLogApp(c *gin.Context) {
+	defer recoverServicePanic(c)
 	h.recordExportLog(c, "app")
 }
 
 func (h *VisualizationHandler) ExportLogTemplate(c *gin.Context) {
+	defer recoverServicePanic(c)
 	h.recordExportLog(c, "template")
 }
 
 func (h *VisualizationHandler) ExportLogPDF(c *gin.Context) {
+	defer recoverServicePanic(c)
 	h.recordExportLog(c, "pdf")
 }
 
 func (h *VisualizationHandler) ExportLogImg(c *gin.Context) {
+	defer recoverServicePanic(c)
 	h.recordExportLog(c, "img")
 }
 
@@ -654,6 +674,7 @@ func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 }
 
 func (h *VisualizationHandler) Decompression(c *gin.Context) {
+	defer recoverServicePanic(c)
 	var req visualization.DecompressionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
