@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"errors"
-	"io"
 	"strconv"
 
 	"dataease/backend/internal/domain/datasource"
@@ -29,23 +27,23 @@ func registerDatasourceCompatRoutes(
 
 func registerDatasourceCompatReadRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddleware *middleware.MenuAuthMiddleware) {
 	r.POST("/list", datasourceHandler.List)
-	r.POST("/tree", datasourceHandler.treeCompat)
+	r.POST("/tree", datasourceHandler.Tree)
 	if menuAuthMiddleware != nil {
 		r.POST("/validate", menuAuthMiddleware.RequireMenuAuth(datasourceMenuPath), datasourceHandler.Validate)
 	} else {
 		r.POST("/validate", datasourceHandler.Validate)
 	}
 	if permMiddleware != nil {
-		r.GET("/validate/:id", permMiddleware.CheckDatasourceView(), datasourceHandler.validateByIDCompat)
+		r.GET("/validate/:id", permMiddleware.CheckDatasourceView(), datasourceHandler.ValidateByID)
 	} else {
-		r.GET("/validate/:id", datasourceHandler.validateByIDCompat)
+		r.GET("/validate/:id", datasourceHandler.ValidateByID)
 	}
-	r.POST("/types", datasourceTypesCompat)
-	r.POST("/getTables", datasourceHandler.getTablesCompat)
-	r.POST("/getTableStatus", datasourceHandler.getTableStatusCompat)
-	r.POST("/getSchema", datasourceHandler.getSchemaCompat)
-	r.POST("/getTableField", datasourceHandler.getTableFieldCompat)
-	r.POST("/previewData", datasourceHandler.previewDataCompat)
+	r.POST("/types", datasourceHandler.Types)
+	r.POST("/getTables", datasourceHandler.Tables)
+	r.POST("/getTableStatus", datasourceHandler.TableStatus)
+	r.POST("/getSchema", datasourceHandler.Schema)
+	r.POST("/getTableField", datasourceHandler.TableField)
+	r.POST("/previewData", datasourceHandler.PreviewData)
 	r.GET("/get/:id", datasourceHandler.getCompat)
 	r.GET("/hidePw/:id", datasourceHandler.hidePwCompat)
 	r.GET("/getSimpleDs/:id", datasourceHandler.getSimpleDsCompat)
@@ -58,120 +56,27 @@ func registerDatasourceCompatUserRoutes(r gin.IRouter, datasourceHandler *Dataso
 }
 
 func registerDatasourceCompatWriteRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler) {
-	r.POST("/save", datasourceHandler.saveCompat)
-	r.POST("/update", datasourceHandler.updateCompat)
+	r.POST("/save", datasourceHandler.Save)
+	r.POST("/update", datasourceHandler.Update)
 	r.POST("/move", datasourceHandler.moveCompat)
 	r.POST("/reName", datasourceHandler.renameCompat)
 	r.POST("/createFolder", datasourceHandler.createFolderCompat)
-	r.POST("/checkRepeat", datasourceHandler.checkRepeatCompat)
-	r.POST("/checkApiDatasource", datasourceHandler.checkAPIDatasourceCompat)
+	r.POST("/checkRepeat", datasourceHandler.CheckRepeat)
+	r.POST("/checkApiDatasource", datasourceHandler.CheckAPIDatasource)
 }
 
 func registerDatasourceCompatFileRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler) {
-	r.POST("/loadRemoteFile", datasourceHandler.loadRemoteFileCompat)
-	r.POST("/syncApiTable", datasourceHandler.syncAPITableCompat)
-	r.POST("/syncApiDs", datasourceHandler.syncAPIDsCompat)
-	r.POST("/uploadFile", datasourceHandler.uploadFileCompat)
-	r.POST("/listSyncRecord/:dsId/:page/:limit", datasourceHandler.listSyncRecordCompat)
+	r.POST("/loadRemoteFile", datasourceHandler.LoadRemoteFile)
+	r.POST("/syncApiTable", datasourceHandler.SyncApiTable)
+	r.POST("/syncApiDs", datasourceHandler.SyncApiDs)
+	r.POST("/uploadFile", datasourceHandler.UploadFile)
+	r.POST("/listSyncRecord/:dsId/:page/:limit", datasourceHandler.ListSyncRecord)
 }
 
 func registerDatasourceCompatDeleteRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler) {
-	r.GET("/delete/:id", datasourceHandler.deleteCompat)
-	r.POST("/delete/:id", datasourceHandler.deleteCompat)
-	r.POST("/perDelete/:id", datasourceHandler.perDeleteCompat)
-}
-
-func (h *DatasourceHandler) treeCompat(c *gin.Context) {
-	var req datasource.ListRequest
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
-		return
-	}
-
-	list, err := h.service.Tree(&req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, buildDatasourceTreeResponse(list))
-}
-
-func (h *DatasourceHandler) validateByIDCompat(c *gin.Context) {
-	id, ok := parseDatasourceIDParam(c)
-	if !ok {
-		return
-	}
-	result, err := h.service.ValidateByID(id)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func datasourceTypesCompat(c *gin.Context) {
-	response.Success(c, []map[string]string{{"type": "MySQL", "name": "MySQL"}, {"type": "PostgreSQL", "name": "PostgreSQL"}, {"type": "SQLServer", "name": "SQL Server"}, {"type": "Oracle", "name": "Oracle"}, {"type": "Excel", "name": "Excel"}})
-}
-
-func (h *DatasourceHandler) getTablesCompat(c *gin.Context) {
-	req, ok := parseTableRequest(c)
-	if !ok {
-		return
-	}
-	result, err := h.service.GetTables(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) getTableStatusCompat(c *gin.Context) {
-	req, ok := parseTableRequest(c)
-	if !ok {
-		return
-	}
-	result, err := h.service.GetTableStatus(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) getSchemaCompat(c *gin.Context) {
-	result, err := h.service.GetSchema()
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) getTableFieldCompat(c *gin.Context) {
-	req, ok := parseTableRequest(c)
-	if !ok {
-		return
-	}
-	result, err := h.service.GetTableField(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) previewDataCompat(c *gin.Context) {
-	req, ok := parseTableRequest(c)
-	if !ok {
-		return
-	}
-	result, err := h.service.PreviewData(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
+	r.GET("/delete/:id", datasourceHandler.Delete)
+	r.POST("/delete/:id", datasourceHandler.Delete)
+	r.POST("/perDelete/:id", datasourceHandler.PerDelete)
 }
 
 func (h *DatasourceHandler) getCompat(c *gin.Context) {
@@ -192,32 +97,6 @@ func (h *DatasourceHandler) getSimpleDsCompat(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"id": strconv.FormatInt(result.ID, 10), "name": result.Name, "type": result.Type})
-}
-
-func (h *DatasourceHandler) saveCompat(c *gin.Context) {
-	req, ok := parseDatasourceWriteRequest(c, true)
-	if !ok {
-		return
-	}
-	result, err := h.service.Save(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) updateCompat(c *gin.Context) {
-	req, ok := parseDatasourceWriteRequest(c, true)
-	if !ok {
-		return
-	}
-	result, err := h.service.Update(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
 }
 
 func (h *DatasourceHandler) moveCompat(c *gin.Context) {
@@ -275,150 +154,6 @@ func (h *DatasourceHandler) createFolderCompat(c *gin.Context) {
 		pid = 0
 	}
 	result, err := h.service.CreateFolder(name, pid)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) checkRepeatCompat(c *gin.Context) {
-	req, ok := parseDatasourceWriteRequest(c, false)
-	if !ok {
-		return
-	}
-	result, err := h.service.CheckRepeat(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) checkAPIDatasourceCompat(c *gin.Context) {
-	var req map[string]string
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
-		return
-	}
-	result, err := h.service.CheckAPIDatasource(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed to check api datasource: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) loadRemoteFileCompat(c *gin.Context) {
-	var req struct {
-		URL          string `json:"url"`
-		UserName     string `json:"userName"`
-		Password     string `json:"passwd"`
-		DatasourceID int64  `json:"datasourceId"`
-	}
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
-		return
-	}
-	result, err := h.service.LoadRemoteFile(req.URL, req.UserName, req.Password, req.DatasourceID)
-	if err != nil {
-		response.Error(c, "500000", "Failed to load remote file: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) syncAPITableCompat(c *gin.Context) {
-	var req map[string]string
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
-		return
-	}
-	result, err := h.service.SyncAPITable(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed to sync api table: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) syncAPIDsCompat(c *gin.Context) {
-	var req map[string]string
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
-		return
-	}
-	result, err := h.service.SyncAPIDs(req)
-	if err != nil {
-		response.Error(c, "500000", "Failed to sync api datasource: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) uploadFileCompat(c *gin.Context) {
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
-		return
-	}
-	defer file.Close()
-
-	var datasourceID int64
-	if idStr := c.PostForm("id"); idStr != "" {
-		datasourceID, _ = strconv.ParseInt(idStr, 10, 64)
-	}
-	var editType int
-	if editTypeStr := c.PostForm("editType"); editTypeStr != "" {
-		editType, _ = strconv.Atoi(editTypeStr)
-	}
-	result, err := h.service.UploadFile(file, header, datasourceID, editType)
-	if err != nil {
-		response.Error(c, "500000", "Failed to process file: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) listSyncRecordCompat(c *gin.Context) {
-	dsID, ok := parseDatasourceIDFromParam(c, "dsId")
-	if !ok {
-		return
-	}
-	page, _ := strconv.Atoi(c.Param("page"))
-	if page < 1 {
-		page = 1
-	}
-	limit, _ := strconv.Atoi(c.Param("limit"))
-	if limit < 1 {
-		limit = 10
-	}
-	result, err := h.service.ListSyncRecord(dsID, page, limit)
-	if err != nil {
-		response.Error(c, "500000", "Failed to list sync records: "+err.Error())
-		return
-	}
-	response.Success(c, result)
-}
-
-func (h *DatasourceHandler) deleteCompat(c *gin.Context) {
-	id, ok := parseDatasourceIDParam(c)
-	if !ok {
-		return
-	}
-	if err := h.service.Delete(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
-		return
-	}
-	response.Success(c, nil)
-}
-
-func (h *DatasourceHandler) perDeleteCompat(c *gin.Context) {
-	id, ok := parseDatasourceIDParam(c)
-	if !ok {
-		return
-	}
-	result, err := h.service.PerDelete(id)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
