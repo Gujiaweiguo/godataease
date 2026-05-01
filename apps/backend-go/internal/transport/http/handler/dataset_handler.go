@@ -586,6 +586,46 @@ func (h *DatasetHandler) GetFieldTree(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// DeleteDatasetField handles POST /datasetField/delete/:id
+func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
+	defer recoverServicePanic(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid field ID")
+		return
+	}
+	if h.service != nil {
+		err = h.service.DeleteField(id)
+	} else {
+		err = h.chartService.DeleteField(id)
+	}
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+// DeleteDatasetFieldByChart handles POST /datasetField/deleteByChartId/:id
+func (h *DatasetHandler) DeleteDatasetFieldByChart(c *gin.Context) {
+	defer recoverServicePanic(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid chart ID")
+		return
+	}
+	if h.service != nil {
+		err = h.service.DeleteFieldByChart(id)
+	} else {
+		err = h.chartService.DeleteFieldByChart(id)
+	}
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
 //nolint:dupl // route registration pattern is intentionally similar
 func RegisterDatasetRoutes(r *gin.RouterGroup, h *DatasetHandler) {
 	datasetGroup := r.Group("/dataset")

@@ -1,9 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
-	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -71,38 +68,7 @@ func registerDatasetFieldEnumRoutes(datasetFieldGroup *gin.RouterGroup, datasetH
 }
 
 func RegisterDatasetFieldDeleteRoutes(r gin.IRouter, datasetHandler *DatasetHandler, chartHandler *ChartHandler) {
-	r.POST("/delete/:id", func(c *gin.Context) {
-		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-		if err != nil {
-			response.Error(c, "500000", "Invalid field ID")
-			return
-		}
-		if datasetHandler != nil {
-			err = datasetHandler.service.DeleteField(id)
-		} else {
-			err = chartHandler.service.DeleteField(id)
-		}
-		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, nil)
-	})
-	r.POST("/deleteByChartId/:id", func(c *gin.Context) {
-		chartID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-		if err != nil {
-			response.Error(c, "500000", "Invalid chart ID")
-			return
-		}
-		if datasetHandler != nil {
-			err = datasetHandler.service.DeleteFieldByChart(chartID)
-		} else {
-			err = chartHandler.service.DeleteFieldByChart(chartID)
-		}
-		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, nil)
-	})
+	_ = chartHandler
+	r.POST("/delete/:id", datasetHandler.DeleteDatasetField)
+	r.POST("/deleteByChartId/:id", datasetHandler.DeleteDatasetFieldByChart)
 }
