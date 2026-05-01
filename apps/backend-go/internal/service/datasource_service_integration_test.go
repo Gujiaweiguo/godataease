@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/auto"
 	datasetdomain "dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/permission"
@@ -835,7 +836,7 @@ func TestDatasourceService_LatestTypes(t *testing.T) {
 }
 
 func TestDatasourceService_ShowFinishPage(t *testing.T) {
-	cleanupTables(&datasource.CoreDatasource{})
+	cleanupTables(&datasource.CoreDatasource{}, &auto.CoreDsFinishPage{})
 
 	repo := repository.NewDatasourceRepository(testDB)
 	svc := NewDatasourceService(repo)
@@ -864,6 +865,25 @@ func TestDatasourceService_ShowFinishPage(t *testing.T) {
 
 		err = svc.SetShowFinishPage(0)
 		require.NoError(t, err)
+	})
+
+	t.Run("setting twice stays idempotent", func(t *testing.T) {
+		userID := time.Now().UnixNano()
+
+		err := svc.SetShowFinishPage(userID)
+		require.NoError(t, err)
+
+		err = svc.SetShowFinishPage(userID)
+		require.NoError(t, err)
+
+		show, err := svc.ShowFinishPage(userID)
+		require.NoError(t, err)
+		assert.False(t, show)
+
+		var count int64
+		err = testDB.Model(&auto.CoreDsFinishPage{}).Where("id = ?", userID).Count(&count).Error
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), count)
 	})
 }
 
