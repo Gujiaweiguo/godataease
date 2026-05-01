@@ -30,7 +30,7 @@ func (h *RoleHandler) Query(c *gin.Context) {
 
 	result, err := h.service.QueryRoles(&req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
 
 	result, err := h.service.QueryRolesByOrgID(orgID, keyword)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *RoleHandler) Page(c *gin.Context) {
 
 	result, err := h.service.QueryRolesPage(&req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -91,7 +91,7 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	callerOrgID := middleware.GetOrgID(c)
 	id, err := h.service.CreateRole(&req, createBy, callerOrgID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h *RoleHandler) Edit(c *gin.Context) {
 	updateBy := h.getCreateBy(c)
 	callerOrgID := middleware.GetOrgID(c)
 	if err := h.service.EditRole(&req, updateBy, callerOrgID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -124,7 +124,7 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.service.DeleteRole(id); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -141,7 +141,7 @@ func (h *RoleHandler) Detail(c *gin.Context) {
 
 	result, err := h.service.GetRoleByID(id)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *RoleHandler) QueryWithOrgID(c *gin.Context) {
 	keyword := c.Query("keyword")
 	result, err := h.service.QueryRolesByOrgID(oid, keyword)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -196,7 +196,7 @@ func (h *RoleHandler) MountUser(c *gin.Context) {
 	}
 
 	if err := h.service.MountUsers(&req); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -217,7 +217,7 @@ func (h *RoleHandler) MountExternalUser(c *gin.Context) {
 		return
 	}
 	if err := h.service.MountExternalUser(&req, orgID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -241,7 +241,7 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 			response.Error(c, "500000", service.ErrLastRoleRemovalBlocked.Error())
 			return
 		}
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -262,7 +262,7 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 
 	count, err := h.service.BeforeUnmountInfo(&req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -280,7 +280,7 @@ func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
 
 	result, err := h.service.SearchExternalUser(keyword, excludeOrgID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -302,7 +302,7 @@ func (h *RoleHandler) OptionForUser(c *gin.Context) {
 	}
 	result, err := h.service.OptionForUser(&req, orgID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -319,7 +319,7 @@ func (h *RoleHandler) SelectedForUser(c *gin.Context) {
 
 	result, err := h.service.SelectedForUser(&req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 

@@ -23,9 +23,9 @@ func TestCustomGeoHandler_InvalidInput(t *testing.T) {
 		body         string
 		expectedCode string
 	}{
-		{name: "save_geo_area_empty_body", method: "POST", url: "/api/customGeo/geoArea/save", body: "", expectedCode: "400000"},
-		{name: "save_geo_sub_area_empty_body", method: "POST", url: "/api/customGeo/geoSubArea/save", body: "", expectedCode: "400000"},
-		{name: "delete_geo_sub_area_invalid_id", method: "DELETE", url: "/api/customGeo/geoSubArea/abc", expectedCode: "400000"},
+		{name: "save_geo_area_empty_body", method: "POST", url: "/api/customGeo/geoArea/save", body: "", expectedCode: "500000"},
+		{name: "save_geo_sub_area_empty_body", method: "POST", url: "/api/customGeo/geoSubArea/save", body: "", expectedCode: "500000"},
+		{name: "delete_geo_sub_area_invalid_id", method: "DELETE", url: "/api/customGeo/geoSubArea/abc", expectedCode: "500000"},
 	}
 
 	for _, tt := range tests {

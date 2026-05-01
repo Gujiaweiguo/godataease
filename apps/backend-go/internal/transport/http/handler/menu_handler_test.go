@@ -328,7 +328,7 @@ func TestMenuHandler_Delete_Error(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	resp := decodeBridgeResp(t, w.Body.Bytes())
 	assert.Equal(t, "500000", resp.Code)
-	assert.Equal(t, service.ErrMenuHasChildren.Error(), resp.Msg)
+	assert.Contains(t, resp.Msg, service.ErrMenuHasChildren.Error())
 }
 
 func TestMenuHandler_UpdateSort_Success(t *testing.T) {

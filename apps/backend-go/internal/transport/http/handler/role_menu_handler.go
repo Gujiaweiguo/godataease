@@ -28,7 +28,7 @@ func (h *RoleMenuHandler) GetRoleMenuAuth(c *gin.Context) {
 
 	result, err := h.roleMenuService.GetRoleMenuAuth(roleID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *RoleMenuHandler) SaveRoleMenuAuth(c *gin.Context) {
 	}
 
 	if err := h.roleMenuService.SaveRoleMenuAuth(&req); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 

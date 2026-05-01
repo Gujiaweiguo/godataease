@@ -22,7 +22,7 @@ func NewMenuHandler(service *service.MenuService) *MenuHandler {
 func (h *MenuHandler) Query(c *gin.Context) {
 	result, err := h.service.Query()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 	applyMenuTitles(result, requestLocale(c, nil))
@@ -92,7 +92,7 @@ func (h *MenuHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(m); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -146,7 +146,7 @@ func (h *MenuHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.service.Update(m); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -162,7 +162,7 @@ func (h *MenuHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.service.Delete(id); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -182,7 +182,7 @@ func (h *MenuHandler) UpdateSort(c *gin.Context) {
 	}
 
 	if err := h.service.UpdateSort(req.ID, req.Sort); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -202,7 +202,7 @@ func (h *MenuHandler) UpdateHidden(c *gin.Context) {
 	}
 
 	if err := h.service.UpdateHidden(req.ID, req.Hidden); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -219,7 +219,7 @@ func (h *MenuHandler) Detail(c *gin.Context) {
 
 	result, err := h.service.GetByID(id)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 

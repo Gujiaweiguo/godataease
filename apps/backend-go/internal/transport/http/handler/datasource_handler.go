@@ -342,12 +342,20 @@ func (h *DatasourceHandler) UploadFile(c *gin.Context) {
 
 	var datasourceID int64
 	if idStr := c.PostForm("id"); idStr != "" {
-		datasourceID, _ = strconv.ParseInt(idStr, 10, 64)
+		datasourceID, err = strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			response.Error(c, "500000", "Invalid datasource ID")
+			return
+		}
 	}
 
 	var editType int
 	if editTypeStr := c.PostForm("editType"); editTypeStr != "" {
-		editType, _ = strconv.Atoi(editTypeStr)
+		editType, err = strconv.Atoi(editTypeStr)
+		if err != nil {
+			response.Error(c, "500000", "Invalid edit type")
+			return
+		}
 	}
 
 	result, err := h.service.UploadFile(file, header, datasourceID, editType)

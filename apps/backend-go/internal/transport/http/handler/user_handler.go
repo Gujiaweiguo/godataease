@@ -285,7 +285,7 @@ func (h *UserHandler) SwitchLanguage(c *gin.Context) {
 	}
 
 	userID := int64(middleware.GetUserID(c))
-	if userID == 0 {
+	if userID <= 0 {
 		response.Error(c, "500000", "Invalid user ID")
 		return
 	}
