@@ -18,12 +18,10 @@ func registerDatasourceCompatRoutes(
 	datasourceHandler *DatasourceHandler,
 	permMiddleware *middleware.PermissionMiddleware,
 	menuAuthMiddleware *middleware.MenuAuthMiddleware,
-	getCurrentUserID func(*gin.Context) int64,
-	getCurrentUsername func(*gin.Context) string,
 ) {
 	datasourceGroup := r.Group("/datasource")
 	registerDatasourceCompatReadRoutes(datasourceGroup, datasourceHandler, permMiddleware, menuAuthMiddleware)
-	registerDatasourceCompatUserRoutes(datasourceGroup, datasourceHandler, getCurrentUserID, getCurrentUsername)
+	registerDatasourceCompatUserRoutes(datasourceGroup, datasourceHandler)
 	registerDatasourceCompatWriteRoutes(datasourceGroup, datasourceHandler)
 	registerDatasourceCompatFileRoutes(datasourceGroup, datasourceHandler)
 	registerDatasourceCompatDeleteRoutes(datasourceGroup, datasourceHandler)
@@ -53,15 +51,10 @@ func registerDatasourceCompatReadRoutes(r gin.IRouter, datasourceHandler *Dataso
 	r.GET("/getSimpleDs/:id", datasourceHandler.getSimpleDsCompat)
 }
 
-func registerDatasourceCompatUserRoutes(
-	r gin.IRouter,
-	datasourceHandler *DatasourceHandler,
-	getCurrentUserID func(*gin.Context) int64,
-	getCurrentUsername func(*gin.Context) string,
-) {
-	r.GET("/showFinishPage", datasourceHandler.showFinishPageCompat(getCurrentUserID))
-	r.POST("/setShowFinishPage", datasourceHandler.setShowFinishPageCompat(getCurrentUserID))
-	r.POST("/latestUse", datasourceHandler.latestUseCompat(getCurrentUsername))
+func registerDatasourceCompatUserRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler) {
+	r.GET("/showFinishPage", datasourceHandler.ShowFinishPage)
+	r.POST("/setShowFinishPage", datasourceHandler.SetShowFinishPage)
+	r.POST("/latestUse", datasourceHandler.LatestUse)
 }
 
 func registerDatasourceCompatWriteRoutes(r gin.IRouter, datasourceHandler *DatasourceHandler) {
@@ -199,38 +192,6 @@ func (h *DatasourceHandler) getSimpleDsCompat(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"id": strconv.FormatInt(result.ID, 10), "name": result.Name, "type": result.Type})
-}
-
-func (h *DatasourceHandler) showFinishPageCompat(getCurrentUserID func(*gin.Context) int64) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		result, err := h.service.ShowFinishPage(getCurrentUserID(c))
-		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, result)
-	}
-}
-
-func (h *DatasourceHandler) setShowFinishPageCompat(getCurrentUserID func(*gin.Context) int64) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if err := h.service.SetShowFinishPage(getCurrentUserID(c)); err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, nil)
-	}
-}
-
-func (h *DatasourceHandler) latestUseCompat(getCurrentUsername func(*gin.Context) string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		result, err := h.service.LatestTypes(getCurrentUsername(c))
-		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
-			return
-		}
-		response.Success(c, result)
-	}
 }
 
 func (h *DatasourceHandler) saveCompat(c *gin.Context) {

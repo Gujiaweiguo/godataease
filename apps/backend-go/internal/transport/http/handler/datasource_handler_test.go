@@ -42,6 +42,10 @@ type datasourceHandlerTreeNode struct {
 }
 
 func setupDatasourceHandlerTestEnv(t *testing.T) *datasourceHandlerTestEnv {
+	return setupDatasourceHandlerTestEnvWithUser(t, 1001, "datasource-tester")
+}
+
+func setupDatasourceHandlerTestEnvWithUser(t *testing.T, userID int64, username string) *datasourceHandlerTestEnv {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
@@ -64,9 +68,9 @@ func setupDatasourceHandlerTestEnv(t *testing.T) *datasourceHandlerTestEnv {
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(1001))
-		c.Set("userId", int64(1001))
-		c.Set("username", "datasource-tester")
+		c.Set("user_id", userID)
+		c.Set("userId", userID)
+		c.Set("username", username)
 		c.Next()
 	})
 	RegisterDatasourceRoutes(r.Group("/api"), h, nil)
@@ -394,4 +398,48 @@ func TestDatasourceHandler_TableStatus_MapsTaskLogStates(t *testing.T) {
 	require.NotNil(t, warning)
 	assert.Equal(t, datasource.TableStatusWarning, warning.Status)
 	assert.Equal(t, int64(0), warning.LastUpdate)
+}
+
+func TestDatasourceHandler_ShowFinishPage_ReturnsTrueForNewUser(t *testing.T) {
+	env := setupDatasourceHandlerTestEnv(t)
+
+	w := performDatasourceJSONRequest(t, env.r, http.MethodGet, "/api/ds/showFinishPage", nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	resp := decodeDatasourceResp(t, w.Body.Bytes())
+	assert.Equal(t, "000000", resp.Code)
+
+	var show bool
+	require.NoError(t, json.Unmarshal(resp.Data, &show))
+	assert.True(t, show)
+}
+
+func TestDatasourceHandler_ShowFinishPage_ReturnsFalseWhenFinishPageRecordExists(t *testing.T) {
+	env := setupDatasourceHandlerTestEnv(t)
+	require.NoError(t, env.db.Create(&auto.CoreDsFinishPage{ID: 1001}).Error)
+
+	w := performDatasourceJSONRequest(t, env.r, http.MethodGet, "/api/ds/showFinishPage", nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	showBody := decodeDatasourceResp(t, w.Body.Bytes())
+	assert.Equal(t, "000000", showBody.Code)
+
+	var show bool
+	require.NoError(t, json.Unmarshal(showBody.Data, &show))
+	assert.False(t, show)
+}
+
+
+func TestDatasourceHandler_LatestUse_ReturnsEmptyWhenCurrentUsernameHasNoDatasources(t *testing.T) {
+	env := setupDatasourceHandlerTestEnvWithUser(t, 1001, "datasource-without-records")
+
+	w := performDatasourceJSONRequest(t, env.r, http.MethodPost, "/api/ds/latestUse", map[string]any{})
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	resp := decodeDatasourceResp(t, w.Body.Bytes())
+	assert.Equal(t, "000000", resp.Code)
+
+	var types []string
+	require.NoError(t, json.Unmarshal(resp.Data, &types))
+	assert.Empty(t, types)
 }
