@@ -491,6 +491,40 @@ func (h *DatasourceHandler) LatestUse(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *DatasourceHandler) Types(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+	response.Success(c, []map[string]string{
+		{"type": "MySQL", "name": "MySQL"},
+		{"type": "PostgreSQL", "name": "PostgreSQL"},
+		{"type": "SQLServer", "name": "SQL Server"},
+		{"type": "Oracle", "name": "Oracle"},
+		{"type": "Excel", "name": "Excel"},
+	})
+}
+
+func (h *DatasourceHandler) ListSyncRecord(c *gin.Context) {
+	defer recoverDatasourceServicePanic(c)
+	dsID, err := strconv.ParseInt(c.Param("dsId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid datasource ID")
+		return
+	}
+	page, _ := strconv.Atoi(c.Param("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(c.Param("limit"))
+	if limit < 1 {
+		limit = 10
+	}
+	result, err := h.service.ListSyncRecord(dsID, page, limit)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
 	var menuAuthMiddleware *middleware.MenuAuthMiddleware
 	if len(menuAuthMiddlewares) > 0 {
@@ -529,16 +563,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMidd
 		dsGroup.POST("/createFolder", h.CreateFolder)
 		dsGroup.POST("/checkRepeat", h.CheckRepeat)
 		dsGroup.POST("/checkApiDatasource", h.CheckAPIDatasource)
-		dsGroup.GET("/types", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
-			response.Success(c, []map[string]string{
-				{"type": "MySQL", "name": "MySQL"},
-				{"type": "PostgreSQL", "name": "PostgreSQL"},
-				{"type": "SQLServer", "name": "SQL Server"},
-				{"type": "Oracle", "name": "Oracle"},
-				{"type": "Excel", "name": "Excel"},
-			})
-		})
+		dsGroup.GET("/types", h.Types)
 		dsGroup.GET("/showFinishPage", h.ShowFinishPage)
 		dsGroup.POST("/showFinishPage", h.SetShowFinishPage)
 		dsGroup.POST("/latestUse", h.LatestUse)
@@ -550,28 +575,7 @@ func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMidd
 		dsGroup.POST("/syncApiTable", h.SyncApiTable)
 		dsGroup.POST("/syncApiDs", h.SyncApiDs)
 		dsGroup.POST("/loadRemoteFile", h.LoadRemoteFile)
-		dsGroup.POST("/syncRecord/:dsId/:page/:limit", func(c *gin.Context) {
-			defer recoverDatasourceServicePanic(c)
-			dsID, err := strconv.ParseInt(c.Param("dsId"), 10, 64)
-			if err != nil {
-				response.Error(c, "500000", "Invalid datasource ID")
-				return
-			}
-			page, _ := strconv.Atoi(c.Param("page"))
-			if page < 1 {
-				page = 1
-			}
-			limit, _ := strconv.Atoi(c.Param("limit"))
-			if limit < 1 {
-				limit = 10
-			}
-			result, err := h.service.ListSyncRecord(dsID, page, limit)
-			if err != nil {
-				response.Error(c, "500000", "Failed: "+err.Error())
-				return
-			}
-			response.Success(c, result)
-		})
+		dsGroup.POST("/syncRecord/:dsId/:page/:limit", h.ListSyncRecord)
 		dsGroup.POST("/uploadFile", h.UploadFile)
 	}
 }
