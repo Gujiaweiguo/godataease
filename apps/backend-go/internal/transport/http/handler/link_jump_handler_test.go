@@ -446,14 +446,9 @@ func TestLinkJumpHandler_QueryTargetVisualizationJumpInfo(t *testing.T) {
 		TargetViewID:  linkJumpTargetViewID,
 		ResourceTable: "visualization",
 	}
-	mappedRepo := repository.NewLinkJumpRepository(env.db.MapColumns(map[string]string{"sourceInfo": "source_info", "targetInfo": "target_info"}))
-	mappedSvc := service.NewLinkJumpService(mappedRepo)
-	mappedHandler := NewLinkJumpHandler(mappedSvc)
-	r := gin.New()
-	RegisterLinkJumpRoutes(r.Group("/api"), mappedHandler)
 
 	path := fmt.Sprintf("/api/linkJump/queryTargetVisualizationJumpInfo?dvId=%d&targetDvId=%d&target_dv_id=%d&sourceDvId=%d&source_dv_id=%d&sourceViewId=%d&source_view_id=%d", linkJumpTargetDvID, linkJumpTargetDvID, linkJumpTargetDvID, linkJumpSourceDvID, linkJumpSourceDvID, linkJumpSourceViewID, linkJumpSourceViewID)
-	w := performLinkJumpJSONRequest(t, r, http.MethodPost, path, body)
+	w := performLinkJumpJSONRequest(t, env.r, http.MethodPost, path, body)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	resp := decodeLinkJumpResp(t, w.Body.Bytes())

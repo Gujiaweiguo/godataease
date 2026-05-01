@@ -78,8 +78,8 @@ type LinkJumpWithDvIDRow struct {
 
 // TargetJumpInfoRow represents a sourceInfo→targetInfo mapping.
 type TargetJumpInfoRow struct {
-	SourceInfo string `json:"sourceInfo"`
-	TargetInfo string `json:"targetInfo"`
+	SourceInfo string `gorm:"column:sourceInfo" json:"sourceInfo"`
+	TargetInfo string `gorm:"column:targetInfo" json:"targetInfo"`
 }
 
 // OutParamsJumpRow represents an outer params target for jump.
