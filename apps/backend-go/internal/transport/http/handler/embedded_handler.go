@@ -44,7 +44,7 @@ func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
 
 	result, err := h.service.QueryGrid(keyword, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *EmbeddedHandler) Create(c *gin.Context) {
 	updateBy := h.getUpdateBy(c)
 	id, err := h.service.Create(&req, updateBy)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -77,7 +77,7 @@ func (h *EmbeddedHandler) Edit(c *gin.Context) {
 
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.Edit(&req, updateBy); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -93,7 +93,7 @@ func (h *EmbeddedHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.service.Delete(id); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *EmbeddedHandler) BatchDelete(c *gin.Context) {
 	}
 
 	if err := h.service.BatchDelete(req.Ids); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -131,7 +131,7 @@ func (h *EmbeddedHandler) Reset(c *gin.Context) {
 
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.ResetSecret(&req, updateBy); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -141,7 +141,7 @@ func (h *EmbeddedHandler) Reset(c *gin.Context) {
 func (h *EmbeddedHandler) DomainList(c *gin.Context) {
 	domains, err := h.service.GetDomainList()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 
@@ -157,7 +157,7 @@ func (h *EmbeddedHandler) InitIframe(c *gin.Context) {
 
 	domains, err := h.service.InitIframe(req.Token, req.Origin)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 

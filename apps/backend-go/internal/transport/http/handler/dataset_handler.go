@@ -596,8 +596,11 @@ func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
 	}
 	if h.service != nil {
 		err = h.service.DeleteField(id)
-	} else {
+	} else if h.chartService != nil {
 		err = h.chartService.DeleteField(id)
+	} else {
+		response.Error(c, "500000", "service unavailable")
+		return
 	}
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -616,8 +619,11 @@ func (h *DatasetHandler) DeleteDatasetFieldByChart(c *gin.Context) {
 	}
 	if h.service != nil {
 		err = h.service.DeleteFieldByChart(id)
-	} else {
+	} else if h.chartService != nil {
 		err = h.chartService.DeleteFieldByChart(id)
+	} else {
+		response.Error(c, "500000", "service unavailable")
+		return
 	}
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())

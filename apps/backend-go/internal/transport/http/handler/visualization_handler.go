@@ -550,7 +550,7 @@ func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
 	}
 	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(dvID)})
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 	if result != nil && result.PID != nil && *result.PID == -1 {
@@ -568,7 +568,7 @@ func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
 	}
 	result, err := h.service.ViewDetailList(dvID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -582,7 +582,7 @@ func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
 	}
 	result, err := h.service.AppCanvasNameCheck(&req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -600,7 +600,7 @@ func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
 	}
 	result, err := h.service.Export2AppCheck(&req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -647,7 +647,7 @@ func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 	ipAddress := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
 	if err := h.service.RecordExportLog(&req, userID, username, &ipAddress, &userAgent, logType); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)

@@ -75,10 +75,8 @@ func (h *StoreHandler) Execute(c *gin.Context) {
 func (h *StoreHandler) Favorited(c *gin.Context) {
 	defer recoverServicePanic(c)
 	idStr := c.Param("id")
-	var id int64
-	if _, err := strconv.ParseInt(idStr, 10, 64); err == nil {
-		id, _ = strconv.ParseInt(idStr, 10, 64)
-	}
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	_ = err
 	if id <= 0 {
 		response.Error(c, "500000", "Invalid id")
 		return
