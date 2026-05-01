@@ -258,7 +258,7 @@ func TestTemplateHandler_Get_InvalidID(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	resp := decodeTemplateResp(t, w.Body.Bytes())
-	assert.Equal(t, "500000", resp.Code)
+	assert.Equal(t, "10001", resp.Code)
 	assert.Equal(t, "Invalid template ID", resp.Msg)
 }
 

@@ -25,7 +25,7 @@ func TestShareHandler_EditRoutesRejectInvalidRequest(t *testing.T) {
 		assert.Equal(t, 200, w.Code)
 		var resp map[string]interface{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, "500000", resp["code"])
+		assert.Equal(t, "10001", resp["code"])
 	})
 
 	t.Run("edit_exp_invalid_payload", func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestShareHandler_EditRoutesRejectInvalidRequest(t *testing.T) {
 		assert.Equal(t, 200, w.Code)
 		var resp map[string]interface{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, "500000", resp["code"])
+		assert.Equal(t, "10001", resp["code"])
 	})
 
 	t.Run("edit_pwd_invalid_payload", func(t *testing.T) {
@@ -49,6 +49,6 @@ func TestShareHandler_EditRoutesRejectInvalidRequest(t *testing.T) {
 		assert.Equal(t, 200, w.Code)
 		var resp map[string]interface{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, "500000", resp["code"])
+		assert.Equal(t, "10001", resp["code"])
 	})
 }
