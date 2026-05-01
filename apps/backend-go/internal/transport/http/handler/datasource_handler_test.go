@@ -429,7 +429,6 @@ func TestDatasourceHandler_ShowFinishPage_ReturnsFalseWhenFinishPageRecordExists
 	assert.False(t, show)
 }
 
-
 func TestDatasourceHandler_LatestUse_ReturnsEmptyWhenCurrentUsernameHasNoDatasources(t *testing.T) {
 	env := setupDatasourceHandlerTestEnvWithUser(t, 1001, "datasource-without-records")
 
