@@ -148,6 +148,14 @@ func (r *LoginFailureRepository) CountSinceTime(username string, since time.Time
 	return count, err
 }
 
+func (r *LoginFailureRepository) ListSinceTime(since time.Time) ([]*audit.LoginFailure, error) {
+	var failures []*audit.LoginFailure
+	err := r.db.Where("create_time >= ?", since).
+		Order("create_time DESC").
+		Find(&failures).Error
+	return failures, err
+}
+
 type AuditLogDetailRepository struct {
 	db *gorm.DB
 }

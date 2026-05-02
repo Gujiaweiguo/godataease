@@ -15,7 +15,7 @@ import (
 
 func TestAuditHandler_DownloadExportFile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewAuditHandler(nil)
+	h := NewAuditHandler(nil, nil)
 	r := gin.New()
 	RegisterAuditRoutes(r.Group(""), h)
 

@@ -17,7 +17,9 @@ import (
 )
 
 type AuditHandler struct {
-	auditService *service.AuditService
+	auditService       *service.AuditService
+	systemParamService *service.SystemParamService
+	auditAlertService  *service.AuditAlertService
 }
 
 const auditMenuPath = "/system/audit"
@@ -26,10 +28,75 @@ const auditExportRateLimitWindow = time.Minute
 
 const auditExportRateLimitRequests = 10
 
-func NewAuditHandler(auditService *service.AuditService) *AuditHandler {
+func NewAuditHandler(auditService *service.AuditService, systemParamService *service.SystemParamService) *AuditHandler {
 	return &AuditHandler{
-		auditService: auditService,
+		auditService:       auditService,
+		systemParamService: systemParamService,
+		auditAlertService:  service.NewAuditAlertService(systemParamService, auditService),
 	}
+}
+
+func (h *AuditHandler) GetAuditAlertSettings(c *gin.Context) {
+	defer recoverServicePanic(c)
+	settings, err := h.systemParamService.QueryAuditAlertSettings()
+	if err != nil {
+		response.InternalError(c, "Failed to get audit alert settings")
+		return
+	}
+
+	response.Success(c, settings)
+}
+
+func (h *AuditHandler) SaveAuditAlertSettings(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req audit.AuditAlertSettings
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.systemParamService.SaveAuditAlertSettings(&req); err != nil {
+		response.InternalError(c, "Failed to save audit alert settings")
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *AuditHandler) CleanupNow(c *gin.Context) {
+	defer recoverServicePanic(c)
+	settings, err := h.systemParamService.QueryAuditAlertSettings()
+	if err != nil {
+		response.InternalError(c, "Failed to get audit alert settings")
+		return
+	}
+
+	affected, err := h.auditService.DeleteAuditLogsBeforeDate(settings.RetentionDays)
+	if err != nil {
+		response.InternalError(c, "Failed to cleanup audit logs")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"deleted":       affected,
+		"retentionDays": settings.RetentionDays,
+	})
+}
+
+func (h *AuditHandler) TestNotification(c *gin.Context) {
+	defer recoverServicePanic(c)
+	event := service.AlertEvent{
+		Type:       service.AlertTypeBatchOperation,
+		Username:   "system",
+		Details:    "测试审计告警通知",
+		DetectedAt: time.Now(),
+	}
+	if err := h.auditAlertService.Notify(event); err != nil {
+		response.InternalError(c, "Failed to send test notification")
+		return
+	}
+
+	response.Success(c, event)
 }
 
 func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
@@ -303,6 +370,10 @@ func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler, menuAuthMiddleware
 	{
 		auditGroup.POST("/log", h.CreateAuditLog)
 		auditGroup.GET("/list", h.QueryAuditLogs)
+		auditGroup.GET("/settings", h.GetAuditAlertSettings)
+		auditGroup.PUT("/settings", h.SaveAuditAlertSettings)
+		auditGroup.POST("/cleanup", h.CleanupNow)
+		auditGroup.POST("/test-notification", h.TestNotification)
 		auditGroup.GET("/:id", h.GetAuditLogByID)
 		auditGroup.GET("/user/:userId", h.GetAuditLogsByUserID)
 		exportGroup.POST("/export", h.ExportAuditLogs)

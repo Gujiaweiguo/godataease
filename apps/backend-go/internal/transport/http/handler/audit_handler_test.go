@@ -69,7 +69,7 @@ func newAuditHandlerForTest(t *testing.T) *AuditHandler {
 		repository.NewLoginFailureRepository(db),
 		repository.NewAuditLogDetailRepository(db),
 	)
-	return NewAuditHandler(auditSvc)
+	return NewAuditHandler(auditSvc, nil)
 }
 
 func TestAuditHandler_CreateAuditLog_Success(t *testing.T) {

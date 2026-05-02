@@ -158,7 +158,6 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	loginFailureRepo := repository.NewLoginFailureRepository(db)
 	auditLogDetailRepo := repository.NewAuditLogDetailRepository(db)
 	auditService := service.NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
-	auditHandler := handler.NewAuditHandler(auditService)
 
 	middleware.SetAuditService(auditService)
 
@@ -297,6 +296,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	systemParamRepo := repository.NewSystemParamRepository(db)
 	systemVariableRepo := repository.NewSystemVariableRepository(db)
 	systemParamService := service.NewSystemParamService(systemParamRepo, auditService)
+	auditHandler := handler.NewAuditHandler(auditService, systemParamService)
 	systemVariableService := service.NewSystemVariableService(systemVariableRepo)
 	systemParamHandler := handler.NewSystemParamHandler(systemParamService)
 	systemVariableHandler := handler.NewSystemVariableHandler(systemVariableService)
