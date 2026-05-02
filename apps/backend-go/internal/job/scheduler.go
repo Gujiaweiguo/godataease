@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
@@ -36,18 +35,19 @@ func (s *Scheduler) AddJob(spec string, job cron.Job) error {
 }
 
 func (s *Scheduler) AddDistributedFunc(name, spec string, cmd func()) error {
-	wrappedCmd := func() {
-		if s.redis != nil {
-			lockKey := s.prefix + name + ":lock"
-			acquired, err := s.redis.SetNX(context.Background(), lockKey, "1", 30*time.Second).Result()
-			if err != nil || !acquired {
-				return
-			}
-			defer s.redis.Del(context.Background(), lockKey)
-		}
-		cmd()
-	}
-	return s.AddFunc(spec, wrappedCmd)
+	return s.AddDefinition(Definition{
+		Metadata: Metadata{
+			Key:         name,
+			Spec:        spec,
+			Description: name,
+			Enabled:     true,
+			Distributed: true,
+		},
+		Run: func(context.Context) error {
+			cmd()
+			return nil
+		},
+	}, nil)
 }
 
 func (s *Scheduler) Start() {
