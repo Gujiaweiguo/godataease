@@ -103,6 +103,10 @@ func NewLinkJumpService(repo *repository.LinkJumpRepository) *LinkJumpService {
 	return &LinkJumpService{repo: repo}
 }
 
+func hasQuotedComponentID(componentData string, viewID int64) bool {
+	return strings.Contains(componentData, fmt.Sprintf(`"%d"`, viewID))
+}
+
 func isSnapshotTable(resourceTable string) bool {
 	return resourceTable == "snapshot"
 }
@@ -336,7 +340,7 @@ func (s *LinkJumpService) ViewTableDetailList(dvID int64) (*VisualizationCompone
 	var viewOrder []int64
 
 	for _, row := range detailRows {
-		if !strings.Contains(componentData, fmt.Sprintf("%d", row.ID)) {
+		if !hasQuotedComponentID(componentData, row.ID) {
 			continue
 		}
 
