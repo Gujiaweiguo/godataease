@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -10,6 +11,7 @@ import (
 var (
 	globalLogger *zap.Logger
 	sugar        *zap.SugaredLogger
+	mu           sync.Mutex
 )
 
 type Config struct {
@@ -51,29 +53,52 @@ func Init(cfg *Config) error {
 	return nil
 }
 
-func L() *zap.Logger {
+func ensureInit() {
+	mu.Lock()
+	defer mu.Unlock()
 	if globalLogger == nil {
 		if err := Init(nil); err != nil {
 			globalLogger = zap.NewNop()
 			sugar = globalLogger.Sugar()
 		}
 	}
-	return globalLogger
+	if sugar == nil {
+		sugar = globalLogger.Sugar()
+	}
+}
+
+func L() *zap.Logger {
+	mu.Lock()
+	l := globalLogger
+	mu.Unlock()
+	if l == nil {
+		ensureInit()
+		mu.Lock()
+		l = globalLogger
+		mu.Unlock()
+	}
+	return l
 }
 
 func S() *zap.SugaredLogger {
-	if sugar == nil {
-		if err := Init(nil); err != nil {
-			globalLogger = zap.NewNop()
-			sugar = globalLogger.Sugar()
-		}
+	mu.Lock()
+	s := sugar
+	mu.Unlock()
+	if s == nil {
+		ensureInit()
+		mu.Lock()
+		s = sugar
+		mu.Unlock()
 	}
-	return sugar
+	return s
 }
 
 func Sync() error {
-	if globalLogger != nil {
-		return globalLogger.Sync()
+	mu.Lock()
+	l := globalLogger
+	mu.Unlock()
+	if l != nil {
+		return l.Sync()
 	}
 	return nil
 }
