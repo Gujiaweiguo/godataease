@@ -236,7 +236,7 @@ func linkJumpSeedBaseData(t *testing.T, db *gorm.DB) {
 	linkJumpMustExec(t, db, `INSERT INTO core_dataset_table_field (id, dataset_group_id, origin_name, name, de_type, type) VALUES (?, ?, ?, ?, ?, ?)`, linkJumpOuterFieldID, linkJumpTargetTableID, "area", "Area", 0, "STRING")
 
 	linkJumpMustExec(t, db, `INSERT INTO data_visualization_info (id, type, component_data) VALUES (?, ?, ?)`, linkJumpSourceDvID, "dashboard", "[]")
-	linkJumpMustExec(t, db, `INSERT INTO data_visualization_info (id, type, component_data) VALUES (?, ?, ?)`, linkJumpTargetDvID, "dashboard", "[2002]")
+	linkJumpMustExec(t, db, `INSERT INTO data_visualization_info (id, type, component_data) VALUES (?, ?, ?)`, linkJumpTargetDvID, "dashboard", `[{"id":"2002","component":"UserView"}]`)
 
 	linkJumpSeedSnapshotJump(t, db, "seed-jump", 1)
 	linkJumpSeedRuntimeJump(t, db, "seed-jump", 1)
@@ -471,7 +471,7 @@ func TestLinkJumpHandler_ViewTableDetailList(t *testing.T) {
 
 	var data map[string]any
 	require.NoError(t, json.Unmarshal(resp.Data, &data))
-	assert.Equal(t, fmt.Sprintf("[%d]", linkJumpTargetViewID), data["componentData"])
+	assert.Equal(t, fmt.Sprintf(`[{"id":"%d","component":"UserView"}]`, linkJumpTargetViewID), data["componentData"])
 
 	componentView, ok := data["componentView"].([]any)
 	require.True(t, ok)

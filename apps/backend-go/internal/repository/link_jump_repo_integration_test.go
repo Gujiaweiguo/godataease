@@ -191,6 +191,57 @@ func TestLinkJumpRepository_GetViewTableDetails(t *testing.T) {
 	assert.Equal(t, fieldName, rows[0].FieldName)
 	assert.Equal(t, fieldType, rows[0].FieldType)
 	assert.Equal(t, "2", rows[0].DeType)
+
+	t.Run("quoted locate does not match substring IDs", func(t *testing.T) {
+		const (
+			substringDvID       = int64(53101)
+			exactViewID         = int64(53012)
+			substringOnlyViewID = int64(3012)
+			substringDatasetID  = int64(53104)
+			substringFieldID    = int64(53105)
+		)
+
+		substringComponentData := `[{"id":"53012","component":"UserView"}]`
+		substringOriginName := "city_id"
+		substringFieldName := "City ID"
+		substringFieldType := "int"
+		substringDeType := 2
+
+		require.NoError(t, testDB.Create(&visualization.DataVisualizationInfo{
+			ID:            substringDvID,
+			Name:          "substring dashboard",
+			Type:          &dvType,
+			ComponentData: &substringComponentData,
+		}).Error)
+		require.NoError(t, testDB.Create(&dataset.CoreDatasetTableField{
+			ID:             substringFieldID,
+			DatasetGroupID: substringDatasetID,
+			OriginName:     &substringOriginName,
+			Name:           &substringFieldName,
+			Type:           &substringFieldType,
+			DeType:         &substringDeType,
+		}).Error)
+		require.NoError(t, testDB.Create(&chart.CoreChartView{
+			ID:      exactViewID,
+			Title:   strPtrLinkJump("Exact View"),
+			SceneID: int64PtrLinkJump(substringDvID),
+			TableID: int64PtrLinkJump(substringDatasetID),
+			Type:    &viewType,
+		}).Error)
+		require.NoError(t, testDB.Create(&chart.CoreChartView{
+			ID:      substringOnlyViewID,
+			Title:   strPtrLinkJump("Substring View"),
+			SceneID: int64PtrLinkJump(substringDvID),
+			TableID: int64PtrLinkJump(substringDatasetID),
+			Type:    &viewType,
+		}).Error)
+
+		rows, err := repo.GetViewTableDetails(substringDvID)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, exactViewID, rows[0].ID)
+		assert.NotEqual(t, substringOnlyViewID, rows[0].ID)
+	})
 }
 
 func int64PtrLinkJump(v int64) *int64 { return &v }

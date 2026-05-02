@@ -302,7 +302,7 @@ func (r *LinkJumpRepository) GetViewTableDetails(dvID int64) ([]ViewTableDetailR
 		  AND core_chart_view.type != 'VQuery'
 		  AND core_chart_view.table_id IS NOT NULL
 		  AND dvi.id = ?
-		  AND LOCATE(core_chart_view.id, dvi.component_data)`, dvID, dvID).Scan(&rows).Error
+		  AND LOCATE(CONCAT('"', core_chart_view.id, '"'), dvi.component_data)`, dvID, dvID).Scan(&rows).Error
 	return rows, err
 }
 
