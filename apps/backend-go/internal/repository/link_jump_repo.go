@@ -284,7 +284,7 @@ func (r *LinkJumpRepository) GetTargetVisualizationJumpInfo(sourceDvID, sourceVi
 // GetViewTableDetails returns chart views with their field details for a dashboard.
 func (r *LinkJumpRepository) GetViewTableDetails(dvID int64) ([]ViewTableDetailRow, error) {
 	var rows []ViewTableDetailRow
-		err := r.db.Raw(`
+	err := r.db.Raw(`
 		SELECT
 			core_chart_view.id,
 			core_chart_view.title,

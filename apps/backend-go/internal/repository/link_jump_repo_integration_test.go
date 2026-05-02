@@ -194,11 +194,11 @@ func TestLinkJumpRepository_GetViewTableDetails(t *testing.T) {
 
 	t.Run("quoted locate does not match substring IDs", func(t *testing.T) {
 		const (
-			substringDvID        = int64(53101)
-			exactViewID          = int64(53012)
-			substringOnlyViewID  = int64(3012)
-			substringDatasetID   = int64(53104)
-			substringFieldID     = int64(53105)
+			substringDvID       = int64(53101)
+			exactViewID         = int64(53012)
+			substringOnlyViewID = int64(3012)
+			substringDatasetID  = int64(53104)
+			substringFieldID    = int64(53105)
 		)
 
 		substringComponentData := `[{"id":"53012","component":"UserView"}]`
