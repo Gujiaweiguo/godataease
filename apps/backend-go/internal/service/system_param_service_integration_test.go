@@ -92,3 +92,26 @@ func TestSystemParamService_SaveBasic_WithAuditService(t *testing.T) {
 	testDB.Model(&audit.AuditLog{}).Where("action_name = ?", "保存基础设置").Count(&count)
 	assert.GreaterOrEqual(t, count, int64(1))
 }
+
+func TestSystemParamService_SaveAuditAlertSettings_WithAuditService(t *testing.T) {
+	cleanupTables(&audit.AuditLog{})
+
+	repo := repository.NewSystemParamRepository(testDB)
+	auditSvc := NewAuditService(
+		repository.NewAuditLogRepository(testDB),
+		repository.NewLoginFailureRepository(testDB),
+		repository.NewAuditLogDetailRepository(testDB),
+	)
+	svc := NewSystemParamService(repo, auditSvc)
+
+	settings := audit.DefaultAuditAlertSettings()
+	settings.EnableEmailNotification = true
+	settings.NotificationEmail = "audit@example.com"
+
+	err := svc.SaveAuditAlertSettings(settings)
+	require.NoError(t, err)
+
+	var count int64
+	testDB.Model(&audit.AuditLog{}).Where("action_name = ?", "保存审计告警设置").Count(&count)
+	assert.GreaterOrEqual(t, count, int64(1))
+}

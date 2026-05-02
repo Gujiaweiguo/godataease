@@ -17,6 +17,7 @@ type MockSystemParamRepository struct {
 	onlineMap             *system.OnlineMapEditor
 	onlineMapByType       *system.OnlineMapEditor
 	sqlBotConfig          *system.SQLBotConfig
+	settingsByKey         map[string]string
 	shareBase             *system.ShareBase
 	requestTimeOut        int
 	defaultSettings       map[string]interface{}
@@ -26,9 +27,11 @@ type MockSystemParamRepository struct {
 	saveBasicErr          error
 	saveOnlineMapErr      error
 	saveSQLBotErr         error
+	saveSettingByKeyErr   error
 	getOnlineMapErr       error
 	getOnlineMapByTypeErr error
 	getSQLBotErr          error
+	getSettingByKeyErr    error
 	getShareBaseErr       error
 	getRequestTimeOutErr  error
 	getDefaultSettingsErr error
@@ -43,6 +46,7 @@ func NewMockSystemParamRepository() *MockSystemParamRepository {
 		basicSettings: []system.SettingItem{
 			{Pkey: "test.key", Pval: "test.value", Type: "basic", Sort: 1},
 		},
+		settingsByKey:   map[string]string{},
 		shareBase:       &system.ShareBase{Disable: false, PERequire: true},
 		requestTimeOut:  30,
 		defaultSettings: map[string]interface{}{"key": "value"},
@@ -108,6 +112,21 @@ func (m *MockSystemParamRepository) SaveSQLBotConfig(cfg *system.SQLBotConfig) e
 		return m.saveSQLBotErr
 	}
 	m.sqlBotConfig = cfg
+	return nil
+}
+
+func (m *MockSystemParamRepository) GetSettingValueByKey(key string) (string, error) {
+	if m.getSettingByKeyErr != nil {
+		return "", m.getSettingByKeyErr
+	}
+	return m.settingsByKey[key], nil
+}
+
+func (m *MockSystemParamRepository) SaveSettingValueByKey(key, value string) error {
+	if m.saveSettingByKeyErr != nil {
+		return m.saveSettingByKeyErr
+	}
+	m.settingsByKey[key] = value
 	return nil
 }
 
@@ -218,6 +237,60 @@ func TestSystemParam_SaveSQLBot_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveSQLBot failed: %v", err)
 	}
+}
+
+func TestSystemParam_QueryAuditAlertSettings_DefaultWhenMissing(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	settings, err := svc.QueryAuditAlertSettings()
+	require.NoError(t, err)
+	assert.Equal(t, audit.DefaultAuditAlertSettings(), settings)
+}
+
+func TestSystemParam_QueryAuditAlertSettings_Success(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	stored := audit.DefaultAuditAlertSettings()
+	stored.EnableEmailNotification = true
+	stored.NotificationEmail = "audit@example.com"
+	data, err := stored.ToJSON()
+	require.NoError(t, err)
+	mockRepo.settingsByKey[auditAlertSettingsKey] = string(data)
+
+	svc := NewSystemParamService(mockRepo, nil)
+	settings, err := svc.QueryAuditAlertSettings()
+	require.NoError(t, err)
+	assert.Equal(t, stored, settings)
+}
+
+func TestSystemParam_SaveAuditAlertSettings_Success(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	settings := audit.DefaultAuditAlertSettings()
+	settings.EnableEmailNotification = true
+	settings.NotificationEmail = "audit@example.com"
+
+	err := svc.SaveAuditAlertSettings(settings)
+	require.NoError(t, err)
+
+	stored := mockRepo.settingsByKey[auditAlertSettingsKey]
+	require.NotEmpty(t, stored)
+	decoded, err := audit.AuditAlertSettingsFromJSON([]byte(stored))
+	require.NoError(t, err)
+	assert.Equal(t, settings, decoded)
+}
+
+func TestSystemParam_SaveAuditAlertSettings_ValidateFirst(t *testing.T) {
+	mockRepo := NewMockSystemParamRepository()
+	svc := NewSystemParamService(mockRepo, nil)
+
+	settings := audit.DefaultAuditAlertSettings()
+	settings.RetentionDays = 1
+
+	err := svc.SaveAuditAlertSettings(settings)
+	assert.Error(t, err)
+	assert.Empty(t, mockRepo.settingsByKey[auditAlertSettingsKey])
 }
 
 func TestSystemParam_RepoNotReady(t *testing.T) {

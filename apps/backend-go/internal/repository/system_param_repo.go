@@ -263,6 +263,20 @@ func (r *SystemParamRepository) GetI18nOptions() (map[string]string, error) {
 	return map[string]string{}, nil
 }
 
+func (r *SystemParamRepository) GetSettingValueByKey(key string) (string, error) {
+	return r.singleVal(strings.TrimSpace(key))
+}
+
+func (r *SystemParamRepository) SaveSettingValueByKey(key, value string) error {
+	pkey := strings.TrimSpace(key)
+	if pkey == "" {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return upsertByPkey(tx, pkey, value, "text", 0)
+	})
+}
+
 func (r *SystemParamRepository) singleVal(key string) (string, error) {
 	var row coreSysSetting
 	err := r.db.Where("pkey = ?", key).Take(&row).Error
