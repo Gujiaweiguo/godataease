@@ -13,6 +13,7 @@ type Config struct {
 	Server      ServerConfig      `mapstructure:"server"`
 	Database    DatabaseConfig    `mapstructure:"database"`
 	Redis       RedisConfig       `mapstructure:"redis"`
+	Scheduler   SchedulerConfig   `mapstructure:"scheduler"`
 	JWT         JWTConfig         `mapstructure:"jwt"`
 	Log         LogConfig         `mapstructure:"log"`
 	Telemetry   TelemetryConfig   `mapstructure:"telemetry"`
@@ -41,6 +42,10 @@ type RedisConfig struct {
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
 	PoolSize int    `mapstructure:"pool_size"`
+}
+
+type SchedulerConfig struct {
+	SampleJobEnabled bool `mapstructure:"sample_job_enabled"`
 }
 
 type JWTConfig struct {
@@ -124,6 +129,7 @@ func bindEnvKeys() error {
 		"redis.password":                    "REDIS_PASSWORD",
 		"redis.db":                          "REDIS_DB",
 		"redis.pool_size":                   "REDIS_POOL_SIZE",
+		"scheduler.sample_job_enabled":      "SCHEDULER_SAMPLE_JOB_ENABLED",
 		"jwt.secret":                        "JWT_SECRET",
 		"jwt.expire":                        "JWT_EXPIRE",
 		"log.level":                         "LOG_LEVEL",

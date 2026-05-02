@@ -18,6 +18,9 @@ redis:
   db: 0
   pool_size: 100
 
+scheduler:
+  sample_job_enabled: false
+
 jwt:
   secret: ${JWT_SECRET:-change-me-in-production}
   expire: 86400
