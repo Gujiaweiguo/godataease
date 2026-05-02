@@ -215,10 +215,10 @@ func (r *OuterParamsRepository) GetDatasetGroupsWithFields(visualizationID strin
 			SELECT DISTINCT ccv.id AS chart_id, ccv.title AS chart_name, ccv.type AS chart_type, ccv.table_id
 			FROM snapshot_core_chart_view ccv
 			INNER JOIN snapshot_data_visualization_info dvi ON ccv.scene_id = dvi.id
-			WHERE ccv.type != 'VQuery' AND dvi.id = ? AND LOCATE(ccv.id, dvi.component_data)
+			WHERE ccv.type != 'VQuery' AND dvi.id = ? AND LOCATE(CONCAT('"', ccv.id, '"'), dvi.component_data)
 		) ccv2 ON ccv2.table_id = cdg.id
 		WHERE ccv.scene_id = ? AND dvi.id = ?
-		  AND LOCATE(ccv.id, dvi.component_data)
+		  AND LOCATE(CONCAT('"', ccv.id, '"'), dvi.component_data)
 		ORDER BY cdtf.de_type, cdtf.origin_name`
 
 	var rows []DatasetGroupRow
