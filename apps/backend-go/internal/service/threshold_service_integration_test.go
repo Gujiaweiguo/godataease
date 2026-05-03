@@ -170,6 +170,80 @@ func TestThresholdServiceIntegration_InstancePager(t *testing.T) {
 	assert.Equal(t, "send failed", rows[0].Msg)
 }
 
+func TestThresholdServiceIntegration_Edit(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	created, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-edit-before", 4701, 5701), 1, "edit-user", 1)
+	require.NoError(t, err)
+
+	editReq := thresholdIntegrationRequest("threshold-edit-after", 4701, 5701)
+	editReq.ID = created.ID
+	editReq.ThresholdRules = `{"logic":"or","items":[]}`
+	edited, err := svc.Edit(context.Background(), editReq)
+	require.NoError(t, err)
+	assert.Equal(t, "threshold-edit-after", edited.Name)
+	assert.Equal(t, `{"logic":"or","items":[]}`, edited.ThresholdRules)
+}
+
+func TestThresholdServiceIntegration_Delete(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	first, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-del-a", 4801, 5801), 1, "del-user", 1)
+	require.NoError(t, err)
+	second, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-del-b", 4802, 5802), 1, "del-user", 1)
+	require.NoError(t, err)
+
+	err = svc.Delete(context.Background(), []int64{first.ID, second.ID}, "core")
+	require.NoError(t, err)
+
+	exists, err := svc.AnyThreshold(context.Background(), first.ChartID, "core")
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestThresholdServiceIntegration_AnyThreshold(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	_, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-exists", 4901, 5901), 1, "exists-user", 1)
+	require.NoError(t, err)
+
+	exists, err := svc.AnyThreshold(context.Background(), 4901, "core")
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	exists, err = svc.AnyThreshold(context.Background(), 9999, "core")
+	require.NoError(t, err)
+	assert.False(t, exists)
+
+	exists, err = svc.AnyThreshold(context.Background(), 4901, "snapshot")
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestThresholdServiceIntegration_Preview_Stub(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	svc := NewThresholdService(nil)
+	_, err := svc.Preview(context.Background(), &thresholddomain.PreviewRequest{ChartID: 1, ThresholdRules: "{}", MsgContent: "test"})
+	assert.Error(t, err)
+}
+
 func thresholdIntegrationRequest(name string, chartID, resourceID int64) *thresholddomain.CreateRequest {
 	req := sampleThresholdRequest()
 	req.Name = name
