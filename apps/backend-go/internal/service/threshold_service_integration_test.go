@@ -251,26 +251,123 @@ func TestThresholdServiceIntegration_EvaluatorCoverage(t *testing.T) {
 		300: {ID: 300, Name: "Date", DataeaseName: "C_300", DeType: deTypeTime},
 	}
 
-	andTree := &thresholddomain.FilterTreeObj{Logic: "and", Items: []thresholddomain.FilterTreeItem{
-		{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "100"},
-		{Type: "item", FieldID: json.Number("200"), FilterType: "logic", Term: "not_empty", Value: ""},
-	}}
-	filtered := FilterRows(rows, andTree, fieldMap)
-	assert.Len(t, filtered, 2)
+	t.Run("FilterRows_AND", func(t *testing.T) {
+		tree := &thresholddomain.FilterTreeObj{Logic: "and", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "100"},
+			{Type: "item", FieldID: json.Number("200"), FilterType: "logic", Term: "not_empty", Value: ""},
+		}}
+		filtered := FilterRows(rows, tree, fieldMap)
+		assert.Len(t, filtered, 2)
+	})
 
-	text := ConvertRulesToText(andTree, fieldMap)
-	assert.Contains(t, text, "Value")
-	assert.Contains(t, text, "gt")
+	t.Run("FilterRows_OR", func(t *testing.T) {
+		tree := &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "eq", Value: "50"},
+			{Type: "item", FieldID: json.Number("200"), FilterType: "logic", Term: "eq", Value: "gamma"},
+		}}
+		filtered := FilterRows(rows, tree, fieldMap)
+		assert.Len(t, filtered, 2)
+	})
 
-	html := GeneratePreviewHTML("[检测时间] [触发告警]", andTree, rows, fieldMap, true, 2)
-	assert.NotEmpty(t, html)
-	assert.Contains(t, html, "Value")
+	t.Run("StringOperators", func(t *testing.T) {
+		field := fieldMap[200]
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "eq", Value: "alpha"}, field))
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "not_eq", Value: "beta"}, field))
+		assert.True(t, rowMatch(rows[1], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "in", Value: "alpha,beta"}, field))
+		assert.True(t, rowMatch(rows[2], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "not_in", Value: "alpha,beta"}, field))
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "like", Value: "alphabet"}, field))
+		assert.True(t, rowMatch(rows[2], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "not_like", Value: "alphabet"}, field))
+		assert.True(t, rowMatch(map[string]any{"C_200": nil}, &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "null"}, field))
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "not_null"}, field))
+		assert.True(t, rowMatch(map[string]any{"C_200": "  "}, &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "empty"}, field))
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "not_empty"}, field))
+	})
 
-	dynamicTree := &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
-		{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "max", ValueType: "dynamic"},
-	}}
-	resolveDynamicValues(rows, dynamicTree, fieldMap)
-	assert.Equal(t, "250", dynamicTree.Items[0].Value)
+	t.Run("NumericOperators", func(t *testing.T) {
+		field := fieldMap[100]
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "eq", Value: "50"}, field))
+		assert.True(t, rowMatch(rows[1], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "gt", Value: "100"}, field))
+		assert.True(t, rowMatch(rows[1], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "ge", Value: "150"}, field))
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "lt", Value: "100"}, field))
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "le", Value: "50"}, field))
+	})
+
+	t.Run("TimeOperators", func(t *testing.T) {
+		field := fieldMap[300]
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "eq", Value: "2024-01-01 00:00:00"}, field))
+		assert.True(t, rowMatch(rows[2], &thresholddomain.FilterTreeItem{FilterType: "logic", Term: "gt", Value: "2024-06-01 00:00:00"}, field))
+	})
+
+	t.Run("EnumFilter", func(t *testing.T) {
+		field := fieldMap[200]
+		assert.True(t, rowMatch(rows[0], &thresholddomain.FilterTreeItem{FilterType: "enum", EnumValue: []string{"alpha", "beta"}}, field))
+		assert.False(t, rowMatch(rows[2], &thresholddomain.FilterTreeItem{FilterType: "enum", EnumValue: []string{"alpha", "beta"}}, field))
+	})
+
+	t.Run("NestedTree", func(t *testing.T) {
+		tree := &thresholddomain.FilterTreeObj{Logic: "and", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "0"},
+			{Type: "tree", SubTree: &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
+				{Type: "item", FieldID: json.Number("200"), FilterType: "logic", Term: "eq", Value: "gamma"},
+				{Type: "item", FieldID: json.Number("300"), FilterType: "logic", Term: "gt", Value: "2024-05-01 00:00:00"},
+			}}},
+		}}
+		assert.True(t, matchesConditionTree(rows[2], tree, fieldMap))
+		assert.False(t, matchesConditionTree(rows[0], tree, fieldMap))
+	})
+
+	t.Run("EmptyTree", func(t *testing.T) {
+		assert.True(t, matchesConditionTree(rows[0], nil, fieldMap))
+		assert.True(t, matchesConditionTree(rows[0], &thresholddomain.FilterTreeObj{}, fieldMap))
+	})
+
+	t.Run("ConvertRulesToText", func(t *testing.T) {
+		tree := &thresholddomain.FilterTreeObj{Logic: "and", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "100"},
+			{Type: "item", FieldID: json.Number("200"), FilterType: "enum", EnumValue: []string{"alpha", "beta"}},
+		}}
+		text := ConvertRulesToText(tree, fieldMap)
+		assert.Contains(t, text, "Value")
+		assert.Contains(t, text, "gt")
+		assert.Contains(t, text, "Label")
+	})
+
+	t.Run("GeneratePreviewHTML", func(t *testing.T) {
+		tree := &thresholddomain.FilterTreeObj{Logic: "and", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "0"},
+		}}
+		html := GeneratePreviewHTML("[检测时间] [触发告警] <span id=\"changeText-100\">x</span> <span id=\"changeText-2\"><span data-mce-content=\"[告警数据]\">[告警数据]</span></span>", tree, rows, fieldMap, true, 2)
+		assert.NotEmpty(t, html)
+		assert.Contains(t, html, "Value")
+		assert.Contains(t, html, "<table")
+	})
+
+	t.Run("DynamicValues", func(t *testing.T) {
+		dynamicTree := &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "max", ValueType: "dynamic"},
+		}}
+		resolveDynamicValues(rows, dynamicTree, fieldMap)
+		assert.Equal(t, "250", dynamicTree.Items[0].Value)
+
+		minTree := &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "lt", Value: "min", ValueType: "dynamic"},
+		}}
+		resolveDynamicValues(rows, minTree, fieldMap)
+		assert.Equal(t, "50", minTree.Items[0].Value)
+
+		avgTree := &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
+			{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "eq", Value: "average", ValueType: "dynamic"},
+		}}
+		resolveDynamicValues(rows, avgTree, fieldMap)
+		assert.Equal(t, "150", avgTree.Items[0].Value)
+	})
+
+	t.Run("FormatDynamicValue", func(t *testing.T) {
+		field := fieldMap[100]
+		assert.Equal(t, "50", formatDynamicValue(rows, &thresholddomain.FilterTreeItem{Value: "min"}, field))
+		assert.Equal(t, "250", formatDynamicValue(rows, &thresholddomain.FilterTreeItem{Value: "max"}, field))
+		assert.Equal(t, "150", formatDynamicValue(rows, &thresholddomain.FilterTreeItem{Value: "average"}, field))
+	})
 }
 
 func TestThresholdServiceIntegration_Preview_Stub(t *testing.T) {
