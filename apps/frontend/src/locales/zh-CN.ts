@@ -94,7 +94,9 @@ export default {
     filter: '筛选',
     filter_condition: '筛选条件',
     no_auth_tips: '缺少菜单权限，请联系管理员',
-    no_menu_tips: '未找到资源，请检查访问地址是否正确'
+    no_menu_tips: '未找到资源，请检查访问地址是否正确',
+    rate_limit_too_frequent: '请求过于频繁，请稍后再试',
+    rate_limit_retry_after: '请求过于频繁，请 {0} 秒后再试'
   },
   toolbox: {
     name: '工具箱',

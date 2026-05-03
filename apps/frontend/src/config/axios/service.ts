@@ -30,6 +30,7 @@ type InternalAxiosRequestConfigWidthLoading<T> = T & {
 
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import router from '@/router'
+import { i18n } from '@/plugins/vue-i18n'
 
 const { result_code } = config
 import { useCache } from '@/hooks/web/useCache'
@@ -41,6 +42,22 @@ const basePath = import.meta.env.VITE_API_BASEPATH
 const embeddedBasePath =
   basePath.startsWith('./') && basePath.length > 2 ? basePath.substring(2) : basePath
 export const PATH_URL = embeddedStore.baseUrl ? embeddedStore?.baseUrl + embeddedBasePath : basePath
+
+const getRateLimitMessage = (key: string, args?: unknown[]) => {
+  if (!i18n) {
+    if (key === 'common.rate_limit_retry_after' && args?.length) {
+      return `请求过于频繁，请 ${args[0]} 秒后再试`
+    }
+    return '请求过于频繁，请稍后再试'
+  }
+
+  const t = i18n.global.t as unknown as (
+    message: string,
+    params?: unknown[] | Record<string, unknown>
+  ) => string
+
+  return args ? t(key, args) : t(key)
+}
 
 export interface AxiosInstanceWithLoading extends AxiosInstance {
   <T = any, R = AxiosResponse<T>, D = any>(
@@ -233,6 +250,25 @@ service.interceptors.response.use(
         showClose: true
       })
       return
+    }
+    if (error?.response.status === 429) {
+      const retryAfter = error.response?.headers?.['retry-after']
+      let message = getRateLimitMessage('common.rate_limit_too_frequent')
+      if (retryAfter) {
+        const retryAfterValue = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter
+        const seconds = parseInt(String(retryAfterValue), 10)
+        if (!isNaN(seconds) && seconds > 0) {
+          message = getRateLimitMessage('common.rate_limit_retry_after', [seconds])
+        }
+      }
+      ElMessage({
+        type: 'warning',
+        message,
+        showClose: true,
+        duration: 5000
+      })
+      error.config.loading && tryHideLoading(permissionStore.getCurrentPath)
+      return Promise.reject(error)
     }
     const header = error.response?.headers as AxiosHeaders
     if (

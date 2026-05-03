@@ -96,7 +96,9 @@ export default {
     filter: 'Filter',
     filter_condition: 'Filter condition',
     no_auth_tips: 'Missing menu permissions, please contact the administrator',
-    no_menu_tips: 'Resource not found. Please verify the URL and try again'
+    no_menu_tips: 'Resource not found. Please verify the URL and try again',
+    rate_limit_too_frequent: 'Too many requests, please try again later',
+    rate_limit_retry_after: 'Too many requests, please try again in {0} seconds'
   },
   toolbox: {
     name: 'Toolbox',
