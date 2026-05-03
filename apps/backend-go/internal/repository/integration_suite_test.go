@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
+	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/menu"
@@ -81,6 +82,7 @@ func TestMain(m *testing.M) {
 		&coreVisualizationTemplate{},
 		&auto.CoreDatasourceTaskLog{},
 		&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{},
+		&datafillingdomain.DataFillingForm{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
