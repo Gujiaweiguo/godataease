@@ -112,7 +112,7 @@ func installAuthContext(r *gin.Engine, roleIDs []int64, userID uint64) {
 
 func TestRegisterAuditRoutes_RequiresMenuAuthorizationForExportRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewAuditHandler(nil)
+	h := NewAuditHandler(nil, nil)
 	menuAuth := createMenuAuthMiddlewareForTests(t)
 
 	t.Run("authorized role can hit export route", func(t *testing.T) {

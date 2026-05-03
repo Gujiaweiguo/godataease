@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"dataease/backend/internal/domain/audit"
@@ -10,6 +11,8 @@ import (
 )
 
 var errSystemParamRepoNotReady = errors.New("system parameter repository not initialized")
+
+const auditAlertSettingsKey = "audit.alert.settings"
 
 type SystemParamRepository interface {
 	ListBasicSettings() ([]system.SettingItem, error)
@@ -21,6 +24,8 @@ type SystemParamRepository interface {
 
 	GetSQLBotConfig() (*system.SQLBotConfig, error)
 	SaveSQLBotConfig(cfg *system.SQLBotConfig) error
+	GetSettingValueByKey(key string) (string, error)
+	SaveSettingValueByKey(key, value string) error
 
 	GetShareBase() (*system.ShareBase, error)
 
@@ -125,6 +130,49 @@ func (s *SystemParamService) SaveSQLBot(cfg *system.SQLBotConfig) error {
 		_, _ = s.auditService.CreateAuditLog(&audit.AuditLogCreateRequest{
 			ActionType: audit.ActionTypeSystemConfig,
 			ActionName: "保存SQLBot配置",
+			Operation:  audit.OperationUpdate,
+			AfterValue: &afterValueStr,
+		})
+	}
+	return nil
+}
+
+func (s *SystemParamService) QueryAuditAlertSettings() (*audit.AuditAlertSettings, error) {
+	if s.repo == nil {
+		return nil, errSystemParamRepoNotReady
+	}
+	value, err := s.repo.GetSettingValueByKey(auditAlertSettingsKey)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(value) == "" {
+		return audit.DefaultAuditAlertSettings(), nil
+	}
+	return audit.AuditAlertSettingsFromJSON([]byte(value))
+}
+
+func (s *SystemParamService) SaveAuditAlertSettings(settings *audit.AuditAlertSettings) error {
+	if s.repo == nil {
+		return errSystemParamRepoNotReady
+	}
+	if settings == nil {
+		return fmt.Errorf("audit alert settings is nil")
+	}
+	if err := settings.Validate(); err != nil {
+		return err
+	}
+	data, err := settings.ToJSON()
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SaveSettingValueByKey(auditAlertSettingsKey, string(data)); err != nil {
+		return err
+	}
+	if s.auditService != nil {
+		afterValueStr := string(data)
+		_, _ = s.auditService.CreateAuditLog(&audit.AuditLogCreateRequest{
+			ActionType: audit.ActionTypeSystemConfig,
+			ActionName: "保存审计告警设置",
 			Operation:  audit.OperationUpdate,
 			AfterValue: &afterValueStr,
 		})
