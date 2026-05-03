@@ -1,12 +1,16 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/pkg/logger"
+
+	"go.uber.org/zap"
 )
 
 type RowPermissionStore interface {
@@ -34,6 +38,7 @@ type DataPermissionAdminService struct {
 	rowStore    RowPermissionStore
 	columnStore ColumnPermissionStore
 	fieldSource DatasetFieldProvider
+	cache       *permission.PermissionCacheService
 }
 
 const (
@@ -80,11 +85,13 @@ func NewDataPermissionAdminService(
 	rowStore RowPermissionStore,
 	columnStore ColumnPermissionStore,
 	fieldSource DatasetFieldProvider,
+	cache *permission.PermissionCacheService,
 ) *DataPermissionAdminService {
 	return &DataPermissionAdminService{
 		rowStore:    rowStore,
 		columnStore: columnStore,
 		fieldSource: fieldSource,
+		cache:       cache,
 	}
 }
 
@@ -280,24 +287,52 @@ func (s *DataPermissionAdminService) SaveColumnPermission(req *ColumnPermissionF
 		column.PermType = req.RuleType
 		column.MaskRule = maskRule
 		column.Status = 1
-		return s.columnStore.Update(column)
+		if err := s.columnStore.Update(column); err != nil {
+			return err
+		}
+		s.invalidateColumnPermissionCache(req.DatasetID)
+		return nil
 	}
 
-	return s.columnStore.Create(&permission.DataPermColumn{
+	if err := s.columnStore.Create(&permission.DataPermColumn{
 		DatasetID:      req.DatasetID,
 		DatasetGroupID: req.DatasetID,
 		FieldName:      req.FieldName,
 		PermType:       req.RuleType,
 		MaskRule:       maskRule,
 		Status:         1,
-	})
+	}); err != nil {
+		return err
+	}
+	s.invalidateColumnPermissionCache(req.DatasetID)
+	return nil
 }
 
 func (s *DataPermissionAdminService) DeleteColumnPermission(id int64) error {
 	if id <= 0 {
 		return fmt.Errorf("id is required")
 	}
-	return s.columnStore.Delete(id)
+	column, err := s.columnStore.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if column == nil {
+		return fmt.Errorf("column permission %d not found", id)
+	}
+	if err := s.columnStore.Delete(id); err != nil {
+		return err
+	}
+	s.invalidateColumnPermissionCache(column.DatasetID)
+	return nil
+}
+
+func (s *DataPermissionAdminService) invalidateColumnPermissionCache(datasetID int64) {
+	if s.cache == nil || datasetID <= 0 {
+		return
+	}
+	if err := s.cache.InvalidateColumnPermissions(context.Background(), datasetID); err != nil {
+		logger.Warn("Failed to invalidate column permission cache", zap.Int64("datasetId", datasetID), zap.Error(err))
+	}
 }
 
 func (s *DataPermissionAdminService) datasetFieldMaps(datasetID int64) (map[int64]chart.ChartField, map[string]chart.ChartField, error) {

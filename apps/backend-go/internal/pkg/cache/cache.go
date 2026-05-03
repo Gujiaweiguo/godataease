@@ -53,6 +53,26 @@ func Del(ctx context.Context, keys ...string) error {
 	return client.Del(ctx, keys...).Err()
 }
 
+func DelByPattern(ctx context.Context, pattern string) error {
+	var cursor uint64
+	for {
+		keys, next, err := client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := client.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		cursor = next
+		if cursor == 0 {
+			break
+		}
+	}
+	return nil
+}
+
 func Exists(ctx context.Context, keys ...string) (int64, error) {
 	return client.Exists(ctx, keys...).Result()
 }

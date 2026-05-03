@@ -1,15 +1,20 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
+
+	"go.uber.org/zap"
 )
 
 type ColumnPermissionService struct {
 	columnPermRepo *repository.ColumnPermissionRepository
+	cache          *permission.PermissionCacheService
 }
 
 const (
@@ -17,16 +22,33 @@ const (
 	defaultRangeMaskText = "*** ***"
 )
 
-func NewColumnPermissionService(columnPermRepo *repository.ColumnPermissionRepository) *ColumnPermissionService {
-	return &ColumnPermissionService{columnPermRepo: columnPermRepo}
+func NewColumnPermissionService(columnPermRepo *repository.ColumnPermissionRepository, cache *permission.PermissionCacheService) *ColumnPermissionService {
+	return &ColumnPermissionService{columnPermRepo: columnPermRepo, cache: cache}
 }
 
 func (s *ColumnPermissionService) GetColumnPermissions(datasetID int64) ([]*permission.DataPermColumn, error) {
-	return s.columnPermRepo.ListByDatasetID(datasetID)
+	if s.cache != nil {
+		if perms, ok := s.cache.GetColumnPermissions(context.Background(), datasetID); ok {
+			return perms, nil
+		}
+	}
+
+	perms, err := s.columnPermRepo.ListByDatasetID(datasetID)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.cache != nil {
+		if err := s.cache.SetColumnPermissions(context.Background(), datasetID, perms); err != nil {
+			logger.Warn("Failed to populate column permission cache", zap.Int64("datasetId", datasetID), zap.Error(err))
+		}
+	}
+
+	return perms, nil
 }
 
 func (s *ColumnPermissionService) GetDisabledColumns(datasetID int64) (map[string]bool, error) {
-	perms, err := s.columnPermRepo.ListByDatasetID(datasetID)
+	perms, err := s.GetColumnPermissions(datasetID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +63,7 @@ func (s *ColumnPermissionService) GetDisabledColumns(datasetID int64) (map[strin
 }
 
 func (s *ColumnPermissionService) GetMaskRules(datasetID int64) (map[string]*permission.DesensitizationRule, error) {
-	perms, err := s.columnPermRepo.ListByDatasetID(datasetID)
+	perms, err := s.GetColumnPermissions(datasetID)
 	if err != nil {
 		return nil, err
 	}

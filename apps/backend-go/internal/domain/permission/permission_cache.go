@@ -21,6 +21,7 @@ type CacheBackend interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
 	Del(ctx context.Context, keys ...string) error
+	DelByPattern(ctx context.Context, pattern string) error
 	Exists(ctx context.Context, keys ...string) (int64, error)
 }
 
@@ -44,6 +45,11 @@ func (s *PermissionCacheService) buildKey(parts ...string) string {
 }
 
 func joinKey(parts ...string) string {
+	// Cache keys intentionally use ':' as the only segment separator.
+	// Do not introduce '/' into parts: our tests use path.Match for wildcard
+	// simulation while Redis SCAN MATCH treats '*' across all non-null bytes.
+	// Keeping keys slash-free preserves equivalent wildcard semantics between
+	// tests and production invalidation.
 	result := ""
 	for i, p := range parts {
 		if i > 0 {
@@ -130,7 +136,7 @@ func (s *PermissionCacheService) SetResourcePermission(ctx context.Context, reso
 
 func (s *PermissionCacheService) InvalidateResourcePermissions(ctx context.Context, resourceType string, resourceID int64) error {
 	pattern := s.buildKey(CacheKeyResourcePerms, resourceType, fmt.Sprintf("%d", resourceID), "*")
-	return s.cache.Del(ctx, pattern)
+	return s.cache.DelByPattern(ctx, pattern)
 }
 
 func (s *PermissionCacheService) GetRowPermissions(ctx context.Context, datasetID, userID int64) (*DatasetRowPermissionsTreeObj, bool) {
@@ -158,7 +164,7 @@ func (s *PermissionCacheService) SetRowPermissions(ctx context.Context, datasetI
 
 func (s *PermissionCacheService) InvalidateRowPermissions(ctx context.Context, datasetID int64) error {
 	key := s.buildKey(CacheKeyRowPerms, fmt.Sprintf("ds:%d:*", datasetID))
-	return s.cache.Del(ctx, key)
+	return s.cache.DelByPattern(ctx, key)
 }
 
 func (s *PermissionCacheService) GetColumnPermissions(ctx context.Context, datasetID int64) ([]*DataPermColumn, bool) {
@@ -190,15 +196,14 @@ func (s *PermissionCacheService) InvalidateColumnPermissions(ctx context.Context
 }
 
 func (s *PermissionCacheService) InvalidateAll(ctx context.Context) error {
-	return s.cache.Del(ctx, CacheKeyPrefix+"*")
+	return s.cache.DelByPattern(ctx, CacheKeyPrefix+"*")
 }
 
 func (s *PermissionCacheService) InvalidateByUserID(ctx context.Context, userID int64) error {
-	keys := []string{
-		s.buildKey(CacheKeyUserPerms, fmt.Sprintf("%d", userID)),
-		s.buildKey(CacheKeyRowPerms, fmt.Sprintf("*:user:%d", userID)),
+	if err := s.cache.Del(ctx, s.buildKey(CacheKeyUserPerms, fmt.Sprintf("%d", userID))); err != nil {
+		return err
 	}
-	return s.cache.Del(ctx, keys...)
+	return s.cache.DelByPattern(ctx, s.buildKey(CacheKeyRowPerms, fmt.Sprintf("*:user:%d", userID)))
 }
 
 func (s *PermissionCacheService) InvalidateByRoleID(ctx context.Context, roleID int64) error {

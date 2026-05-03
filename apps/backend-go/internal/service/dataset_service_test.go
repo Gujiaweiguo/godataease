@@ -257,6 +257,18 @@ func TestNewDatasetServiceWithPermission(t *testing.T) {
 	}
 }
 
+func TestDatasetService_SetColumnPermissionService(t *testing.T) {
+	rowSvc := &RowPermissionService{}
+	columnSvc := &ColumnPermissionService{}
+	svc := NewDatasetServiceWithPermission(nil, rowSvc)
+
+	svc.SetColumnPermissionService(columnSvc)
+
+	if svc.columnPermissionService != columnSvc {
+		t.Fatal("expected column permission service configured")
+	}
+}
+
 func TestEnumAliasAndFieldIDFromAlias(t *testing.T) {
 	alias := enumAlias(123)
 	if alias != "f_123" {

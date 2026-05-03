@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/permission"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type fakeRowPermissionStore struct {
@@ -131,7 +135,7 @@ func TestDataPermissionAdminService_SaveRowPermission(t *testing.T) {
 		Name:       "region_alias",
 	}}}}
 
-	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider)
+	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider, nil)
 	err := svc.SaveRowPermission(&RowPermissionForm{
 		DatasetID:   9,
 		FilterType:  permission.AuthTargetTypeRole,
@@ -180,7 +184,7 @@ func TestDataPermissionAdminService_RowPermissionPage(t *testing.T) {
 		OriginName: "region",
 	}}}}
 
-	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider)
+	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider, nil)
 	page, err := svc.RowPermissionPage(9, 1, 10)
 	if err != nil {
 		t.Fatalf("RowPermissionPage failed: %v", err)
@@ -219,7 +223,7 @@ func TestDataPermissionAdminService_RowPermissionPageByTarget(t *testing.T) {
 		OriginName: "region",
 	}}}}
 
-	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider)
+	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider, nil)
 	page, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeRole, 7, 1, 10)
 	if err != nil {
 		t.Fatalf("RowPermissionPageByTarget failed: %v", err)
@@ -238,7 +242,7 @@ func TestDataPermissionAdminService_RowPermissionPageByTarget(t *testing.T) {
 }
 
 func TestDataPermissionAdminService_RowPermissionPageByTarget_RejectsUnsupportedType(t *testing.T) {
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{}, nil)
 	if _, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeDept, 7, 1, 10); err == nil {
 		t.Fatal("expected unsupported targetType to fail")
 	}
@@ -248,7 +252,7 @@ func TestDataPermissionAdminService_RowPermissionPageByTarget_RejectsUnsupported
 }
 
 func TestDataPermissionAdminService_RowPermissionPageByTarget_RejectsMissingTargetID(t *testing.T) {
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{}, nil)
 	if _, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeRole, 0, 1, 10); err == nil || err.Error() != "targetId is required" {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -262,7 +266,7 @@ func TestDataPermissionAdminService_SaveColumnPermission(t *testing.T) {
 		Type:       "string",
 	}}}}
 
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 	err := svc.SaveColumnPermission(&ColumnPermissionForm{
 		DatasetID: 9,
 		FieldName: "mobile",
@@ -292,7 +296,7 @@ func TestDataPermissionAdminService_SaveColumnPermission(t *testing.T) {
 
 func TestDataPermissionAdminService_SaveRowPermission_Validation(t *testing.T) {
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 11, OriginName: "region", Name: "region_alias"}}}}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider, nil)
 
 	if err := svc.SaveRowPermission(&RowPermissionForm{TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "region"}); err == nil || err.Error() != "datasetId is required" {
 		t.Fatalf("unexpected datasetId validation error: %v", err)
@@ -324,7 +328,7 @@ func TestDataPermissionAdminService_SaveColumnPermission_Validation(t *testing.T
 
 func testSaveColumnPermissionValidationErrors(t *testing.T) {
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider, nil)
 
 	if err := svc.SaveColumnPermission(&ColumnPermissionForm{FieldName: "mobile", RuleType: permission.PermTypeMask}); err == nil || err.Error() != "datasetId is required" {
 		t.Fatalf("unexpected datasetId validation error: %v", err)
@@ -343,7 +347,7 @@ func testSaveColumnPermissionValidationErrors(t *testing.T) {
 func testSaveColumnPermissionValidationPersistsRules(t *testing.T) {
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
 	columnStore := &fakeColumnPermissionStore{}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 	err := svc.SaveColumnPermission(&ColumnPermissionForm{DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeMask, MaskRule: maskRuleCustom, MaskStart: 1, MaskEnd: 5})
 	if err != nil {
 		t.Fatalf("expected custom mask permission to succeed: %v", err)
@@ -357,7 +361,7 @@ func testSaveColumnPermissionValidationPersistsRules(t *testing.T) {
 	}
 
 	columnStore = &fakeColumnPermissionStore{}
-	svc = NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc = NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 	err = svc.SaveColumnPermission(&ColumnPermissionForm{DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeDisable})
 	if err != nil {
 		t.Fatalf("expected disable permission to succeed: %v", err)
@@ -381,7 +385,7 @@ func TestDataPermissionAdminService_SaveRowPermission_UpdateExisting(t *testing.
 		Name:       "region_alias",
 	}}}}
 
-	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider)
+	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider, nil)
 	err = svc.SaveRowPermission(&RowPermissionForm{
 		ID:          8,
 		DatasetID:   9,
@@ -417,7 +421,7 @@ func TestDataPermissionAdminService_SaveColumnPermission_UpdateExisting(t *testi
 		Type:       "string",
 	}}}}
 
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 	err := svc.SaveColumnPermission(&ColumnPermissionForm{
 		ID:        6,
 		DatasetID: 9,
@@ -445,7 +449,7 @@ func TestDataPermissionAdminService_SaveColumnPermission_UpdateExisting(t *testi
 
 func TestDataPermissionAdminService_DeleteRowPermission(t *testing.T) {
 	rowStore := &fakeRowPermissionStore{}
-	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+	svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{}, nil)
 
 	if err := svc.DeleteRowPermission(0); err == nil {
 		t.Fatal("expected error when row permission id is missing")
@@ -460,8 +464,8 @@ func TestDataPermissionAdminService_DeleteRowPermission(t *testing.T) {
 }
 
 func TestDataPermissionAdminService_DeleteColumnPermission(t *testing.T) {
-	columnStore := &fakeColumnPermissionStore{}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, &fakeDatasetFieldProvider{})
+	columnStore := &fakeColumnPermissionStore{lookupByID: map[int64]*permission.DataPermColumn{12: {ID: 12, DatasetID: 9}}}
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, &fakeDatasetFieldProvider{}, nil)
 
 	if err := svc.DeleteColumnPermission(0); err == nil {
 		t.Fatal("expected error when column permission id is missing")
@@ -475,9 +479,47 @@ func TestDataPermissionAdminService_DeleteColumnPermission(t *testing.T) {
 	}
 }
 
+func TestDataPermissionAdminService_ColumnPermissionCacheInvalidation(t *testing.T) {
+	cacheSvc, _ := newMockPermissionCacheService()
+	t.Run("create invalidates cache", func(t *testing.T) {
+		columnStore := &fakeColumnPermissionStore{}
+		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, cacheSvc)
+		require.NoError(t, cacheSvc.SetColumnPermissions(context.Background(), 9, []*permission.DataPermColumn{{DatasetID: 9, FieldName: "stale"}}))
+
+		err := svc.SaveColumnPermission(&ColumnPermissionForm{DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeDisable})
+		require.NoError(t, err)
+		_, found := cacheSvc.GetColumnPermissions(context.Background(), 9)
+		assert.False(t, found)
+	})
+
+	t.Run("update invalidates cache", func(t *testing.T) {
+		columnStore := &fakeColumnPermissionStore{lookupByID: map[int64]*permission.DataPermColumn{6: {ID: 6, DatasetID: 9, FieldName: "mobile"}}}
+		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, cacheSvc)
+		require.NoError(t, cacheSvc.SetColumnPermissions(context.Background(), 9, []*permission.DataPermColumn{{DatasetID: 9, FieldName: "stale"}}))
+
+		err := svc.SaveColumnPermission(&ColumnPermissionForm{ID: 6, DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeMask, MaskRule: maskRuleKeepEnds})
+		require.NoError(t, err)
+		_, found := cacheSvc.GetColumnPermissions(context.Background(), 9)
+		assert.False(t, found)
+	})
+
+	t.Run("delete invalidates cache", func(t *testing.T) {
+		columnStore := &fakeColumnPermissionStore{lookupByID: map[int64]*permission.DataPermColumn{12: {ID: 12, DatasetID: 9}}}
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, &fakeDatasetFieldProvider{}, cacheSvc)
+		require.NoError(t, cacheSvc.SetColumnPermissions(context.Background(), 9, []*permission.DataPermColumn{{DatasetID: 9, FieldName: "stale"}}))
+
+		err := svc.DeleteColumnPermission(12)
+		require.NoError(t, err)
+		_, found := cacheSvc.GetColumnPermissions(context.Background(), 9)
+		assert.False(t, found)
+	})
+}
+
 func TestDataPermissionAdminService_RowPermissionStoreErrorPaths(t *testing.T) {
 	t.Run("target pager error propagates", func(t *testing.T) {
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{targetErr: errors.New("target pager failed")}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{targetErr: errors.New("target pager failed")}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{}, nil)
 		page, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeUser, 7, 1, 10)
 		if !errors.Is(err, svc.rowStore.(*fakeRowPermissionStore).targetErr) {
 			t.Fatalf("expected target pager error, got %v", err)
@@ -488,7 +530,7 @@ func TestDataPermissionAdminService_RowPermissionStoreErrorPaths(t *testing.T) {
 	})
 
 	t.Run("row page store error", func(t *testing.T) {
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{pagerErr: errors.New("row pager failed")}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{pagerErr: errors.New("row pager failed")}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{}, nil)
 		page, err := svc.RowPermissionPage(9, 1, 10)
 		if !errors.Is(err, svc.rowStore.(*fakeRowPermissionStore).pagerErr) {
 			t.Fatalf("expected row pager error, got %v", err)
@@ -500,7 +542,7 @@ func TestDataPermissionAdminService_RowPermissionStoreErrorPaths(t *testing.T) {
 
 	t.Run("delete error propagates", func(t *testing.T) {
 		rowErr := errors.New("row delete failed")
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{deleteErr: rowErr}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{})
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{deleteErr: rowErr}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{}, nil)
 		err := svc.DeleteRowPermission(9)
 		if !errors.Is(err, rowErr) {
 			t.Fatalf("expected row delete error, got %v", err)
@@ -510,7 +552,7 @@ func TestDataPermissionAdminService_RowPermissionStoreErrorPaths(t *testing.T) {
 	t.Run("update get by id error", func(t *testing.T) {
 		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 11, OriginName: "region"}}}}
 		lookupErr := errors.New("row lookup failed")
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{getErr: lookupErr}, &fakeColumnPermissionStore{}, fieldProvider)
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{getErr: lookupErr}, &fakeColumnPermissionStore{}, fieldProvider, nil)
 		err := svc.SaveRowPermission(&RowPermissionForm{ID: 8, DatasetID: 9, FilterType: permission.AuthTargetTypeUser, TargetID: 3, FilterField: "region", FilterValue: "west"})
 		if !errors.Is(err, lookupErr) {
 			t.Fatalf("expected row lookup error, got %v", err)
@@ -520,7 +562,7 @@ func TestDataPermissionAdminService_RowPermissionStoreErrorPaths(t *testing.T) {
 	t.Run("decode expression error still builds fallback row", func(t *testing.T) {
 		rowStore := &fakeRowPermissionStore{items: []*permission.DataPermRow{{ID: 9, DatasetID: 9, AuthTargetType: permission.AuthTargetTypeUser, AuthTargetID: 3, ExpressionTree: "not-json", Status: 1}}}
 		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 11, OriginName: "region"}}}}
-		svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider)
+		svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider, nil)
 		page, err := svc.RowPermissionPage(9, 1, 10)
 		if err != nil {
 			t.Fatalf("RowPermissionPage failed: %v", err)
@@ -537,7 +579,7 @@ func TestDataPermissionAdminService_RowPermissionStoreErrorPaths(t *testing.T) {
 
 func TestDataPermissionAdminService_ColumnPermissionStoreErrorPaths(t *testing.T) {
 	t.Run("column page store error", func(t *testing.T) {
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{pagerErr: errors.New("column pager failed")}, &fakeDatasetFieldProvider{})
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{pagerErr: errors.New("column pager failed")}, &fakeDatasetFieldProvider{}, nil)
 		page, err := svc.ColumnPermissionPage(9, 1, 10)
 		if !errors.Is(err, svc.columnStore.(*fakeColumnPermissionStore).pagerErr) {
 			t.Fatalf("expected column pager error, got %v", err)
@@ -549,17 +591,26 @@ func TestDataPermissionAdminService_ColumnPermissionStoreErrorPaths(t *testing.T
 
 	t.Run("delete error propagates", func(t *testing.T) {
 		columnErr := errors.New("column delete failed")
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{deleteErr: columnErr}, &fakeDatasetFieldProvider{})
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{deleteErr: columnErr, lookupByID: map[int64]*permission.DataPermColumn{12: {ID: 12, DatasetID: 9}}}, &fakeDatasetFieldProvider{}, nil)
 		err := svc.DeleteColumnPermission(12)
 		if !errors.Is(err, columnErr) {
 			t.Fatalf("expected column delete error, got %v", err)
 		}
 	})
 
+	t.Run("delete get by id error", func(t *testing.T) {
+		lookupErr := errors.New("column lookup failed")
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{getErr: lookupErr}, &fakeDatasetFieldProvider{}, nil)
+		err := svc.DeleteColumnPermission(12)
+		if !errors.Is(err, lookupErr) {
+			t.Fatalf("expected column lookup error, got %v", err)
+		}
+	})
+
 	t.Run("update get by id error", func(t *testing.T) {
 		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 22, OriginName: "mobile", Type: "string"}}}}
 		lookupErr := errors.New("column lookup failed")
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{getErr: lookupErr}, fieldProvider)
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{getErr: lookupErr}, fieldProvider, nil)
 		err := svc.SaveColumnPermission(&ColumnPermissionForm{ID: 6, DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeMask, MaskRule: maskRuleKeepEnds})
 		if !errors.Is(err, lookupErr) {
 			t.Fatalf("expected column lookup error, got %v", err)
@@ -569,7 +620,7 @@ func TestDataPermissionAdminService_ColumnPermissionStoreErrorPaths(t *testing.T
 	t.Run("unknown field leaves type empty", func(t *testing.T) {
 		columnStore := &fakeColumnPermissionStore{items: []*permission.DataPermColumn{{ID: 1, DatasetID: 9, FieldName: "missing", PermType: permission.PermTypeDisable, MaskRule: ""}}}
 		fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 21, OriginName: "known", Type: "string"}}}}
-		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 		page, err := svc.ColumnPermissionPage(9, 1, 10)
 		if err != nil {
 			t.Fatalf("ColumnPermissionPage failed: %v", err)
@@ -625,7 +676,7 @@ func testColumnPermissionPageBase(t *testing.T) {
 		{ID: 22, OriginName: "email", Type: "string"},
 	}}}
 
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 	page, err := svc.ColumnPermissionPage(9, 0, 0)
 	if err != nil {
 		t.Fatalf("ColumnPermissionPage failed: %v", err)
@@ -657,7 +708,7 @@ func testColumnPermissionPageKeepEnds(t *testing.T) {
 
 	columnStore := &fakeColumnPermissionStore{items: []*permission.DataPermColumn{{ID: 3, DatasetID: 10, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: string(keepEndsBytes)}}}
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 21, OriginName: "mobile", Type: "string"}}}}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 
 	page, err := svc.ColumnPermissionPage(10, 1, 10)
 	if err != nil {
@@ -680,7 +731,7 @@ func testColumnPermissionPageKeepMiddle(t *testing.T) {
 
 	columnStore := &fakeColumnPermissionStore{items: []*permission.DataPermColumn{{ID: 4, DatasetID: 10, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: string(keepMiddleBytes)}}}
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 21, OriginName: "mobile", Type: "string"}}}}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil)
 
 	page, err := svc.ColumnPermissionPage(10, 1, 10)
 	if err != nil {
@@ -806,7 +857,7 @@ func TestDataPermissionAdminService_FieldProviderErrorsAndMaps(t *testing.T) {
 
 func testDataPermissionFieldProviderErrors(t *testing.T) {
 	fieldErr := errors.New("field provider failed")
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{err: fieldErr})
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, &fakeDatasetFieldProvider{err: fieldErr}, nil)
 
 	if _, err := svc.RowPermissionPage(9, 1, 10); !errors.Is(err, fieldErr) {
 		t.Fatalf("expected row page field provider error, got %v", err)
@@ -821,7 +872,7 @@ func testDataPermissionFieldProviderErrors(t *testing.T) {
 
 func testDataPermissionDatasetFieldMaps(t *testing.T) {
 	provider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 31, Name: "raw_name", OriginName: "origin_name", DataeaseName: "dataease_name", FieldShortName: "short_name"}}}}
-	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, provider)
+	svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, provider, nil)
 	byID, byName, err := svc.datasetFieldMaps(9)
 	if err != nil {
 		t.Fatalf("datasetFieldMaps failed: %v", err)
@@ -836,7 +887,7 @@ func testDataPermissionDatasetFieldMaps(t *testing.T) {
 	}
 
 	provider = &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 31, Name: "dim_name", OriginName: "dim_origin"}}, QuotaList: []chart.ChartField{{ID: 32, Name: "quota_name", OriginName: "quota_origin", DataeaseName: "quota_dataease", FieldShortName: "quota_short"}}}}
-	svc = NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, provider)
+	svc = NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, provider, nil)
 	_, byName, err = svc.datasetFieldMaps(9)
 	if err != nil {
 		t.Fatalf("datasetFieldMaps with quota failed: %v", err)
