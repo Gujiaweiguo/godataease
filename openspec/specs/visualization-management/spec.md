@@ -178,3 +178,17 @@ The system SHALL ensure that backfilled dashboard and big-screen resources share
 - **WHEN** a user accesses a backfilled dashboard or big-screen resource without sufficient permission
 - **THEN** the system MUST return authorization-denied semantics
 - **AND** the result MUST remain distinguishable from missing visualization resource or missing route behavior
+
+### Requirement: Chart-Linked Threshold Data Is Governed Visualization Behavior
+
+Chart-linked threshold alert data is a governed part of visualization behavior. When a chart is deleted or a visualization resource is removed, associated threshold definitions SHALL be cleaned up via the supported threshold routes.
+
+#### Scenario: Chart deletion triggers threshold cleanup via threshold routes
+- **WHEN** a chart that has associated threshold definitions is deleted through visualization workflows
+- **THEN** the threshold management routes (`/threshold/deleteWithChart/{chartId}/{resourceTable}`) SHALL be available to remove orphaned threshold records
+- **AND** the cleanup SHALL NOT require the visualization module to directly access threshold persistence internals
+
+#### Scenario: Threshold lookup does not break visualization rendering
+- **WHEN** a visualization containing a chart with threshold definitions is rendered
+- **THEN** the threshold lookup (`/threshold/anyThreshold/{chartId}/{resourceTable}`) SHALL be available for the frontend to display threshold indicators
+- **AND** failure of threshold lookup SHALL NOT prevent chart rendering from completing
