@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"dataease/backend/internal/app"
+	scheduler "dataease/backend/internal/job"
+	"dataease/backend/internal/job/jobs"
 	pkgauth "dataease/backend/internal/pkg/auth"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/metrics"
@@ -74,8 +76,8 @@ func determineRouteSource(path string) string {
 	}
 
 	// API routes
-	if strings.HasPrefix(path, "/api/") {
-		parts := strings.Split(strings.TrimPrefix(path, "/api/"), "/")
+	if trimmed, ok := strings.CutPrefix(path, "/api/"); ok {
+		parts := strings.Split(trimmed, "/")
 		if len(parts) > 0 && parts[0] != "" {
 			return "api/" + parts[0]
 		}
@@ -143,6 +145,7 @@ type Router struct {
 	dataPermissionHandler          *handler.DataPermissionHandler
 	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
 	menuAuthMiddleware             *middleware.MenuAuthMiddleware
+	scheduler                      *scheduler.Scheduler
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -384,6 +387,17 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 
 	relationHandler := handler.NewRelationHandler()
+	jobScheduler := scheduler.NewScheduler()
+	schedulerCfg := app.SchedulerConfig{}
+	if application != nil && application.Config != nil {
+		schedulerCfg = application.Config.Scheduler
+	}
+	jobRegistry, err := jobs.NewRegistry(schedulerCfg)
+	if err != nil {
+		logger.Warn("Failed to build scheduled job registry", zap.Error(err))
+	} else if err := jobScheduler.AddRegistry(jobRegistry, nil); err != nil {
+		logger.Warn("Failed to register scheduled jobs", zap.Error(err))
+	}
 
 	return &Router{
 		engine:                         engine,
@@ -433,6 +447,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		dataPermissionHandler:          dataPermissionHandler,
 		resourceGovernanceHandler:      resourceGovernanceHandler,
 		menuAuthMiddleware:             menuAuthMiddleware,
+		scheduler:                      jobScheduler,
 	}
 }
 
@@ -678,7 +693,7 @@ func (r *Router) registerAPIRoutes() {
 		copilot := api.Group("/copilot")
 		{
 			copilot.POST("/chat", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
-			copilot.POST("/getList", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": []interface{}{}, "msg": ""}) })
+			copilot.POST("/getList", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": []any{}, "msg": ""}) })
 			copilot.POST("/clearAll", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
 		}
 
@@ -890,9 +905,25 @@ func (r *Router) Engine() *gin.Engine {
 	return r.engine
 }
 
+func (r *Router) StartScheduler() {
+	if r == nil || r.scheduler == nil {
+		return
+	}
+	r.scheduler.Start()
+}
+
+func (r *Router) StopScheduler() {
+	if r == nil || r.scheduler == nil {
+		return
+	}
+	r.scheduler.Stop()
+}
+
 func Start(application *app.Application, db *gorm.DB) error {
 	router := NewRouter(application, db)
 	router.RegisterRoutes()
+	router.StartScheduler()
+	defer router.StopScheduler()
 
 	routes := collectRoutesFromEngine(router.engine)
 	conflicts := detectRouteConflicts(routes)

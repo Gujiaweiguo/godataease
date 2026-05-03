@@ -19,10 +19,10 @@ const (
 const auditAlertLookbackWindow = time.Hour
 
 type AlertEvent struct {
-	Type       AlertType
-	Username   string
-	Details    string
-	DetectedAt time.Time
+	Type       AlertType `json:"type"`
+	Username   string    `json:"username"`
+	Details    string    `json:"details"`
+	DetectedAt time.Time `json:"detectedAt"`
 }
 
 type AlertNotifier interface {
