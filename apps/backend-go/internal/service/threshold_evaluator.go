@@ -21,6 +21,29 @@ const (
 	deTypeFloat  = 3
 )
 
+const (
+	itemType     = "item"
+	treeType     = "tree"
+	logicFilter  = "logic"
+	enumFilter   = "enum"
+	fixedValue   = "fixed"
+	dynamicValue = "dynamic"
+	nullTerm     = "null"
+	eqTerm       = "eq"
+	notEqTerm    = "not_eq"
+	inTerm       = "in"
+	notInTerm    = "not_in"
+	likeTerm     = "like"
+	notLikeTerm  = "not_like"
+	notNullTerm  = "not_null"
+	emptyTerm    = "empty"
+	notEmptyTerm = "not_empty"
+	gtTerm       = "gt"
+	geTerm       = "ge"
+	ltTerm       = "lt"
+	leTerm       = "le"
+)
+
 var nonDigitRegexp = regexp.MustCompile(`\D+`)
 
 // FieldDTO is a minimal representation of DatasetTableFieldDTO used by the evaluator.
@@ -52,10 +75,10 @@ func resolveDynamicValues(rows []map[string]any, tree *thresholddomain.FilterTre
 	for idx := range tree.Items {
 		item := &tree.Items[idx]
 		switch item.Type {
-		case "tree":
+		case treeType:
 			resolveDynamicValues(rows, item.SubTree, fieldMap)
-		case "item":
-			if item.ValueType != "dynamic" {
+		case itemType:
+			if item.ValueType != dynamicValue {
 				continue
 			}
 			field, ok := lookupField(item, fieldMap)
@@ -97,14 +120,14 @@ func matchesConditionItem(row map[string]any, item *thresholddomain.FilterTreeIt
 	if item == nil {
 		return false
 	}
-	if item.Type == "item" {
+	if item.Type == itemType {
 		field, ok := lookupField(item, fieldMap)
 		if !ok {
 			return false
 		}
 		return rowMatch(row, item, field)
 	}
-	if item.Type == "tree" && item.SubTree != nil {
+	if item.Type == treeType && item.SubTree != nil {
 		return matchesConditionTree(row, item.SubTree, fieldMap)
 	}
 	return false
@@ -112,103 +135,118 @@ func matchesConditionItem(row map[string]any, item *thresholddomain.FilterTreeIt
 
 func rowMatch(row map[string]any, item *thresholddomain.FilterTreeItem, field FieldDTO) bool {
 	valueObj := row[field.DataeaseName]
-	if item.FilterType == "enum" {
-		if valueObj == nil {
-			return false
-		}
-		valueText := fmt.Sprint(valueObj)
-		return slices.Contains(item.EnumValue, valueText)
+	if item.FilterType == enumFilter {
+		return matchEnumFilter(valueObj, item)
 	}
-
-	term := item.Term
 	switch field.DeType {
 	case deTypeString:
-		if valueObj == nil {
-			return term == "null"
-		}
-		valueText := fmt.Sprint(valueObj)
-		switch term {
-		case "eq":
-			return item.Value == valueText
-		case "not_eq":
-			return item.Value != valueText
-		case "in":
-			return containsString(splitCSV(item.Value), valueText)
-		case "not_in":
-			return !containsString(splitCSV(item.Value), valueText)
-		case "like":
-			return strings.Contains(item.Value, valueText)
-		case "not_like":
-			return !strings.Contains(item.Value, valueText)
-		case "null":
-			return false
-		case "not_null":
-			return true
-		case "empty":
-			return strings.TrimSpace(valueText) == ""
-		case "not_empty":
-			return strings.TrimSpace(valueText) != ""
-		default:
-			return item.Value == valueText
-		}
+		return matchStringOperator(valueObj, item)
 	case deTypeInt, deTypeFloat:
-		if valueObj == nil || strings.TrimSpace(item.Value) == "" {
-			return false
-		}
-		targetVal, ok := parseFloat(item.Value)
-		if !ok {
-			return false
-		}
-		originVal, ok := parseFloat(fmt.Sprint(valueObj))
-		if !ok {
-			return false
-		}
-		switch term {
-		case "eq":
-			return strconv.FormatFloat(originVal, 'f', -1, 64) == strconv.FormatFloat(targetVal, 'f', -1, 64)
-		case "not_eq":
-			return strconv.FormatFloat(originVal, 'f', -1, 64) != strconv.FormatFloat(targetVal, 'f', -1, 64)
-		case "gt":
-			return targetVal < originVal
-		case "ge":
-			return targetVal <= originVal
-		case "lt":
-			return targetVal > originVal
-		case "le":
-			return targetVal >= originVal
-		default:
-			return item.Value == fmt.Sprint(valueObj)
-		}
+		return matchNumericOperator(valueObj, item)
 	case deTypeTime:
-		if valueObj == nil {
-			return false
-		}
-		target, ok := parseDigitsInt64(item.Value)
-		if !ok {
-			return false
-		}
-		origin, ok := parseDigitsInt64(fmt.Sprint(valueObj))
-		if !ok {
-			return false
-		}
-		switch term {
-		case "eq":
-			return origin == target
-		case "not_eq":
-			return origin != target
-		case "gt":
-			return origin > target
-		case "ge":
-			return origin >= target
-		case "lt":
-			return origin < target
-		case "le":
-			return origin <= target
-		default:
-			return origin == target
-		}
+		return matchTimeOperator(valueObj, item)
 	default:
 		return true
+	}
+}
+
+func matchEnumFilter(valueObj any, item *thresholddomain.FilterTreeItem) bool {
+	if valueObj == nil {
+		return false
+	}
+	valueText := fmt.Sprint(valueObj)
+	return slices.Contains(item.EnumValue, valueText)
+}
+
+func matchStringOperator(valueObj any, item *thresholddomain.FilterTreeItem) bool {
+	term := item.Term
+	if valueObj == nil {
+		return term == nullTerm
+	}
+	valueText := fmt.Sprint(valueObj)
+	switch term {
+	case eqTerm:
+		return item.Value == valueText
+	case notEqTerm:
+		return item.Value != valueText
+	case inTerm:
+		return containsString(splitCSV(item.Value), valueText)
+	case notInTerm:
+		return !containsString(splitCSV(item.Value), valueText)
+	case likeTerm:
+		return strings.Contains(item.Value, valueText)
+	case notLikeTerm:
+		return !strings.Contains(item.Value, valueText)
+	case nullTerm:
+		return false
+	case notNullTerm:
+		return true
+	case emptyTerm:
+		return strings.TrimSpace(valueText) == ""
+	case notEmptyTerm:
+		return strings.TrimSpace(valueText) != ""
+	default:
+		return item.Value == valueText
+	}
+}
+
+func matchNumericOperator(valueObj any, item *thresholddomain.FilterTreeItem) bool {
+	if valueObj == nil || strings.TrimSpace(item.Value) == "" {
+		return false
+	}
+	targetVal, ok := parseFloat(item.Value)
+	if !ok {
+		return false
+	}
+	originVal, ok := parseFloat(fmt.Sprint(valueObj))
+	if !ok {
+		return false
+	}
+	switch item.Term {
+	case eqTerm:
+		return strconv.FormatFloat(originVal, 'f', -1, 64) == strconv.FormatFloat(targetVal, 'f', -1, 64)
+	case notEqTerm:
+		return strconv.FormatFloat(originVal, 'f', -1, 64) != strconv.FormatFloat(targetVal, 'f', -1, 64)
+	case gtTerm:
+		return targetVal < originVal
+	case geTerm:
+		return targetVal <= originVal
+	case ltTerm:
+		return targetVal > originVal
+	case leTerm:
+		return targetVal >= originVal
+	default:
+		return item.Value == fmt.Sprint(valueObj)
+	}
+}
+
+func matchTimeOperator(valueObj any, item *thresholddomain.FilterTreeItem) bool {
+	if valueObj == nil {
+		return false
+	}
+	target, ok := parseDigitsInt64(item.Value)
+	if !ok {
+		return false
+	}
+	origin, ok := parseDigitsInt64(fmt.Sprint(valueObj))
+	if !ok {
+		return false
+	}
+	switch item.Term {
+	case eqTerm:
+		return origin == target
+	case notEqTerm:
+		return origin != target
+	case gtTerm:
+		return origin > target
+	case geTerm:
+		return origin >= target
+	case ltTerm:
+		return origin < target
+	case leTerm:
+		return origin <= target
+	default:
+		return origin == target
 	}
 }
 
@@ -267,7 +305,7 @@ func ConvertRulesToText(tree *thresholddomain.FilterTreeObj, fieldMap map[int64]
 	parts := make([]string, 0, len(tree.Items))
 	for idx := range tree.Items {
 		item := &tree.Items[idx]
-		if item.Type == "tree" && item.SubTree != nil {
+		if item.Type == treeType && item.SubTree != nil {
 			child := ConvertRulesToText(item.SubTree, fieldMap)
 			if child != "" {
 				parts = append(parts, child)
@@ -278,7 +316,7 @@ func ConvertRulesToText(tree *thresholddomain.FilterTreeObj, fieldMap map[int64]
 		if !ok {
 			continue
 		}
-		if item.FilterType == "enum" {
+		if item.FilterType == enumFilter {
 			parts = append(parts, fmt.Sprintf("%s in ( %s )", field.Name, strings.Join(item.EnumValue, ",")))
 			continue
 		}
@@ -558,7 +596,7 @@ func collectThresholdFieldIDs(tree *thresholddomain.FilterTreeObj) []int64 {
 		}
 		for idx := range node.Items {
 			item := &node.Items[idx]
-			if item.Type == "tree" {
+			if item.Type == treeType {
 				walk(item.SubTree)
 				continue
 			}
