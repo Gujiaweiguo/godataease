@@ -312,6 +312,7 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	// Permanent shim: xpack/plugin/AI integration
 	engine.GET("/aiBase/findTargetUrl", h.FindTargetUrl)
 	engine.GET("/xpackComponent/content/:id", h.GetXpackContent)
+	engine.GET("/xpackComponent/contentPlugin/:id", h.GetXpackContent)
 	engine.GET("/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
 	engine.GET("/websocket/info", h.GetWebSocketInfo)
 
@@ -322,6 +323,7 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.POST("/api/store/query", h.QueryStore)
 	engine.GET("/api/aiBase/findTargetUrl", h.FindTargetUrl)
 	engine.GET("/api/xpackComponent/content/:id", h.GetXpackContent)
+	engine.GET("/api/xpackComponent/contentPlugin/:id", h.GetXpackContent)
 	engine.GET("/api/xpackComponent/pluginStaticInfo/:id", h.GetXpackPluginStaticInfo)
 	engine.GET("/api/websocket/info", h.GetWebSocketInfo)
 
