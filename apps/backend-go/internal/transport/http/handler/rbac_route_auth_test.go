@@ -118,7 +118,7 @@ func TestRegisterAuditRoutes_RequiresMenuAuthorizationForExportRoutes(t *testing
 	t.Run("authorized role can hit export route", func(t *testing.T) {
 		r := gin.New()
 		installAuthContext(r, []int64{2}, 2)
-		RegisterAuditRoutes(r.Group(""), h, menuAuth)
+		RegisterAuditRoutes(r.Group(""), h, nil, menuAuth)
 
 		req := httptest.NewRequest(http.MethodPost, "/audit/export", strings.NewReader("{"))
 		req.Header.Set("Content-Type", "application/json")
@@ -132,7 +132,7 @@ func TestRegisterAuditRoutes_RequiresMenuAuthorizationForExportRoutes(t *testing
 	t.Run("unauthorized role gets forbidden", func(t *testing.T) {
 		r := gin.New()
 		installAuthContext(r, []int64{3}, 3)
-		RegisterAuditRoutes(r.Group(""), h, menuAuth)
+		RegisterAuditRoutes(r.Group(""), h, nil, menuAuth)
 
 		req := httptest.NewRequest(http.MethodGet, "/audit/download?path=/etc/passwd&format=csv", nil)
 		w := httptest.NewRecorder()
@@ -147,7 +147,7 @@ func TestRegisterAuditRoutes_RequiresMenuAuthorizationForExportRoutes(t *testing
 	t.Run("admin bypasses menu auth", func(t *testing.T) {
 		r := gin.New()
 		installAuthContext(r, []int64{1}, 1)
-		RegisterAuditRoutes(r.Group(""), h, menuAuth)
+		RegisterAuditRoutes(r.Group(""), h, nil, menuAuth)
 
 		req := httptest.NewRequest(http.MethodPost, "/audit/export", strings.NewReader("{"))
 		req.Header.Set("Content-Type", "application/json")
@@ -167,7 +167,7 @@ func TestDatasourceValidationRoutes_RequireAuthorization(t *testing.T) {
 	t.Run("canonical post validate requires datasource menu auth", func(t *testing.T) {
 		r := gin.New()
 		installAuthContext(r, []int64{3}, 3)
-		RegisterDatasourceRoutes(r.Group("/api"), h, createDatasourcePermissionMiddleware(true), menuAuth)
+		RegisterDatasourceRoutes(r.Group("/api"), h, createDatasourcePermissionMiddleware(true), nil, menuAuth)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/ds/validate", strings.NewReader("{"))
 		req.Header.Set("Content-Type", "application/json")
@@ -180,7 +180,7 @@ func TestDatasourceValidationRoutes_RequireAuthorization(t *testing.T) {
 	t.Run("canonical get validate by id uses datasource permission", func(t *testing.T) {
 		r := gin.New()
 		installAuthContext(r, []int64{2}, 2)
-		RegisterDatasourceRoutes(r.Group("/api"), h, createDatasourcePermissionMiddleware(true), menuAuth)
+		RegisterDatasourceRoutes(r.Group("/api"), h, createDatasourcePermissionMiddleware(true), nil, menuAuth)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/ds/validate/1", nil)
 		w := httptest.NewRecorder()
@@ -194,7 +194,7 @@ func TestDatasourceValidationRoutes_RequireAuthorization(t *testing.T) {
 	t.Run("canonical get validate by id denies missing datasource permission", func(t *testing.T) {
 		r := gin.New()
 		installAuthContext(r, []int64{2}, 2)
-		RegisterDatasourceRoutes(r.Group("/api"), h, createDatasourcePermissionMiddleware(false), menuAuth)
+		RegisterDatasourceRoutes(r.Group("/api"), h, createDatasourcePermissionMiddleware(false), nil, menuAuth)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/ds/validate/1", nil)
 		w := httptest.NewRecorder()

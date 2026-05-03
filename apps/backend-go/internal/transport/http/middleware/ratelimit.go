@@ -24,6 +24,11 @@ type RateLimiterBackend interface {
 	Allow(key string, limit int, window time.Duration) (allowed bool, remaining int, resetAt time.Time)
 }
 
+type RouteRateLimitOptions struct {
+	Config  app.RateLimitConfig
+	Backend RateLimiterBackend
+}
+
 type tokenBucketLimiter struct {
 	mu            sync.Mutex
 	buckets       map[string]*tokenBucket
@@ -203,24 +208,89 @@ func maxInt(a, b int) int {
 	return b
 }
 
-func RateLimit(name string, maxRequests int, window time.Duration, keyFunc RateLimitKeyFunc) gin.HandlerFunc {
-	limiter := newTokenBucketLimiter(name, maxRequests, window, time.Now)
-	return func(c *gin.Context) {
-		key := strings.TrimSpace(keyFunc(c))
-		if key == "" {
-			key = strings.TrimSpace(c.ClientIP())
-		}
-		if key == "" {
-			key = "anonymous"
-		}
+func ResolveRouteLimit(cfg app.RateLimitConfig, name string, defaultMaxRequests int, defaultWindow time.Duration) (bool, int, time.Duration) {
+	enabled := true
+	maxRequests := defaultMaxRequests
+	window := defaultWindow
 
-		if !limiter.allow(key) {
+	if override, ok := cfg.RouteOverrides[name]; ok {
+		if override.Enabled != nil {
+			enabled = *override.Enabled
+		}
+		if override.MaxRequests > 0 {
+			maxRequests = override.MaxRequests
+		}
+		if override.WindowSeconds > 0 {
+			window = time.Duration(override.WindowSeconds) * time.Second
+		}
+	}
+
+	if maxRequests <= 0 {
+		maxRequests = 1
+	}
+	if window <= 0 {
+		window = time.Second
+	}
+
+	return enabled, maxRequests, window
+}
+
+func ConfigurableRateLimit(name string, maxRequests int, window time.Duration, backend RateLimiterBackend, keyFunc RateLimitKeyFunc) gin.HandlerFunc {
+	if backend == nil {
+		backend = newInMemoryBackend()
+	}
+
+	if maxRequests <= 0 {
+		maxRequests = 1
+	}
+	if window <= 0 {
+		window = time.Second
+	}
+
+	return func(c *gin.Context) {
+		key := resolveRateLimitKey(c, keyFunc)
+		allowed, remaining, resetAt := backend.Allow(fmt.Sprintf("%s:%s", name, key), maxRequests, window)
+		setRateLimitHeaders(c, maxRequests, remaining, resetAt)
+		if !allowed {
+			c.Header("Retry-After", strconv.Itoa(secondsUntilReset(resetAt, time.Now())))
 			response.TooManyRequests(c, "rate limit exceeded")
 			return
 		}
 
 		c.Next()
 	}
+}
+
+func RateLimit(name string, maxRequests int, window time.Duration, keyFunc RateLimitKeyFunc) gin.HandlerFunc {
+	return ConfigurableRateLimit(name, maxRequests, window, newInMemoryBackend(), keyFunc)
+}
+
+func resolveRateLimitKey(c *gin.Context, keyFunc RateLimitKeyFunc) string {
+	key := ""
+	if keyFunc != nil {
+		key = strings.TrimSpace(keyFunc(c))
+	}
+	if key == "" {
+		key = strings.TrimSpace(c.ClientIP())
+	}
+	if key == "" {
+		key = "anonymous"
+	}
+	return key
+}
+
+func setRateLimitHeaders(c *gin.Context, limit int, remaining int, resetAt time.Time) {
+	c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
+	c.Header("X-RateLimit-Remaining", strconv.Itoa(maxInt(remaining, 0)))
+	c.Header("X-RateLimit-Reset", strconv.FormatInt(resetAt.Unix(), 10))
+}
+
+func secondsUntilReset(resetAt time.Time, now time.Time) int {
+	seconds := int(math.Ceil(resetAt.Sub(now).Seconds()))
+	if seconds < 0 {
+		return 0
+	}
+	return seconds
 }
 
 func ClientIPKey(c *gin.Context) string {

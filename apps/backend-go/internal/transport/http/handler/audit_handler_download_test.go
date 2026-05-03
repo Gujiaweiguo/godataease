@@ -17,7 +17,7 @@ func TestAuditHandler_DownloadExportFile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewAuditHandler(nil, nil)
 	r := gin.New()
-	RegisterAuditRoutes(r.Group(""), h)
+	RegisterAuditRoutes(r.Group(""), h, nil)
 
 	t.Run("rejects missing path", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/audit/download", nil)

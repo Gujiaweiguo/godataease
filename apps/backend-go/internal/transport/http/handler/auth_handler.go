@@ -115,9 +115,21 @@ func (h *AuthHandler) Model(c *gin.Context) {
 	response.Success(c, false)
 }
 
-func RegisterAuthRoutes(engine *gin.Engine, h *AuthHandler) {
+func RegisterAuthRoutes(engine *gin.Engine, h *AuthHandler, rateLimitOpts *middleware.RouteRateLimitOptions) {
+	loginMiddleware := middleware.RateLimit("login", loginRateLimitRequests, loginRateLimitWindow, middleware.ClientIPKey)
+	if rateLimitOpts != nil {
+		enabled, maxRequests, window := middleware.ResolveRouteLimit(rateLimitOpts.Config, "login", loginRateLimitRequests, loginRateLimitWindow)
+		if enabled {
+			loginMiddleware = middleware.ConfigurableRateLimit("login", maxRequests, window, rateLimitOpts.Backend, middleware.ClientIPKey)
+		} else {
+			loginMiddleware = nil
+		}
+	}
+
 	loginGroup := engine.Group("")
-	loginGroup.Use(middleware.RateLimit("login", loginRateLimitRequests, loginRateLimitWindow, middleware.ClientIPKey))
+	if loginMiddleware != nil {
+		loginGroup.Use(loginMiddleware)
+	}
 	loginGroup.POST("/login/localLogin", h.LocalLogin)
 	loginGroup.POST("/api/login/localLogin", h.LocalLogin)
 	engine.GET("/login/refresh", h.Refresh)

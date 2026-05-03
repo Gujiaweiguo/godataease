@@ -18,7 +18,7 @@ func TestRegisterDatasourceRoutes_RateLimitsValidateRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewDatasourceHandler(service.NewDatasourceService(nil))
 	r := gin.New()
-	RegisterDatasourceRoutes(r.Group("/api"), h, nil)
+	RegisterDatasourceRoutes(r.Group("/api"), h, nil, nil)
 
 	for i := 0; i < datasourceValidateRateLimitRequests; i++ {
 		req := httptest.NewRequest(http.MethodPost, "/api/ds/validate", strings.NewReader("{"))

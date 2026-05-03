@@ -56,7 +56,7 @@ func setupAuditHandlerTestEnv(t *testing.T) *auditHandlerTestEnv {
 	h := NewAuditHandler(auditSvc, paramSvc)
 
 	r := gin.New()
-	RegisterAuditRoutes(r.Group(""), h)
+	RegisterAuditRoutes(r.Group(""), h, nil)
 	return &auditHandlerTestEnv{r: r, db: db}
 }
 

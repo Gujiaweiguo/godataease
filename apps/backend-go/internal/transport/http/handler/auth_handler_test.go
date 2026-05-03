@@ -6,12 +6,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
+	"dataease/backend/internal/app"
 	domainauth "dataease/backend/internal/domain/auth"
 	pkgauth "dataease/backend/internal/pkg/auth"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -60,7 +63,7 @@ func TestAuthHandler_ModelAndRouteAliases(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewAuthHandler(service.NewAuthService(nil, nil, nil, nil))
 	r := gin.New()
-	RegisterAuthRoutes(r, h)
+	RegisterAuthRoutes(r, h, nil)
 
 	for _, path := range []string{"/model", "/api/model"} {
 		t.Run(path, func(t *testing.T) {
@@ -145,7 +148,7 @@ func TestRegisterAuthRoutes_RateLimitsLocalLogin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewAuthHandler(service.NewAuthService(nil, nil, nil, nil))
 	r := gin.New()
-	RegisterAuthRoutes(r, h)
+	RegisterAuthRoutes(r, h, nil)
 
 	for i := 0; i < loginRateLimitRequests; i++ {
 		req := httptest.NewRequest("POST", "/login/localLogin", strings.NewReader("{"))
@@ -168,6 +171,54 @@ func TestRegisterAuthRoutes_RateLimitsLocalLogin(t *testing.T) {
 	var resp bridgeCodeResp
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "429001", resp.Code)
+}
+
+func TestRegisterAuthRoutes_UsesConfiguredLoginOverride(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewAuthHandler(service.NewAuthService(nil, nil, nil, nil))
+	r := gin.New()
+	RegisterAuthRoutes(r, h, &middleware.RouteRateLimitOptions{Config: app.RateLimitConfig{
+		RouteOverrides: map[string]app.RouteLimitConfig{
+			"login": {MaxRequests: 1, WindowSeconds: 120},
+		},
+	}})
+
+	first := httptest.NewRequest("POST", "/login/localLogin", strings.NewReader("{"))
+	first.RemoteAddr = "192.0.2.55:8080"
+	first.Header.Set("Content-Type", "application/json")
+	firstResp := httptest.NewRecorder()
+	r.ServeHTTP(firstResp, first)
+	assert.Equal(t, 200, firstResp.Code)
+	assert.Equal(t, "1", firstResp.Header().Get("X-RateLimit-Limit"))
+
+	second := httptest.NewRequest("POST", "/api/login/localLogin", strings.NewReader("{"))
+	second.RemoteAddr = "192.0.2.55:8080"
+	second.Header.Set("Content-Type", "application/json")
+	secondResp := httptest.NewRecorder()
+	r.ServeHTTP(secondResp, second)
+
+	assert.Equal(t, 429, secondResp.Code)
+	assert.Equal(t, "1", secondResp.Header().Get("X-RateLimit-Limit"))
+	assert.Equal(t, "0", secondResp.Header().Get("X-RateLimit-Remaining"))
+	var resp bridgeCodeResp
+	require.NoError(t, json.Unmarshal(secondResp.Body.Bytes(), &resp))
+	assert.Equal(t, "429001", resp.Code)
+}
+
+func TestRegisterAuthRoutes_UsesDefaultLoginLimitWithoutOverride(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewAuthHandler(service.NewAuthService(nil, nil, nil, nil))
+	r := gin.New()
+	RegisterAuthRoutes(r, h, &middleware.RouteRateLimitOptions{Config: app.RateLimitConfig{}})
+
+	req := httptest.NewRequest("POST", "/login/localLogin", strings.NewReader("{"))
+	req.RemoteAddr = "192.0.2.65:8080"
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, strconv.Itoa(loginRateLimitRequests), w.Header().Get("X-RateLimit-Limit"))
 }
 
 func TestDecryptCredentialIfNeeded(t *testing.T) {
