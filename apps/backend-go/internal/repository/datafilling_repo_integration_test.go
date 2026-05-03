@@ -22,9 +22,9 @@ func TestDataFillingRepository_CRUDAndTree(t *testing.T) {
 	repo := NewDataFillingRepository(testDB)
 	ctx := context.Background()
 
-	folder := &datafillingdomain.DataFillingForm{Name: "folder", PID: 0, Level: 0, NodeType: "folder", CreateBy: 1, CreateTime: 1, UpdateBy: 1, UpdateTime: 1}
+	folder := &datafillingdomain.DataFillingForm{Name: "folder", PID: 0, Level: 0, NodeType: datafillingdomain.NodeTypeFolder, CreateBy: 1, CreateTime: 1, UpdateBy: 1, UpdateTime: 1}
 	require.NoError(t, repo.Create(ctx, folder))
-	form := &datafillingdomain.DataFillingForm{Name: "form", PID: folder.ID, Level: 1, NodeType: "form", PhysicalTableName: "df_repo_test", DatasourceID: 1, Forms: "[]", CreateBy: 1, CreateTime: 1, UpdateBy: 1, UpdateTime: 1}
+	form := &datafillingdomain.DataFillingForm{Name: "form", PID: folder.ID, Level: 1, NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_repo_test", DatasourceID: 1, Forms: "[]", CreateBy: 1, CreateTime: 1, UpdateBy: 1, UpdateTime: 1}
 	require.NoError(t, repo.Create(ctx, form))
 
 	got, err := repo.GetByID(ctx, form.ID)
@@ -49,7 +49,7 @@ func TestDataFillingRepository_CRUDAndTree(t *testing.T) {
 	tree, err := repo.GetTree(ctx)
 	require.NoError(t, err)
 	assert.Len(t, tree, 2)
-	assert.Equal(t, "folder", tree[0].NodeType)
+	assert.Equal(t, datafillingdomain.NodeTypeFolder, tree[0].NodeType)
 
 	require.NoError(t, repo.DeleteByID(ctx, folder.ID))
 	_, err = repo.GetByID(ctx, folder.ID)

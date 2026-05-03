@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"testing"
 
@@ -167,7 +166,7 @@ func TestDataFillingService_SaveFolderSkipsDDL(t *testing.T) {
 	ddl := &fakeDDLProvider{}
 	svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, ddl)
 
-	item, err := svc.Save(context.Background(), &datafillingdomain.CreateFormRequest{Name: "root", NodeType: "folder"}, 9)
+	item, err := svc.Save(context.Background(), &datafillingdomain.CreateFormRequest{Name: "root", NodeType: datafillingdomain.NodeTypeFolder}, 9)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), item.ID)
 	assert.Empty(t, ddl.created)
@@ -175,8 +174,8 @@ func TestDataFillingService_SaveFolderSkipsDDL(t *testing.T) {
 
 func TestDataFillingService_RenameMoveTree(t *testing.T) {
 	repo := newFakeDataFillingRepo()
-	repo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "A", NodeType: "folder", PID: 0, Level: 0}
-	repo.records[2] = &datafillingdomain.DataFillingForm{ID: 2, Name: "B", NodeType: "form", PID: 1, Level: 1}
+	repo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "A", NodeType: datafillingdomain.NodeTypeFolder, PID: 0, Level: 0}
+	repo.records[2] = &datafillingdomain.DataFillingForm{ID: 2, Name: "B", NodeType: datafillingdomain.NodeTypeForm, PID: 1, Level: 1}
 	svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{})
 
 	renamed, err := svc.Rename(context.Background(), 2, "B2")
@@ -215,10 +214,10 @@ func TestDataFillingService_CreatePhysicalTableParsesFields(t *testing.T) {
 	formFields, err := json.Marshal([]datafillingdomain.ExtTableField{{Settings: datafillingdomain.ExtTableFieldSetting{Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "name", Type: datafillingdomain.BaseTypeNvarchar}}}})
 	require.NoError(t, err)
 
-	conf := fmt.Sprintf(`{"host":"127.0.0.1","port":3306,"dataBase":"demo","username":"u","password":"p"}`)
+	conf := `{"host":"127.0.0.1","port":3306,"dataBase":"demo","username":"u","password":"p"}`
 	svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{ds: map[int64]*datasourcedomain.CoreDatasource{8: {ID: 8, Type: "mysql", Configuration: &conf}}}, ddl)
 
-	_, err = svc.Save(context.Background(), &datafillingdomain.CreateFormRequest{Name: "form", NodeType: "form", TableName: "df_form_1", DatasourceID: 8, Forms: string(formFields), UseExistsTable: true}, 1)
+	_, err = svc.Save(context.Background(), &datafillingdomain.CreateFormRequest{Name: "form", NodeType: datafillingdomain.NodeTypeForm, TableName: "df_form_1", DatasourceID: 8, Forms: string(formFields), UseExistsTable: true}, 1)
 	require.NoError(t, err)
 	assert.Empty(t, ddl.created)
 }

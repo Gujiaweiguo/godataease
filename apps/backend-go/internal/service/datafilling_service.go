@@ -72,7 +72,7 @@ func (s *DataFillingService) Save(ctx context.Context, req *datafillingdomain.Cr
 	if err := s.repo.Create(ctx, form); err != nil {
 		return nil, err
 	}
-	if nodeType == "form" && !req.UseExistsTable {
+	if nodeType == datafillingdomain.NodeTypeForm && !req.UseExistsTable {
 		if err := s.createPhysicalTable(ctx, form); err != nil {
 			_ = s.repo.DeleteByID(ctx, form.ID)
 			return nil, err
@@ -137,7 +137,7 @@ func (s *DataFillingService) Delete(ctx context.Context, id int64) error {
 			return err
 		}
 	}
-	if normalizeDataFillingNodeType(item.NodeType) == "form" && item.DatasourceID > 0 && strings.TrimSpace(item.PhysicalTableName) != "" && s.ddlProvider != nil {
+	if normalizeDataFillingNodeType(item.NodeType) == datafillingdomain.NodeTypeForm && item.DatasourceID > 0 && strings.TrimSpace(item.PhysicalTableName) != "" && s.ddlProvider != nil {
 		db, err := s.GetDatasourceConnection(ctx, item.DatasourceID)
 		if err != nil {
 			return err
@@ -313,7 +313,7 @@ func validateDataFillingCreateRequest(req *datafillingdomain.CreateFormRequest) 
 	if req == nil || strings.TrimSpace(req.Name) == "" {
 		return gorm.ErrInvalidData
 	}
-	if normalizeDataFillingNodeType(req.NodeType) == "folder" {
+	if normalizeDataFillingNodeType(req.NodeType) == datafillingdomain.NodeTypeFolder {
 		return nil
 	}
 	if strings.TrimSpace(req.TableName) == "" || req.DatasourceID <= 0 {
@@ -323,10 +323,10 @@ func validateDataFillingCreateRequest(req *datafillingdomain.CreateFormRequest) 
 }
 
 func normalizeDataFillingNodeType(nodeType string) string {
-	if strings.EqualFold(strings.TrimSpace(nodeType), "folder") {
-		return "folder"
+	if strings.EqualFold(strings.TrimSpace(nodeType), datafillingdomain.NodeTypeFolder) {
+		return datafillingdomain.NodeTypeFolder
 	}
-	return "form"
+	return datafillingdomain.NodeTypeForm
 }
 
 func buildDataFillingTree(rows []*datafillingdomain.DataFillingForm) []*datafillingdomain.TreeNode {

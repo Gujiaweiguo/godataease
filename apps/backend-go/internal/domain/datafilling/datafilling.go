@@ -26,6 +26,11 @@ type DataFillingForm struct {
 
 func (DataFillingForm) TableName() string { return "data_filling_forms" }
 
+const (
+	NodeTypeFolder = "folder"
+	NodeTypeForm   = "form"
+)
+
 type BaseType string
 
 const (

@@ -30,7 +30,7 @@ func TestDataFillingHandler_SaveAndGet(t *testing.T) {
 	h := NewDataFillingHandler(svc)
 	RegisterDataFillingRoutes(engine, h, nil, nil)
 
-	body := []byte(`{"name":"folder-1","nodeType":"folder","pid":0}`)
+	body := []byte(`{"name":"folder-1","nodeType":"` + datafillingdomain.NodeTypeFolder + `","pid":0}`)
 	resp := performDataFillingRequest(t, engine, http.MethodPost, "/data-filling/save", body)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "000000", resp.Body.Code)
