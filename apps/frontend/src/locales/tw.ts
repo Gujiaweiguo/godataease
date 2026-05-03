@@ -93,7 +93,9 @@ export default {
     filter: '篩選',
     filter_condition: '篩選條件',
     no_auth_tips: '缺少選單權限，請聯絡管理員',
-    no_menu_tips: '未找到資源，請檢查訪問地址是否正確'
+    no_menu_tips: '未找到資源，請檢查訪問地址是否正確',
+    rate_limit_too_frequent: '請求過於頻繁，請稍後再試',
+    rate_limit_retry_after: '請求過於頻繁，請 {0} 秒後再試'
   },
   toolbox: {
     name: '工具箱',
