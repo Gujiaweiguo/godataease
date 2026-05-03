@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
+	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/driver"
@@ -79,6 +80,7 @@ func TestMain(m *testing.M) {
 		&visualization.DataVisualizationInfo{},
 		&visualization.Watermark{},
 		&datasource.CoreDatasource{}, &auto.CoreDatasourceTaskLog{},
+		&datafillingdomain.DataFillingForm{},
 		&auto.CoreDsFinishPage{},
 		&dataset.CoreDatasetGroup{},
 		&auto.CoreExportTask{},

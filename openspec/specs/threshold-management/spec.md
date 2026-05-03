@@ -182,3 +182,28 @@ The system SHALL return explicit non-success responses for operations that fall 
 - **WHEN** a threshold references a chart type or resource type that the preview engine cannot evaluate
 - **THEN** the system returns an explicit non-success response naming the unsupported target type
 - **AND** the response remains distinguishable from missing-resource or authorization failures
+
+### Requirement: Chart Data Accessor Interface
+The system SHALL provide a `ThresholdChartDataAccessor` interface that ThresholdService depends on to retrieve chart data for preview evaluation.
+
+#### Scenario: Accessor returns rows and fields for a valid chart
+- **WHEN** the accessor's `GetChartDataForThreshold` method is called with a valid chart ID and resource table
+- **THEN** the accessor returns a slice of row maps, a slice of FieldDTO objects, and no error
+- **AND** the rows contain the actual chart data values keyed by field DataeaseName
+- **AND** the FieldDTO slice contains field metadata (ID, Name, DataeaseName, DeType) for all chart fields
+
+#### Scenario: Accessor returns error for missing chart
+- **WHEN** the accessor's `GetChartDataForThreshold` method is called with a chart ID that does not exist
+- **THEN** the accessor returns an error indicating the chart data is unavailable
+
+#### Scenario: Accessor returns empty rows for chart with no data
+- **WHEN** the accessor's `GetChartDataForThreshold` method is called for a chart that has no data rows
+- **THEN** the accessor returns an empty row slice, the available fields, and no error
+
+### Requirement: Preview Template Style Normalization
+The system SHALL normalize preview HTML template styles by stripping blue highlight backgrounds from span elements.
+
+#### Scenario: Preview template styles are normalized
+- **WHEN** the generated preview HTML contains span elements with blue highlight background styles
+- **THEN** the system strips background-color styles from template span elements before returning the HTML
+- **AND** the normalized HTML preserves all other styling and content
