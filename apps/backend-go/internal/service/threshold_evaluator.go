@@ -639,3 +639,15 @@ func marshalStringList(values []string) string {
 	}
 	return string(data)
 }
+
+// normalizeTemplateStyles strips blue highlight backgrounds from span elements
+// to produce clean preview output matching Java's convertStyle behavior.
+func normalizeTemplateStyles(htmlContent string) string {
+	reBackground := regexp.MustCompile(`(<span[^>]*id="changeText-[^"]*"[^>]*)(\s+style="[^"]*background-color:\s*#3370FF33[^"]*")([^>]*>)`)
+	htmlContent = reBackground.ReplaceAllString(htmlContent, `$1$3`)
+
+	reColor := regexp.MustCompile(`(<span[^>]*id="changeText-[^"]*"[^>]*)(\s+style="[^"]*color:\s*#2b5fd9[^"]*")([^>]*>)`)
+	htmlContent = reColor.ReplaceAllString(htmlContent, `$1$3`)
+
+	return htmlContent
+}

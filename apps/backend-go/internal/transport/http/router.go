@@ -389,6 +389,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	thresholdRepo := repository.NewThresholdRepository(db)
 	thresholdService := service.NewThresholdService(thresholdRepo)
+	thresholdService.SetChartDataAccessor(chartService)
 	thresholdHandler := handler.NewThresholdHandler(thresholdService)
 
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
@@ -396,6 +397,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	visualService.SetTemplateService(templateService)
 	visualService.SetTemplateExtendDataRepo(templateExtendDataRepo)
 	visualService.SetAuditService(auditService)
+	visualService.SetThresholdService(thresholdService)
 
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
 

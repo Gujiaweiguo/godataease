@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ type VisualizationService struct {
 	templateService        *TemplateService
 	templateExtendDataRepo *repository.TemplateExtendDataRepository
 	auditService           *AuditService
+	thresholdService       *ThresholdService
 }
 
 type marketTemplateDTO struct {
@@ -67,6 +69,10 @@ func (s *VisualizationService) SetDatasetRepository(r *repository.DatasetReposit
 
 func (s *VisualizationService) SetAuditService(auditSvc *AuditService) {
 	s.auditService = auditSvc
+}
+
+func (s *VisualizationService) SetThresholdService(ts *ThresholdService) {
+	s.thresholdService = ts
 }
 
 func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy string) (int64, error) {
@@ -285,7 +291,62 @@ func (s *VisualizationService) InteractiveTree(busiFlag string) ([]*visualizatio
 }
 
 func (s *VisualizationService) DeleteLogic(id int64, updateBy string) error {
-	return s.repo.DeleteLogic(id, updateBy)
+	var chartIDs []int64
+	if s.thresholdService != nil {
+		viz, err := s.repo.GetByID(id)
+		if err == nil && viz != nil && viz.ComponentData != nil {
+			chartIDs = extractChartIDsFromComponentData(json.RawMessage(*viz.ComponentData))
+		}
+	}
+
+	if err := s.repo.DeleteLogic(id, updateBy); err != nil {
+		return err
+	}
+
+	if s.thresholdService != nil && len(chartIDs) > 0 {
+		for _, chartID := range chartIDs {
+			_ = s.thresholdService.DeleteWithChart(context.Background(), chartID, "core")
+		}
+	}
+
+	return nil
+}
+
+// extractChartIDsFromComponentData parses ComponentData JSON and returns chart component IDs.
+func extractChartIDsFromComponentData(componentData json.RawMessage) []int64 {
+	if len(componentData) == 0 {
+		return nil
+	}
+	var components []struct {
+		Component string `json:"component"`
+		ID        int64  `json:"id"`
+		PropValue []struct {
+			ID        int64  `json:"id"`
+			Component string `json:"component"`
+		} `json:"propValue"`
+	}
+	if err := json.Unmarshal(componentData, &components); err != nil {
+		return nil
+	}
+	seen := make(map[int64]struct{})
+	chartIDs := make([]int64, 0)
+	appendChartID := func(component string, id int64) {
+		if component != "UserView" || id <= 0 {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		chartIDs = append(chartIDs, id)
+	}
+	for _, c := range components {
+		appendChartID(c.Component, c.ID)
+		for _, pv := range c.PropValue {
+			appendChartID(pv.Component, pv.ID)
+		}
+	}
+	return chartIDs
 }
 
 func (s *VisualizationService) FindDvType(id int64) (string, error) {

@@ -78,6 +78,8 @@ type PreviewRequest struct {
 	ChartID        int64  `json:"chartId"`
 	ThresholdRules string `json:"thresholdRules"`
 	MsgContent     string `json:"msgContent"`
+	ShowFieldValue *bool  `json:"showFieldValue"`
+	ThresholdLimit int    `json:"thresholdLimit"`
 	ResourceTable  string `json:"resourceTable"`
 }
 

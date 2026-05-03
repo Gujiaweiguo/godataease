@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,11 @@ import (
 
 	"gorm.io/gorm"
 )
+
+// ThresholdChartDataAccessor provides chart data for threshold preview.
+type ThresholdChartDataAccessor interface {
+	GetChartDataForThreshold(ctx context.Context, chartID int64, resourceTable string) ([]map[string]any, []FieldDTO, error)
+}
 
 type ThresholdRepo interface {
 	Create(ctx context.Context, info *auto.XpackThresholdInfo) error
@@ -29,11 +35,16 @@ type ThresholdRepo interface {
 var errThresholdRepoNotReady = errors.New("threshold repository not initialized")
 
 type ThresholdService struct {
-	repo ThresholdRepo
+	repo              ThresholdRepo
+	chartDataAccessor ThresholdChartDataAccessor
 }
 
 func NewThresholdService(repo ThresholdRepo) *ThresholdService {
 	return &ThresholdService{repo: repo}
+}
+
+func (s *ThresholdService) SetChartDataAccessor(a ThresholdChartDataAccessor) {
+	s.chartDataAccessor = a
 }
 
 func (s *ThresholdService) Create(ctx context.Context, req *thresholddomain.CreateRequest, userID int64, userName string, oid int64) (*auto.XpackThresholdInfo, error) {
@@ -233,7 +244,36 @@ func (s *ThresholdService) InstancePager(ctx context.Context, req *thresholddoma
 }
 
 func (s *ThresholdService) Preview(ctx context.Context, req *thresholddomain.PreviewRequest) (string, error) {
-	return "", errors.New("preview requires chart data access - not yet implemented")
+	if s.chartDataAccessor == nil {
+		return "", errors.New("chart data accessor not configured")
+	}
+	if req == nil || req.ChartID <= 0 {
+		return "", gorm.ErrInvalidData
+	}
+
+	rows, fields, err := s.chartDataAccessor.GetChartDataForThreshold(ctx, req.ChartID, req.ResourceTable)
+	if err != nil {
+		return "", fmt.Errorf("fetch chart data: %w", err)
+	}
+
+	var rules thresholddomain.FilterTreeObj
+	if err := json.Unmarshal([]byte(req.ThresholdRules), &rules); err != nil {
+		return "", fmt.Errorf("parse threshold rules: %w", err)
+	}
+
+	fieldMap := make(map[int64]FieldDTO, len(fields))
+	for _, f := range fields {
+		fieldMap[f.ID] = f
+	}
+
+	showFieldValue := false
+	if req.ShowFieldValue != nil {
+		showFieldValue = *req.ShowFieldValue
+	}
+	htmlResult := GeneratePreviewHTML(req.MsgContent, &rules, rows, fieldMap, showFieldValue, req.ThresholdLimit)
+	htmlResult = normalizeTemplateStyles(htmlResult)
+
+	return htmlResult, nil
 }
 
 func validateThresholdCreateRequest(req *thresholddomain.CreateRequest) error {
