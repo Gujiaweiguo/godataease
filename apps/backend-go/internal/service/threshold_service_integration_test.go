@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"dataease/backend/internal/domain/auto"
@@ -233,6 +234,43 @@ func TestThresholdServiceIntegration_AnyThreshold(t *testing.T) {
 	exists, err = svc.AnyThreshold(context.Background(), 4901, "snapshot")
 	require.NoError(t, err)
 	assert.False(t, exists)
+}
+
+func TestThresholdServiceIntegration_EvaluatorCoverage(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	rows := []map[string]any{
+		{"C_100": float64(50), "C_200": "alpha", "C_300": "2024-01-01 00:00:00"},
+		{"C_100": float64(150), "C_200": "beta", "C_300": "2024-06-01 00:00:00"},
+		{"C_100": float64(250), "C_200": "gamma", "C_300": "2024-12-01 00:00:00"},
+	}
+	fieldMap := map[int64]FieldDTO{
+		100: {ID: 100, Name: "Value", DataeaseName: "C_100", DeType: deTypeFloat},
+		200: {ID: 200, Name: "Label", DataeaseName: "C_200", DeType: deTypeString},
+		300: {ID: 300, Name: "Date", DataeaseName: "C_300", DeType: deTypeTime},
+	}
+
+	andTree := &thresholddomain.FilterTreeObj{Logic: "and", Items: []thresholddomain.FilterTreeItem{
+		{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "100"},
+		{Type: "item", FieldID: json.Number("200"), FilterType: "logic", Term: "not_empty", Value: ""},
+	}}
+	filtered := FilterRows(rows, andTree, fieldMap)
+	assert.Len(t, filtered, 2)
+
+	text := ConvertRulesToText(andTree, fieldMap)
+	assert.Contains(t, text, "Value")
+	assert.Contains(t, text, "gt")
+
+	html := GeneratePreviewHTML("[检测时间] [触发告警]", andTree, rows, fieldMap, true, 2)
+	assert.NotEmpty(t, html)
+	assert.Contains(t, html, "Value")
+
+	dynamicTree := &thresholddomain.FilterTreeObj{Logic: "or", Items: []thresholddomain.FilterTreeItem{
+		{Type: "item", FieldID: json.Number("100"), FilterType: "logic", Term: "gt", Value: "max", ValueType: "dynamic"},
+	}}
+	resolveDynamicValues(rows, dynamicTree, fieldMap)
+	assert.Equal(t, "250", dynamicTree.Items[0].Value)
 }
 
 func TestThresholdServiceIntegration_Preview_Stub(t *testing.T) {
