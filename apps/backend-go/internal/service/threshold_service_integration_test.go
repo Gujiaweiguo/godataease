@@ -1,0 +1,179 @@
+//go:build integration
+
+package service
+
+import (
+	"context"
+	"testing"
+
+	"dataease/backend/internal/domain/auto"
+	thresholddomain "dataease/backend/internal/domain/threshold"
+	"dataease/backend/internal/repository"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestThresholdServiceIntegration_CreateAndFormInfo(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	req := thresholdIntegrationRequest("threshold-create-form", 4101, 5101)
+
+	created, err := svc.Create(context.Background(), req, 101, "integration-user", 201)
+	require.NoError(t, err)
+
+	form, err := svc.FormInfo(context.Background(), created.ID, "core")
+	require.NoError(t, err)
+	assert.Equal(t, created.ID, form.ID)
+	assert.Equal(t, req.Name, form.Name)
+	assert.Equal(t, req.UIDList, form.UIDList)
+	assert.Equal(t, req.RIDList, form.RIDList)
+	assert.Equal(t, req.EmailList, form.EmailList)
+	assert.Equal(t, req.LarkGroupList, form.LarkGroupList)
+	assert.Equal(t, req.LarksuiteGroupList, form.LarksuiteGroupList)
+	assert.Equal(t, req.WebhookList, form.WebhookList)
+	assert.Equal(t, req.ReciFlagList, form.ReciFlagList)
+	assert.Equal(t, "core", form.ResourceTable)
+}
+
+func TestThresholdServiceIntegration_PagerFiltering(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	for idx, name := range []string{"ops cpu threshold", "finance revenue threshold", "ops memory threshold"} {
+		_, err := svc.Create(context.Background(), thresholdIntegrationRequest(name, int64(4201+idx), int64(5201+idx)), 1, "pager-user", 1)
+		require.NoError(t, err)
+	}
+
+	page, err := svc.Pager(context.Background(), &thresholddomain.GridRequest{Keyword: "ops"}, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), page.Total)
+	rows, ok := page.List.([]*thresholddomain.GridVO)
+	require.True(t, ok)
+	require.Len(t, rows, 2)
+	assert.Contains(t, rows[0].Name, "ops")
+	assert.Contains(t, rows[1].Name, "ops")
+}
+
+func TestThresholdServiceIntegration_EnableSwitch(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	created, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-switch", 4301, 5301), 1, "switch-user", 1)
+	require.NoError(t, err)
+	assert.True(t, created.Enable)
+
+	disabled := false
+	err = svc.SwitchEnable(context.Background(), &thresholddomain.SwitchRequest{ID: created.ID, Enable: &disabled, ResourceTable: "core"})
+	require.NoError(t, err)
+
+	form, err := svc.FormInfo(context.Background(), created.ID, "core")
+	require.NoError(t, err)
+	require.NotNil(t, form.Enable)
+	assert.False(t, *form.Enable)
+}
+
+func TestThresholdServiceIntegration_BatchReci(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	first, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-batch-one", 4401, 5401), 1, "batch-user", 1)
+	require.NoError(t, err)
+	second, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-batch-two", 4402, 5402), 1, "batch-user", 1)
+	require.NoError(t, err)
+
+	err = svc.BatchReci(context.Background(), &thresholddomain.BatchReciRequest{
+		BaseReciDTO: thresholddomain.BaseReciDTO{
+			UIDList:            []string{"updated-user"},
+			RIDList:            []string{"updated-role"},
+			EmailList:          []string{"updated@example.com"},
+			LarkGroupList:      []string{"updated-lark"},
+			LarksuiteGroupList: []string{"updated-suite"},
+			WebhookList:        []string{"https://example.com/updated-hook"},
+		},
+		IDList: []int64{first.ID, second.ID},
+	})
+	require.NoError(t, err)
+
+	for _, id := range []int64{first.ID, second.ID} {
+		form, formErr := svc.FormInfo(context.Background(), id, "core")
+		require.NoError(t, formErr)
+		assert.Equal(t, []string{"updated-user"}, form.UIDList)
+		assert.Equal(t, []string{"updated-role"}, form.RIDList)
+		assert.Equal(t, []string{"updated@example.com"}, form.EmailList)
+		assert.Equal(t, []string{"updated-lark"}, form.LarkGroupList)
+		assert.Equal(t, []string{"updated-suite"}, form.LarksuiteGroupList)
+		assert.Equal(t, []string{"https://example.com/updated-hook"}, form.WebhookList)
+	}
+}
+
+func TestThresholdServiceIntegration_DeleteByChart(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	created, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-delete-chart", 4501, 5501), 1, "delete-user", 1)
+	require.NoError(t, err)
+
+	err = svc.DeleteWithChart(context.Background(), created.ChartID, "core")
+	require.NoError(t, err)
+
+	exists, err := svc.AnyThreshold(context.Background(), created.ChartID, "core")
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestThresholdServiceIntegration_InstancePager(t *testing.T) {
+	if testDB == nil {
+		t.Skip("test database not available")
+	}
+	require.NoError(t, testDB.AutoMigrate(&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{}))
+	cleanupTables("xpack_threshold_instance", "xpack_threshold_info")
+
+	svc := NewThresholdService(repository.NewThresholdRepository(testDB))
+	created, err := svc.Create(context.Background(), thresholdIntegrationRequest("threshold-instance", 4601, 5601), 1, "instance-user", 1)
+	require.NoError(t, err)
+	require.NoError(t, testDB.Create([]*auto.XpackThresholdInstance{
+		{ID: 9001, TaskID: created.ID, ExecTime: 1700000001, Status: true, Content: "cpu reached", Msg: ""},
+		{ID: 9002, TaskID: created.ID, ExecTime: 1700000002, Status: false, Content: "memory normal", Msg: "send failed"},
+	}).Error)
+
+	page, err := svc.InstancePager(context.Background(), &thresholddomain.InstanceRequest{Keyword: "failed", ThresholdID: &created.ID}, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), page.Total)
+	rows, ok := page.List.([]*thresholddomain.InstanceVO)
+	require.True(t, ok)
+	require.Len(t, rows, 1)
+	assert.Equal(t, int64(9002), rows[0].ID)
+	assert.Equal(t, created.ID, rows[0].TaskID)
+	assert.Equal(t, "threshold-instance", rows[0].Name)
+	assert.Equal(t, "send failed", rows[0].Msg)
+}
+
+func thresholdIntegrationRequest(name string, chartID, resourceID int64) *thresholddomain.CreateRequest {
+	req := sampleThresholdRequest()
+	req.Name = name
+	req.ChartID = chartID
+	req.ResourceID = resourceID
+	return req
+}
