@@ -70,7 +70,7 @@ type ThresholdChartDataAccessor interface {
 
 **[Risk] Chart data accessor implementation complexity** → The `GetChartDataForThreshold` method on `ChartService` must assemble rows + fields. If chart data assembly is tightly coupled to HTTP request context, the interface method may need a lightweight DTO. Mitigation: check existing chart data paths before implementing. If too complex, fall back to a narrower accessor that returns pre-computed data.
 
-**[Risk] ComponentData parsing fragility** → Chart component JSON structure could vary between visualization versions. Mitigation: parse defensively with `json.RawMessage`, log warnings for unparseable components, and never fail the deletion if threshold cleanup errors.
+**[Risk] ComponentData parsing fragility** → Chart component JSON structure could vary between visualization versions. Mitigation: parse defensively with `json.RawMessage`, log warnings for unparsable components, and never fail the deletion if threshold cleanup errors.
 
 **[Risk] Setter injection nil guard** → If `ThresholdService` is not wired before `DeleteLogic` is called, the cleanup silently skips. Mitigation: the setter is called in `router.go` immediately after service construction, same as all other setters. Add a nil check in `DeleteLogic` with a log warning.
 

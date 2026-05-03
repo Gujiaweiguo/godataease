@@ -26,7 +26,7 @@ Chart-linked threshold alert data is a governed part of visualization behavior. 
 - **THEN** the visualization deletion completes successfully without threshold cleanup
 - **AND** the system logs a warning indicating that threshold cleanup was skipped
 
-#### Scenario: Visualization deletion handles unparseable ComponentData
+#### Scenario: Visualization deletion handles unparsable ComponentData
 - **WHEN** a visualization is deleted and its ComponentData cannot be parsed to extract chart IDs
 - **THEN** the visualization deletion completes successfully
 - **AND** threshold cleanup is skipped for that visualization without failing the deletion
