@@ -4,6 +4,7 @@ import (
 	"dataease/backend/internal/app"
 	pkgauth "dataease/backend/internal/pkg/auth"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -15,6 +16,90 @@ func newRouterWithJWTConfig() *Router {
 			JWT: app.JWTConfig{Secret: "test-secret", Expire: 3600},
 		},
 	}, nil)
+}
+
+func newRouterWithRateLimitConfig(cfg app.RateLimitConfig) *Router {
+	return NewRouter(&app.Application{
+		Config: &app.Config{
+			JWT:       app.JWTConfig{Secret: "test-secret", Expire: 3600},
+			RateLimit: cfg,
+		},
+	}, nil)
+}
+
+func TestRegisterRoutes_AppliesConfiguredGlobalDefaultRateLimit(t *testing.T) {
+	router := newRouterWithRateLimitConfig(app.RateLimitConfig{
+		Enabled:              true,
+		DefaultMaxRequests:   1,
+		DefaultWindowSeconds: 60,
+	})
+	router.RegisterRoutes()
+
+	jwt := pkgauth.NewJWT(&pkgauth.JWTConfig{Secret: "test-secret", Expire: 3600})
+	token, err := jwt.GenerateTokenWithOrgID(42, "alice", "", 3)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	request := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/ds/list", strings.NewReader("{"))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		router.Engine().ServeHTTP(resp, req)
+		return resp
+	}
+
+	first := request()
+	if first.Code != http.StatusOK {
+		t.Fatalf("expected first request to reach handler, got %d: %s", first.Code, first.Body.String())
+	}
+	if got := first.Header().Get("X-RateLimit-Limit"); got != "1" {
+		t.Fatalf("expected global limit header 1, got %q", got)
+	}
+
+	second := request()
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second request to be rate limited, got %d: %s", second.Code, second.Body.String())
+	}
+	if got := second.Header().Get("X-RateLimit-Remaining"); got != "0" {
+		t.Fatalf("expected remaining header 0, got %q", got)
+	}
+}
+
+func TestRegisterRoutes_AppliesConfiguredLoginRouteOverride(t *testing.T) {
+	router := newRouterWithRateLimitConfig(app.RateLimitConfig{
+		DefaultMaxRequests:   100,
+		DefaultWindowSeconds: 60,
+		RouteOverrides: map[string]app.RouteLimitConfig{
+			"login": {MaxRequests: 1, WindowSeconds: 60},
+		},
+	})
+	router.RegisterRoutes()
+
+	first := httptest.NewRequest(http.MethodPost, "/login/localLogin", strings.NewReader("{"))
+	first.RemoteAddr = "192.0.2.77:8080"
+	first.Header.Set("Content-Type", "application/json")
+	firstResp := httptest.NewRecorder()
+	router.Engine().ServeHTTP(firstResp, first)
+	if firstResp.Code != http.StatusOK {
+		t.Fatalf("expected first login request to reach handler, got %d: %s", firstResp.Code, firstResp.Body.String())
+	}
+	if got := firstResp.Header().Get("X-RateLimit-Limit"); got != "1" {
+		t.Fatalf("expected login override limit header 1, got %q", got)
+	}
+
+	second := httptest.NewRequest(http.MethodPost, "/api/login/localLogin", strings.NewReader("{"))
+	second.RemoteAddr = "192.0.2.77:8080"
+	second.Header.Set("Content-Type", "application/json")
+	secondResp := httptest.NewRecorder()
+	router.Engine().ServeHTTP(secondResp, second)
+	if secondResp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second login request to be rate limited, got %d: %s", secondResp.Code, secondResp.Body.String())
+	}
+	if got := secondResp.Header().Get("X-RateLimit-Limit"); got != "1" {
+		t.Fatalf("expected login override header 1, got %q", got)
+	}
 }
 
 func TestRegisterRoutes_RegistersVisualizationCompatibilityRoutes(t *testing.T) {

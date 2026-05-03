@@ -351,7 +351,7 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 	c.FileAttachment(absPath, "audit_logs."+format)
 }
 
-func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
+func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler, rateLimitOpts *middleware.RouteRateLimitOptions, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
 	var menuAuthMiddleware *middleware.MenuAuthMiddleware
 	if len(menuAuthMiddlewares) > 0 {
 		menuAuthMiddleware = menuAuthMiddlewares[0]
@@ -361,12 +361,23 @@ func RegisterAuditRoutes(r *gin.RouterGroup, h *AuditHandler, menuAuthMiddleware
 	if menuAuthMiddleware != nil {
 		exportGroup.Use(menuAuthMiddleware.RequireMenuAuth(auditMenuPath))
 	}
-	exportGroup.Use(middleware.RateLimit(
+	exportMiddleware := middleware.RateLimit(
 		"audit-export",
 		auditExportRateLimitRequests,
 		auditExportRateLimitWindow,
 		middleware.AuthenticatedUserKey,
-	))
+	)
+	if rateLimitOpts != nil {
+		enabled, maxRequests, window := middleware.ResolveRouteLimit(rateLimitOpts.Config, "audit-export", auditExportRateLimitRequests, auditExportRateLimitWindow)
+		if enabled {
+			exportMiddleware = middleware.ConfigurableRateLimit("audit-export", maxRequests, window, rateLimitOpts.Backend, middleware.AuthenticatedUserKey)
+		} else {
+			exportMiddleware = nil
+		}
+	}
+	if exportMiddleware != nil {
+		exportGroup.Use(exportMiddleware)
+	}
 	{
 		auditGroup.POST("/log", h.CreateAuditLog)
 		auditGroup.GET("/list", h.QueryAuditLogs)

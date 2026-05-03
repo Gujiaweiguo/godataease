@@ -566,19 +566,30 @@ func (h *DatasourceHandler) ListSyncRecord(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
+func RegisterDatasourceRoutes(r *gin.RouterGroup, h *DatasourceHandler, permMiddleware *middleware.PermissionMiddleware, rateLimitOpts *middleware.RouteRateLimitOptions, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
 	var menuAuthMiddleware *middleware.MenuAuthMiddleware
 	if len(menuAuthMiddlewares) > 0 {
 		menuAuthMiddleware = menuAuthMiddlewares[0]
 	}
 	dsGroup := r.Group("/ds")
 	validateGroup := dsGroup.Group("")
-	validateGroup.Use(middleware.RateLimit(
+	validateMiddleware := middleware.RateLimit(
 		"datasource-validate",
 		datasourceValidateRateLimitRequests,
 		datasourceValidateRateLimitWindow,
 		middleware.AuthenticatedUserKey,
-	))
+	)
+	if rateLimitOpts != nil {
+		enabled, maxRequests, window := middleware.ResolveRouteLimit(rateLimitOpts.Config, "datasource-validate", datasourceValidateRateLimitRequests, datasourceValidateRateLimitWindow)
+		if enabled {
+			validateMiddleware = middleware.ConfigurableRateLimit("datasource-validate", maxRequests, window, rateLimitOpts.Backend, middleware.AuthenticatedUserKey)
+		} else {
+			validateMiddleware = nil
+		}
+	}
+	if validateMiddleware != nil {
+		validateGroup.Use(validateMiddleware)
+	}
 	{
 		dsGroup.POST("/list", h.List)
 		dsGroup.POST("/tree", h.Tree)

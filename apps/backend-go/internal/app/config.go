@@ -13,6 +13,7 @@ type Config struct {
 	Server      ServerConfig      `mapstructure:"server"`
 	Database    DatabaseConfig    `mapstructure:"database"`
 	Redis       RedisConfig       `mapstructure:"redis"`
+	RateLimit   RateLimitConfig   `mapstructure:"rate_limit"`
 	Scheduler   SchedulerConfig   `mapstructure:"scheduler"`
 	JWT         JWTConfig         `mapstructure:"jwt"`
 	Log         LogConfig         `mapstructure:"log"`
@@ -42,6 +43,20 @@ type RedisConfig struct {
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
 	PoolSize int    `mapstructure:"pool_size"`
+}
+
+type RateLimitConfig struct {
+	Enabled              bool                        `mapstructure:"enabled"`
+	DefaultMaxRequests   int                         `mapstructure:"default_max_requests"`
+	DefaultWindowSeconds int                         `mapstructure:"default_window_seconds"`
+	UseRedis             bool                        `mapstructure:"use_redis"`
+	RouteOverrides       map[string]RouteLimitConfig `mapstructure:"route_overrides"`
+}
+
+type RouteLimitConfig struct {
+	Enabled       *bool `mapstructure:"enabled"`
+	MaxRequests   int   `mapstructure:"max_requests"`
+	WindowSeconds int   `mapstructure:"window_seconds"`
 }
 
 type SchedulerConfig struct {
@@ -105,6 +120,7 @@ func LoadConfig() (*Config, error) {
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+	applyDefaults(&config)
 
 	if err := validateConfig(&config); err != nil {
 		return nil, err
@@ -129,6 +145,10 @@ func bindEnvKeys() error {
 		"redis.password":                    "REDIS_PASSWORD",
 		"redis.db":                          "REDIS_DB",
 		"redis.pool_size":                   "REDIS_POOL_SIZE",
+		"rate_limit.enabled":                "RATE_LIMIT_ENABLED",
+		"rate_limit.default_max_requests":   "RATE_LIMIT_DEFAULT_MAX_REQUESTS",
+		"rate_limit.default_window_seconds": "RATE_LIMIT_DEFAULT_WINDOW_SECONDS",
+		"rate_limit.use_redis":              "RATE_LIMIT_USE_REDIS",
 		"scheduler.sample_job_enabled":      "SCHEDULER_SAMPLE_JOB_ENABLED",
 		"jwt.secret":                        "JWT_SECRET",
 		"jwt.expire":                        "JWT_EXPIRE",
@@ -154,6 +174,32 @@ func bindEnvKeys() error {
 	return nil
 }
 
+func applyDefaults(config *Config) {
+	if config == nil {
+		return
+	}
+
+	if config.RateLimit.DefaultMaxRequests <= 0 {
+		config.RateLimit.DefaultMaxRequests = 100
+	}
+	if config.RateLimit.DefaultWindowSeconds <= 0 {
+		config.RateLimit.DefaultWindowSeconds = 60
+	}
+	if !viper.IsSet("rate_limit.use_redis") && os.Getenv("RATE_LIMIT_USE_REDIS") == "" {
+		config.RateLimit.UseRedis = true
+	}
+
+	for key, override := range config.RateLimit.RouteOverrides {
+		if override.MaxRequests <= 0 {
+			override.MaxRequests = config.RateLimit.DefaultMaxRequests
+		}
+		if override.WindowSeconds <= 0 {
+			override.WindowSeconds = config.RateLimit.DefaultWindowSeconds
+		}
+		config.RateLimit.RouteOverrides[key] = override
+	}
+}
+
 func validateConfig(config *Config) error {
 	if config.Database.Host == "" {
 		return fmt.Errorf("database.host is required")
@@ -166,6 +212,20 @@ func validateConfig(config *Config) error {
 	}
 	if config.JWT.Secret == "" {
 		return fmt.Errorf("jwt.secret must be set")
+	}
+	if config.RateLimit.DefaultMaxRequests <= 0 {
+		return fmt.Errorf("rate_limit.default_max_requests must be greater than 0")
+	}
+	if config.RateLimit.DefaultWindowSeconds <= 0 {
+		return fmt.Errorf("rate_limit.default_window_seconds must be greater than 0")
+	}
+	for routeName, override := range config.RateLimit.RouteOverrides {
+		if override.MaxRequests <= 0 {
+			return fmt.Errorf("rate_limit.route_overrides.%s.max_requests must be greater than 0", routeName)
+		}
+		if override.WindowSeconds <= 0 {
+			return fmt.Errorf("rate_limit.route_overrides.%s.window_seconds must be greater than 0", routeName)
+		}
 	}
 	return nil
 }

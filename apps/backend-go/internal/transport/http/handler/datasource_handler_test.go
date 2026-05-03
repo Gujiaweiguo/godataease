@@ -73,7 +73,7 @@ func setupDatasourceHandlerTestEnvWithUser(t *testing.T, userID int64, username 
 		c.Set("username", username)
 		c.Next()
 	})
-	RegisterDatasourceRoutes(r.Group("/api"), h, nil)
+	RegisterDatasourceRoutes(r.Group("/api"), h, nil, nil)
 
 	return &datasourceHandlerTestEnv{r: r, db: db}
 }

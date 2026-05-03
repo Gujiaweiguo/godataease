@@ -12,6 +12,7 @@ import (
 	scheduler "dataease/backend/internal/job"
 	"dataease/backend/internal/job/jobs"
 	pkgauth "dataease/backend/internal/pkg/auth"
+	"dataease/backend/internal/pkg/cache"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/metrics"
 	"dataease/backend/internal/repository"
@@ -490,12 +491,14 @@ func (r *Router) RegisterRoutes() {
 
 func (r *Router) registerRootRoutes() {
 	protected := r.engine.Group("")
+	var rateLimitOpts *middleware.RouteRateLimitOptions
 	if r.app != nil && r.app.Config != nil {
 		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
 			Secret: r.app.Config.JWT.Secret,
 			Expire: r.app.Config.JWT.Expire,
 		})
 		protected.Use(middleware.Auth(jwtInstance))
+		rateLimitOpts = &middleware.RouteRateLimitOptions{Config: r.app.Config.RateLimit, Backend: middleware.NewRateLimiterBackend(r.app.Config.RateLimit, cache.GetClient())}
 	}
 
 	r.engine.GET("/health", func(c *gin.Context) {
@@ -512,7 +515,7 @@ func (r *Router) registerRootRoutes() {
 	})
 
 	r.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
-	handler.RegisterAuthRoutes(r.engine, r.authHandler)
+	handler.RegisterAuthRoutes(r.engine, r.authHandler, rateLimitOpts)
 	if r.userHandler != nil {
 		protected.POST("/api/user/switchLanguage", r.userHandler.SwitchLanguage)
 	}
@@ -553,81 +556,99 @@ func (r *Router) registerAPIRoutes() {
 	chartDataAPI := api
 	staticAPI := api
 	fontAPI := api
+	var routeRateLimitOpts *middleware.RouteRateLimitOptions
 	if r.app != nil && r.app.Config != nil {
+		rateLimitCfg := r.app.Config.RateLimit
+		rateLimitBackend := middleware.NewRateLimiterBackend(rateLimitCfg, cache.GetClient())
+		routeRateLimitOpts = &middleware.RouteRateLimitOptions{Config: rateLimitCfg, Backend: rateLimitBackend}
 		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
 			Secret: r.app.Config.JWT.Secret,
 			Expire: r.app.Config.JWT.Expire,
 		})
+		authMiddlewares := func(extra ...gin.HandlerFunc) []gin.HandlerFunc {
+			middlewares := []gin.HandlerFunc{middleware.Auth(jwtInstance)}
+			if rateLimitCfg.Enabled {
+				middlewares = append(middlewares, middleware.ConfigurableRateLimit(
+					"global-default",
+					rateLimitCfg.DefaultMaxRequests,
+					time.Duration(rateLimitCfg.DefaultWindowSeconds)*time.Second,
+					rateLimitBackend,
+					middleware.AuthenticatedUserKey,
+				))
+			}
+			middlewares = append(middlewares, extra...)
+			return middlewares
+		}
 		protectedDatasourceAPI := r.engine.Group("/api")
-		protectedDatasourceAPI.Use(middleware.Auth(jwtInstance))
+		protectedDatasourceAPI.Use(authMiddlewares()...)
 		datasourceAPI = protectedDatasourceAPI
 		protectedUserAPI := r.engine.Group("/api")
-		protectedUserAPI.Use(middleware.Auth(jwtInstance))
+		protectedUserAPI.Use(authMiddlewares()...)
 		userAPI = protectedUserAPI
 		protectedRoleAPI := r.engine.Group("/api")
-		protectedRoleAPI.Use(middleware.Auth(jwtInstance))
+		protectedRoleAPI.Use(authMiddlewares()...)
 		roleAPI = protectedRoleAPI
 		protectedRoleDe2API := r.engine.Group("/de2api")
-		protectedRoleDe2API.Use(middleware.Auth(jwtInstance))
+		protectedRoleDe2API.Use(authMiddlewares()...)
 		roleDe2API = protectedRoleDe2API
 		roleMenuAPI = protectedRoleAPI
 		protectedPermissionCompatAPI := r.engine.Group("/api")
-		protectedPermissionCompatAPI.Use(middleware.Auth(jwtInstance), r.menuAuthMiddleware.RequireMenuAuth("/system/permission"))
+		protectedPermissionCompatAPI.Use(authMiddlewares(r.menuAuthMiddleware.RequireMenuAuth("/system/permission"))...)
 		permissionCompatAPI = protectedPermissionCompatAPI
 		protectedPermissionCompatDe2API := r.engine.Group("/de2api")
-		protectedPermissionCompatDe2API.Use(middleware.Auth(jwtInstance), r.menuAuthMiddleware.RequireMenuAuth("/system/permission"))
+		protectedPermissionCompatDe2API.Use(authMiddlewares(r.menuAuthMiddleware.RequireMenuAuth("/system/permission"))...)
 		permissionCompatDe2API = protectedPermissionCompatDe2API
 		dataPermissionAPI = protectedRoleAPI
 		protectedDatasourceDe2API := r.engine.Group("/de2api")
-		protectedDatasourceDe2API.Use(middleware.Auth(jwtInstance))
+		protectedDatasourceDe2API.Use(authMiddlewares()...)
 		datasourceDe2API = protectedDatasourceDe2API
 
 		protectedDatasetAPI := r.engine.Group("/api")
-		protectedDatasetAPI.Use(middleware.Auth(jwtInstance))
+		protectedDatasetAPI.Use(authMiddlewares()...)
 		datasetAPI = protectedDatasetAPI
 
 		protectedDatasetDe2API := r.engine.Group("/de2api")
-		protectedDatasetDe2API.Use(middleware.Auth(jwtInstance))
+		protectedDatasetDe2API.Use(authMiddlewares()...)
 		datasetDe2API = protectedDatasetDe2API
 
 		protectedVisualizationDe2API := r.engine.Group("/de2api")
-		protectedVisualizationDe2API.Use(middleware.Auth(jwtInstance))
+		protectedVisualizationDe2API.Use(authMiddlewares()...)
 		visualizationDe2API = protectedVisualizationDe2API
 
 		protectedVisualizationAPI := r.engine.Group("/api")
-		protectedVisualizationAPI.Use(middleware.Auth(jwtInstance))
+		protectedVisualizationAPI.Use(authMiddlewares()...)
 		visualizationAPI = protectedVisualizationAPI
 
 		protectedAuditAPI := r.engine.Group("/api")
-		protectedAuditAPI.Use(middleware.Auth(jwtInstance))
+		protectedAuditAPI.Use(authMiddlewares()...)
 		auditAPI = protectedAuditAPI
 
 		protectedWatermarkAPI := r.engine.Group("/api")
-		protectedWatermarkAPI.Use(middleware.Auth(jwtInstance))
+		protectedWatermarkAPI.Use(authMiddlewares()...)
 		watermarkAPI = protectedWatermarkAPI
 
 		protectedExportAPI := r.engine.Group("/api")
-		protectedExportAPI.Use(middleware.Auth(jwtInstance))
+		protectedExportAPI.Use(authMiddlewares()...)
 		exportAPI = protectedExportAPI
 
 		protectedMenuWriteAPI := r.engine.Group("/api")
-		protectedMenuWriteAPI.Use(middleware.Auth(jwtInstance))
+		protectedMenuWriteAPI.Use(authMiddlewares()...)
 		menuWriteAPI = protectedMenuWriteAPI
 
 		protectedStoreAPI := r.engine.Group("/api")
-		protectedStoreAPI.Use(middleware.Auth(jwtInstance))
+		protectedStoreAPI.Use(authMiddlewares()...)
 		storeAPI = protectedStoreAPI
 
 		protectedChartDataAPI := r.engine.Group("/api")
-		protectedChartDataAPI.Use(middleware.Auth(jwtInstance))
+		protectedChartDataAPI.Use(authMiddlewares()...)
 		chartDataAPI = protectedChartDataAPI
 
 		protectedStaticAPI := r.engine.Group("/api")
-		protectedStaticAPI.Use(middleware.Auth(jwtInstance))
+		protectedStaticAPI.Use(authMiddlewares()...)
 		staticAPI = protectedStaticAPI
 
 		protectedFontAPI := r.engine.Group("/api")
-		protectedFontAPI.Use(middleware.Auth(jwtInstance))
+		protectedFontAPI.Use(authMiddlewares()...)
 		fontAPI = protectedFontAPI
 	}
 	{
@@ -637,7 +658,7 @@ func (r *Router) registerAPIRoutes() {
 			})
 		})
 
-		handler.RegisterAuditRoutes(auditAPI, r.auditHandler, r.menuAuthMiddleware)
+		handler.RegisterAuditRoutes(auditAPI, r.auditHandler, routeRateLimitOpts, r.menuAuthMiddleware)
 		handler.RegisterUserRoutes(userAPI, r.userHandler)
 		handler.RegisterOrgRoutes(api, r.orgHandler)
 		handler.RegisterPermRoutes(permissionCompatAPI, r.permHandler)
@@ -653,7 +674,7 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterResourceGovernanceRoutes(roleAPI, r.resourceGovernanceHandler)
 		handler.RegisterDataPermissionRoutes(dataPermissionAPI, r.dataPermissionHandler)
 		handler.RegisterMapRoutes(api, r.mapHandler)
-		handler.RegisterDatasourceRoutes(datasourceAPI, r.datasourceHandler, r.permMiddleware, r.menuAuthMiddleware)
+		handler.RegisterDatasourceRoutes(datasourceAPI, r.datasourceHandler, r.permMiddleware, routeRateLimitOpts, r.menuAuthMiddleware)
 		handler.RegisterCompatibilityBridgeRoutes(datasourceDe2API, nil, nil, r.datasourceHandler, nil, nil, r.permMiddleware, r.menuAuthMiddleware)
 		handler.RegisterSyncRoutes(api, r.syncHandler)
 		r.registerDatasetRoutes(datasetAPI)
