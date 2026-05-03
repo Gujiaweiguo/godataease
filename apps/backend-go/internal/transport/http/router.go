@@ -147,6 +147,7 @@ type Router struct {
 	customGeoHandler               *handler.CustomGeoHandler
 	dataPermissionHandler          *handler.DataPermissionHandler
 	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
+	thresholdHandler               *handler.ThresholdHandler
 	menuAuthMiddleware             *middleware.MenuAuthMiddleware
 	scheduler                      *scheduler.Scheduler
 }
@@ -386,6 +387,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateService := service.NewTemplateService(templateRepo)
 	templateHandler := handler.NewTemplateHandler(templateService)
 
+	thresholdRepo := repository.NewThresholdRepository(db)
+	thresholdService := service.NewThresholdService(thresholdRepo)
+	thresholdHandler := handler.NewThresholdHandler(thresholdService)
+
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
 	visualService.SetDatasetRepository(datasetRepo)
 	visualService.SetTemplateService(templateService)
@@ -454,6 +459,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		relationHandler:                relationHandler,
 		dataPermissionHandler:          dataPermissionHandler,
 		resourceGovernanceHandler:      resourceGovernanceHandler,
+		thresholdHandler:               thresholdHandler,
 		menuAuthMiddleware:             menuAuthMiddleware,
 		scheduler:                      jobScheduler,
 	}
@@ -563,6 +569,8 @@ func (r *Router) registerAPIRoutes() {
 	chartDataAPI := api
 	staticAPI := api
 	fontAPI := api
+	thresholdAPI := api
+	thresholdDe2API := r.engine.Group("/de2api")
 	var routeRateLimitOpts *middleware.RouteRateLimitOptions
 	if r.app != nil && r.app.Config != nil {
 		rateLimitCfg := r.app.Config.RateLimit
@@ -657,6 +665,14 @@ func (r *Router) registerAPIRoutes() {
 		protectedFontAPI := r.engine.Group("/api")
 		protectedFontAPI.Use(authMiddlewares()...)
 		fontAPI = protectedFontAPI
+
+		protectedThresholdAPI := r.engine.Group("/api")
+		protectedThresholdAPI.Use(authMiddlewares()...)
+		thresholdAPI = protectedThresholdAPI
+
+		protectedThresholdDe2API := r.engine.Group("/de2api")
+		protectedThresholdDe2API.Use(authMiddlewares()...)
+		thresholdDe2API = protectedThresholdDe2API
 	}
 	{
 		api.GET("/ping", func(c *gin.Context) {
@@ -707,6 +723,12 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterFontDownloadRoute(api, r.fontHandler)
 		handler.RegisterPdfTemplateRoutes(api, r.pdfTemplateHandler)
 		handler.RegisterExportRoutes(exportAPI, r.exportHandler)
+		var thresholdMenuAuth gin.HandlerFunc
+		if r.menuAuthMiddleware != nil {
+			thresholdMenuAuth = r.menuAuthMiddleware.RequireMenuAuth("/threshold")
+		}
+		handler.RegisterThresholdRoutes(thresholdAPI, r.thresholdHandler, nil, thresholdMenuAuth)
+		handler.RegisterThresholdRoutes(thresholdDe2API, r.thresholdHandler, nil, thresholdMenuAuth)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)

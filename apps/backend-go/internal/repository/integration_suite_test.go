@@ -80,6 +80,7 @@ func TestMain(m *testing.M) {
 		&coreShare{}, &coreShareTicket{},
 		&coreVisualizationTemplate{},
 		&auto.CoreDatasourceTaskLog{},
+		&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
