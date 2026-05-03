@@ -241,7 +241,7 @@ func sampleThresholdRequest() *thresholddomain.CreateRequest {
 		ThresholdRules: `{"logic":"and"}`,
 		MsgTitle:       "title",
 		MsgContent:     "content",
-		ShowFieldValue: boolPtr(true),
+		ShowFieldValue: thresholdBoolPtr(true),
 		ResourceTable:  "core",
 	}
 }

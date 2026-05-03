@@ -117,29 +117,29 @@ func (s *ThresholdService) FormInfo(ctx context.Context, id int64, resourceTable
 		BaseReciDTO:    thresholddomain.BaseReciDTO{},
 		ID:             info.ID,
 		Name:           info.Name,
-		Enable:         boolPtr(info.Enable),
-		RateType:       intPtr(int(info.RateType)),
+		Enable:         thresholdBoolPtr(info.Enable),
+		RateType:       thresholdIntPtr(int(info.RateType)),
 		RateValue:      info.RateValue,
 		ResourceID:     info.ResourceID,
 		ResourceType:   info.ResourceType,
 		ChartID:        info.ChartID,
 		ChartType:      info.ChartType,
 		ThresholdRules: info.ThresholdRules,
-		MsgType:        intPtr(int(info.MsgType)),
+		MsgType:        thresholdIntPtr(int(info.MsgType)),
 		MsgTitle:       info.MsgTitle,
 		MsgContent:     info.MsgContent,
-		RepeatSend:     boolPtr(info.RepeatSend),
-		ShowFieldValue: boolPtr(false),
+		RepeatSend:     thresholdBoolPtr(info.RepeatSend),
+		ShowFieldValue: thresholdBoolPtr(false),
 		ResourceTable:  "core",
 	}
 
-	fromJSONString(info.ReciUsers, &result.UIDList)
-	fromJSONString(info.ReciRoles, &result.RIDList)
-	fromJSONString(info.ReciEmails, &result.EmailList)
-	fromJSONString(info.ReciLarkGroups, &result.LarkGroupList)
-	fromJSONString(info.ReciLarksuiteGroups, &result.LarksuiteGroupList)
-	fromJSONString(info.ReciWebhooks, &result.WebhookList)
-	fromJSONString(info.Recisetting, &result.ReciFlagList)
+	thresholdUnmarshalJSON(info.ReciUsers, &result.UIDList)
+	thresholdUnmarshalJSON(info.ReciRoles, &result.RIDList)
+	thresholdUnmarshalJSON(info.ReciEmails, &result.EmailList)
+	thresholdUnmarshalJSON(info.ReciLarkGroups, &result.LarkGroupList)
+	thresholdUnmarshalJSON(info.ReciLarksuiteGroups, &result.LarksuiteGroupList)
+	thresholdUnmarshalJSON(info.ReciWebhooks, &result.WebhookList)
+	thresholdUnmarshalJSON(info.Recisetting, &result.ReciFlagList)
 
 	return result, nil
 }
@@ -190,12 +190,12 @@ func (s *ThresholdService) BatchReci(ctx context.Context, req *thresholddomain.B
 	return s.repo.UpdateRecipients(
 		ctx,
 		req.IDList,
-		toJSONString(req.UIDList),
-		toJSONString(req.RIDList),
-		toJSONString(req.EmailList),
-		toJSONString(req.LarkGroupList),
-		toJSONString(req.LarksuiteGroupList),
-		toJSONString(req.WebhookList),
+		thresholdMarshalJSON(req.UIDList),
+		thresholdMarshalJSON(req.RIDList),
+		thresholdMarshalJSON(req.EmailList),
+		thresholdMarshalJSON(req.LarkGroupList),
+		thresholdMarshalJSON(req.LarksuiteGroupList),
+		thresholdMarshalJSON(req.WebhookList),
 	)
 }
 
@@ -274,13 +274,13 @@ func buildThresholdInfo(req *thresholddomain.CreateRequest) *auto.XpackThreshold
 		ChartType:           req.ChartType,
 		ChartID:             req.ChartID,
 		ThresholdRules:      req.ThresholdRules,
-		Recisetting:         toJSONString(req.ReciFlagList),
-		ReciUsers:           toJSONString(req.UIDList),
-		ReciRoles:           toJSONString(req.RIDList),
-		ReciEmails:          toJSONString(req.EmailList),
-		ReciLarkGroups:      toJSONString(req.LarkGroupList),
-		ReciLarksuiteGroups: toJSONString(req.LarksuiteGroupList),
-		ReciWebhooks:        toJSONString(req.WebhookList),
+		Recisetting:         thresholdMarshalJSON(req.ReciFlagList),
+		ReciUsers:           thresholdMarshalJSON(req.UIDList),
+		ReciRoles:           thresholdMarshalJSON(req.RIDList),
+		ReciEmails:          thresholdMarshalJSON(req.EmailList),
+		ReciLarkGroups:      thresholdMarshalJSON(req.LarkGroupList),
+		ReciLarksuiteGroups: thresholdMarshalJSON(req.LarksuiteGroupList),
+		ReciWebhooks:        thresholdMarshalJSON(req.WebhookList),
 		MsgTitle:            req.MsgTitle,
 		MsgType:             int32(msgType),
 		MsgContent:          req.MsgContent,
@@ -292,7 +292,7 @@ func isSnapshotResourceTable(resourceTable string) bool {
 	return strings.EqualFold(strings.TrimSpace(resourceTable), "snapshot")
 }
 
-func toJSONString(v any) string {
+func thresholdMarshalJSON(v any) string {
 	if v == nil {
 		return ""
 	}
@@ -303,13 +303,13 @@ func toJSONString(v any) string {
 	return string(b)
 }
 
-func fromJSONString(s string, target any) {
+func thresholdUnmarshalJSON(s string, target any) {
 	if s == "" {
 		return
 	}
 	_ = json.Unmarshal([]byte(s), target)
 }
 
-func boolPtr(b bool) *bool { return &b }
+func thresholdBoolPtr(b bool) *bool { return &b }
 
-func intPtr(i int) *int { return &i }
+func thresholdIntPtr(i int) *int { return &i }
