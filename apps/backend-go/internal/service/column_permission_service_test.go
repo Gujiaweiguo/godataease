@@ -1,39 +1,78 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"path"
 	"testing"
+	"time"
 
 	"dataease/backend/internal/domain/permission"
-	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
-func setupColumnPermissionServiceRepoTest(t *testing.T) (*ColumnPermissionService, *repository.ColumnPermissionRepository, *gorm.DB) {
-	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&permission.DataPermColumn{}))
-
-	repo := repository.NewColumnPermissionRepository(db)
-	return NewColumnPermissionService(repo), repo, db
+type mockPermissionCacheBackend struct {
+	data map[string]string
 }
 
-func setupClosedColumnPermissionServiceRepoTest(t *testing.T) *ColumnPermissionService {
-	t.Helper()
+func newMockPermissionCacheBackend() *mockPermissionCacheBackend {
+	return &mockPermissionCacheBackend{data: make(map[string]string)}
+}
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&permission.DataPermColumn{}))
-	sqlDB, err := db.DB()
-	require.NoError(t, err)
-	require.NoError(t, sqlDB.Close())
+func (m *mockPermissionCacheBackend) Get(ctx context.Context, key string) (string, error) {
+	if value, ok := m.data[key]; ok {
+		return value, nil
+	}
+	return "", errors.New("cache miss")
+}
 
-	return NewColumnPermissionService(repository.NewColumnPermissionRepository(db))
+func (m *mockPermissionCacheBackend) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	switch typed := value.(type) {
+	case string:
+		m.data[key] = typed
+	case []byte:
+		m.data[key] = string(typed)
+	default:
+		m.data[key] = ""
+	}
+	return nil
+}
+
+func (m *mockPermissionCacheBackend) Del(ctx context.Context, keys ...string) error {
+	for _, key := range keys {
+		delete(m.data, key)
+	}
+	return nil
+}
+
+func (m *mockPermissionCacheBackend) DelByPattern(ctx context.Context, pattern string) error {
+	for key := range m.data {
+		matched, err := path.Match(pattern, key)
+		if err != nil {
+			return err
+		}
+		if matched {
+			delete(m.data, key)
+		}
+	}
+	return nil
+}
+
+func (m *mockPermissionCacheBackend) Exists(ctx context.Context, keys ...string) (int64, error) {
+	var count int64
+	for _, key := range keys {
+		if _, ok := m.data[key]; ok {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func newMockPermissionCacheService() (*permission.PermissionCacheService, *mockPermissionCacheBackend) {
+	backend := newMockPermissionCacheBackend()
+	return permission.NewPermissionCacheService(backend, 30*time.Minute), backend
 }
 
 func TestApplyMask_CompleteDesensitization(t *testing.T) {
@@ -244,17 +283,6 @@ func TestFilterDisabledColumns(t *testing.T) {
 	}
 }
 
-func TestGetMaskRules_EmptyMaskRuleFallsBackToDefaultDesensitization(t *testing.T) {
-	svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
-	require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}))
-
-	rules, err := svc.GetMaskRules(9)
-	require.NoError(t, err)
-	require.Contains(t, rules, "region")
-	require.NotNil(t, rules["region"])
-	assert.Equal(t, permission.BuiltInRuleCompleteDesensitization, rules["region"].BuiltInRule)
-}
-
 func TestFilterDisabledColumns_EmptyFilter(t *testing.T) {
 	svc := &ColumnPermissionService{}
 	row := map[string]interface{}{
@@ -346,107 +374,6 @@ func TestRetainMToN_EdgeCases(t *testing.T) {
 	}
 }
 
-func TestColumnPermissionService_GetColumnPermissions_Unit(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		svc, _, _ := setupColumnPermissionServiceRepoTest(t)
-
-		perms, err := svc.GetColumnPermissions(9)
-		require.NoError(t, err)
-		assert.NotNil(t, perms)
-		assert.Empty(t, perms)
-	})
-
-	t.Run("returns repo rows", func(t *testing.T) {
-		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: `{"builtInRule":"all"}`}))
-
-		perms, err := svc.GetColumnPermissions(9)
-		require.NoError(t, err)
-		assert.Len(t, perms, 1)
-		assert.Equal(t, "mobile", perms[0].FieldName)
-	})
-
-	t.Run("repo error", func(t *testing.T) {
-		svc := setupClosedColumnPermissionServiceRepoTest(t)
-
-		perms, err := svc.GetColumnPermissions(9)
-		require.Error(t, err)
-		assert.Nil(t, perms)
-	})
-}
-
-func TestColumnPermissionService_GetDisabledColumns_Unit(t *testing.T) {
-	t.Run("filters disable perms only", func(t *testing.T) {
-		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "mobile", PermType: permission.PermTypeDisable}))
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "email", PermType: permission.PermTypeMask, MaskRule: `{"builtInRule":"all"}`}))
-
-		disabled, err := svc.GetDisabledColumns(9)
-		require.NoError(t, err)
-		assert.Equal(t, map[string]bool{"mobile": true}, disabled)
-	})
-
-	t.Run("repo error", func(t *testing.T) {
-		svc := setupClosedColumnPermissionServiceRepoTest(t)
-
-		disabled, err := svc.GetDisabledColumns(9)
-		require.Error(t, err)
-		assert.Nil(t, disabled)
-	})
-
-	t.Run("empty returns empty map", func(t *testing.T) {
-		svc, _, _ := setupColumnPermissionServiceRepoTest(t)
-
-		disabled, err := svc.GetDisabledColumns(99)
-		require.NoError(t, err)
-		assert.Empty(t, disabled)
-	})
-}
-
-func TestColumnPermissionService_GetMaskRules_Unit(t *testing.T) {
-	t.Run("parses only mask rules and skips invalid json", func(t *testing.T) {
-		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
-		validRule := `{"builtInRule":"keep_first_and_last_three"}`
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: validRule}))
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "email", PermType: permission.PermTypeMask, MaskRule: `not-json`}))
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 9, FieldName: "secret", PermType: permission.PermTypeDisable}))
-
-		rules, err := svc.GetMaskRules(9)
-		require.NoError(t, err)
-		assert.Len(t, rules, 1)
-		require.NotNil(t, rules["mobile"])
-		assert.Equal(t, "keep_first_and_last_three", rules["mobile"].BuiltInRule)
-	})
-
-	t.Run("repo error", func(t *testing.T) {
-		svc := setupClosedColumnPermissionServiceRepoTest(t)
-
-		rules, err := svc.GetMaskRules(9)
-		require.Error(t, err)
-		assert.Nil(t, rules)
-	})
-
-	t.Run("no mask rules returns empty map", func(t *testing.T) {
-		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 10, FieldName: "mobile", PermType: permission.PermTypeDisable}))
-
-		rules, err := svc.GetMaskRules(10)
-		require.NoError(t, err)
-		assert.Empty(t, rules)
-	})
-
-	t.Run("empty mask rule falls back to default desensitization", func(t *testing.T) {
-		svc, repo, _ := setupColumnPermissionServiceRepoTest(t)
-		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 11, FieldName: "mobile", PermType: permission.PermTypeMask, MaskRule: ""}))
-
-		rules, err := svc.GetMaskRules(11)
-		require.NoError(t, err)
-		require.Contains(t, rules, "mobile")
-		require.NotNil(t, rules["mobile"])
-		assert.Equal(t, permission.BuiltInRuleCompleteDesensitization, rules["mobile"].BuiltInRule)
-	})
-}
-
 func TestColumnPermissionService_ParseMaskRule_Unit(t *testing.T) {
 	svc := &ColumnPermissionService{}
 	assert.Nil(t, svc.parseMaskRule(""))
@@ -479,4 +406,45 @@ func TestColumnPermissionService_FilterDisabledColumns_AllColumnsDisabledReturns
 	svc := &ColumnPermissionService{}
 	result := svc.FilterDisabledColumns(map[string]interface{}{"a": 1, "b": 2}, map[string]bool{"a": true, "b": true})
 	assert.Empty(t, result)
+}
+
+func TestColumnPermissionService_GetColumnPermissions_UsesCacheWhenAvailable(t *testing.T) {
+	cacheSvc, _ := newMockPermissionCacheService()
+	svc := NewColumnPermissionService(nil, cacheSvc)
+
+	require.NoError(t, cacheSvc.SetColumnPermissions(context.Background(), 9, []*permission.DataPermColumn{{DatasetID: 9, FieldName: "cached", PermType: permission.PermTypeMask}}))
+
+	perms, err := svc.GetColumnPermissions(9)
+	require.NoError(t, err)
+	require.Len(t, perms, 1)
+	assert.Equal(t, "cached", perms[0].FieldName)
+}
+func TestColumnPermissionService_GetDerivedRules_ReuseCachedPermissions(t *testing.T) {
+	cacheSvc, _ := newMockPermissionCacheService()
+	svc := NewColumnPermissionService(nil, cacheSvc)
+	require.NoError(t, cacheSvc.SetColumnPermissions(context.Background(), 9, []*permission.DataPermColumn{
+		{DatasetID: 9, FieldName: "secret", PermType: permission.PermTypeDisable},
+		{DatasetID: 9, FieldName: "phone", PermType: permission.PermTypeMask, MaskRule: `{"builtInRule":"` + permission.BuiltInRuleCompleteDesensitization + `"}`},
+	}))
+
+	disabled, err := svc.GetDisabledColumns(9)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"secret": true}, disabled)
+
+	rules, err := svc.GetMaskRules(9)
+	require.NoError(t, err)
+	require.Contains(t, rules, "phone")
+	assert.Equal(t, permission.BuiltInRuleCompleteDesensitization, rules["phone"].BuiltInRule)
+}
+
+func TestColumnPermissionService_GetMaskRules_DefaultsEmptyMaskRuleFromCache(t *testing.T) {
+	cacheSvc, _ := newMockPermissionCacheService()
+	svc := NewColumnPermissionService(nil, cacheSvc)
+	require.NoError(t, cacheSvc.SetColumnPermissions(context.Background(), 9, []*permission.DataPermColumn{{DatasetID: 9, FieldName: "region", PermType: permission.PermTypeMask, MaskRule: ""}}))
+
+	rules, err := svc.GetMaskRules(9)
+	require.NoError(t, err)
+	require.Contains(t, rules, "region")
+	require.NotNil(t, rules["region"])
+	assert.Equal(t, permission.BuiltInRuleCompleteDesensitization, rules["region"].BuiltInRule)
 }

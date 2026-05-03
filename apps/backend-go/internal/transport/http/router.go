@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"dataease/backend/internal/app"
+	"dataease/backend/internal/domain/permission"
 	scheduler "dataease/backend/internal/job"
 	"dataease/backend/internal/job/jobs"
 	pkgauth "dataease/backend/internal/pkg/auth"
 	"dataease/backend/internal/pkg/cache"
+	pkgcache "dataease/backend/internal/pkg/cache"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/metrics"
 	"dataease/backend/internal/repository"
@@ -242,6 +244,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	syncService := service.NewSyncService(syncRepo, datasourceRepo, datasourceService)
 	syncHandler := handler.NewSyncHandler(syncService)
 	adminChecker := middleware.NewDefaultAdminChecker([]int64{1})
+	var permissionCacheService *permission.PermissionCacheService
+	if pkgcache.GetClient() != nil {
+		permissionCacheService = permission.NewPermissionCacheService(pkgcache.NewRedisCacheBackend(), 0)
+	}
 
 	// Dataset with row permission integration
 	datasetRepo := repository.NewDatasetRepository(db)
@@ -250,6 +256,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	rowPermService := service.NewRowPermissionService(rowPermRepo, columnPermRepo, userRoleRepo, adminChecker)
 	rowPermService.SetDatasetFieldResolver(datasetRepo)
 	datasetService := service.NewDatasetServiceWithPermission(datasetRepo, rowPermService)
+	datasetService.SetColumnPermissionService(service.NewColumnPermissionService(columnPermRepo, permissionCacheService))
 	if application != nil && application.Config != nil {
 		calciteCfg := application.Config.Integration.Calcite
 		datasetService.SetCalciteConfig(
@@ -264,11 +271,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	chartRepo := repository.NewChartRepository(db)
 	chartService := service.NewChartService(chartRepo)
 	chartService.SetRowPermissionService(rowPermService)
-	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnPermRepo))
+	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnPermRepo, permissionCacheService))
 	datasetHandler := handler.NewDatasetHandler(datasetService, chartService)
 
 	chartHandler := handler.NewChartHandler(chartService, datasetService)
-	dataPermissionService := service.NewDataPermissionAdminService(rowPermRepo, columnPermRepo, chartService)
+	dataPermissionService := service.NewDataPermissionAdminService(rowPermRepo, columnPermRepo, chartService, permissionCacheService)
 	dataPermissionHandler := handler.NewDataPermissionHandler(dataPermissionService)
 
 	visualRepo := repository.NewVisualizationRepository(db)
@@ -350,7 +357,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	datasetService.SetResourcePermissionService(resourcePermService)
 	visualService.SetResourcePermissionService(resourcePermService)
 	resourceGovernanceAdminService := service.NewResourceGovernanceAdminService(datasourceService, datasetService, visualService)
-	exportPermService := service.NewExportPermissionService(resourcePermService, nil)
+	exportPermService := service.NewExportPermissionService(resourcePermService, permissionCacheService)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
 	permMiddleware.SetChartDatasetResolver(chartRepo)
 	permMiddleware.SetVisualizationTypeResolver(visualService)

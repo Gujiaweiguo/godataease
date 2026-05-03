@@ -73,7 +73,7 @@ func TestDataPermissionHandler_RowPermissionPagerByTarget(t *testing.T) {
 			Status:         1,
 		}},
 	}}
-	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(rowStore, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}))
+	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(rowStore, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}, nil))
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -106,7 +106,7 @@ func TestDataPermissionHandler_RowPermissionPagerByTarget(t *testing.T) {
 
 func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsInvalidTargetID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}))
+	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}, nil))
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -131,7 +131,7 @@ func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsInvalidTargetID(
 
 func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsUnsupportedTargetType(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}))
+	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}, nil))
 
 	r := gin.New()
 	api := r.Group("/api")
@@ -159,7 +159,7 @@ func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsUnsupportedTarge
 
 func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsSysParamsTargetType(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}))
+	h := NewDataPermissionHandler(service.NewDataPermissionAdminService(&fakeRowPermissionHandlerStore{}, &fakeColumnPermissionHandlerStore{}, &fakeDataPermissionFieldProvider{}, nil))
 
 	r := gin.New()
 	api := r.Group("/api")

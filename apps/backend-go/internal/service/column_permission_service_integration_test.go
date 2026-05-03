@@ -16,7 +16,7 @@ func TestColumnPermissionService_GetColumnPermissions(t *testing.T) {
 	cleanupTables(&permission.DataPermColumn{})
 
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("get column permissions empty", func(t *testing.T) {
 		result, err := svc.GetColumnPermissions(999)
@@ -45,7 +45,7 @@ func TestColumnPermissionService_GetDisabledColumns(t *testing.T) {
 	cleanupTables(&permission.DataPermColumn{})
 
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("get disabled columns empty", func(t *testing.T) {
 		result, err := svc.GetDisabledColumns(999)
@@ -85,7 +85,7 @@ func TestColumnPermissionService_GetMaskRules(t *testing.T) {
 	cleanupTables(&permission.DataPermColumn{})
 
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("get mask rules empty", func(t *testing.T) {
 		result, err := svc.GetMaskRules(999)
@@ -115,7 +115,7 @@ func TestColumnPermissionService_GetMaskRules(t *testing.T) {
 
 func TestColumnPermissionService_ApplyMask(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("apply mask with nil rule", func(t *testing.T) {
 		result := svc.ApplyMask("test", nil)
@@ -188,7 +188,7 @@ func TestColumnPermissionService_ApplyMask(t *testing.T) {
 
 func TestColumnPermissionService_KeepFirstAndLastThree(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	tests := []struct {
 		name     string
@@ -211,7 +211,7 @@ func TestColumnPermissionService_KeepFirstAndLastThree(t *testing.T) {
 
 func TestColumnPermissionService_KeepMiddleThree(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	tests := []struct {
 		name     string
@@ -234,7 +234,7 @@ func TestColumnPermissionService_KeepMiddleThree(t *testing.T) {
 
 func TestColumnPermissionService_RetainBeforeMAndAfterN(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	tests := []struct {
 		name     string
@@ -261,7 +261,7 @@ func TestColumnPermissionService_RetainBeforeMAndAfterN(t *testing.T) {
 
 func TestColumnPermissionService_RetainMToN(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	tests := []struct {
 		name     string
@@ -289,7 +289,7 @@ func TestColumnPermissionService_RetainMToN(t *testing.T) {
 
 func TestColumnPermissionService_MaskRowData(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("empty rules returns original", func(t *testing.T) {
 		row := map[string]interface{}{"name": "John", "email": "john@example.com"}
@@ -319,7 +319,7 @@ func TestColumnPermissionService_MaskRowData(t *testing.T) {
 
 func TestColumnPermissionService_FilterDisabledColumns(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("empty disabled returns original", func(t *testing.T) {
 		row := map[string]interface{}{"name": "John", "email": "john@example.com"}
@@ -346,7 +346,7 @@ func TestColumnPermissionService_FilterDisabledColumns(t *testing.T) {
 
 func TestColumnPermissionService_ParseMaskRule(t *testing.T) {
 	repo := repository.NewColumnPermissionRepository(testDB)
-	svc := NewColumnPermissionService(repo)
+	svc := NewColumnPermissionService(repo, nil)
 
 	t.Run("parse valid rule", func(t *testing.T) {
 		jsonRule := `{"builtInRule":"` + permission.BuiltInRuleCompleteDesensitization + `"}`

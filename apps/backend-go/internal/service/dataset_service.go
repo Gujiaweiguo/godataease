@@ -30,6 +30,7 @@ type DatasetService struct {
 	datasourceRepo         *repository.DatasourceRepository
 	exportRepo             repository.ExportRepositoryInterface
 	rowPermissionService   *RowPermissionService
+	columnPermissionService *ColumnPermissionService
 	resourcePermService    *ResourcePermissionService
 	calciteAddress         string
 	calciteTimeout         time.Duration
@@ -102,6 +103,13 @@ func (s *DatasetService) SetPreviewExecutorFactory(factory PreviewExecutorFactor
 
 func (s *DatasetService) SetResourcePermissionService(resourcePermSvc *ResourcePermissionService) {
 	s.resourcePermService = resourcePermSvc
+}
+
+func (s *DatasetService) SetColumnPermissionService(columnPermSvc *ColumnPermissionService) {
+	s.columnPermissionService = columnPermSvc
+	if columnPermSvc != nil && s.rowPermissionService != nil && s.rowPermissionService.columnPermRepo == nil {
+		s.rowPermissionService.columnPermRepo = columnPermSvc.columnPermRepo
+	}
 }
 
 func (s *DatasetService) SetExportRepository(exportRepo repository.ExportRepositoryInterface) {
@@ -267,7 +275,7 @@ func (s *DatasetService) FieldsWithPermission(datasetGroupID int64, userID int64
 		return resp, nil
 	}
 
-	columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+	columnSvc := s.getColumnPermissionService()
 	disabledColumns, err := columnSvc.GetDisabledColumns(datasetGroupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
@@ -345,7 +353,7 @@ func (s *DatasetService) applyDatasetColumnPermissions(datasetGroupID int64, use
 		return resp, nil
 	}
 
-	columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+	columnSvc := s.getColumnPermissionService()
 	disabledColumns, err := columnSvc.GetDisabledColumns(datasetGroupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
@@ -463,7 +471,7 @@ func (s *DatasetService) applyColumnPermissionFilter(rows []map[string]interface
 	if s.rowPermissionService == nil || s.rowPermissionService.columnPermRepo == nil {
 		return rows, nil
 	}
-	columnSvc := NewColumnPermissionService(s.rowPermissionService.columnPermRepo)
+	columnSvc := s.getColumnPermissionService()
 	disabledColumns, err := columnSvc.GetDisabledColumns(datasetGroupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load disabled columns: %w", err)
@@ -477,6 +485,16 @@ func (s *DatasetService) applyColumnPermissionFilter(rows []map[string]interface
 		rows[i] = columnSvc.MaskRowData(rows[i], maskRules)
 	}
 	return rows, nil
+}
+
+func (s *DatasetService) getColumnPermissionService() *ColumnPermissionService {
+	if s.columnPermissionService != nil {
+		return s.columnPermissionService
+	}
+	if s.rowPermissionService == nil || s.rowPermissionService.columnPermRepo == nil {
+		return nil
+	}
+	return NewColumnPermissionService(s.rowPermissionService.columnPermRepo, nil)
 }
 
 func (s *DatasetService) ensureDatasourceDependenciesViewable(datasetGroupID, userID int64) error {

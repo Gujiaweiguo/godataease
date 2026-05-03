@@ -243,7 +243,7 @@ func TestChartServiceIntegration_QueryDataWithPermission_AppliesRowAndColumnRule
 
 	rowPermSvc := NewRowPermissionService(rowPermRepo, columnPermRepo, nil, nil)
 	rowPermSvc.SetDatasetFieldResolver(datasetRepo)
-	columnPermSvc := NewColumnPermissionService(columnPermRepo)
+	columnPermSvc := NewColumnPermissionService(columnPermRepo, nil)
 	svc := NewChartService(chartRepo)
 	svc.SetRowPermissionService(rowPermSvc)
 	svc.SetColumnPermissionService(columnPermSvc)
@@ -312,7 +312,7 @@ func TestChartServiceIntegration_ListByDQWithPermission_FiltersDisabledAndMarksM
 	chartRepo := repository.NewChartRepository(testDB)
 	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
 	svc := NewChartService(chartRepo)
-	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo))
+	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo, nil))
 
 	datasetGroupID := int64(9401)
 	chartID := int64(9402)
@@ -353,7 +353,7 @@ func TestChartServiceIntegration_ListByDQWithPermission_ReturnsColumnPermissionE
 	chartRepo := repository.NewChartRepository(testDB)
 	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
 	svc := NewChartService(chartRepo)
-	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo))
+	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo, nil))
 
 	datasetGroupID := int64(9403)
 	chartID := int64(9404)
@@ -433,7 +433,7 @@ func TestChartServiceIntegration_QueryDataWithPermission_ReturnsColumnPermission
 	chartRepo := repository.NewChartRepository(testDB)
 	columnPermRepo := repository.NewColumnPermissionRepository(testDB)
 	svc := NewChartService(chartRepo)
-	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo))
+	svc.SetColumnPermissionService(NewColumnPermissionService(columnPermRepo, nil))
 
 	tableName := "it_chart_data_rows"
 	err := testDB.Create(&dataset.CoreDatasetTable{Name: chartSvcStringPtr("it_chart_column_error"), DatasetGroupID: 9601, PhysicalTable: &tableName}).Error

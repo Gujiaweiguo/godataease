@@ -3,6 +3,7 @@ package permission
 import (
 	"context"
 	"errors"
+	"path"
 	"testing"
 	"time"
 )
@@ -43,6 +44,20 @@ func (m *mockCacheBackend) Del(ctx context.Context, keys ...string) error {
 	for _, key := range keys {
 		delete(m.data, key)
 		delete(m.expiration, key)
+	}
+	return nil
+}
+
+func (m *mockCacheBackend) DelByPattern(ctx context.Context, pattern string) error {
+	for key := range m.data {
+		matched, err := path.Match(pattern, key)
+		if err != nil {
+			return err
+		}
+		if matched {
+			delete(m.data, key)
+			delete(m.expiration, key)
+		}
 	}
 	return nil
 }
@@ -240,5 +255,124 @@ func TestPermissionCacheService_InvalidateByRoleID(t *testing.T) {
 	_, found := svc.GetRolePermissions(ctx, roleID)
 	if found {
 		t.Error("Role permissions should be invalidated")
+	}
+}
+
+func TestPermissionCacheService_InvalidateResourcePermissions(t *testing.T) {
+	cache := newMockCacheBackend()
+	svc := NewPermissionCacheService(cache, 30*time.Minute)
+	ctx := context.Background()
+
+	requireNoError := func(err error) {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	requireNoError(svc.SetResourcePermission(ctx, "dashboard", 789, "view", true))
+	requireNoError(svc.SetResourcePermission(ctx, "dashboard", 789, "export", true))
+	requireNoError(svc.SetResourcePermission(ctx, "dashboard", 790, "view", true))
+
+	requireNoError(svc.InvalidateResourcePermissions(ctx, "dashboard", 789))
+
+	if _, found := svc.GetResourcePermission(ctx, "dashboard", 789, "view"); found {
+		t.Fatal("dashboard 789 view permission should be invalidated")
+	}
+	if _, found := svc.GetResourcePermission(ctx, "dashboard", 789, "export"); found {
+		t.Fatal("dashboard 789 export permission should be invalidated")
+	}
+	if _, found := svc.GetResourcePermission(ctx, "dashboard", 790, "view"); !found {
+		t.Fatal("dashboard 790 permission should remain")
+	}
+}
+
+func TestPermissionCacheService_InvalidateRowPermissions(t *testing.T) {
+	cache := newMockCacheBackend()
+	svc := NewPermissionCacheService(cache, 30*time.Minute)
+	ctx := context.Background()
+
+	obj := &DatasetRowPermissionsTreeObj{Logic: "OR"}
+	if err := svc.SetRowPermissions(ctx, 100, 1, obj); err != nil {
+		t.Fatalf("set row permissions failed: %v", err)
+	}
+	if err := svc.SetRowPermissions(ctx, 100, 2, obj); err != nil {
+		t.Fatalf("set row permissions failed: %v", err)
+	}
+	if err := svc.SetRowPermissions(ctx, 101, 1, obj); err != nil {
+		t.Fatalf("set row permissions failed: %v", err)
+	}
+
+	if err := svc.InvalidateRowPermissions(ctx, 100); err != nil {
+		t.Fatalf("invalidate row permissions failed: %v", err)
+	}
+
+	if _, found := svc.GetRowPermissions(ctx, 100, 1); found {
+		t.Fatal("dataset 100 user 1 row permissions should be invalidated")
+	}
+	if _, found := svc.GetRowPermissions(ctx, 100, 2); found {
+		t.Fatal("dataset 100 user 2 row permissions should be invalidated")
+	}
+	if _, found := svc.GetRowPermissions(ctx, 101, 1); !found {
+		t.Fatal("dataset 101 user 1 row permissions should remain")
+	}
+}
+
+func TestPermissionCacheService_InvalidateAll(t *testing.T) {
+	cache := newMockCacheBackend()
+	svc := NewPermissionCacheService(cache, 30*time.Minute)
+	ctx := context.Background()
+
+	if err := svc.SetUserPermissions(ctx, 123, []int64{1}); err != nil {
+		t.Fatalf("set user permissions failed: %v", err)
+	}
+	if err := svc.SetRolePermissions(ctx, 456, []int64{2}); err != nil {
+		t.Fatalf("set role permissions failed: %v", err)
+	}
+	if err := svc.SetColumnPermissions(ctx, 789, []*DataPermColumn{{DatasetID: 789, FieldName: "mobile"}}); err != nil {
+		t.Fatalf("set column permissions failed: %v", err)
+	}
+
+	if err := svc.InvalidateAll(ctx); err != nil {
+		t.Fatalf("invalidate all failed: %v", err)
+	}
+	if len(cache.data) != 0 {
+		t.Fatalf("expected all cache entries removed, got %d", len(cache.data))
+	}
+}
+
+func TestPermissionCacheService_InvalidateByUserID_RemovesWildcardRowPermissions(t *testing.T) {
+	cache := newMockCacheBackend()
+	svc := NewPermissionCacheService(cache, 30*time.Minute)
+	ctx := context.Background()
+
+	obj := &DatasetRowPermissionsTreeObj{Logic: "OR"}
+	if err := svc.SetUserPermissions(ctx, 123, []int64{1, 2, 3}); err != nil {
+		t.Fatalf("set user permissions failed: %v", err)
+	}
+	if err := svc.SetRowPermissions(ctx, 100, 123, obj); err != nil {
+		t.Fatalf("set row permissions failed: %v", err)
+	}
+	if err := svc.SetRowPermissions(ctx, 101, 123, obj); err != nil {
+		t.Fatalf("set row permissions failed: %v", err)
+	}
+	if err := svc.SetRowPermissions(ctx, 101, 456, obj); err != nil {
+		t.Fatalf("set row permissions failed: %v", err)
+	}
+
+	if err := svc.InvalidateByUserID(ctx, 123); err != nil {
+		t.Fatalf("invalidate by user id failed: %v", err)
+	}
+
+	if _, found := svc.GetUserPermissions(ctx, 123); found {
+		t.Fatal("user permissions should be invalidated")
+	}
+	if _, found := svc.GetRowPermissions(ctx, 100, 123); found {
+		t.Fatal("dataset 100 row permissions for user 123 should be invalidated")
+	}
+	if _, found := svc.GetRowPermissions(ctx, 101, 123); found {
+		t.Fatal("dataset 101 row permissions for user 123 should be invalidated")
+	}
+	if _, found := svc.GetRowPermissions(ctx, 101, 456); !found {
+		t.Fatal("row permissions for other users should remain")
 	}
 }

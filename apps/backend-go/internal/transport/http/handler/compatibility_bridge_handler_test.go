@@ -713,7 +713,7 @@ func TestDatasetFieldListWithPermissions_FiltersDisabledAndMarksMasked(t *testin
 	if err = columnRepo.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}); err != nil {
 		t.Fatalf("create mask permission failed: %v", err)
 	}
-	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo))
+	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo, nil))
 	chartHandler := NewChartHandler(chartService, nil)
 
 	r := gin.New()
@@ -2731,7 +2731,7 @@ func TestCompatibilityBridge_ChartListByDQ_UsesPermissionAwareFieldsWhenGoverned
 	if err = columnRepo.Create(&permission.DataPermColumn{DatasetID: 11, DatasetGroupID: 11, FieldName: "region", PermType: permission.PermTypeMask, Status: 1}); err != nil {
 		t.Fatalf("create mask permission failed: %v", err)
 	}
-	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo))
+	chartService.SetColumnPermissionService(service.NewColumnPermissionService(columnRepo, nil))
 	chartHandler := NewChartHandler(chartService, nil)
 
 	mockRepo := &mockBridgeResourcePermRepo{hasPermission: true}
