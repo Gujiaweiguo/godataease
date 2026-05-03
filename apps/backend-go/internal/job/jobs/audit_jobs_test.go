@@ -40,7 +40,9 @@ type stubAuditAlertDetector struct {
 	err    error
 }
 
-type testContextKey struct{}
+type auditJobTestContextKey string
+
+const requestKey auditJobTestContextKey = "request"
 
 func (s *stubAuditAlertDetector) DetectAndAlert(ctx context.Context) error {
 	s.called = true
@@ -79,10 +81,10 @@ func TestAuditCleanupDefinitionRunUsesSettingsRetention(t *testing.T) {
 
 func TestAuditAlertCheckDefinitionRunCallsDetectAndAlert(t *testing.T) {
 	detector := &stubAuditAlertDetector{}
-	ctx := context.WithValue(context.Background(), testContextKey{}, "audit")
+	ctx := context.WithValue(context.Background(), requestKey, "audit")
 
 	err := NewAuditAlertCheckDefinition(detector).Run(ctx)
 	require.NoError(t, err)
 	assert.True(t, detector.called)
-	assert.Equal(t, "audit", detector.ctx.Value("request"))
+	assert.Equal(t, "audit", detector.ctx.Value(requestKey))
 }
