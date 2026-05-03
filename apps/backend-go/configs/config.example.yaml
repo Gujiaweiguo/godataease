@@ -18,6 +18,22 @@ redis:
   db: 0
   pool_size: 100
 
+rate_limit:
+  enabled: false
+  default_max_requests: 100
+  default_window_seconds: 60
+  use_redis: true
+  # route_overrides:
+  #   login:
+  #     max_requests: 10
+  #     window_seconds: 60
+  #   datasource-validate:
+  #     max_requests: 30
+  #     window_seconds: 60
+  #   audit-export:
+  #     max_requests: 10
+  #     window_seconds: 60
+
 scheduler:
   sample_job_enabled: false
 
@@ -42,3 +58,6 @@ integration:
     address: ${SEATUNNEL_GRPC_ADDR:-}
     timeout_sec: ${SEATUNNEL_GRPC_TIMEOUT_SEC:-15}
     max_retries: ${SEATUNNEL_GRPC_MAX_RETRIES:-1}
+
+menu:
+  hardcoded_fallback: false

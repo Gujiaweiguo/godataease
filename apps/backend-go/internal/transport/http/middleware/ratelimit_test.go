@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/app"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +19,7 @@ func TestRateLimit_RejectsRequestsOverBudget(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		req := httptest.NewRequest(http.MethodGet, "/limited", nil)
 		req.RemoteAddr = "192.0.2.10:1234"
 		resp := httptest.NewRecorder()
@@ -44,4 +46,27 @@ func TestAuthenticatedUserKey_FallsBackToClientIP(t *testing.T) {
 
 	c.Set("user_id", uint64(42))
 	assert.Equal(t, "42", AuthenticatedUserKey(c))
+}
+
+func TestInMemoryBackend_AllowReportsRemaining(t *testing.T) {
+	backend := newInMemoryBackend()
+
+	allowed, remaining, resetAt := backend.Allow("user-1", 2, time.Minute)
+	assert.True(t, allowed)
+	assert.Equal(t, 1, remaining)
+	assert.WithinDuration(t, time.Now().Add(time.Minute), resetAt, 2*time.Second)
+
+	allowed, remaining, _ = backend.Allow("user-1", 2, time.Minute)
+	assert.True(t, allowed)
+	assert.Equal(t, 0, remaining)
+
+	allowed, remaining, _ = backend.Allow("user-1", 2, time.Minute)
+	assert.False(t, allowed)
+	assert.Equal(t, 0, remaining)
+}
+
+func TestNewRateLimiterBackend_FallsBackToInMemory(t *testing.T) {
+	backend := NewRateLimiterBackend(app.RateLimitConfig{UseRedis: true}, nil)
+	_, ok := backend.(*InMemoryBackend)
+	assert.True(t, ok)
 }
