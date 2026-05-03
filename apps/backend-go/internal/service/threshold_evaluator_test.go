@@ -216,3 +216,17 @@ func TestThresholdGeneratePreviewHTML(t *testing.T) {
 	assert.Contains(t, html, `banana`)
 	assert.NotContains(t, html, `cherry`)
 }
+
+func TestNormalizeTemplateStyles(t *testing.T) {
+	t.Run("removes highlight styles from changeText spans", func(t *testing.T) {
+		html := `<span id="changeText-1" style="background-color: #3370FF33">a</span><span id="changeText-2" style="color: #2b5fd9">b</span>`
+		normalized := normalizeTemplateStyles(html)
+		assert.NotContains(t, normalized, `background-color: #3370FF33`)
+		assert.NotContains(t, normalized, `color: #2b5fd9`)
+	})
+
+	t.Run("keeps unrelated styles unchanged", func(t *testing.T) {
+		html := `<span id="other" style="background-color: #3370FF33">a</span><span id="changeText-3">b</span>`
+		assert.Equal(t, html, normalizeTemplateStyles(html))
+	})
+}

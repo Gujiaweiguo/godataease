@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,6 +68,18 @@ func TestVisualizationServiceHelpers(t *testing.T) {
 		types, err = resolveInteractiveVisualizationTypes("bad")
 		require.Error(t, err)
 		assert.Nil(t, types)
+	})
+
+	t.Run("extract chart ids from component data", func(t *testing.T) {
+		componentData, err := json.Marshal([]map[string]any{
+			{"component": "UserView", "id": 11},
+			{"component": "Container", "propValue": []map[string]any{{"component": "UserView", "id": 22}, {"component": "Other", "id": 33}}},
+			{"component": "UserView", "id": 11},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []int64{11, 22}, extractChartIDsFromComponentData(componentData))
+		assert.Nil(t, extractChartIDsFromComponentData(json.RawMessage(`bad`)))
+		assert.Nil(t, extractChartIDsFromComponentData(nil))
 	})
 
 	t.Run("normalize visualization resource type", func(t *testing.T) {
@@ -138,6 +152,38 @@ func TestVisualizationService_Detail_DeleteLogic_FindDvType(t *testing.T) {
 		item, err := repo.GetByID(id)
 		require.Error(t, err)
 		assert.Nil(t, item)
+	})
+
+	t.Run("delete logic cleans threshold charts from component data", func(t *testing.T) {
+		svc, repo, _ := setupVisualizationServiceRepoTest(t)
+		thresholdSvc, thresholdRepo := newThresholdServiceForTest()
+		svc.SetThresholdService(thresholdSvc)
+
+		componentData := `[{"component":"UserView","id":101},{"component":"Group","propValue":[{"component":"UserView","id":202},{"component":"UserView","id":101}]}]`
+		id, err := svc.Save(&visualization.SaveRequest{Name: "Delete Threshold Item", ComponentData: strPtr(componentData)}, "tester")
+		require.NoError(t, err)
+
+		for _, chartID := range []int64{101, 202, 303} {
+			req := sampleThresholdRequest()
+			req.Name = "threshold"
+			req.ChartID = chartID
+			_, createErr := thresholdSvc.Create(context.Background(), req, 1, "tester", 1)
+			require.NoError(t, createErr)
+		}
+
+		require.NoError(t, svc.DeleteLogic(id, "tester"))
+		_, err = repo.GetByID(id)
+		require.Error(t, err)
+		exists101, err := thresholdSvc.AnyThreshold(context.Background(), 101, "core")
+		require.NoError(t, err)
+		exists202, err := thresholdSvc.AnyThreshold(context.Background(), 202, "core")
+		require.NoError(t, err)
+		exists303, err := thresholdSvc.AnyThreshold(context.Background(), 303, "core")
+		require.NoError(t, err)
+		assert.False(t, exists101)
+		assert.False(t, exists202)
+		assert.True(t, exists303)
+		assert.Len(t, thresholdRepo.records, 1)
 	})
 
 	t.Run("find dv type nil type returns empty", func(t *testing.T) {
