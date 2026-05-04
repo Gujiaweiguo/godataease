@@ -40,3 +40,25 @@ func TestExtTableFieldJSONRoundTrip(t *testing.T) {
 	assert.Equal(t, "decimal", string(BaseTypeDecimal))
 	assert.Equal(t, "datetime", string(BaseTypeDatetime))
 }
+
+func TestSearchParamAndTableDataResponseJSON(t *testing.T) {
+	payload := TableDataRequest{
+		ID:          1,
+		CurrentPage: 2,
+		PageSize:    10,
+		SearchParams: []SearchParam{
+			{Field: "name", Term: "eq", Value: "alice"},
+			{Field: "status", Multiple: true, Values: []interface{}{"enabled", "disabled"}},
+		},
+	}
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"searchParams"`)
+
+	response := TableDataResponse{Data: []map[string]interface{}{{"id": "1"}}, Fields: `[]`, Total: 1, CurrentPage: 2, PageSize: 10, Key: "id"}
+	raw, err = json.Marshal(response)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"currentPage":2`)
+
+	assert.Equal(t, "df_commit_log", (DfCommitLog{}).TableName())
+}

@@ -394,7 +394,8 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	thresholdHandler := handler.NewThresholdHandler(thresholdService)
 
 	dataFillingRepo := repository.NewDataFillingRepository(db)
-	dataFillingService := service.NewDataFillingService(dataFillingRepo, datasourceService, service.NewMySQLDDLProvider())
+	commitLogRepo := repository.NewCommitLogRepository(db)
+	dataFillingService := service.NewDataFillingService(dataFillingRepo, datasourceService, service.NewMySQLDDLProvider(), commitLogRepo)
 	dataFillingHandler := handler.NewDataFillingHandler(dataFillingService)
 
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
