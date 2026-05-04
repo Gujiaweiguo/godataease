@@ -76,11 +76,11 @@ func TestMySQLDDLProviderBuildDMLSQL(t *testing.T) {
 
 func TestBuildWhereClause(t *testing.T) {
 	tests := []struct {
-		name      string
-		params     []datafillingdomain.SearchParam
-		wantSQL    string
-		wantArgs   []interface{}
-		wantErr    bool
+		name     string
+		params   []datafillingdomain.SearchParam
+		wantSQL  string
+		wantArgs []interface{}
+		wantErr  bool
 	}{
 		{name: "empty", params: nil, wantSQL: "", wantArgs: nil},
 		{name: "eq", params: []datafillingdomain.SearchParam{{Field: "name", Term: "eq", Value: "alice"}}, wantSQL: "`name` = ?", wantArgs: []interface{}{"alice"}},
