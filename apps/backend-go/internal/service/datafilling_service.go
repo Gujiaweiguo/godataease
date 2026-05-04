@@ -15,6 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const nilStringValue = "<nil>"
+
 type DataFillingRepo interface {
 	Create(ctx context.Context, form *datafillingdomain.DataFillingForm) error
 	GetByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingForm, error)
@@ -40,11 +42,11 @@ type CommitLogRepo interface {
 }
 
 type DataFillingService struct {
-	repo                     DataFillingRepo
-	datasourceService        DataFillingDatasourceService
-	ddlProvider              DDLProvider
-	commitLogRepo            CommitLogRepo
-	datasourceConnProvider   DatasourceConnectionProvider
+	repo                   DataFillingRepo
+	datasourceService      DataFillingDatasourceService
+	ddlProvider            DDLProvider
+	commitLogRepo          CommitLogRepo
+	datasourceConnProvider DatasourceConnectionProvider
 }
 
 func NewDataFillingService(repo DataFillingRepo, datasourceService DataFillingDatasourceService, ddlProvider DDLProvider, commitLogRepo CommitLogRepo) *DataFillingService {
@@ -181,7 +183,7 @@ func (s *DataFillingService) SaveRowData(ctx context.Context, formID int64, rowD
 	}
 	rowID := strings.TrimSpace(fmt.Sprint(rowData["id"]))
 	operate := 1
-	if rowID == "" || rowID == "<nil>" {
+	if rowID == "" || rowID == nilStringValue {
 		delete(rowData, "id")
 		if err := s.ddlProvider.InsertRow(ctx, db, form.PhysicalTableName, rowData); err != nil {
 			return nil, err
@@ -502,7 +504,9 @@ func diffExtTableFields(oldFields, newFields []datafillingdomain.ExtTableField) 
 			toDrop = append(toDrop, column)
 		}
 	}
-	sort.Slice(toAdd, func(i, j int) bool { return toAdd[i].Settings.Mapping.ColumnName < toAdd[j].Settings.Mapping.ColumnName })
+	sort.Slice(toAdd, func(i, j int) bool {
+		return toAdd[i].Settings.Mapping.ColumnName < toAdd[j].Settings.Mapping.ColumnName
+	})
 	sort.Strings(toDrop)
 	return toAdd, toDrop
 }

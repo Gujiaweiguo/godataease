@@ -188,7 +188,7 @@ func (f *fakeDDLProvider) InsertRow(ctx context.Context, db *gorm.DB, tableName 
 	_ = ctx
 	_ = db
 	_ = tableName
-	if strings.TrimSpace(fmt.Sprint(rowData["id"])) == "" || fmt.Sprint(rowData["id"]) == "<nil>" {
+	if strings.TrimSpace(fmt.Sprint(rowData["id"])) == "" || fmt.Sprint(rowData["id"]) == nilStringValue {
 		rowData["id"] = "generated-id"
 	}
 	f.insertedRows = append(f.insertedRows, copyMap(rowData))
