@@ -52,6 +52,18 @@ func int64Ptr(v int64) *int64 { return &v }
 func intPtrVisualization(v int) *int { return &v }
 
 func TestVisualizationServiceHelpers(t *testing.T) {
+	t.Run("setter helpers wire dependencies", func(t *testing.T) {
+		svc, _, db := setupVisualizationServiceRepoTest(t)
+		templateSvc := &TemplateService{}
+		tplRepo := repository.NewTemplateExtendDataRepository(db)
+
+		svc.SetTemplateService(templateSvc)
+		svc.SetTemplateExtendDataRepo(tplRepo)
+
+		assert.Same(t, templateSvc, svc.templateService)
+		assert.Same(t, tplRepo, svc.templateExtendDataRepo)
+	})
+
 	t.Run("resolve interactive visualization types", func(t *testing.T) {
 		types, err := resolveInteractiveVisualizationTypes("")
 		require.NoError(t, err)

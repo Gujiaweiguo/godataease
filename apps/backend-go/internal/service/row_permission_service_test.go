@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/repository"
 
@@ -26,11 +27,23 @@ type mockUserRoleRepo struct {
 	err     error
 }
 
+type mockDatasetFieldResolver struct {
+	field *dataset.CoreDatasetTableField
+	err   error
+}
+
 func (m *mockUserRoleRepo) GetRoleIDsByUserID(_ int64) ([]int64, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.roleIDs, nil
+}
+
+func (m *mockDatasetFieldResolver) GetFieldByID(int64) (*dataset.CoreDatasetTableField, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.field, nil
 }
 
 func setupRowPermissionServiceRepoTest(t *testing.T, userRoleRepo UserRoleRepositoryInterface, adminChecker AdminCheckerInterface) (*RowPermissionService, *repository.RowPermissionRepository, *repository.ColumnPermissionRepository, *gorm.DB) {
@@ -218,6 +231,24 @@ func TestParseTreeObj(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRowPermissionService_SetDatasetFieldResolverAndResolveFieldReference(t *testing.T) {
+	origin := "origin_name"
+	name := "display_name"
+	svc := &RowPermissionService{}
+
+	assert.Equal(t, "`7`", svc.resolveFieldReference(7))
+
+	svc.SetDatasetFieldResolver(&mockDatasetFieldResolver{field: &dataset.CoreDatasetTableField{OriginName: &origin, Name: &name}})
+	assert.NotNil(t, svc.datasetFieldResolver)
+	assert.Equal(t, "`origin_name`", svc.resolveFieldReference(7))
+
+	svc.SetDatasetFieldResolver(&mockDatasetFieldResolver{field: &dataset.CoreDatasetTableField{Name: &name}})
+	assert.Equal(t, "`display_name`", svc.resolveFieldReference(7))
+
+	svc.SetDatasetFieldResolver(&mockDatasetFieldResolver{err: errors.New("boom")})
+	assert.Equal(t, "`7`", svc.resolveFieldReference(7))
 }
 
 func TestEscapeSQL(t *testing.T) {

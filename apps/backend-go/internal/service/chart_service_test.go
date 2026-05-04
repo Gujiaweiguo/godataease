@@ -11,10 +11,18 @@ import (
 
 	"dataease/backend/internal/domain/chart"
 	"dataease/backend/internal/domain/dataset"
+	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/repository"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
+
+type chartAdminChecker struct{ isAdmin bool }
+
+func (c chartAdminChecker) IsAdmin(int64) bool { return c.isAdmin }
 
 type chartRegressionSample struct {
 	Name            string                   `json:"name"`
@@ -345,6 +353,102 @@ func TestChartQueryData_BuildsSeriesDataFromPayload(t *testing.T) {
 	assert.Equal(t, 2620.0, resp.Data[0].Value)
 	assert.Equal(t, "2", resp.Data[0].DimensionList[0].ID)
 	assert.Equal(t, "5", resp.Data[0].QuotaList[0].ID)
+}
+
+func TestChartIntLikeToFloat(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  float64
+		ok    bool
+	}{
+		{name: "int", input: int(7), want: 7, ok: true},
+		{name: "int64", input: int64(8), want: 8, ok: true},
+		{name: "uint32", input: uint32(9), want: 9, ok: true},
+		{name: "nil", input: nil, want: 0, ok: false},
+		{name: "string", input: "10", want: 0, ok: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := intLikeToFloat(tt.input)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.ok, ok)
+		})
+	}
+}
+
+func TestChartService_SetPermissionServices(t *testing.T) {
+	svc := NewChartService(&fakeChartRepo{})
+	rowSvc := &RowPermissionService{}
+	columnSvc := &ColumnPermissionService{}
+
+	svc.SetRowPermissionService(rowSvc)
+	svc.SetColumnPermissionService(columnSvc)
+
+	assert.Same(t, rowSvc, svc.rowPermissionService)
+	assert.Same(t, columnSvc, svc.columnPermissionService)
+}
+
+func TestChartFieldPermissionKeyAndFilterChartFields(t *testing.T) {
+	svc := &ChartService{}
+	maskRules := map[string]*permission.DesensitizationRule{
+		"phone": {BuiltInRule: permission.BuiltInRuleCompleteDesensitization},
+	}
+	fields := []chart.ChartField{
+		{ID: 1, OriginName: " secret ", Name: "Secret"},
+		{ID: 2, Name: "phone"},
+		{ID: -1, Name: "记录数*"},
+	}
+
+	assert.Equal(t, "origin", chartFieldPermissionKey(chart.ChartField{OriginName: " origin ", Name: "fallback"}))
+	assert.Equal(t, "fallback", chartFieldPermissionKey(chart.ChartField{Name: " fallback ", DataeaseName: "de_name"}))
+	assert.Equal(t, "de_name", chartFieldPermissionKey(chart.ChartField{DataeaseName: "de_name", FieldShortName: "short"}))
+	assert.Equal(t, "short", chartFieldPermissionKey(chart.ChartField{FieldShortName: " short "}))
+	assert.Empty(t, chartFieldPermissionKey(chart.ChartField{}))
+
+	filtered := svc.filterChartFields(fields, map[string]bool{"secret": true}, maskRules)
+	require.Len(t, filtered, 2)
+	assert.Equal(t, int64(2), filtered[0].ID)
+	assert.True(t, filtered[0].Desensitized)
+	assert.Equal(t, int64(-1), filtered[1].ID)
+	assert.False(t, filtered[1].Desensitized)
+}
+
+func TestChartService_ApplyColumnRules(t *testing.T) {
+	t.Run("returns early for empty rows or admin", func(t *testing.T) {
+		rows := []map[string]interface{}{{"name": "alice"}}
+		svc := &ChartService{}
+		got, err := svc.applyColumnRules(1, 2, rows)
+		require.NoError(t, err)
+		assert.Equal(t, rows, got)
+
+		svc = &ChartService{
+			columnPermissionService: &ColumnPermissionService{},
+			rowPermissionService:    &RowPermissionService{adminChecker: chartAdminChecker{isAdmin: true}},
+		}
+		got, err = svc.applyColumnRules(1, 99, rows)
+		require.NoError(t, err)
+		assert.Equal(t, rows, got)
+	})
+
+	t.Run("filters disabled columns and masks configured fields", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		require.NoError(t, db.AutoMigrate(&permission.DataPermColumn{}))
+
+		repo := repository.NewColumnPermissionRepository(db)
+		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 7, FieldName: "secret", PermType: permission.PermTypeDisable}))
+		require.NoError(t, repo.Create(&permission.DataPermColumn{DatasetID: 7, FieldName: "phone", PermType: permission.PermTypeMask}))
+
+		svc := &ChartService{columnPermissionService: NewColumnPermissionService(repo, nil)}
+		rows := []map[string]interface{}{{"name": "alice", "secret": "hidden", "phone": "13812345678"}}
+
+		got, err := svc.applyColumnRules(7, 2, rows)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		assert.Equal(t, map[string]interface{}{"name": "alice", "phone": "******"}, got[0])
+	})
 }
 
 func TestChartQueryData_BuildsTableInfoDataFromPayload(t *testing.T) {

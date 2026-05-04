@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -267,6 +268,109 @@ func TestDatasetService_SetColumnPermissionService(t *testing.T) {
 	if svc.columnPermissionService != columnSvc {
 		t.Fatal("expected column permission service configured")
 	}
+}
+
+func TestBuildFieldTreeNodes(t *testing.T) {
+	textType := 0
+	floatType := 3
+	specs := []fieldTreeSpec{
+		{alias: "f_1", field: &dataset.CoreDatasetTableField{DeType: &textType}},
+		{alias: "f_2", field: &dataset.CoreDatasetTableField{DeType: &floatType}},
+	}
+	rows := []map[string]interface{}{
+		{"f_1": "East", "f_2": "1.23E+3"},
+		{"f_1": "East", "f_2": "1.23E+3"},
+		{"f_1": "West", "f_2": "45"},
+		{"f_1": nil},
+	}
+
+	nodes := buildFieldTreeNodes(rows, specs)
+	require.Len(t, nodes, 2)
+	assert.Equal(t, "East", nodes[0].Text)
+	require.Len(t, nodes[0].Children, 1)
+	assert.Equal(t, "1230", nodes[0].Children[0].Text)
+	assert.Equal(t, "f_1:East", nodes[0].Children[0].Pid)
+	assert.Equal(t, "West", nodes[1].Text)
+	assert.Equal(t, []dataset.BaseTreeNode{}, buildFieldTreeNodes(nil, specs))
+}
+
+func TestDatasetService_FieldsWithPermission(t *testing.T) {
+	t.Run("groups fields and appends count field without permission filtering", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		checked := true
+		groupTypeD, groupTypeQ := "d", "q"
+		deString, deInt := 0, 2
+		region, amount := "region", "amount"
+
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 1, DatasetGroupID: 77, Name: &region, OriginName: &region, GroupType: &groupTypeD, DeType: &deString, Checked: &checked}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 2, DatasetGroupID: 77, Name: &amount, OriginName: &amount, GroupType: &groupTypeQ, DeType: &deInt, Checked: &checked}).Error)
+
+		resp, err := svc.FieldsWithPermission(77, 0)
+		require.NoError(t, err)
+		require.Len(t, resp.DimensionList, 1)
+		assert.Equal(t, "region", resp.DimensionList[0].Name)
+		require.Len(t, resp.QuotaList, 2)
+		assert.Equal(t, "amount", resp.QuotaList[0].Name)
+		assert.Equal(t, int64(-1), resp.QuotaList[1].ID)
+	})
+
+	t.Run("applies column permissions for non admin users", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		checked := true
+		groupTypeD, groupTypeQ := "d", "q"
+		deString, deInt := 0, 2
+		region, amount := "region", "amount"
+
+		require.NoError(t, db.AutoMigrate(&permission.DataPermColumn{}))
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 11, DatasetGroupID: 88, Name: &region, OriginName: &region, GroupType: &groupTypeD, DeType: &deString, Checked: &checked}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 12, DatasetGroupID: 88, Name: &amount, OriginName: &amount, GroupType: &groupTypeQ, DeType: &deInt, Checked: &checked}).Error)
+
+		columnRepo := repository.NewColumnPermissionRepository(db)
+		require.NoError(t, columnRepo.Create(&permission.DataPermColumn{DatasetID: 88, FieldName: "region", PermType: permission.PermTypeDisable}))
+		ruleJSON, err := json.Marshal(&permission.DesensitizationRule{BuiltInRule: permission.BuiltInRuleCompleteDesensitization})
+		require.NoError(t, err)
+		require.NoError(t, columnRepo.Create(&permission.DataPermColumn{DatasetID: 88, FieldName: "amount", PermType: permission.PermTypeMask, MaskRule: string(ruleJSON)}))
+
+		svc.rowPermissionService = &RowPermissionService{columnPermRepo: columnRepo, adminChecker: datasetAdminChecker{isAdmin: false}}
+
+		resp, err := svc.FieldsWithPermission(88, 9)
+		require.NoError(t, err)
+		assert.Empty(t, resp.DimensionList)
+		require.Len(t, resp.QuotaList, 2)
+		assert.True(t, resp.QuotaList[0].Desensitized)
+		assert.Equal(t, int64(-1), resp.QuotaList[1].ID)
+	})
+}
+
+func TestDatasetService_GetFieldTree(t *testing.T) {
+	t.Run("returns empty for nil request", func(t *testing.T) {
+		svc, _ := setupDatasetServiceRepoTest(t)
+		result, err := svc.GetFieldTree(nil)
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("builds tree from dataset fields", func(t *testing.T) {
+		svc, db := setupDatasetServiceRepoTest(t)
+		tableName := "tree_values"
+		region, city := "region", "city"
+		deString := 0
+		datasetTableID := int64(101)
+
+		require.NoError(t, db.Exec(`CREATE TABLE tree_values (region TEXT, city TEXT)`).Error)
+		require.NoError(t, db.Exec(`INSERT INTO tree_values(region, city) VALUES ('East', 'Beijing'), ('East', 'Shanghai'), ('West', 'Chengdu')`).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTable{ID: datasetTableID, DatasetGroupID: 66, PhysicalTable: &tableName}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 21, DatasetGroupID: 66, DatasetTableID: &datasetTableID, OriginName: &region, Name: &region, DeType: &deString}).Error)
+		require.NoError(t, db.Create(&dataset.CoreDatasetTableField{ID: 22, DatasetGroupID: 66, DatasetTableID: &datasetTableID, OriginName: &city, Name: &city, DeType: &deString}).Error)
+
+		result, err := svc.GetFieldTree(&dataset.MultFieldValuesRequest{FieldIDs: []int64{21, 22}})
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		assert.Equal(t, "East", result[0].Text)
+		assert.Len(t, result[0].Children, 2)
+		assert.Equal(t, "West", result[1].Text)
+		assert.Len(t, result[1].Children, 1)
+	})
 }
 
 func TestEnumAliasAndFieldIDFromAlias(t *testing.T) {
