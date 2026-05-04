@@ -11,6 +11,7 @@ import (
 
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/integration/seatunnel"
 	"dataease/backend/internal/repository"
 
@@ -131,6 +132,88 @@ func TestDatasourceService_Validate(t *testing.T) {
 		assert.Equal(t, datasource.StatusError, resp.Status)
 		assert.Contains(t, resp.Message, "failed to connect")
 	})
+}
+
+func TestDatasourceService_SetUserRepositoryAndResolveUserName(t *testing.T) {
+	svc, db := setupDatasourceServiceRepoTest(t)
+	require.NoError(t, db.AutoMigrate(&user.SysUser{}))
+	require.NoError(t, db.Create(&user.SysUser{UserID: 8, Username: "alice", NickName: "Alice"}).Error)
+	require.NoError(t, db.Create(&user.SysUser{UserID: 9, Username: "bob"}).Error)
+
+	userRepo := repository.NewUserRepository(db)
+	svc.SetUserRepository(userRepo)
+
+	assert.Same(t, userRepo, svc.userRepo)
+	assert.Equal(t, "Alice", svc.ResolveUserName("8"))
+	assert.Equal(t, "bob", svc.ResolveUserName("9"))
+	assert.Equal(t, "bad", svc.ResolveUserName("bad"))
+	assert.Equal(t, "99", svc.ResolveUserName("99"))
+	assert.Equal(t, "", svc.ResolveUserName(""))
+}
+
+func TestDatasourceService_TreeAndSyncHelpers(t *testing.T) {
+	t.Run("tree lists datasources and handles missing repo", func(t *testing.T) {
+		svc, db := setupDatasourceServiceRepoTest(t)
+		dsType := datasource.TypeFolder
+		name := "Root"
+		require.NoError(t, db.Create(&datasource.CoreDatasource{ID: 1, Name: name, Type: dsType}).Error)
+
+		result, err := svc.Tree(&datasource.ListRequest{})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, int64(1), result[0].ID)
+
+		_, err = (&DatasourceService{}).Tree(&datasource.ListRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "repository is unavailable")
+	})
+
+	t.Run("maps sync record status and timestamps", func(t *testing.T) {
+		records := []datasource.SyncRecord{
+			{TableName: "orders", TaskStatus: seatunnel.StatusPending, CreateTime: 10},
+			{TableName: " Orders ", TaskStatus: seatunnel.StatusSuccess, StartTime: 15, EndTime: 20},
+			{TableName: "users", TaskStatus: seatunnel.StatusRunning, StartTime: 30, CreateTime: 25},
+			{TableName: "users", TaskStatus: seatunnel.StatusFailed, EndTime: 40},
+		}
+		latest := latestSyncRecordByTable(records)
+		require.Len(t, latest, 2)
+		assert.Equal(t, seatunnel.StatusSuccess, latest["orders"].TaskStatus)
+		assert.Equal(t, seatunnel.StatusFailed, latest["users"].TaskStatus)
+
+		assert.Equal(t, datasource.TableStatusWarning, mapTableSyncStatus(nil))
+		assert.Equal(t, datasource.TableStatusPending, mapTableSyncStatus(&datasource.SyncRecord{TaskStatus: seatunnel.StatusPending}))
+		assert.Equal(t, datasource.TableStatusCompleted, mapTableSyncStatus(&datasource.SyncRecord{TaskStatus: seatunnel.StatusSuccess}))
+		assert.Equal(t, datasource.TableStatusUnderExecution, mapTableSyncStatus(&datasource.SyncRecord{TaskStatus: seatunnel.StatusRunning}))
+		assert.Equal(t, datasource.TableStatusError, mapTableSyncStatus(&datasource.SyncRecord{TaskStatus: seatunnel.StatusFailed}))
+		assert.Equal(t, datasource.TableStatusCancelled, mapTableSyncStatus(&datasource.SyncRecord{TaskStatus: seatunnel.StatusCancelled}))
+
+		assert.Equal(t, int64(20), tableSyncLastUpdate(&datasource.SyncRecord{TaskStatus: seatunnel.StatusSuccess, EndTime: 20, StartTime: 15, CreateTime: 10}))
+		assert.Equal(t, int64(25), tableSyncLastUpdate(&datasource.SyncRecord{TaskStatus: seatunnel.StatusRunning, StartTime: 25, CreateTime: 20}))
+		assert.Equal(t, int64(12), tableSyncLastUpdate(&datasource.SyncRecord{TaskStatus: "unknown", CreateTime: 12}))
+		assert.Zero(t, tableSyncLastUpdate(nil))
+	})
+}
+
+func TestDatasourceService_GetTableStatus(t *testing.T) {
+	svc, db := setupDatasourceServiceRepoTest(t)
+	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 1, DatasourceID: 9, Name: "Orders", PhysicalTableName: "orders", Type: "db"}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 2, DatasourceID: 9, Name: "Users", PhysicalTableName: "users", Type: "db"}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{ID: 1, DsID: 9, PhysicalTableName: "orders", TaskStatus: seatunnel.StatusSuccess, StartTime: 100, EndTime: 200}).Error)
+	require.NoError(t, db.Create(&auto.CoreDatasourceTaskLog{ID: 2, DsID: 9, PhysicalTableName: "users", TaskStatus: seatunnel.StatusRunning, StartTime: 300, CreateTime: 250}).Error)
+
+	result, err := svc.GetTableStatus(&datasource.TableRequest{DatasourceID: 9})
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	assert.Equal(t, datasource.TableStatusUnderExecution, result[0].Status)
+	assert.Equal(t, int64(300), result[0].LastUpdate)
+	assert.Equal(t, datasource.TableStatusCompleted, result[1].Status)
+	assert.Equal(t, int64(200), result[1].LastUpdate)
+
+	filtered, err := svc.GetTableStatus(&datasource.TableRequest{DatasourceID: 9, TableName: "orders"})
+	require.NoError(t, err)
+	require.Len(t, filtered, 2)
+	assert.Equal(t, datasource.TableStatusCompleted, filtered[1].Status)
+	assert.Empty(t, filtered[0].Status)
 }
 
 func TestDatasourceServiceHelpers_PingTCPTimeout(t *testing.T) {

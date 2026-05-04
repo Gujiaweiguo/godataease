@@ -138,6 +138,10 @@ func TestMenuService_CRUDAndDeleteGuards(t *testing.T) {
 	assert.Equal(t, 99, updated.MenuSort)
 	assert.True(t, updated.Hidden)
 
+	byPath, err := svc.GetByPath("/parent")
+	require.NoError(t, err)
+	assert.Equal(t, int64(30), byPath.ID)
+
 	err = svc.Delete(30)
 	require.ErrorIs(t, err, ErrMenuHasChildren)
 
