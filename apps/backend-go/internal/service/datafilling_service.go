@@ -41,16 +41,45 @@ type CommitLogRepo interface {
 	DeleteByFormID(ctx context.Context, formID int64) error
 }
 
+type TaskRepository interface {
+	CreateTask(ctx context.Context, task *datafillingdomain.DataFillingTask) error
+	UpdateTask(ctx context.Context, task *datafillingdomain.DataFillingTask) error
+	GetTaskByID(ctx context.Context, taskID int64) (*datafillingdomain.DataFillingTask, error)
+	ListTasksByFormID(ctx context.Context, formID int64, page, pageSize int) ([]*datafillingdomain.DataFillingTask, int64, error)
+	DeleteTasksByIDs(ctx context.Context, taskIDs []int64) error
+	GetStartedTasks(ctx context.Context) ([]*datafillingdomain.DataFillingTask, error)
+}
+
+type SubTaskRepository interface {
+	CreateSubTask(ctx context.Context, subTask *datafillingdomain.DataFillingSubTask) error
+	UpdateSubTaskCounts(ctx context.Context, subTaskID int64, totalCount, unfinishedCount, totalUserCount, unfinishedUserCount int) error
+	ListSubTasksByTaskID(ctx context.Context, taskID int64, page, pageSize int) ([]*datafillingdomain.DataFillingSubTask, int64, error)
+	DeleteSubTasksByIDs(ctx context.Context, subTaskIDs []int64) error
+	ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs []int64) ([]int64, error)
+}
+
+type SubInstanceRepository interface {
+	BatchCreateSubInstances(ctx context.Context, instances []*datafillingdomain.DataFillingSubInstance) error
+	DeleteSubInstancesByPID(ctx context.Context, pid int64) error
+	DeleteSubInstancesByPIDs(ctx context.Context, pids []int64) error
+	DeleteSubInstancesByTaskIDs(ctx context.Context, taskIDs []int64) error
+	ListSubInstancesByPID(ctx context.Context, pid int64, statusFilter *int) ([]*datafillingdomain.DataFillingSubInstance, error)
+}
+
 type DataFillingService struct {
 	repo                   DataFillingRepo
 	datasourceService      DataFillingDatasourceService
 	ddlProvider            DDLProvider
 	commitLogRepo          CommitLogRepo
 	datasourceConnProvider DatasourceConnectionProvider
+	taskRepo               TaskRepository
+	subTaskRepo            SubTaskRepository
+	subInstanceRepo        SubInstanceRepository
+	scheduler              *DataFillingScheduler
 }
 
-func NewDataFillingService(repo DataFillingRepo, datasourceService DataFillingDatasourceService, ddlProvider DDLProvider, commitLogRepo CommitLogRepo) *DataFillingService {
-	return &DataFillingService{repo: repo, datasourceService: datasourceService, ddlProvider: ddlProvider, commitLogRepo: commitLogRepo}
+func NewDataFillingService(repo DataFillingRepo, datasourceService DataFillingDatasourceService, ddlProvider DDLProvider, commitLogRepo CommitLogRepo, taskRepo TaskRepository, subTaskRepo SubTaskRepository, subInstanceRepo SubInstanceRepository, scheduler *DataFillingScheduler) *DataFillingService {
+	return &DataFillingService{repo: repo, datasourceService: datasourceService, ddlProvider: ddlProvider, commitLogRepo: commitLogRepo, taskRepo: taskRepo, subTaskRepo: subTaskRepo, subInstanceRepo: subInstanceRepo, scheduler: scheduler}
 }
 
 func (s *DataFillingService) SetDatasourceConnectionProvider(provider DatasourceConnectionProvider) {
@@ -273,6 +302,277 @@ func (s *DataFillingService) ClearCommitLogs(ctx context.Context, formID int64) 
 		return gorm.ErrInvalidData
 	}
 	return s.commitLogRepo.DeleteByFormID(ctx, formID)
+}
+
+func marshalTaskLists(req *datafillingdomain.TaskSaveRequest) (reciFlagList, uidList, ridList string, err error) {
+	rf, err := json.Marshal(req.ReciFlagList)
+	if err != nil {
+		return "", "", "", err
+	}
+	ul, err := json.Marshal(req.UIDList)
+	if err != nil {
+		return "", "", "", err
+	}
+	rl, err := json.Marshal(req.RIDList)
+	if err != nil {
+		return "", "", "", err
+	}
+	return string(rf), string(ul), string(rl), nil
+}
+
+func (s *DataFillingService) updateExistingTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64, reciFlagList, uidList, ridList string) (int64, error) {
+	current, err := s.taskRepo.GetTaskByID(ctx, *req.ID)
+	if err != nil {
+		return 0, err
+	}
+	wasStarted := current.Status == datafillingdomain.TaskStatusStarted
+	current.FormID = req.FormID
+	current.Name = strings.TrimSpace(req.Name)
+	current.ReciFlagList = reciFlagList
+	current.UIDList = uidList
+	current.RIDList = ridList
+	current.FillType = req.FillType
+	current.FitType = req.FitType
+	current.FitColumn = strings.TrimSpace(req.FitColumn)
+	current.RateType = req.RateType
+	current.RateVal = strings.TrimSpace(req.RateVal)
+	current.OneTimeType = req.OneTimeType
+	current.StartTime = req.StartTime
+	current.EndTime = req.EndTime
+	current.PublishRangeTime = req.PublishRangeTime
+	current.PublishRangeTimeType = req.PublishRangeTimeType
+	current.FormExtSetting = strings.TrimSpace(req.FormExtSetting)
+	current.FormFilterSetting = strings.TrimSpace(req.FormFilterSetting)
+	current.UpdateBy = userID
+	current.UpdateTime = time.Now().UnixMilli()
+	if wasStarted && s.scheduler != nil {
+		s.scheduler.UnregisterTask(current.ID)
+	}
+	if err := s.taskRepo.UpdateTask(ctx, current); err != nil {
+		return 0, err
+	}
+	if wasStarted && s.scheduler != nil {
+		nextExecTime, err := s.scheduler.computeNextExecTime(current)
+		if err != nil {
+			return 0, err
+		}
+		current.NextExecTime = nextExecTime
+		if err := s.taskRepo.UpdateTask(ctx, current); err != nil {
+			return 0, err
+		}
+		if err := s.scheduler.RegisterTask(ctx, current.ID); err != nil {
+			return 0, err
+		}
+	}
+	return current.ID, nil
+}
+
+func (s *DataFillingService) createNewTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64, reciFlagList, uidList, ridList string) (int64, error) {
+	now := time.Now().UnixMilli()
+	task := &datafillingdomain.DataFillingTask{
+		FormID:               req.FormID,
+		Name:                 strings.TrimSpace(req.Name),
+		ReciFlagList:         reciFlagList,
+		UIDList:              uidList,
+		RIDList:              ridList,
+		FillType:             req.FillType,
+		FitType:              req.FitType,
+		FitColumn:            strings.TrimSpace(req.FitColumn),
+		RateType:             req.RateType,
+		RateVal:              strings.TrimSpace(req.RateVal),
+		OneTimeType:          req.OneTimeType,
+		StartTime:            req.StartTime,
+		EndTime:              req.EndTime,
+		PublishRangeTime:     req.PublishRangeTime,
+		PublishRangeTimeType: req.PublishRangeTimeType,
+		Status:               datafillingdomain.TaskStatusStopped,
+		CreateBy:             userID,
+		CreateTime:           now,
+		UpdateBy:             userID,
+		UpdateTime:           now,
+		FormExtSetting:       strings.TrimSpace(req.FormExtSetting),
+		FormFilterSetting:    strings.TrimSpace(req.FormFilterSetting),
+	}
+	if err := s.taskRepo.CreateTask(ctx, task); err != nil {
+		return 0, err
+	}
+	return task.ID, nil
+}
+
+func (s *DataFillingService) SaveTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64) (int64, error) {
+	if s.taskRepo == nil {
+		return 0, fmt.Errorf("task repository not configured")
+	}
+	if req == nil || req.FormID <= 0 || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.RateVal) == "" {
+		return 0, gorm.ErrInvalidData
+	}
+	if _, err := s.repo.GetByID(ctx, req.FormID); err != nil {
+		return 0, err
+	}
+	reciFlagList, uidList, ridList, err := marshalTaskLists(req)
+	if err != nil {
+		return 0, err
+	}
+	if req.ID != nil && *req.ID > 0 {
+		return s.updateExistingTask(ctx, req, userID, reciFlagList, uidList, ridList)
+	}
+	return s.createNewTask(ctx, req, userID, reciFlagList, uidList, ridList)
+}
+
+func (s *DataFillingService) GetTaskInfo(ctx context.Context, taskID int64) (*datafillingdomain.TaskInfoVO, error) {
+	if s.taskRepo == nil || taskID <= 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	task, err := s.taskRepo.GetTaskByID(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	return buildTaskInfoVO(task)
+}
+
+func (s *DataFillingService) StartTask(ctx context.Context, formID, taskID int64) error {
+	if s.taskRepo == nil || s.scheduler == nil || formID <= 0 || taskID <= 0 {
+		return gorm.ErrInvalidData
+	}
+	task, err := s.taskRepo.GetTaskByID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	if task.FormID != formID {
+		return gorm.ErrRecordNotFound
+	}
+	if task.Status == datafillingdomain.TaskStatusStarted {
+		return fmt.Errorf("task already started")
+	}
+	nextExecTime, err := s.scheduler.computeNextExecTime(task)
+	if err != nil {
+		return err
+	}
+	if err := s.scheduler.RegisterTask(ctx, task.ID); err != nil {
+		return err
+	}
+	task.Status = datafillingdomain.TaskStatusStarted
+	task.NextExecTime = nextExecTime
+	task.UpdateTime = time.Now().UnixMilli()
+	return s.taskRepo.UpdateTask(ctx, task)
+}
+
+func (s *DataFillingService) StopTask(ctx context.Context, formID, taskID int64) error {
+	if s.taskRepo == nil || formID <= 0 || taskID <= 0 {
+		return gorm.ErrInvalidData
+	}
+	task, err := s.taskRepo.GetTaskByID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	if task.FormID != formID {
+		return gorm.ErrRecordNotFound
+	}
+	if s.scheduler != nil {
+		s.scheduler.UnregisterTask(task.ID)
+	}
+	task.Status = datafillingdomain.TaskStatusStopped
+	task.NextExecTime = 0
+	task.UpdateTime = time.Now().UnixMilli()
+	return s.taskRepo.UpdateTask(ctx, task)
+}
+
+func (s *DataFillingService) ExecuteNowTask(ctx context.Context, taskID int64) error {
+	if s.scheduler == nil || taskID <= 0 {
+		return gorm.ErrInvalidData
+	}
+	return s.scheduler.FireTask(ctx, taskID)
+}
+
+func (s *DataFillingService) TaskPageList(ctx context.Context, formID int64, page, pageSize int) (*datafillingdomain.TaskPageResponse, error) {
+	if s.taskRepo == nil || formID <= 0 || page <= 0 || pageSize <= 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	rows, total, err := s.taskRepo.ListTasksByFormID(ctx, formID, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]*datafillingdomain.TaskInfoVO, 0, len(rows))
+	for _, row := range rows {
+		item, err := buildTaskInfoVO(row)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, item)
+	}
+	return &datafillingdomain.TaskPageResponse{Records: records, Total: total, Current: page, Size: pageSize}, nil
+}
+
+func (s *DataFillingService) DeleteTasks(ctx context.Context, formID int64, taskIDs []int64) error {
+	if s.taskRepo == nil || s.subTaskRepo == nil || s.subInstanceRepo == nil || formID <= 0 || len(taskIDs) == 0 {
+		return gorm.ErrInvalidData
+	}
+	for _, taskID := range taskIDs {
+		task, err := s.taskRepo.GetTaskByID(ctx, taskID)
+		if err != nil {
+			return err
+		}
+		if task.FormID != formID {
+			return gorm.ErrRecordNotFound
+		}
+		if s.scheduler != nil {
+			s.scheduler.UnregisterTask(taskID)
+		}
+	}
+	subTaskIDs, err := s.subTaskRepo.ListSubTaskIDsByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return err
+	}
+	if err := s.subInstanceRepo.DeleteSubInstancesByTaskIDs(ctx, taskIDs); err != nil {
+		return err
+	}
+	if err := s.subTaskRepo.DeleteSubTasksByIDs(ctx, subTaskIDs); err != nil {
+		return err
+	}
+	return s.taskRepo.DeleteTasksByIDs(ctx, taskIDs)
+}
+
+func (s *DataFillingService) SubTaskPageList(ctx context.Context, taskID int64, page, pageSize int) (*datafillingdomain.SubTaskPageResponse, error) {
+	if s.subTaskRepo == nil || taskID <= 0 || page <= 0 || pageSize <= 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	rows, total, err := s.subTaskRepo.ListSubTasksByTaskID(ctx, taskID, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	return &datafillingdomain.SubTaskPageResponse{Records: rows, Total: total, Current: page, Size: pageSize}, nil
+}
+
+func (s *DataFillingService) DeleteSubTasks(ctx context.Context, formID int64, subTaskIDs []int64) error {
+	if s.subTaskRepo == nil || s.subInstanceRepo == nil || formID <= 0 || len(subTaskIDs) == 0 {
+		return gorm.ErrInvalidData
+	}
+	if _, err := s.repo.GetByID(ctx, formID); err != nil {
+		return err
+	}
+	if err := s.subInstanceRepo.DeleteSubInstancesByPIDs(ctx, subTaskIDs); err != nil {
+		return err
+	}
+	return s.subTaskRepo.DeleteSubTasksByIDs(ctx, subTaskIDs)
+}
+
+func (s *DataFillingService) SubTaskUsersList(ctx context.Context, subTaskID int64, listType string) ([]*datafillingdomain.SubTaskUserItem, error) {
+	if s.subInstanceRepo == nil || subTaskID <= 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	statusFilter, err := mapSubTaskUserStatusFilter(listType)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.subInstanceRepo.ListSubInstancesByPID(ctx, subTaskID, statusFilter)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*datafillingdomain.SubTaskUserItem, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, &datafillingdomain.SubTaskUserItem{ID: row.ID, TaskID: row.TaskID, PID: row.PID, UID: row.UID, FormID: row.FormID, DataID: row.DataID, FinishTime: row.FinishTime, Status: row.Status})
+	}
+	return result, nil
 }
 
 func (s *DataFillingService) Delete(ctx context.Context, id int64) error {
@@ -638,4 +938,77 @@ func filterDataFillingTree(nodes []*datafillingdomain.TreeNode, keyword string) 
 		}
 	}
 	return filtered
+}
+
+func buildTaskInfoVO(task *datafillingdomain.DataFillingTask) (*datafillingdomain.TaskInfoVO, error) {
+	if task == nil {
+		return nil, gorm.ErrInvalidData
+	}
+	reciFlagList, err := parseJSONIntList(task.ReciFlagList)
+	if err != nil {
+		return nil, err
+	}
+	uidList, err := parseJSONInt64List(task.UIDList)
+	if err != nil {
+		return nil, err
+	}
+	ridList, err := parseJSONInt64List(task.RIDList)
+	if err != nil {
+		return nil, err
+	}
+	return &datafillingdomain.TaskInfoVO{
+		ID:                   task.ID,
+		FormID:               task.FormID,
+		Name:                 task.Name,
+		ReciFlagList:         reciFlagList,
+		UIDList:              uidList,
+		RIDList:              ridList,
+		FillType:             task.FillType,
+		FitType:              task.FitType,
+		FitColumn:            task.FitColumn,
+		RateType:             task.RateType,
+		RateVal:              task.RateVal,
+		OneTimeType:          task.OneTimeType,
+		StartTime:            task.StartTime,
+		EndTime:              task.EndTime,
+		PublishRangeTime:     task.PublishRangeTime,
+		PublishRangeTimeType: task.PublishRangeTimeType,
+		Status:               task.Status,
+		LastExecStatus:       task.LastExecStatus,
+		LastExecTime:         task.LastExecTime,
+		NextExecTime:         task.NextExecTime,
+		CreateBy:             task.CreateBy,
+		CreateTime:           task.CreateTime,
+		UpdateBy:             task.UpdateBy,
+		UpdateTime:           task.UpdateTime,
+		FormExtSetting:       task.FormExtSetting,
+		FormFilterSetting:    task.FormFilterSetting,
+	}, nil
+}
+
+func parseJSONIntList(raw string) ([]int, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return []int{}, nil
+	}
+	values := make([]int, 0)
+	if err := json.Unmarshal([]byte(trimmed), &values); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func mapSubTaskUserStatusFilter(listType string) (*int, error) {
+	switch strings.ToLower(strings.TrimSpace(listType)) {
+	case "", "all":
+		return nil, nil
+	case "unfinished", "open", "todo":
+		status := datafillingdomain.SubInstanceStatusOpen
+		return &status, nil
+	case "finished", "done":
+		status := datafillingdomain.SubInstanceStatusFinished
+		return &status, nil
+	default:
+		return nil, gorm.ErrInvalidData
+	}
 }

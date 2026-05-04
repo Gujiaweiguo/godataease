@@ -27,7 +27,7 @@ type dataFillingHandlerResponse struct {
 
 func TestDataFillingHandler_Save(t *testing.T) {
 	repo := newFakeDataFillingRepo()
-	svc := service.NewDataFillingService(repo, &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{})
+	svc := service.NewDataFillingService(repo, &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{}, nil, nil, nil, nil)
 	svc.SetDatasourceConnectionProvider(&serviceTestDatasourceConnProviderBridge{})
 	h := NewDataFillingHandler(svc)
 
@@ -44,7 +44,7 @@ func TestDataFillingHandler_Save(t *testing.T) {
 }
 
 func TestDataFillingHandler_TreeBadRequest(t *testing.T) {
-	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{})
+	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{}, nil, nil, nil, nil)
 	svc.SetDatasourceConnectionProvider(&serviceTestDatasourceConnProviderBridge{})
 	h := NewDataFillingHandler(svc)
 	resp := performDataFillingHandlerCall(t, func(c *gin.Context) {
@@ -58,7 +58,7 @@ func TestDataFillingHandler_TreeBadRequest(t *testing.T) {
 
 func TestDataFillingHandler_RegisterRoutesIncludesDMLEndpoints(t *testing.T) {
 	engine := gin.New()
-	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{})
+	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{}, nil, nil, nil, nil)
 	h := NewDataFillingHandler(svc)
 	RegisterDataFillingRoutes(engine, h, nil, nil)
 
@@ -74,6 +74,16 @@ func TestDataFillingHandler_RegisterRoutesIncludesDMLEndpoints(t *testing.T) {
 	assert.True(t, routes["POST /data-filling/form/:formId/listColumnData"])
 	assert.True(t, routes["POST /data-filling/log/page/:goPage/:pageSize"])
 	assert.True(t, routes["POST /data-filling/log/clear"])
+	assert.True(t, routes["GET /data-filling/task/info/:taskId"])
+	assert.True(t, routes["POST /data-filling/task/save"])
+	assert.True(t, routes["POST /data-filling/task/executeNow"])
+	assert.True(t, routes["POST /data-filling/form/:formId/task/page/:goPage/:pageSize"])
+	assert.True(t, routes["GET /data-filling/form/:formId/task/:id/start"])
+	assert.True(t, routes["GET /data-filling/form/:formId/task/:id/stop"])
+	assert.True(t, routes["POST /data-filling/form/:formId/task/delete"])
+	assert.True(t, routes["POST /data-filling/sub-task/page/:goPage/:pageSize"])
+	assert.True(t, routes["POST /data-filling/form/:formId/sub-task/delete"])
+	assert.True(t, routes["GET /data-filling/sub-task/:id/users/list/:type"])
 }
 
 func performDataFillingHandlerCall(t *testing.T, invoke func(c *gin.Context)) *struct {

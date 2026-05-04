@@ -40,9 +40,83 @@ type DfCommitLog struct {
 
 func (DfCommitLog) TableName() string { return "df_commit_log" }
 
+// DataFillingTask is the GORM model for data_filling_task table.
+type DataFillingTask struct {
+	ID                   int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	FormID               int64  `gorm:"column:form_id;index" json:"formId"`
+	Name                 string `gorm:"column:name;type:varchar(255)" json:"name"`
+	ReciFlagList         string `gorm:"column:reci_flag_list;type:longtext" json:"reciFlagList"`
+	UIDList              string `gorm:"column:uid_list;type:longtext" json:"uidList"`
+	RIDList              string `gorm:"column:rid_list;type:longtext" json:"ridList"`
+	FillType             int    `gorm:"column:fill_type" json:"fillType"`
+	FitType              int    `gorm:"column:fit_type" json:"fitType"`
+	FitColumn            string `gorm:"column:fit_column;type:varchar(255)" json:"fitColumn"`
+	RateType             int    `gorm:"column:rate_type" json:"rateType"`
+	RateVal              string `gorm:"column:rate_val;type:varchar(255)" json:"rateVal"`
+	OneTimeType          int    `gorm:"column:one_time_type" json:"oneTimeType"`
+	StartTime            int64  `gorm:"column:start_time" json:"startTime"`
+	EndTime              int64  `gorm:"column:end_time" json:"endTime"`
+	PublishRangeTime     int    `gorm:"column:publish_range_time" json:"publishRangeTime"`
+	PublishRangeTimeType int    `gorm:"column:publish_range_time_type" json:"publishRangeTimeType"`
+	Status               int    `gorm:"column:status" json:"status"`
+	LastExecStatus       int    `gorm:"column:last_exec_status" json:"lastExecStatus"`
+	LastExecTime         int64  `gorm:"column:last_exec_time" json:"lastExecTime"`
+	NextExecTime         int64  `gorm:"column:next_exec_time" json:"nextExecTime"`
+	CreateBy             int64  `gorm:"column:create_by" json:"createBy"`
+	CreateTime           int64  `gorm:"column:create_time" json:"createTime"`
+	UpdateBy             int64  `gorm:"column:update_by" json:"updateBy"`
+	UpdateTime           int64  `gorm:"column:update_time" json:"updateTime"`
+	FormExtSetting       string `gorm:"column:form_ext_setting;type:longtext" json:"formExtSetting"`
+	FormFilterSetting    string `gorm:"column:form_filter_setting;type:longtext" json:"formFilterSetting"`
+}
+
+func (DataFillingTask) TableName() string { return "data_filling_task" }
+
+// DataFillingSubTask is the GORM model for data_filling_sub_task table.
+type DataFillingSubTask struct {
+	ID                  int64 `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	TaskID              int64 `gorm:"column:task_id;index" json:"taskId"`
+	StartTime           int64 `gorm:"column:start_time" json:"startTime"`
+	EndTime             int64 `gorm:"column:end_time" json:"endTime"`
+	ExecStatus          int   `gorm:"column:exec_status" json:"execStatus"`
+	Status              int   `gorm:"column:status" json:"status"`
+	TotalCount          int   `gorm:"column:total_count" json:"totalCount"`
+	UnfinishedCount     int   `gorm:"column:unfinished_count" json:"unfinishedCount"`
+	TotalUserCount      int   `gorm:"column:total_user_count" json:"totalUserCount"`
+	UnfinishedUserCount int   `gorm:"column:unfinished_user_count" json:"unfinishedUserCount"`
+	FillType            int   `gorm:"column:fill_type" json:"fillType"`
+}
+
+func (DataFillingSubTask) TableName() string { return "data_filling_sub_task" }
+
+// DataFillingSubInstance is the GORM model for data_filling_sub_instance table.
+type DataFillingSubInstance struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	TaskID     int64  `gorm:"column:task_id;index:idx_task_pid" json:"taskId"`
+	PID        int64  `gorm:"column:pid;index:idx_task_pid" json:"pid"`
+	UID        int64  `gorm:"column:uid;index" json:"uid"`
+	FormID     int64  `gorm:"column:form_id" json:"formId"`
+	DataID     string `gorm:"column:data_id;type:varchar(64)" json:"dataId"`
+	FinishTime int64  `gorm:"column:finish_time" json:"finishTime"`
+	Status     int    `gorm:"column:status" json:"status"`
+}
+
+func (DataFillingSubInstance) TableName() string { return "data_filling_sub_instance" }
+
 const (
 	NodeTypeFolder = "folder"
 	NodeTypeForm   = "form"
+)
+
+const (
+	TaskStatusStopped = 0
+	TaskStatusStarted = 1
+
+	SubTaskStatusExpired = 0
+	SubTaskStatusActive  = 1
+
+	SubInstanceStatusOpen     = 0
+	SubInstanceStatusFinished = 1
 )
 
 type BaseType string
@@ -155,6 +229,106 @@ type ListColumnDataRequest struct {
 type CommitLogPageRequest struct {
 	FormID  int64 `json:"formId"`
 	Operate *int  `json:"operate,omitempty"`
+}
+
+type TaskSaveRequest struct {
+	ID                   *int64  `json:"id,omitempty"`
+	FormID               int64   `json:"formId"`
+	Name                 string  `json:"name"`
+	ReciFlagList         []int   `json:"reciFlagList"`
+	UIDList              []int64 `json:"uidList"`
+	RIDList              []int64 `json:"ridList"`
+	FillType             int     `json:"fillType"`
+	FitType              int     `json:"fitType"`
+	FitColumn            string  `json:"fitColumn"`
+	RateType             int     `json:"rateType"`
+	RateVal              string  `json:"rateVal"`
+	OneTimeType          int     `json:"oneTimeType"`
+	StartTime            int64   `json:"startTime"`
+	EndTime              int64   `json:"endTime"`
+	PublishRangeTime     int     `json:"publishRangeTime"`
+	PublishRangeTimeType int     `json:"publishRangeTimeType"`
+	FormExtSetting       string  `json:"formExtSetting"`
+	FormFilterSetting    string  `json:"formFilterSetting"`
+}
+
+type TaskInfoVO struct {
+	ID                   int64   `json:"id"`
+	FormID               int64   `json:"formId"`
+	Name                 string  `json:"name"`
+	ReciFlagList         []int   `json:"reciFlagList"`
+	UIDList              []int64 `json:"uidList"`
+	RIDList              []int64 `json:"ridList"`
+	FillType             int     `json:"fillType"`
+	FitType              int     `json:"fitType"`
+	FitColumn            string  `json:"fitColumn"`
+	RateType             int     `json:"rateType"`
+	RateVal              string  `json:"rateVal"`
+	OneTimeType          int     `json:"oneTimeType"`
+	StartTime            int64   `json:"startTime"`
+	EndTime              int64   `json:"endTime"`
+	PublishRangeTime     int     `json:"publishRangeTime"`
+	PublishRangeTimeType int     `json:"publishRangeTimeType"`
+	Status               int     `json:"status"`
+	LastExecStatus       int     `json:"lastExecStatus"`
+	LastExecTime         int64   `json:"lastExecTime"`
+	NextExecTime         int64   `json:"nextExecTime"`
+	CreateBy             int64   `json:"createBy"`
+	CreateTime           int64   `json:"createTime"`
+	UpdateBy             int64   `json:"updateBy"`
+	UpdateTime           int64   `json:"updateTime"`
+	FormExtSetting       string  `json:"formExtSetting"`
+	FormFilterSetting    string  `json:"formFilterSetting"`
+}
+
+type TaskPageRequest struct {
+	TaskID  *int64  `json:"taskId,omitempty"`
+	Keyword *string `json:"keyword,omitempty"`
+}
+
+type TaskPageResponse struct {
+	Records []*TaskInfoVO `json:"records"`
+	Total   int64         `json:"total"`
+	Current int           `json:"current"`
+	Size    int           `json:"size"`
+}
+
+type BatchDeleteTaskRequest struct {
+	IDs []int64 `json:"ids"`
+}
+
+type BatchDeleteSubTaskRequest struct {
+	IDs []int64 `json:"ids"`
+}
+
+type SubTaskPageRequest struct {
+	TaskID int64 `json:"taskId"`
+}
+
+type SubTaskPageResponse struct {
+	Records []*DataFillingSubTask `json:"records"`
+	Total   int64                 `json:"total"`
+	Current int                   `json:"current"`
+	Size    int                   `json:"size"`
+}
+
+type SubTaskUsersRequest struct {
+	TaskID int64 `json:"taskId"`
+}
+
+type SubTaskUserItem struct {
+	ID         int64  `json:"id"`
+	TaskID     int64  `json:"taskId"`
+	PID        int64  `json:"pid"`
+	UID        int64  `json:"uid"`
+	FormID     int64  `json:"formId"`
+	DataID     string `json:"dataId"`
+	FinishTime int64  `json:"finishTime"`
+	Status     int    `json:"status"`
+}
+
+type ExecuteNowRequest struct {
+	TaskID int64 `json:"taskId"`
 }
 
 type ClearCommitLogRequest struct {

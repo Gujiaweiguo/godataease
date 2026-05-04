@@ -5,6 +5,7 @@ import (
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
+	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/driver"
@@ -52,6 +53,11 @@ func AutoMigrate(db *gorm.DB) error {
 		&audit.LoginFailure{},
 		// chart
 		&chart.CoreChartView{},
+		&datafillingdomain.DataFillingForm{},
+		&datafillingdomain.DfCommitLog{},
+		&datafillingdomain.DataFillingTask{},
+		&datafillingdomain.DataFillingSubTask{},
+		&datafillingdomain.DataFillingSubInstance{},
 		// dataset
 		&dataset.CoreDatasetGroup{},
 		&dataset.CoreDatasetTable{},
