@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -151,6 +152,7 @@ type Router struct {
 	dataFillingHandler             *handler.DataFillingHandler
 	menuAuthMiddleware             *middleware.MenuAuthMiddleware
 	scheduler                      *scheduler.Scheduler
+	dataFillingScheduler           *service.DataFillingScheduler
 }
 
 func NewRouter(application *app.Application, db *gorm.DB) *Router {
@@ -395,7 +397,11 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	dataFillingRepo := repository.NewDataFillingRepository(db)
 	commitLogRepo := repository.NewCommitLogRepository(db)
-	dataFillingService := service.NewDataFillingService(dataFillingRepo, datasourceService, service.NewMySQLDDLProvider(), commitLogRepo)
+	taskRepo := repository.NewTaskRepository(db)
+	subTaskRepo := repository.NewSubTaskRepository(db)
+	subInstanceRepo := repository.NewSubInstanceRepository(db)
+	dataFillingScheduler := service.NewDataFillingScheduler(taskRepo, subTaskRepo, subInstanceRepo, dataFillingRepo)
+	dataFillingService := service.NewDataFillingService(dataFillingRepo, datasourceService, service.NewMySQLDDLProvider(), commitLogRepo, taskRepo, subTaskRepo, subInstanceRepo, dataFillingScheduler)
 	dataFillingHandler := handler.NewDataFillingHandler(dataFillingService)
 
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
@@ -471,6 +477,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		dataFillingHandler:             dataFillingHandler,
 		menuAuthMiddleware:             menuAuthMiddleware,
 		scheduler:                      jobScheduler,
+		dataFillingScheduler:           dataFillingScheduler,
 	}
 }
 
@@ -977,17 +984,27 @@ func (r *Router) Engine() *gin.Engine {
 }
 
 func (r *Router) StartScheduler() {
-	if r == nil || r.scheduler == nil {
+	if r == nil {
 		return
 	}
-	r.scheduler.Start()
+	if r.scheduler != nil {
+		r.scheduler.Start()
+	}
+	if r.dataFillingScheduler != nil {
+		r.dataFillingScheduler.Start(context.Background())
+	}
 }
 
 func (r *Router) StopScheduler() {
-	if r == nil || r.scheduler == nil {
+	if r == nil {
 		return
 	}
-	r.scheduler.Stop()
+	if r.scheduler != nil {
+		r.scheduler.Stop()
+	}
+	if r.dataFillingScheduler != nil {
+		r.dataFillingScheduler.Stop()
+	}
 }
 
 func Start(application *app.Application, db *gorm.DB) error {

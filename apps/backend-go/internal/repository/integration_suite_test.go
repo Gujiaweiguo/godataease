@@ -83,6 +83,7 @@ func TestMain(m *testing.M) {
 		&auto.CoreDatasourceTaskLog{},
 		&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{},
 		&datafillingdomain.DataFillingForm{}, &datafillingdomain.DfCommitLog{},
+		&datafillingdomain.DataFillingTask{}, &datafillingdomain.DataFillingSubTask{}, &datafillingdomain.DataFillingSubInstance{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}

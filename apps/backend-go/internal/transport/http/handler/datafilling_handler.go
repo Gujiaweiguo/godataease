@@ -41,6 +41,16 @@ func RegisterDataFillingRoutes(r gin.IRouter, h *DataFillingHandler, authMiddlew
 	group.POST("/form/:formId/listColumnData", h.ListColumnData)
 	group.POST("/log/page/:goPage/:pageSize", h.LogPage)
 	group.POST("/log/clear", h.LogClear)
+	group.GET("/task/info/:taskId", h.GetTaskInfo)
+	group.POST("/task/save", h.SaveTask)
+	group.POST("/task/executeNow", h.ExecuteNowTask)
+	group.POST("/form/:formId/task/page/:goPage/:pageSize", h.TaskPageList)
+	group.GET("/form/:formId/task/:id/start", h.StartTask)
+	group.GET("/form/:formId/task/:id/stop", h.StopTask)
+	group.POST("/form/:formId/task/delete", h.DeleteTasks)
+	group.POST("/sub-task/page/:goPage/:pageSize", h.SubTaskPageList)
+	group.POST("/form/:formId/sub-task/delete", h.DeleteSubTasks)
+	group.GET("/sub-task/:id/users/list/:type", h.SubTaskUsersList)
 	group.GET("/datasource/list", h.ListDatasourceList)
 	group.GET("/datasource/listAll", h.ListDatasourceListAll)
 	group.POST("/getBuiltInTables", h.GetBuiltInTables)
@@ -236,6 +246,170 @@ func (h *DataFillingHandler) LogClear(c *gin.Context) {
 		return
 	}
 	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) GetTaskInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
+	taskID, ok := parseIDParamBadRequest(c, "taskId")
+	if !ok {
+		return
+	}
+	result, err := h.service.GetTaskInfo(c.Request.Context(), taskID)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) SaveTask(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req datafillingdomain.TaskSaveRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.SaveTask(c.Request.Context(), &req, int64(transportmiddleware.GetUserID(c)))
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) ExecuteNowTask(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req datafillingdomain.ExecuteNowRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.ExecuteNowTask(c.Request.Context(), req.TaskID); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) TaskPageList(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	goPage, pageSize, ok := parseThresholdPageParams(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.TaskPageList(c.Request.Context(), formID, goPage, pageSize)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) StartTask(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	taskID, ok := parseIDParamBadRequest(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.StartTask(c.Request.Context(), formID, taskID); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) StopTask(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	taskID, ok := parseIDParamBadRequest(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.StopTask(c.Request.Context(), formID, taskID); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) DeleteTasks(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req datafillingdomain.BatchDeleteTaskRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.DeleteTasks(c.Request.Context(), formID, req.IDs); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) SubTaskPageList(c *gin.Context) {
+	defer recoverServicePanic(c)
+	goPage, pageSize, ok := parseThresholdPageParams(c)
+	if !ok {
+		return
+	}
+	var req datafillingdomain.SubTaskPageRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.SubTaskPageList(c.Request.Context(), req.TaskID, goPage, pageSize)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) DeleteSubTasks(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req datafillingdomain.BatchDeleteSubTaskRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.DeleteSubTasks(c.Request.Context(), formID, req.IDs); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) SubTaskUsersList(c *gin.Context) {
+	defer recoverServicePanic(c)
+	subTaskID, ok := parseIDParamBadRequest(c, "id")
+	if !ok {
+		return
+	}
+	result, err := h.service.SubTaskUsersList(c.Request.Context(), subTaskID, c.Param("type"))
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *DataFillingHandler) Rename(c *gin.Context) {
