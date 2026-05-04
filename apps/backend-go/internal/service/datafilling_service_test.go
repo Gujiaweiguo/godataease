@@ -1283,11 +1283,11 @@ func TestMapSubTaskUserStatusFilter(t *testing.T) {
 	}{
 		{name: "all empty", input: "", want: nil},
 		{name: "all literal", input: "all", want: nil},
-		{name: "unfinished", input: "unfinished", want: intPtr(datafillingdomain.SubInstanceStatusOpen)},
-		{name: "open alias", input: "open", want: intPtr(datafillingdomain.SubInstanceStatusOpen)},
-		{name: "todo alias", input: "todo", want: intPtr(datafillingdomain.SubInstanceStatusOpen)},
-		{name: "finished", input: "finished", want: intPtr(datafillingdomain.SubInstanceStatusFinished)},
-		{name: "done alias", input: "done", want: intPtr(datafillingdomain.SubInstanceStatusFinished)},
+		{name: "unfinished", input: "unfinished", want: intPtrVal(datafillingdomain.SubInstanceStatusOpen)},
+		{name: "open alias", input: "open", want: intPtrVal(datafillingdomain.SubInstanceStatusOpen)},
+		{name: "todo alias", input: "todo", want: intPtrVal(datafillingdomain.SubInstanceStatusOpen)},
+		{name: "finished", input: "finished", want: intPtrVal(datafillingdomain.SubInstanceStatusFinished)},
+		{name: "done alias", input: "done", want: intPtrVal(datafillingdomain.SubInstanceStatusFinished)},
 		{name: "invalid", input: "other", wantErr: gorm.ErrInvalidData},
 	}
 
@@ -1421,7 +1421,7 @@ func TestDataFillingService_GetTemplateByUserTaskItem(t *testing.T) {
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
-func intPtr(v int) *int { return &v }
+func intPtrVal(v int) *int { return &v }
 
 func localStringPtr(v string) *string { return &v }
 
