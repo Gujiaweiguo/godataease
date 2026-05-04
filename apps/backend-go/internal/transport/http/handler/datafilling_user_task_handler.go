@@ -31,6 +31,7 @@ func RegisterDataFillingUserTaskRoutes(r *gin.RouterGroup, h *UserTaskHandler, a
 	userTask.GET("/list/:id", h.UserTaskData)
 	userTask.POST("/saveData/:id", h.UserTaskSave)
 	userTask.POST("/appendData/:id", h.UserTaskAppend)
+	userTask.POST("/appendData/:id/form/:formId/confirmUpload", h.UserTaskConfirmUpload)
 	userTask.GET("/:taskInstanceId/deleteData/:id", h.UserTaskDelete)
 }
 
@@ -121,6 +122,30 @@ func (h *UserTaskHandler) UserTaskDelete(c *gin.Context) {
 	}
 	dataID := c.Param("id")
 	if err := h.service.DeleteUserTaskData(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID, []string{dataID}); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *UserTaskHandler) UserTaskConfirmUpload(c *gin.Context) {
+	defer recoverServicePanic(c)
+	subTaskID, ok := parseIDParamBadRequest(c, "id")
+	if !ok {
+		return
+	}
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.UserTaskConfirmUpload(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID, formID, req.ID); err != nil {
 		response.Error(c, "500000", err.Error())
 		return
 	}
