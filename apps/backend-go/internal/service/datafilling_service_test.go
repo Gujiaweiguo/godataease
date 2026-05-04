@@ -23,13 +23,23 @@ import (
 )
 
 type fakeDataFillingRepo struct {
-	records map[int64]*datafillingdomain.DataFillingForm
-	nextID  int64
+	records     map[int64]*datafillingdomain.DataFillingForm
+	nextID      int64
+	createErr   error
+	getErr      error
+	updateErr   error
+	deleteErr   error
+	renameErr   error
+	moveErr     error
+	childrenErr error
 }
 
 type fakeDataFillingDatasourceService struct {
-	list []*datasourcedomain.CoreDatasource
-	ds   map[int64]*datasourcedomain.CoreDatasource
+	list      []*datasourcedomain.CoreDatasource
+	ds        map[int64]*datasourcedomain.CoreDatasource
+	getErr    error
+	treeErr   error
+	tablesErr error
 }
 
 type fakeDDLProvider struct {
@@ -51,6 +61,7 @@ type fakeCommitLogRepo struct {
 	created []*datafillingdomain.DfCommitLog
 	deleted []int64
 	logs    []*datafillingdomain.DfCommitLog
+	total   int64
 	err     error
 }
 
@@ -60,20 +71,43 @@ type fakeDatasourceConnProvider struct {
 }
 
 type fakeTaskRepo struct {
-	records map[int64]*datafillingdomain.DataFillingTask
-	nextID  int64
+	records    map[int64]*datafillingdomain.DataFillingTask
+	nextID     int64
+	createErr  error
+	updateErr  error
+	getErr     error
+	listErr    error
+	deleteErr  error
+	startedErr error
 }
 
 type fakeSubTaskRepo struct {
-	records     map[int64]*datafillingdomain.DataFillingSubTask
-	nextID      int64
-	decremented []int64
+	records         map[int64]*datafillingdomain.DataFillingSubTask
+	nextID          int64
+	decremented     []int64
+	createErr       error
+	getErr          error
+	updateCountsErr error
+	listErr         error
+	deleteErr       error
+	listIDsErr      error
+	decrementErr    error
 }
 
 type fakeSubInstanceRepo struct {
 	records           []*datafillingdomain.DataFillingSubInstance
 	statusUpdates     []int64
 	statusUpdateValue []int
+	batchCreateErr    error
+	deletePIDErr      error
+	deletePIDsErr     error
+	deleteTaskIDsErr  error
+	listByPIDErr      error
+	listByUIDErr      error
+	countErr          error
+	getErr            error
+	getByPIDAndUIDErr error
+	updateErr         error
 }
 
 type userTaskPageSubInstanceRepo struct {
@@ -104,6 +138,9 @@ func newFakeSubTaskRepo() *fakeSubTaskRepo {
 
 func (r *fakeDataFillingRepo) Create(ctx context.Context, form *datafillingdomain.DataFillingForm) error {
 	_ = ctx
+	if r.createErr != nil {
+		return r.createErr
+	}
 	cloned := *form
 	if cloned.ID <= 0 {
 		cloned.ID = r.nextID
@@ -116,6 +153,9 @@ func (r *fakeDataFillingRepo) Create(ctx context.Context, form *datafillingdomai
 
 func (r *fakeDataFillingRepo) GetByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingForm, error) {
 	_ = ctx
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
 	row, ok := r.records[id]
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
@@ -126,6 +166,9 @@ func (r *fakeDataFillingRepo) GetByID(ctx context.Context, id int64) (*datafilli
 
 func (r *fakeDataFillingRepo) Update(ctx context.Context, form *datafillingdomain.DataFillingForm) error {
 	_ = ctx
+	if r.updateErr != nil {
+		return r.updateErr
+	}
 	if _, ok := r.records[form.ID]; !ok {
 		return gorm.ErrRecordNotFound
 	}
@@ -136,12 +179,18 @@ func (r *fakeDataFillingRepo) Update(ctx context.Context, form *datafillingdomai
 
 func (r *fakeDataFillingRepo) DeleteByID(ctx context.Context, id int64) error {
 	_ = ctx
+	if r.deleteErr != nil {
+		return r.deleteErr
+	}
 	delete(r.records, id)
 	return nil
 }
 
 func (r *fakeDataFillingRepo) Rename(ctx context.Context, id int64, name string) error {
 	_ = ctx
+	if r.renameErr != nil {
+		return r.renameErr
+	}
 	row, ok := r.records[id]
 	if !ok {
 		return gorm.ErrRecordNotFound
@@ -152,6 +201,9 @@ func (r *fakeDataFillingRepo) Rename(ctx context.Context, id int64, name string)
 
 func (r *fakeDataFillingRepo) Move(ctx context.Context, id int64, pid int64) error {
 	_ = ctx
+	if r.moveErr != nil {
+		return r.moveErr
+	}
 	row, ok := r.records[id]
 	if !ok {
 		return gorm.ErrRecordNotFound
@@ -186,6 +238,9 @@ func (r *fakeDataFillingRepo) GetByPID(ctx context.Context, pid int64) ([]*dataf
 
 func (r *fakeDataFillingRepo) GetChildren(ctx context.Context, pid int64) ([]*datafillingdomain.DataFillingForm, error) {
 	_ = ctx
+	if r.childrenErr != nil {
+		return nil, r.childrenErr
+	}
 	result := make([]*datafillingdomain.DataFillingForm, 0)
 	for _, row := range r.records {
 		if row.PID == pid {
@@ -198,6 +253,9 @@ func (r *fakeDataFillingRepo) GetChildren(ctx context.Context, pid int64) ([]*da
 }
 
 func (f *fakeDataFillingDatasourceService) GetByID(id int64) (*datasourcedomain.CoreDatasource, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
 	if ds, ok := f.ds[id]; ok {
 		return ds, nil
 	}
@@ -206,12 +264,12 @@ func (f *fakeDataFillingDatasourceService) GetByID(id int64) (*datasourcedomain.
 
 func (f *fakeDataFillingDatasourceService) Tree(req *datasourcedomain.ListRequest) ([]*datasourcedomain.CoreDatasource, error) {
 	_ = req
-	return f.list, nil
+	return f.list, f.treeErr
 }
 
 func (f *fakeDataFillingDatasourceService) GetTables(req *datasourcedomain.TableRequest) ([]datasourcedomain.TableInfo, error) {
 	_ = req
-	return []datasourcedomain.TableInfo{}, nil
+	return []datasourcedomain.TableInfo{}, f.tablesErr
 }
 
 func (f *fakeDDLProvider) CreateTable(ctx context.Context, db *gorm.DB, tableName string, fields []datafillingdomain.ExtTableField) error {
@@ -320,7 +378,11 @@ func (f *fakeCommitLogRepo) ListByFormID(ctx context.Context, formID int64, page
 	_ = formID
 	_ = page
 	_ = pageSize
-	return f.logs, int64(len(f.logs)), f.err
+	total := f.total
+	if total == 0 {
+		total = int64(len(f.logs))
+	}
+	return f.logs, total, f.err
 }
 
 func (f *fakeCommitLogRepo) DeleteByFormID(ctx context.Context, formID int64) error {
@@ -337,6 +399,9 @@ func (f *fakeDatasourceConnProvider) GetDatasourceConnection(ctx context.Context
 
 func (r *fakeTaskRepo) CreateTask(ctx context.Context, task *datafillingdomain.DataFillingTask) error {
 	_ = ctx
+	if r.createErr != nil {
+		return r.createErr
+	}
 	cloned := *task
 	if cloned.ID <= 0 {
 		cloned.ID = r.nextID
@@ -349,6 +414,9 @@ func (r *fakeTaskRepo) CreateTask(ctx context.Context, task *datafillingdomain.D
 
 func (r *fakeTaskRepo) UpdateTask(ctx context.Context, task *datafillingdomain.DataFillingTask) error {
 	_ = ctx
+	if r.updateErr != nil {
+		return r.updateErr
+	}
 	if _, ok := r.records[task.ID]; !ok {
 		return gorm.ErrRecordNotFound
 	}
@@ -359,6 +427,9 @@ func (r *fakeTaskRepo) UpdateTask(ctx context.Context, task *datafillingdomain.D
 
 func (r *fakeTaskRepo) GetTaskByID(ctx context.Context, taskID int64) (*datafillingdomain.DataFillingTask, error) {
 	_ = ctx
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
 	row, ok := r.records[taskID]
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
@@ -369,6 +440,9 @@ func (r *fakeTaskRepo) GetTaskByID(ctx context.Context, taskID int64) (*datafill
 
 func (r *fakeTaskRepo) ListTasksByFormID(ctx context.Context, formID int64, page, pageSize int) ([]*datafillingdomain.DataFillingTask, int64, error) {
 	_ = ctx
+	if r.listErr != nil {
+		return nil, 0, r.listErr
+	}
 	rows := make([]*datafillingdomain.DataFillingTask, 0)
 	for _, row := range r.records {
 		if row.FormID == formID {
@@ -394,6 +468,9 @@ func (r *fakeTaskRepo) ListTasksByFormID(ctx context.Context, formID int64, page
 
 func (r *fakeTaskRepo) DeleteTasksByIDs(ctx context.Context, taskIDs []int64) error {
 	_ = ctx
+	if r.deleteErr != nil {
+		return r.deleteErr
+	}
 	for _, id := range taskIDs {
 		delete(r.records, id)
 	}
@@ -402,6 +479,9 @@ func (r *fakeTaskRepo) DeleteTasksByIDs(ctx context.Context, taskIDs []int64) er
 
 func (r *fakeTaskRepo) GetStartedTasks(ctx context.Context) ([]*datafillingdomain.DataFillingTask, error) {
 	_ = ctx
+	if r.startedErr != nil {
+		return nil, r.startedErr
+	}
 	rows := make([]*datafillingdomain.DataFillingTask, 0)
 	for _, row := range r.records {
 		if row.Status == datafillingdomain.TaskStatusStarted {
@@ -415,6 +495,9 @@ func (r *fakeTaskRepo) GetStartedTasks(ctx context.Context) ([]*datafillingdomai
 
 func (r *fakeSubTaskRepo) CreateSubTask(ctx context.Context, subTask *datafillingdomain.DataFillingSubTask) error {
 	_ = ctx
+	if r.createErr != nil {
+		return r.createErr
+	}
 	cloned := *subTask
 	if cloned.ID <= 0 {
 		cloned.ID = r.nextID
@@ -427,6 +510,9 @@ func (r *fakeSubTaskRepo) CreateSubTask(ctx context.Context, subTask *datafillin
 
 func (r *fakeSubTaskRepo) GetSubTaskByID(ctx context.Context, subTaskID int64) (*datafillingdomain.DataFillingSubTask, error) {
 	_ = ctx
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
 	row, ok := r.records[subTaskID]
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
@@ -437,6 +523,9 @@ func (r *fakeSubTaskRepo) GetSubTaskByID(ctx context.Context, subTaskID int64) (
 
 func (r *fakeSubTaskRepo) UpdateSubTaskCounts(ctx context.Context, subTaskID int64, totalCount, unfinishedCount, totalUserCount, unfinishedUserCount int) error {
 	_ = ctx
+	if r.updateCountsErr != nil {
+		return r.updateCountsErr
+	}
 	row, ok := r.records[subTaskID]
 	if !ok {
 		return gorm.ErrRecordNotFound
@@ -450,6 +539,9 @@ func (r *fakeSubTaskRepo) UpdateSubTaskCounts(ctx context.Context, subTaskID int
 
 func (r *fakeSubTaskRepo) ListSubTasksByTaskID(ctx context.Context, taskID int64, page, pageSize int) ([]*datafillingdomain.DataFillingSubTask, int64, error) {
 	_ = ctx
+	if r.listErr != nil {
+		return nil, 0, r.listErr
+	}
 	rows := make([]*datafillingdomain.DataFillingSubTask, 0)
 	for _, row := range r.records {
 		if row.TaskID == taskID {
@@ -475,6 +567,9 @@ func (r *fakeSubTaskRepo) ListSubTasksByTaskID(ctx context.Context, taskID int64
 
 func (r *fakeSubTaskRepo) DeleteSubTasksByIDs(ctx context.Context, subTaskIDs []int64) error {
 	_ = ctx
+	if r.deleteErr != nil {
+		return r.deleteErr
+	}
 	for _, id := range subTaskIDs {
 		delete(r.records, id)
 	}
@@ -483,6 +578,9 @@ func (r *fakeSubTaskRepo) DeleteSubTasksByIDs(ctx context.Context, subTaskIDs []
 
 func (r *fakeSubTaskRepo) ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs []int64) ([]int64, error) {
 	_ = ctx
+	if r.listIDsErr != nil {
+		return nil, r.listIDsErr
+	}
 	lookup := make(map[int64]struct{}, len(taskIDs))
 	for _, id := range taskIDs {
 		lookup[id] = struct{}{}
@@ -499,6 +597,9 @@ func (r *fakeSubTaskRepo) ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs [
 
 func (r *fakeSubTaskRepo) DecrementSubTaskUnfinishedCount(ctx context.Context, subTaskID int64) error {
 	_ = ctx
+	if r.decrementErr != nil {
+		return r.decrementErr
+	}
 	row, ok := r.records[subTaskID]
 	if !ok {
 		return gorm.ErrRecordNotFound
@@ -515,6 +616,9 @@ func (r *fakeSubTaskRepo) DecrementSubTaskUnfinishedCount(ctx context.Context, s
 
 func (r *fakeSubInstanceRepo) BatchCreateSubInstances(ctx context.Context, instances []*datafillingdomain.DataFillingSubInstance) error {
 	_ = ctx
+	if r.batchCreateErr != nil {
+		return r.batchCreateErr
+	}
 	for _, instance := range instances {
 		cloned := *instance
 		cloned.ID = int64(len(r.records) + 1)
@@ -526,11 +630,17 @@ func (r *fakeSubInstanceRepo) BatchCreateSubInstances(ctx context.Context, insta
 
 func (r *fakeSubInstanceRepo) DeleteSubInstancesByPID(ctx context.Context, pid int64) error {
 	_ = ctx
+	if r.deletePIDErr != nil {
+		return r.deletePIDErr
+	}
 	return r.DeleteSubInstancesByPIDs(context.Background(), []int64{pid})
 }
 
 func (r *fakeSubInstanceRepo) DeleteSubInstancesByPIDs(ctx context.Context, pids []int64) error {
 	_ = ctx
+	if r.deletePIDsErr != nil {
+		return r.deletePIDsErr
+	}
 	lookup := make(map[int64]struct{}, len(pids))
 	for _, id := range pids {
 		lookup[id] = struct{}{}
@@ -547,6 +657,9 @@ func (r *fakeSubInstanceRepo) DeleteSubInstancesByPIDs(ctx context.Context, pids
 
 func (r *fakeSubInstanceRepo) DeleteSubInstancesByTaskIDs(ctx context.Context, taskIDs []int64) error {
 	_ = ctx
+	if r.deleteTaskIDsErr != nil {
+		return r.deleteTaskIDsErr
+	}
 	lookup := make(map[int64]struct{}, len(taskIDs))
 	for _, id := range taskIDs {
 		lookup[id] = struct{}{}
@@ -563,6 +676,9 @@ func (r *fakeSubInstanceRepo) DeleteSubInstancesByTaskIDs(ctx context.Context, t
 
 func (r *fakeSubInstanceRepo) ListSubInstancesByPID(ctx context.Context, pid int64, statusFilter *int) ([]*datafillingdomain.DataFillingSubInstance, error) {
 	_ = ctx
+	if r.listByPIDErr != nil {
+		return nil, r.listByPIDErr
+	}
 	rows := make([]*datafillingdomain.DataFillingSubInstance, 0)
 	for _, row := range r.records {
 		if row.PID != pid {
@@ -581,6 +697,9 @@ func (r *fakeSubInstanceRepo) ListSubInstancesByUID(ctx context.Context, uid int
 	_ = ctx
 	_ = page
 	_ = pageSize
+	if r.listByUIDErr != nil {
+		return nil, 0, r.listByUIDErr
+	}
 	result := make([]*datafillingdomain.UserTaskVO, 0)
 	for _, row := range r.records {
 		if row.UID != uid {
@@ -605,6 +724,9 @@ func (r *fakeSubInstanceRepo) ListSubInstancesByUID(ctx context.Context, uid int
 
 func (r *fakeSubInstanceRepo) CountOpenSubInstancesByUID(ctx context.Context, uid int64) (int64, error) {
 	_ = ctx
+	if r.countErr != nil {
+		return 0, r.countErr
+	}
 	var total int64
 	for _, row := range r.records {
 		if row.UID == uid && row.Status == datafillingdomain.SubInstanceStatusOpen {
@@ -616,6 +738,9 @@ func (r *fakeSubInstanceRepo) CountOpenSubInstancesByUID(ctx context.Context, ui
 
 func (r *fakeSubInstanceRepo) GetSubInstanceByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingSubInstance, error) {
 	_ = ctx
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
 	for _, row := range r.records {
 		if row.ID == id {
 			cloned := *row
@@ -627,6 +752,9 @@ func (r *fakeSubInstanceRepo) GetSubInstanceByID(ctx context.Context, id int64) 
 
 func (r *fakeSubInstanceRepo) GetSubInstanceByPIDAndUID(ctx context.Context, pid, uid int64) ([]*datafillingdomain.DataFillingSubInstance, error) {
 	_ = ctx
+	if r.getByPIDAndUIDErr != nil {
+		return nil, r.getByPIDAndUIDErr
+	}
 	rows := make([]*datafillingdomain.DataFillingSubInstance, 0)
 	for _, row := range r.records {
 		if row.PID == pid && row.UID == uid {
@@ -639,6 +767,9 @@ func (r *fakeSubInstanceRepo) GetSubInstanceByPIDAndUID(ctx context.Context, pid
 
 func (r *fakeSubInstanceRepo) UpdateSubInstanceStatus(ctx context.Context, id int64, status int, finishTime int64) error {
 	_ = ctx
+	if r.updateErr != nil {
+		return r.updateErr
+	}
 	for _, row := range r.records {
 		if row.ID == id {
 			row.Status = status
@@ -1403,6 +1534,438 @@ func TestDataFillingScheduler_StartStopAndLoadStartedTasks(t *testing.T) {
 func TestDataFillingScheduler_Stop_NoPanicOnNil(t *testing.T) {
 	var scheduler *DataFillingScheduler
 	assert.NotPanics(t, func() { scheduler.Stop() })
+}
+
+func TestMySQLDDLProvider_SQLiteBackedExecution(t *testing.T) {
+	provider := NewMySQLDDLProvider()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	ctx := context.Background()
+	fields := []datafillingdomain.ExtTableField{
+		{Settings: datafillingdomain.ExtTableFieldSetting{Name: "姓名", Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "name", Type: datafillingdomain.BaseTypeNvarchar}}},
+		{Settings: datafillingdomain.ExtTableFieldSetting{Name: "城市", Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "city", Type: datafillingdomain.BaseTypeNvarchar}}},
+	}
+
+	require.NoError(t, provider.CreateTable(ctx, db, "df_ddl_case", fields))
+	require.NoError(t, provider.InsertRow(ctx, db, "df_ddl_case", map[string]interface{}{"name": "alice", "city": "shanghai"}))
+	require.NoError(t, provider.InsertRow(ctx, db, "df_ddl_case", map[string]interface{}{"id": "row-2", "name": "bob", "city": "beijing"}))
+	require.NoError(t, provider.InsertRow(ctx, db, "df_ddl_case", map[string]interface{}{"id": "row-3", "name": "bob", "city": "hangzhou"}))
+
+	rows, err := provider.SearchRows(ctx, db, "df_ddl_case", "`name` = ?", []interface{}{"bob"}, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+
+	total, err := provider.CountRows(ctx, db, "df_ddl_case", "`name` = ?", []interface{}{"bob"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+
+	require.NoError(t, provider.UpdateRow(ctx, db, "df_ddl_case", "row-2", map[string]interface{}{"name": "bobby", "city": "nanjing"}))
+	updatedRows, err := provider.SearchRows(ctx, db, "df_ddl_case", "`id` = ?", []interface{}{"row-2"}, 1, 0)
+	require.NoError(t, err)
+	require.Len(t, updatedRows, 1)
+	assert.Equal(t, "bobby", fmt.Sprint(updatedRows[0]["name"]))
+
+	values, err := provider.ListColumnData(ctx, db, "df_ddl_case", "name")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"alice", "bob", "bobby"}, values)
+
+	newFields := []datafillingdomain.ExtTableField{{Settings: datafillingdomain.ExtTableFieldSetting{Name: "年龄", Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "age", Type: datafillingdomain.BaseTypeNumber}}}}
+	require.NoError(t, provider.AddTableColumns(ctx, db, "df_ddl_case", newFields))
+	require.NoError(t, provider.UpdateRow(ctx, db, "df_ddl_case", "row-2", map[string]interface{}{"age": 18}))
+	ageRows, err := provider.SearchRows(ctx, db, "df_ddl_case", "`age` = ?", []interface{}{18}, 1, 0)
+	require.NoError(t, err)
+	require.Len(t, ageRows, 1)
+
+	require.NoError(t, provider.DeleteRows(ctx, db, "df_ddl_case", []string{"row-2", "row-3"}))
+	total, err = provider.CountRows(ctx, db, "df_ddl_case", "", nil)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+
+	require.NoError(t, provider.DropTable(ctx, db, "df_ddl_case"))
+	_, err = provider.SearchRows(ctx, db, "df_ddl_case", "", nil, 1, 0)
+	assert.Error(t, err)
+}
+
+func TestMySQLDDLProvider_ErrorAndBuilderPaths(t *testing.T) {
+	provider := NewMySQLDDLProvider()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	assert.EqualError(t, provider.TruncateTable(ctx, db, "bad-table"), "invalid table name")
+	assert.EqualError(t, provider.DropTableColumns(ctx, db, "df_demo", []string{"id"}), "cannot drop primary key column")
+
+	sql, err := provider.buildListColumnDataSQL("df_demo", "name")
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT DISTINCT `name` FROM `df_demo` ORDER BY `name` ASC", sql)
+
+	sql, err = provider.buildDropTableColumnsSQL("df_demo", []string{"name", "age"})
+	require.NoError(t, err)
+	assert.Equal(t, "ALTER TABLE `df_demo` DROP COLUMN `name`, DROP COLUMN `age`", sql)
+}
+
+func TestDataFillingService_LowCoverageErrorPaths(t *testing.T) {
+	t.Run("rename move and row validations", func(t *testing.T) {
+		repo := newFakeDataFillingRepo()
+		repo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "root", NodeType: datafillingdomain.NodeTypeFolder}
+		repo.records[2] = &datafillingdomain.DataFillingForm{ID: 2, Name: "form", PID: 1, Level: 1, NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_demo", DatasourceID: 8}
+		svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, &fakeCommitLogRepo{}, nil, nil, nil, nil)
+		svc.SetDatasourceConnectionProvider(&fakeDatasourceConnProvider{})
+
+		_, err := svc.Rename(context.Background(), 2, "   ")
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		_, err = svc.Move(context.Background(), 2, 2)
+		require.EqualError(t, err, "cannot move node to itself")
+
+		_, err = svc.Move(context.Background(), 2, 99)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		err = svc.DeleteRowData(context.Background(), 2, "   ", 9, "tester")
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+	})
+
+	t.Run("commit logs and task validation", func(t *testing.T) {
+		formRepo := newFakeDataFillingRepo()
+		formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form"}
+		logRepo := &fakeCommitLogRepo{err: fmt.Errorf("delete failed")}
+		taskRepo := newFakeTaskRepo()
+		svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, logRepo, taskRepo, nil, nil, nil)
+
+		_, _, err := svc.ListCommitLogs(context.Background(), 1, 0, 10)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		err = svc.ClearCommitLogs(context.Background(), 1)
+		require.EqualError(t, err, "delete failed")
+
+		_, err = svc.SaveTask(context.Background(), &datafillingdomain.TaskSaveRequest{FormID: 1, Name: "task", RateVal: "   "}, 9)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		_, err = svc.SaveTask(context.Background(), &datafillingdomain.TaskSaveRequest{FormID: 99, Name: "task", RateVal: "09:30:00"}, 9)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("load form and commit helpers", func(t *testing.T) {
+		repo := newFakeDataFillingRepo()
+		repo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", DatasourceID: 8}
+		svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, &fakeCommitLogRepo{}, nil, nil, nil, nil)
+
+		_, _, err := svc.loadFormAndDatasource(context.Background(), 0)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		svc.ddlProvider = nil
+		_, _, err = svc.loadFormAndDatasource(context.Background(), 1)
+		require.EqualError(t, err, "ddl provider not configured")
+
+		svc.ddlProvider = &fakeDDLProvider{}
+		svc.SetDatasourceConnectionProvider(&fakeDatasourceConnProvider{err: fmt.Errorf("connect failed")})
+		_, _, err = svc.loadFormAndDatasource(context.Background(), 1)
+		require.EqualError(t, err, "connect failed")
+
+		svc.commitLogRepo = nil
+		require.NoError(t, svc.writeCommitLog(context.Background(), 1, "row-1", 1, 9, "tester", 1))
+
+		svc.commitLogRepo = &fakeCommitLogRepo{err: fmt.Errorf("write failed")}
+		err = svc.writeCommitLog(context.Background(), 1, "row-1", 1, 9, "tester", 1)
+		require.EqualError(t, err, "write failed")
+	})
+
+	t.Run("delete subtasks and create physical table", func(t *testing.T) {
+		repo := newFakeDataFillingRepo()
+		repo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form"}
+		subTaskRepo := newFakeSubTaskRepo()
+		subInstanceRepo := &fakeSubInstanceRepo{deletePIDsErr: fmt.Errorf("delete sub instances failed")}
+		svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, nil, nil, subTaskRepo, subInstanceRepo, nil)
+
+		err := svc.DeleteSubTasks(context.Background(), 1, []int64{10})
+		require.EqualError(t, err, "delete sub instances failed")
+
+		err = svc.createPhysicalTable(context.Background(), &datafillingdomain.DataFillingForm{DatasourceID: 8, PhysicalTableName: "df_demo", Forms: "{"})
+		require.ErrorContains(t, err, "parse form fields")
+	})
+}
+
+func TestDataFillingScheduler_LowCoverageBranches(t *testing.T) {
+	t.Run("start load and register errors", func(t *testing.T) {
+		var nilScheduler *DataFillingScheduler
+		assert.NotPanics(t, func() { nilScheduler.Start(context.Background()) })
+
+		scheduler := NewDataFillingScheduler(&fakeTaskRepo{startedErr: fmt.Errorf("load failed")}, newFakeSubTaskRepo(), &fakeSubInstanceRepo{}, newFakeDataFillingRepo())
+		require.EqualError(t, scheduler.loadAndRegisterStartedTasks(context.Background()), "load failed")
+	})
+
+	t.Run("register and validate preconditions", func(t *testing.T) {
+		taskRepo := newFakeTaskRepo()
+		taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1, RateType: 9, RateVal: "bad"}
+		scheduler := NewDataFillingScheduler(taskRepo, newFakeSubTaskRepo(), &fakeSubInstanceRepo{}, newFakeDataFillingRepo())
+		err := scheduler.RegisterTask(context.Background(), 1)
+		require.EqualError(t, err, "unsupported rate type: 9")
+
+		taskRepo.records[2] = &datafillingdomain.DataFillingTask{ID: 2, FormID: 99, RateType: 1, RateVal: "09:30:00"}
+		_, err = scheduler.validateFireTaskPreconditions(context.Background(), 2)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("compute next execution edges", func(t *testing.T) {
+		scheduler := NewDataFillingScheduler(newFakeTaskRepo(), newFakeSubTaskRepo(), &fakeSubInstanceRepo{}, newFakeDataFillingRepo())
+		_, err := scheduler.computeNextExecTime(nil)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		base := time.Date(2026, 1, 31, 23, 0, 0, 0, time.Local)
+		next, err := computeTaskNextExecTime(&datafillingdomain.DataFillingTask{RateType: 3, RateVal: "31 08:00:00", LastExecTime: base.UnixMilli()}, time.Date(2026, 2, 1, 9, 0, 0, 0, time.Local))
+		require.NoError(t, err)
+		assert.Equal(t, time.February, next.Month())
+		assert.Equal(t, 28, next.Day())
+	})
+}
+
+func TestDataFillingService_AdditionalCoverageHelpers(t *testing.T) {
+	t.Run("save export and list helpers", func(t *testing.T) {
+		repo := newFakeDataFillingRepo()
+		repo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", PhysicalTableName: "df_demo", DatasourceID: 8, Forms: `[{"settings":{"name":"姓名","mapping":{"columnName":"name","type":"nvarchar"}}}]`}
+		repo.nextID = 2
+		datasourceSvc := &fakeDataFillingDatasourceService{treeErr: fmt.Errorf("tree failed")}
+		dropDDL := &fakeDDLProvider{}
+		svc := NewDataFillingService(repo, datasourceSvc, dropDDL, nil, nil, nil, nil, nil)
+
+		_, err := svc.Save(context.Background(), &datafillingdomain.CreateFormRequest{Name: "bad-form", NodeType: datafillingdomain.NodeTypeForm, TableName: "df_bad", DatasourceID: 8, Forms: "{"}, 9)
+		require.ErrorContains(t, err, "parse form fields")
+		_, err = repo.GetByID(context.Background(), 2)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		_, err = svc.listDatasourceSummaries(true)
+		require.EqualError(t, err, "tree failed")
+
+		svc.datasourceService = nil
+		summaries, err := svc.listDatasourceSummaries(true)
+		require.NoError(t, err)
+		assert.Empty(t, summaries)
+
+		svc.datasourceService = &fakeDataFillingDatasourceService{}
+		svc.ddlProvider = &fakeDDLProvider{countRows: 0}
+		svc.SetDatasourceConnectionProvider(&fakeDatasourceConnProvider{})
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, svc.ExportFormData(context.Background(), 1, buf))
+	})
+
+	t.Run("task and delete branches", func(t *testing.T) {
+		formRepo := newFakeDataFillingRepo()
+		formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", PhysicalTableName: "df_demo", DatasourceID: 8, NodeType: datafillingdomain.NodeTypeForm}
+		taskRepo := newFakeTaskRepo()
+		taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1, Name: "task", UIDList: `[1]`, RIDList: `[]`, RateType: 1, RateVal: "09:30:00", Status: datafillingdomain.TaskStatusStarted}
+		subTaskRepo := newFakeSubTaskRepo()
+		subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1}
+		subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, PID: 10, TaskID: 1, UID: 9, Status: datafillingdomain.SubInstanceStatusOpen}}, countErr: fmt.Errorf("count failed")}
+		scheduler := NewDataFillingScheduler(taskRepo, subTaskRepo, subInstanceRepo, formRepo)
+		svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, nil, taskRepo, subTaskRepo, subInstanceRepo, scheduler)
+		svc.SetDatasourceConnectionProvider(&fakeDatasourceConnProvider{})
+
+		err := svc.StartTask(context.Background(), 2, 1)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		err = svc.ExecuteNowTask(context.Background(), 0)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		_, err = svc.UserTaskTodoCount(context.Background(), 9)
+		require.EqualError(t, err, "count failed")
+
+		err = svc.DeleteTasks(context.Background(), 2, []int64{1})
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		err = svc.Delete(context.Background(), 0)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+	})
+
+	t.Run("append and helper functions", func(t *testing.T) {
+		formRepo := newFakeDataFillingRepo()
+		formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", PhysicalTableName: "df_demo", DatasourceID: 8}
+		taskRepo := newFakeTaskRepo()
+		taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1}
+		subTaskRepo := newFakeSubTaskRepo()
+		subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1}
+		subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, PID: 10, UID: 9, FormID: 1, Status: datafillingdomain.SubInstanceStatusOpen}}}
+		svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{err: fmt.Errorf("insert failed")}, nil, taskRepo, subTaskRepo, subInstanceRepo, nil)
+		svc.SetDatasourceConnectionProvider(&fakeDatasourceConnProvider{})
+
+		err := svc.AppendUserTaskData(context.Background(), 9, 10, []map[string]interface{}{{"name": "alice"}, {}})
+		require.EqualError(t, err, "insert failed")
+
+		fields, drops := diffExtTableFields(
+			[]datafillingdomain.ExtTableField{{Settings: datafillingdomain.ExtTableFieldSetting{Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "name", Type: datafillingdomain.BaseTypeNvarchar}}}, {Settings: datafillingdomain.ExtTableFieldSetting{Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "age", Type: datafillingdomain.BaseTypeNumber}}}},
+			[]datafillingdomain.ExtTableField{{Settings: datafillingdomain.ExtTableFieldSetting{Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "name", Type: datafillingdomain.BaseTypeNvarchar}}}, {Settings: datafillingdomain.ExtTableFieldSetting{Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "city", Type: datafillingdomain.BaseTypeNvarchar}}}},
+		)
+		assert.Equal(t, "city", fields[0].Settings.Mapping.ColumnName)
+		assert.Equal(t, []string{"age"}, drops)
+
+		mapped, err := parseFormFieldMaps("[")
+		require.Nil(t, mapped)
+		require.ErrorContains(t, err, "parse form fields")
+
+		extFields, err := parseExtTableFields("[")
+		require.Nil(t, extFields)
+		require.ErrorContains(t, err, "parse form fields")
+
+		assert.Nil(t, buildExcelRowData([]string{""}, map[int]excelFieldMeta{0: {ColumnName: "name"}}))
+		item := buildExcelRowData([]string{"row-1", "alice"}, map[int]excelFieldMeta{0: {ColumnName: "id"}, 1: {ColumnName: "name"}})
+		require.NotNil(t, item)
+		assert.False(t, item.Insert)
+		assert.Equal(t, "", stringifyExcelValue(nil))
+	})
+
+	t.Run("builder edge cases", func(t *testing.T) {
+		provider := NewMySQLDDLProvider()
+
+		_, _, err := provider.buildUpdateRowSQL("df_demo", "row-1", map[string]interface{}{"id": "row-1"})
+		require.EqualError(t, err, "no columns to update")
+
+		sql, err := provider.buildAddTableColumnsSQL("df_demo", []datafillingdomain.ExtTableField{{Removed: true}})
+		require.NoError(t, err)
+		assert.Equal(t, "", sql)
+
+		_, err = buildColumnDefinition(datafillingdomain.ExtTableField{Settings: datafillingdomain.ExtTableFieldSetting{Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "bad-name", Type: datafillingdomain.BaseTypeNvarchar}}})
+		require.EqualError(t, err, "invalid column name")
+
+		columnType, err := mysqlColumnType(datafillingdomain.ExtTableFieldMapping{Type: datafillingdomain.BaseTypeDecimal})
+		require.NoError(t, err)
+		assert.Equal(t, "DECIMAL(19,0)", columnType)
+
+		_, err = provider.buildListColumnDataSQL("df_demo", "bad-name")
+		require.EqualError(t, err, "invalid column name")
+	})
+}
+
+func TestDataFillingService_PureHelpersAndEdgeCases(t *testing.T) {
+	t.Run("excel and upload helpers", func(t *testing.T) {
+		metas := activeExcelFieldMetas([]datafillingdomain.ExtTableField{
+			{ID: "1", Settings: datafillingdomain.ExtTableFieldSetting{Name: "", Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "name", Type: datafillingdomain.BaseTypeNvarchar}}},
+			{ID: "2", Removed: true, Settings: datafillingdomain.ExtTableFieldSetting{Name: "年龄", Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "age", Type: datafillingdomain.BaseTypeNumber}}},
+			{ID: "3", Settings: datafillingdomain.ExtTableFieldSetting{Name: "空列", Mapping: datafillingdomain.ExtTableFieldMapping{ColumnName: "", Type: datafillingdomain.BaseTypeText}}},
+		})
+		require.Len(t, metas, 1)
+		assert.Equal(t, "name", metas[0].DisplayName)
+
+		book := excelize.NewFile()
+		defer book.Close()
+		require.NoError(t, writeExcelHeaders(book, metas))
+		require.NoError(t, writeExcelDataRows(book, metas, []map[string]interface{}{{"name": "alice"}}))
+		rows, err := book.GetRows(book.GetSheetName(book.GetActiveSheetIndex()))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"name"}, rows[0])
+		assert.Equal(t, []string{"alice"}, rows[1])
+
+		_, err = parseExcelUploadRows(nil, metas)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		session := NewExcelUploadSession()
+		assert.Equal(t, "", session.Store(nil))
+		_, ok := session.Load(" ")
+		assert.False(t, ok)
+		session.Delete(" ")
+	})
+
+	t.Run("persist rows and task data helpers", func(t *testing.T) {
+		formRepo := newFakeDataFillingRepo()
+		formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", PhysicalTableName: "df_demo", DatasourceID: 8}
+		ddl := &fakeDDLProvider{}
+		logs := &fakeCommitLogRepo{}
+		taskRepo := newFakeTaskRepo()
+		taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1}
+		subTaskRepo := newFakeSubTaskRepo()
+		subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1, UnfinishedCount: 1, UnfinishedUserCount: 1}
+		subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, PID: 10, UID: 9, FormID: 1, Status: datafillingdomain.SubInstanceStatusOpen}}}
+		svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, ddl, logs, taskRepo, subTaskRepo, subInstanceRepo, nil)
+		svc.SetDatasourceConnectionProvider(&fakeDatasourceConnProvider{})
+
+		require.NoError(t, svc.persistUploadedRows(context.Background(), 1, []datafillingdomain.RowDataDatum{{Data: map[string]interface{}{}}, {Data: map[string]interface{}{"name": "alice"}, Insert: true}, {ID: "row-1", Data: map[string]interface{}{"name": "bob"}, Insert: false}}, 9, "tester"))
+		assert.Len(t, ddl.insertedRows, 1)
+		assert.Len(t, ddl.updatedRows, 1)
+		assert.Len(t, logs.created, 2)
+
+		instanceSet, form, err := svc.loadUserTaskForm(context.Background(), 9, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), form.ID)
+		require.NoError(t, svc.finishUserTaskIfOpen(context.Background(), instanceSet))
+		assert.Equal(t, datafillingdomain.SubInstanceStatusFinished, instanceSet.current.Status)
+		assert.Equal(t, []int64{10}, subTaskRepo.decremented)
+
+		require.NoError(t, svc.finishUserTaskIfOpen(context.Background(), instanceSet))
+		err = svc.finishUserTaskIfOpen(context.Background(), nil)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+	})
+
+	t.Run("validation and parsing helpers", func(t *testing.T) {
+		assert.ErrorIs(t, validateDataFillingCreateRequest(nil), gorm.ErrInvalidData)
+		assert.NoError(t, validateDataFillingCreateRequest(&datafillingdomain.CreateFormRequest{Name: "folder", NodeType: datafillingdomain.NodeTypeFolder}))
+		assert.ErrorIs(t, validateDataFillingCreateRequest(&datafillingdomain.CreateFormRequest{Name: "form", NodeType: datafillingdomain.NodeTypeForm}), gorm.ErrInvalidData)
+
+		datasourceID, tableName, optionColumn, extraColumns, value, err := validateExtraDetailsRequest(nil)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+		assert.Zero(t, datasourceID)
+		assert.Empty(t, tableName)
+		assert.Empty(t, optionColumn)
+		assert.Nil(t, extraColumns)
+		assert.Empty(t, value)
+
+		_, _, _, _, _, err = validateExtraDetailsRequest(&datafillingdomain.ExtraDetailsRequest{OptionDatasource: "1", OptionTable: "users", OptionColumn: "name", ExtraColumns: []string{"bad-name"}})
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+
+		tableName, optionColumn, orderColumn, err := validateDatasourceOptionsRequest(&datafillingdomain.DatasourceOptionsRequest{OptionTable: "user_table", OptionColumn: "name"})
+		require.NoError(t, err)
+		assert.Equal(t, "user_table", tableName)
+		assert.Equal(t, "name", optionColumn)
+		assert.Equal(t, "name", orderColumn)
+
+		values, err := parseJSONIntList(`[1,2,3]`)
+		require.NoError(t, err)
+		assert.Equal(t, []int{1, 2, 3}, values)
+		_, err = parseJSONIntList(`bad`)
+		require.Error(t, err)
+	})
+
+	t.Run("tree and task info helpers", func(t *testing.T) {
+		tree := buildDataFillingTree([]*datafillingdomain.DataFillingForm{nil, {ID: 1, Name: "root", PID: 0}, {ID: 2, Name: "child", PID: 1}, {ID: 3, Name: "orphan", PID: 99}})
+		require.Len(t, tree, 2)
+		assert.Len(t, tree[0].Children, 1)
+
+		info, err := buildTaskInfoVO(&datafillingdomain.DataFillingTask{ID: 1, FormID: 2, Name: "task", ReciFlagList: `[1]`, UIDList: `[9]`, RIDList: `[8]`})
+		require.NoError(t, err)
+		assert.Equal(t, []int{1}, info.ReciFlagList)
+		assert.Equal(t, []int64{9}, info.UIDList)
+
+		_, err = buildTaskInfoVO(nil)
+		require.ErrorIs(t, err, gorm.ErrInvalidData)
+		_, err = buildTaskInfoVO(&datafillingdomain.DataFillingTask{ReciFlagList: `bad`, UIDList: `[]`, RIDList: `[]`})
+		require.Error(t, err)
+	})
+
+	t.Run("scheduler and ddl pure helpers", func(t *testing.T) {
+		spec, err := buildTaskCronSpec(&datafillingdomain.DataFillingTask{RateType: 0, RateVal: " 0 0 8 * * * "})
+		require.NoError(t, err)
+		assert.Equal(t, "0 0 8 * * *", spec)
+
+		_, err = buildTaskCronSpec(&datafillingdomain.DataFillingTask{RateType: 2, RateVal: "0 1"})
+		require.EqualError(t, err, "invalid weekly rate value")
+		_, err = buildTaskCronSpec(&datafillingdomain.DataFillingTask{RateType: 3, RateVal: "32 09:00:00"})
+		require.EqualError(t, err, "invalid monthly day")
+
+		_, _, _, err = extractTimeParts([]int{25, 0, 0})
+		require.EqualError(t, err, "invalid time value")
+
+		_, err = computeSimpleNextTime(9, "09:00:00", time.Now())
+		require.EqualError(t, err, "unsupported rate type: 9")
+
+		provider := NewMySQLDDLProvider()
+		_, err = provider.buildCreateTableSQL("bad-table", nil)
+		require.EqualError(t, err, "invalid table name")
+		_, _, err = provider.buildInsertRowSQL("df_demo", map[string]interface{}{"bad-name": "alice"})
+		require.EqualError(t, err, "invalid column name")
+		_, _, err = provider.buildDeleteRowsSQL("bad-table", []string{"1"})
+		require.EqualError(t, err, "invalid table name")
+		_, _, err = provider.buildSearchRowsSQL("bad-table", "", nil, 1, 0)
+		require.EqualError(t, err, "invalid table name")
+		_, _, err = provider.buildCountRowsSQL("bad-table", "", nil)
+		require.EqualError(t, err, "invalid table name")
+	})
 }
 
 func TestDataFillingService_GetTemplateByUserTaskItem(t *testing.T) {
