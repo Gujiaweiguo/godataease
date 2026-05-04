@@ -259,6 +259,7 @@ func TestUserTaskHandler_RoutesRegistered(t *testing.T) {
 	assert.True(t, routes["GET /data-filling/user-task/list/:id"])
 	assert.True(t, routes["POST /data-filling/user-task/saveData/:id"])
 	assert.True(t, routes["POST /data-filling/user-task/appendData/:id"])
+	assert.True(t, routes["POST /data-filling/user-task/appendData/:id/form/:formId/confirmUpload"])
 	assert.True(t, routes["GET /data-filling/user-task/:taskInstanceId/deleteData/:id"])
 }
 
@@ -289,6 +290,11 @@ func TestUserTaskHandler_Endpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	resp = decodeDatasetResp(t, w.Body.Bytes())
 	assert.Equal(t, "000000", resp.Code)
+
+	w = performUserTaskJSONRequest(t, r, http.MethodPost, "/data-filling/user-task/appendData/10/form/1/confirmUpload", map[string]any{"id": "missing"})
+	assert.Equal(t, http.StatusOK, w.Code)
+	resp = decodeDatasetResp(t, w.Body.Bytes())
+	assert.Equal(t, "500000", resp.Code)
 
 	w = performUserTaskJSONRequest(t, r, http.MethodGet, "/data-filling/user-task/10/deleteData/row-1", nil)
 	assert.Equal(t, http.StatusOK, w.Code)

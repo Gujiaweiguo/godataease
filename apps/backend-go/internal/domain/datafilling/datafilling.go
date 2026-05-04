@@ -226,6 +226,45 @@ type ListColumnDataRequest struct {
 	ColumnName string `json:"columnName"`
 }
 
+type RowDataDatum struct {
+	ID     string                 `json:"id"`
+	Data   map[string]interface{} `json:"data"`
+	Insert bool                   `json:"insert"`
+}
+
+type DfExcelData struct {
+	FormFields []map[string]interface{} `json:"formFields"`
+	DataList   []RowDataDatum           `json:"dataList"`
+	ID         string                   `json:"id"`
+	ExcelName  string                   `json:"excelName"`
+	Path       string                   `json:"path"`
+	Suffix     string                   `json:"suffix"`
+}
+
+type ExtraDetailsRequest struct {
+	OptionDatasource string   `json:"optionDatasource"`
+	OptionTable      string   `json:"optionTable"`
+	OptionColumn     string   `json:"optionColumn"`
+	ExtraColumns     []string `json:"extraColumns"`
+	Value            string   `json:"value"`
+}
+
+type ExtraDetails struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type DatasourceOptionsRequest struct {
+	OptionTable  string `json:"optionTable"`
+	OptionColumn string `json:"optionColumn"`
+	OptionOrder  string `json:"optionOrder"`
+}
+
+type ColumnOption struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type CommitLogPageRequest struct {
 	FormID  int64 `json:"formId"`
 	Operate *int  `json:"operate,omitempty"`

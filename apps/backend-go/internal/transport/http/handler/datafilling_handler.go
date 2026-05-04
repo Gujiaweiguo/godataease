@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"bytes"
 	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
 	transportmiddleware "dataease/backend/internal/transport/http/middleware"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -39,6 +41,13 @@ func RegisterDataFillingRoutes(r gin.IRouter, h *DataFillingHandler, authMiddlew
 	group.POST("/form/:formId/batch-delete", h.BatchDeleteRowData)
 	group.GET("/form/:formId/truncate", h.TruncateTableData)
 	group.POST("/form/:formId/listColumnData", h.ListColumnData)
+	group.GET("/form/:formId/excelTemplate", h.ExcelTemplate)
+	group.POST("/form/:formId/uploadFile", h.ExcelUpload)
+	group.POST("/form/:formId/confirmUpload", h.ConfirmUpload)
+	group.POST("/form/extraDetails", h.ExtraDetails)
+	group.POST("/form/:formId/options", h.ListDatasourceOptions)
+	group.GET("/template/:itemId", h.GetTemplateByUserTaskItem)
+	group.POST("/innerExport/:isDataEaseBi/:formId", h.ExportFormData)
 	group.POST("/log/page/:goPage/:pageSize", h.LogPage)
 	group.POST("/log/clear", h.LogClear)
 	group.GET("/task/info/:taskId", h.GetTaskInfo)
@@ -213,6 +222,131 @@ func (h *DataFillingHandler) ListColumnData(c *gin.Context) {
 		return
 	}
 	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) ExcelTemplate(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	buf := bytes.NewBuffer(nil)
+	if err := h.service.ExcelTemplateDownload(c.Request.Context(), formID, buf); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	filename := "template.xlsx"
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+}
+
+func (h *DataFillingHandler) ExcelUpload(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
+		return
+	}
+	result, err := h.service.ExcelUpload(c.Request.Context(), formID, fileHeader)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) ConfirmUpload(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.ConfirmUpload(c.Request.Context(), formID, req.ID, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c)); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) ExtraDetails(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req datafillingdomain.ExtraDetailsRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.ExtraDetails(c.Request.Context(), &req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) ListDatasourceOptions(c *gin.Context) {
+	defer recoverServicePanic(c)
+	datasourceID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req datafillingdomain.DatasourceOptionsRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.ListDatasourceOptions(c.Request.Context(), datasourceID, &req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) GetTemplateByUserTaskItem(c *gin.Context) {
+	defer recoverServicePanic(c)
+	itemID, ok := parseIDParamBadRequest(c, "itemId")
+	if !ok {
+		return
+	}
+	result, err := h.service.GetTemplateByUserTaskItem(c.Request.Context(), itemID)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) ExportFormData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	buf := bytes.NewBuffer(nil)
+	if err := h.service.ExportFormData(c.Request.Context(), formID, buf); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	filename := "form-data.xlsx"
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 }
 
 func (h *DataFillingHandler) LogPage(c *gin.Context) {

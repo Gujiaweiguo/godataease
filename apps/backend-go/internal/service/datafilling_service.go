@@ -4,18 +4,65 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	datasourcedomain "dataease/backend/internal/domain/datasource"
 
+	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 const nilStringValue = "<nil>"
+const maxDataFillingExcelUploadSize int64 = 10 * 1024 * 1024
+
+type ExcelUploadSession struct {
+	mu       sync.RWMutex
+	sessions map[string]*datafillingdomain.DfExcelData
+}
+
+func NewExcelUploadSession() *ExcelUploadSession {
+	return &ExcelUploadSession{sessions: make(map[string]*datafillingdomain.DfExcelData)}
+}
+
+func (s *ExcelUploadSession) Store(data *datafillingdomain.DfExcelData) string {
+	if s == nil || data == nil {
+		return ""
+	}
+	key := uuid.NewString()
+	s.mu.Lock()
+	s.sessions[key] = data
+	s.mu.Unlock()
+	return key
+}
+
+func (s *ExcelUploadSession) Load(key string) (*datafillingdomain.DfExcelData, bool) {
+	if s == nil || strings.TrimSpace(key) == "" {
+		return nil, false
+	}
+	s.mu.RLock()
+	data, ok := s.sessions[key]
+	s.mu.RUnlock()
+	return data, ok
+}
+
+func (s *ExcelUploadSession) Delete(key string) {
+	if s == nil || strings.TrimSpace(key) == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.sessions, key)
+	s.mu.Unlock()
+}
 
 type DataFillingRepo interface {
 	Create(ctx context.Context, form *datafillingdomain.DataFillingForm) error
@@ -83,14 +130,203 @@ type DataFillingService struct {
 	subTaskRepo            SubTaskRepository
 	subInstanceRepo        SubInstanceRepository
 	scheduler              *DataFillingScheduler
+	excelUploadSession     *ExcelUploadSession
 }
 
 func NewDataFillingService(repo DataFillingRepo, datasourceService DataFillingDatasourceService, ddlProvider DDLProvider, commitLogRepo CommitLogRepo, taskRepo TaskRepository, subTaskRepo SubTaskRepository, subInstanceRepo SubInstanceRepository, scheduler *DataFillingScheduler) *DataFillingService {
-	return &DataFillingService{repo: repo, datasourceService: datasourceService, ddlProvider: ddlProvider, commitLogRepo: commitLogRepo, taskRepo: taskRepo, subTaskRepo: subTaskRepo, subInstanceRepo: subInstanceRepo, scheduler: scheduler}
+	return &DataFillingService{repo: repo, datasourceService: datasourceService, ddlProvider: ddlProvider, commitLogRepo: commitLogRepo, taskRepo: taskRepo, subTaskRepo: subTaskRepo, subInstanceRepo: subInstanceRepo, scheduler: scheduler, excelUploadSession: NewExcelUploadSession()}
 }
 
 func (s *DataFillingService) SetDatasourceConnectionProvider(provider DatasourceConnectionProvider) {
 	s.datasourceConnProvider = provider
+}
+
+func (s *DataFillingService) ExcelTemplateDownload(ctx context.Context, formID int64, writer io.Writer) error {
+	if writer == nil {
+		return gorm.ErrInvalidData
+	}
+	form, err := s.repo.GetByID(ctx, formID)
+	if err != nil {
+		return err
+	}
+	fields, err := parseExtTableFields(form.Forms)
+	if err != nil {
+		return err
+	}
+	file := excelize.NewFile()
+	defer func() { _ = file.Close() }()
+	if err := writeExcelHeaders(file, activeExcelFieldMetas(fields)); err != nil {
+		return err
+	}
+	return file.Write(writer)
+}
+
+func (s *DataFillingService) ExcelUpload(ctx context.Context, formID int64, fileHeader *multipart.FileHeader) (*datafillingdomain.DfExcelData, error) {
+	if fileHeader == nil || fileHeader.Size <= 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	if fileHeader.Size > maxDataFillingExcelUploadSize {
+		return nil, fmt.Errorf("file size exceeds 10MB limit")
+	}
+	form, err := s.repo.GetByID(ctx, formID)
+	if err != nil {
+		return nil, err
+	}
+	formFields, err := parseFormFieldMaps(form.Forms)
+	if err != nil {
+		return nil, err
+	}
+	fields, err := parseExtTableFields(form.Forms)
+	if err != nil {
+		return nil, err
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	workbook, err := excelize.OpenReader(file)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = workbook.Close() }()
+	dataList, err := parseExcelUploadRows(workbook, activeExcelFieldMetas(fields))
+	if err != nil {
+		return nil, err
+	}
+	result := &datafillingdomain.DfExcelData{
+		FormFields: formFields,
+		DataList:   dataList,
+		ExcelName:  fileHeader.Filename,
+		Path:       "",
+		Suffix:     filepath.Ext(fileHeader.Filename),
+	}
+	result.ID = s.excelUploadSession.Store(result)
+	return result, nil
+}
+
+func (s *DataFillingService) ConfirmUpload(ctx context.Context, formID int64, uploadID string, userID int64, userName string) error {
+	data, err := s.mustLoadExcelUpload(uploadID)
+	if err != nil {
+		return err
+	}
+	defer s.excelUploadSession.Delete(uploadID)
+	return s.persistUploadedRows(ctx, formID, data.DataList, userID, userName)
+}
+
+func (s *DataFillingService) UserTaskConfirmUpload(ctx context.Context, userID, subTaskID, formID int64, uploadID string) error {
+	if userID <= 0 || formID <= 0 {
+		return gorm.ErrInvalidData
+	}
+	instanceSet, form, err := s.loadUserTaskForm(ctx, userID, subTaskID)
+	if err != nil {
+		return err
+	}
+	if form.ID != formID {
+		return gorm.ErrRecordNotFound
+	}
+	data, err := s.mustLoadExcelUpload(uploadID)
+	if err != nil {
+		return err
+	}
+	defer s.excelUploadSession.Delete(uploadID)
+	if err := s.persistUploadedRows(ctx, formID, data.DataList, userID, ""); err != nil {
+		return err
+	}
+	return s.finishUserTaskIfOpen(ctx, instanceSet)
+}
+
+func (s *DataFillingService) ExtraDetails(ctx context.Context, req *datafillingdomain.ExtraDetailsRequest) ([]*datafillingdomain.ExtraDetails, error) {
+	datasourceID, tableName, optionColumn, extraColumns, value, err := validateExtraDetailsRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	db, err := s.GetDatasourceConnection(ctx, datasourceID)
+	if err != nil {
+		return nil, err
+	}
+	selectColumns := append([]string{quoteIdentifier(optionColumn)}, quoteIdentifiers(extraColumns)...)
+	rows := make([]map[string]interface{}, 0)
+	query := db.WithContext(ctx).Table(quoteIdentifier(tableName)).Select(strings.Join(selectColumns, ", ")).Where(fmt.Sprintf("%s = ?", quoteIdentifier(optionColumn)), value).Limit(1000)
+	if err := query.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return flattenExtraDetails(rows, extraColumns), nil
+}
+
+func (s *DataFillingService) ListDatasourceOptions(ctx context.Context, datasourceID int64, req *datafillingdomain.DatasourceOptionsRequest) ([]*datafillingdomain.ColumnOption, error) {
+	tableName, optionColumn, orderColumn, err := validateDatasourceOptionsRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	db, err := s.GetDatasourceConnection(ctx, datasourceID)
+	if err != nil {
+		return nil, err
+	}
+	values := make([]string, 0)
+	if err := db.WithContext(ctx).Table(quoteIdentifier(tableName)).Distinct().Order(quoteIdentifier(orderColumn)).Limit(1000).Pluck(optionColumn, &values).Error; err != nil {
+		return nil, err
+	}
+	result := make([]*datafillingdomain.ColumnOption, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		result = append(result, &datafillingdomain.ColumnOption{Name: trimmed, Value: trimmed})
+	}
+	return result, nil
+}
+
+func (s *DataFillingService) GetTemplateByUserTaskItem(ctx context.Context, itemID int64) (string, error) {
+	if s.subInstanceRepo == nil || s.taskRepo == nil || itemID <= 0 {
+		return "", gorm.ErrInvalidData
+	}
+	instance, err := s.subInstanceRepo.GetSubInstanceByID(ctx, itemID)
+	if err != nil {
+		return "", err
+	}
+	task, err := s.taskRepo.GetTaskByID(ctx, instance.TaskID)
+	if err != nil {
+		return "", err
+	}
+	formID := task.FormID
+	if formID <= 0 {
+		formID = instance.FormID
+	}
+	form, err := s.repo.GetByID(ctx, formID)
+	if err != nil {
+		return "", err
+	}
+	return form.Forms, nil
+}
+
+func (s *DataFillingService) ExportFormData(ctx context.Context, formID int64, writer io.Writer) error {
+	if writer == nil {
+		return gorm.ErrInvalidData
+	}
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return err
+	}
+	fields, err := parseExtTableFields(form.Forms)
+	if err != nil {
+		return err
+	}
+	metas := activeExcelFieldMetas(fields)
+	rows, err := s.loadAllFormRows(ctx, db, form.PhysicalTableName)
+	if err != nil {
+		return err
+	}
+	file := excelize.NewFile()
+	defer func() { _ = file.Close() }()
+	if err := writeExcelHeaders(file, metas); err != nil {
+		return err
+	}
+	if err := writeExcelDataRows(file, metas, rows); err != nil {
+		return err
+	}
+	return file.Write(writer)
 }
 
 func (s *DataFillingService) Save(ctx context.Context, req *datafillingdomain.CreateFormRequest, userID int64) (*datafillingdomain.DataFillingForm, error) {
@@ -900,6 +1136,275 @@ func (s *DataFillingService) writeCommitLog(ctx context.Context, formID int64, d
 		return nil
 	}
 	return s.commitLogRepo.Create(ctx, &datafillingdomain.DfCommitLog{FormID: formID, DataID: dataID, Operate: operate, CommitBy: userID, Committer: userName, CommitTime: time.Now().UnixMilli(), Count: count})
+}
+
+type excelFieldMeta struct {
+	DisplayName string
+	ColumnName  string
+	ID          string
+}
+
+func activeExcelFieldMetas(fields []datafillingdomain.ExtTableField) []excelFieldMeta {
+	metas := make([]excelFieldMeta, 0, len(fields))
+	for _, field := range fields {
+		if field.Removed {
+			continue
+		}
+		columnName := strings.TrimSpace(field.Settings.Mapping.ColumnName)
+		if columnName == "" {
+			continue
+		}
+		displayName := strings.TrimSpace(field.Settings.Name)
+		if displayName == "" {
+			displayName = columnName
+		}
+		metas = append(metas, excelFieldMeta{DisplayName: displayName, ColumnName: columnName, ID: strings.TrimSpace(field.ID)})
+	}
+	return metas
+}
+
+func writeExcelHeaders(file *excelize.File, metas []excelFieldMeta) error {
+	sheetName := file.GetSheetName(file.GetActiveSheetIndex())
+	for idx, meta := range metas {
+		cell, err := excelize.CoordinatesToCellName(idx+1, 1)
+		if err != nil {
+			return err
+		}
+		if err := file.SetCellValue(sheetName, cell, meta.DisplayName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeExcelDataRows(file *excelize.File, metas []excelFieldMeta, rows []map[string]interface{}) error {
+	sheetName := file.GetSheetName(file.GetActiveSheetIndex())
+	for rowIndex, row := range rows {
+		for colIndex, meta := range metas {
+			cell, err := excelize.CoordinatesToCellName(colIndex+1, rowIndex+2)
+			if err != nil {
+				return err
+			}
+			if err := file.SetCellValue(sheetName, cell, stringifyExcelValue(row[meta.ColumnName])); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func parseFormFieldMaps(raw string) ([]map[string]interface{}, error) {
+	if strings.TrimSpace(raw) == "" {
+		return []map[string]interface{}{}, nil
+	}
+	result := make([]map[string]interface{}, 0)
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return nil, fmt.Errorf("parse form fields: %w", err)
+	}
+	return result, nil
+}
+
+func parseExcelUploadRows(workbook *excelize.File, metas []excelFieldMeta) ([]datafillingdomain.RowDataDatum, error) {
+	if workbook == nil {
+		return nil, gorm.ErrInvalidData
+	}
+	sheets := workbook.GetSheetList()
+	if len(sheets) == 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	rows, err := workbook.GetRows(sheets[0])
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return []datafillingdomain.RowDataDatum{}, nil
+	}
+	headerMap := buildExcelHeaderMap(rows[0], metas)
+	result := make([]datafillingdomain.RowDataDatum, 0)
+	for _, row := range rows[1:] {
+		item := buildExcelRowData(row, headerMap)
+		if item != nil {
+			result = append(result, *item)
+		}
+	}
+	return result, nil
+}
+
+func buildExcelHeaderMap(headers []string, metas []excelFieldMeta) map[int]excelFieldMeta {
+	metaMap := make(map[string]excelFieldMeta, len(metas)*2)
+	for _, meta := range metas {
+		metaMap[strings.ToLower(strings.TrimSpace(meta.DisplayName))] = meta
+		metaMap[strings.ToLower(strings.TrimSpace(meta.ColumnName))] = meta
+	}
+	result := make(map[int]excelFieldMeta)
+	for idx, header := range headers {
+		if meta, ok := metaMap[strings.ToLower(strings.TrimSpace(header))]; ok {
+			result[idx] = meta
+		}
+	}
+	return result
+}
+
+func buildExcelRowData(row []string, headerMap map[int]excelFieldMeta) *datafillingdomain.RowDataDatum {
+	data := make(map[string]interface{})
+	rowID := ""
+	hasValue := false
+	for idx, meta := range headerMap {
+		if idx >= len(row) {
+			continue
+		}
+		value := strings.TrimSpace(row[idx])
+		if value == "" {
+			continue
+		}
+		hasValue = true
+		data[meta.ColumnName] = value
+		if meta.ColumnName == "id" {
+			rowID = value
+		}
+	}
+	if !hasValue {
+		return nil
+	}
+	insert := strings.TrimSpace(rowID) == ""
+	if rowID != "" {
+		data["id"] = rowID
+	}
+	return &datafillingdomain.RowDataDatum{ID: rowID, Data: data, Insert: insert}
+}
+
+func (s *DataFillingService) mustLoadExcelUpload(uploadID string) (*datafillingdomain.DfExcelData, error) {
+	if strings.TrimSpace(uploadID) == "" {
+		return nil, gorm.ErrInvalidData
+	}
+	data, ok := s.excelUploadSession.Load(uploadID)
+	if !ok || data == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return data, nil
+}
+
+func (s *DataFillingService) persistUploadedRows(ctx context.Context, formID int64, rows []datafillingdomain.RowDataDatum, userID int64, userName string) error {
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := s.persistUploadedRow(ctx, form, db, row, userID, userName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *DataFillingService) persistUploadedRow(ctx context.Context, form *datafillingdomain.DataFillingForm, db *gorm.DB, row datafillingdomain.RowDataDatum, userID int64, userName string) error {
+	if form == nil || len(row.Data) == 0 {
+		return nil
+	}
+	rowData := copyMap(row.Data)
+	rowID := strings.TrimSpace(row.ID)
+	if row.Insert || rowID == "" || rowID == nilStringValue {
+		delete(rowData, "id")
+		if err := s.ddlProvider.InsertRow(ctx, db, form.PhysicalTableName, rowData); err != nil {
+			return err
+		}
+		return s.writeCommitLog(ctx, form.ID, strings.TrimSpace(fmt.Sprint(rowData["id"])), 1, userID, userName, 1)
+	}
+	if err := s.ddlProvider.UpdateRow(ctx, db, form.PhysicalTableName, rowID, rowData); err != nil {
+		return err
+	}
+	return s.writeCommitLog(ctx, form.ID, rowID, 2, userID, userName, 1)
+}
+
+func validateExtraDetailsRequest(req *datafillingdomain.ExtraDetailsRequest) (int64, string, string, []string, string, error) {
+	if req == nil {
+		return 0, "", "", nil, "", gorm.ErrInvalidData
+	}
+	datasourceID, err := strconv.ParseInt(strings.TrimSpace(req.OptionDatasource), 10, 64)
+	if err != nil || datasourceID <= 0 {
+		return 0, "", "", nil, "", gorm.ErrInvalidData
+	}
+	tableName := strings.TrimSpace(req.OptionTable)
+	optionColumn := strings.TrimSpace(req.OptionColumn)
+	if !isValidDDLIdentifier(tableName) || !isValidDDLIdentifier(optionColumn) {
+		return 0, "", "", nil, "", gorm.ErrInvalidData
+	}
+	extraColumns := make([]string, 0, len(req.ExtraColumns))
+	for _, column := range req.ExtraColumns {
+		trimmed := strings.TrimSpace(column)
+		if trimmed == "" {
+			continue
+		}
+		if !isValidDDLIdentifier(trimmed) {
+			return 0, "", "", nil, "", gorm.ErrInvalidData
+		}
+		extraColumns = append(extraColumns, trimmed)
+	}
+	return datasourceID, tableName, optionColumn, extraColumns, strings.TrimSpace(req.Value), nil
+}
+
+func validateDatasourceOptionsRequest(req *datafillingdomain.DatasourceOptionsRequest) (string, string, string, error) {
+	if req == nil {
+		return "", "", "", gorm.ErrInvalidData
+	}
+	tableName := strings.TrimSpace(req.OptionTable)
+	optionColumn := strings.TrimSpace(req.OptionColumn)
+	orderColumn := strings.TrimSpace(req.OptionOrder)
+	if orderColumn == "" {
+		orderColumn = optionColumn
+	}
+	if !isValidDDLIdentifier(tableName) || !isValidDDLIdentifier(optionColumn) || !isValidDDLIdentifier(orderColumn) {
+		return "", "", "", gorm.ErrInvalidData
+	}
+	return tableName, optionColumn, orderColumn, nil
+}
+
+func quoteIdentifier(identifier string) string {
+	return "`" + strings.TrimSpace(identifier) + "`"
+}
+
+func quoteIdentifiers(columns []string) []string {
+	result := make([]string, 0, len(columns))
+	for _, column := range columns {
+		result = append(result, quoteIdentifier(column))
+	}
+	return result
+}
+
+func flattenExtraDetails(rows []map[string]interface{}, extraColumns []string) []*datafillingdomain.ExtraDetails {
+	result := make([]*datafillingdomain.ExtraDetails, 0, len(rows)*len(extraColumns))
+	for _, row := range rows {
+		for _, column := range extraColumns {
+			result = append(result, &datafillingdomain.ExtraDetails{Name: column, Value: stringifyExcelValue(row[column])})
+		}
+	}
+	return result
+}
+
+func stringifyExcelValue(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func copyMap(input map[string]interface{}) map[string]interface{} {
+	cloned := make(map[string]interface{}, len(input))
+	for key, value := range input {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func (s *DataFillingService) loadAllFormRows(ctx context.Context, db *gorm.DB, tableName string) ([]map[string]interface{}, error) {
+	total, err := s.ddlProvider.CountRows(ctx, db, tableName, "", nil)
+	if err != nil {
+		return nil, err
+	}
+	if total == 0 {
+		return []map[string]interface{}{}, nil
+	}
+	return s.ddlProvider.SearchRows(ctx, db, tableName, "", nil, total, 0)
 }
 
 func parseExtTableFields(raw string) ([]datafillingdomain.ExtTableField, error) {

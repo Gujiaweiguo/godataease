@@ -1,9 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"testing"
@@ -14,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
@@ -900,6 +904,130 @@ func TestDataFillingService_DeleteUserTaskData(t *testing.T) {
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
+func TestDataFillingService_ExcelTemplateDownload(t *testing.T) {
+	repo := newFakeDataFillingRepo()
+	repo.records[1] = &datafillingdomain.DataFillingForm{
+		ID:    1,
+		Forms: `[{"id":"f1","settings":{"name":"姓名","mapping":{"columnName":"name","type":"nvarchar"}}},{"id":"f2","settings":{"name":"年龄","mapping":{"columnName":"age","type":"number"}}}]`,
+	}
+	svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, nil, nil, nil, nil, nil)
+
+	buf := bytes.NewBuffer(nil)
+	err := svc.ExcelTemplateDownload(context.Background(), 1, buf)
+	require.NoError(t, err)
+
+	book, err := excelize.OpenReader(bytes.NewReader(buf.Bytes()))
+	require.NoError(t, err)
+	defer book.Close()
+	rows, err := book.GetRows(book.GetSheetName(book.GetActiveSheetIndex()))
+	require.NoError(t, err)
+	require.NotEmpty(t, rows)
+	assert.Equal(t, []string{"姓名", "年龄"}, rows[0])
+
+	err = svc.ExcelTemplateDownload(context.Background(), 999, bytes.NewBuffer(nil))
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func TestDataFillingService_ExcelUpload(t *testing.T) {
+	repo := newFakeDataFillingRepo()
+	repo.records[1] = &datafillingdomain.DataFillingForm{
+		ID:    1,
+		Forms: `[{"id":"f1","settings":{"name":"姓名","mapping":{"columnName":"name","type":"nvarchar"}}},{"id":"f2","settings":{"name":"年龄","mapping":{"columnName":"age","type":"number"}}}]`,
+	}
+	svc := NewDataFillingService(repo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, nil, nil, nil, nil, nil)
+
+	header := newExcelUploadFileHeader(t, "upload.xlsx", [][]string{{"姓名", "年龄"}, {"alice", "18"}, {"bob", "20"}})
+	result, err := svc.ExcelUpload(context.Background(), 1, header)
+	require.NoError(t, err)
+	require.Len(t, result.DataList, 2)
+	assert.Equal(t, "alice", result.DataList[0].Data["name"])
+	assert.Equal(t, "18", result.DataList[0].Data["age"])
+	assert.True(t, result.DataList[0].Insert)
+	assert.NotEmpty(t, result.ID)
+
+	emptyHeader := newExcelUploadFileHeader(t, "empty.xlsx", [][]string{{"姓名", "年龄"}})
+	emptyResult, err := svc.ExcelUpload(context.Background(), 1, emptyHeader)
+	require.NoError(t, err)
+	assert.Empty(t, emptyResult.DataList)
+
+	large := *header
+	large.Size = maxDataFillingExcelUploadSize + 1
+	_, err = svc.ExcelUpload(context.Background(), 1, &large)
+	require.EqualError(t, err, "file size exceeds 10MB limit")
+}
+
+func TestDataFillingService_ConfirmUpload(t *testing.T) {
+	formRepo := newFakeDataFillingRepo()
+	formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_demo", DatasourceID: 8, Forms: "[]"}
+	ddl := &fakeDDLProvider{}
+	logs := &fakeCommitLogRepo{}
+	svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, ddl, logs, nil, nil, nil, nil)
+	svc.datasourceConnProvider = &fakeDatasourceConnProvider{}
+
+	uploadID := svc.excelUploadSession.Store(&datafillingdomain.DfExcelData{DataList: []datafillingdomain.RowDataDatum{{Data: map[string]interface{}{"name": "alice"}, Insert: true}, {ID: "row-1", Data: map[string]interface{}{"id": "row-1", "name": "bob"}, Insert: false}}})
+	err := svc.ConfirmUpload(context.Background(), 1, uploadID, 9, "tester")
+	require.NoError(t, err)
+	assert.Len(t, ddl.insertedRows, 1)
+	assert.Len(t, ddl.updatedRows, 1)
+	assert.Len(t, logs.created, 2)
+	_, ok := svc.excelUploadSession.Load(uploadID)
+	assert.False(t, ok)
+
+	err = svc.ConfirmUpload(context.Background(), 1, "missing", 9, "tester")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func TestDataFillingService_ExtraDetails_ValidateIdentifiers(t *testing.T) {
+	svc := NewDataFillingService(newFakeDataFillingRepo(), &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, nil, nil, nil, nil, nil)
+	_, err := svc.ExtraDetails(context.Background(), &datafillingdomain.ExtraDetailsRequest{OptionDatasource: "1", OptionTable: "bad-table", OptionColumn: "name", ExtraColumns: []string{"city"}, Value: "alice"})
+	require.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestDataFillingService_GetTemplateByUserTaskItem(t *testing.T) {
+	formRepo := newFakeDataFillingRepo()
+	formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Forms: `[{"settings":{"name":"姓名","mapping":{"columnName":"name","type":"nvarchar"}}}]`}
+	taskRepo := newFakeTaskRepo()
+	taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1}
+	subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, FormID: 1}}}
+	svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, nil, taskRepo, newFakeSubTaskRepo(), subInstanceRepo, nil)
+
+	template, err := svc.GetTemplateByUserTaskItem(context.Background(), 100)
+	require.NoError(t, err)
+	assert.Contains(t, template, "姓名")
+
+	_, err = svc.GetTemplateByUserTaskItem(context.Background(), 999)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func newExcelUploadFileHeader(t *testing.T, filename string, rows [][]string) *multipart.FileHeader {
+	t.Helper()
+	file := excelize.NewFile()
+	defer file.Close()
+	sheet := file.GetSheetName(file.GetActiveSheetIndex())
+	for rowIndex, row := range rows {
+		for colIndex, value := range row {
+			cell, err := excelize.CoordinatesToCellName(colIndex+1, rowIndex+1)
+			require.NoError(t, err)
+			require.NoError(t, file.SetCellValue(sheet, cell, value))
+		}
+	}
+	buf, err := file.WriteToBuffer()
+	require.NoError(t, err)
+	body := bytes.NewBuffer(nil)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filename)
+	require.NoError(t, err)
+	_, err = part.Write(buf.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	req := httptest.NewRequest("POST", "/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	require.NoError(t, req.ParseMultipartForm(int64(body.Len())+1024))
+	_, header, err := req.FormFile("file")
+	require.NoError(t, err)
+	return header
+}
+
 func TestDataFillingScheduler_ComputeNextExecTime(t *testing.T) {
 	scheduler := NewDataFillingScheduler(newFakeTaskRepo(), newFakeSubTaskRepo(), &fakeSubInstanceRepo{}, newFakeDataFillingRepo())
 
@@ -918,12 +1046,4 @@ func TestDataFillingScheduler_ComputeNextExecTime(t *testing.T) {
 	monthlyNext, err := computeTaskNextExecTime(&datafillingdomain.DataFillingTask{RateType: 3, RateVal: "15 08:00:00"}, time.Date(2026, 5, 4, 10, 0, 0, 0, time.Local))
 	require.NoError(t, err)
 	assert.Equal(t, 15, monthlyNext.Day())
-}
-
-func copyMap(input map[string]interface{}) map[string]interface{} {
-	cloned := make(map[string]interface{}, len(input))
-	for key, value := range input {
-		cloned[key] = value
-	}
-	return cloned
 }
