@@ -33,14 +33,26 @@ type DataFillingDatasourceService interface {
 	GetTables(req *datasourcedomain.TableRequest) ([]datasourcedomain.TableInfo, error)
 }
 
-type DataFillingService struct {
-	repo              DataFillingRepo
-	datasourceService DataFillingDatasourceService
-	ddlProvider       DDLProvider
+type CommitLogRepo interface {
+	Create(ctx context.Context, log *datafillingdomain.DfCommitLog) error
+	ListByFormID(ctx context.Context, formID int64, page, pageSize int) ([]*datafillingdomain.DfCommitLog, int64, error)
+	DeleteByFormID(ctx context.Context, formID int64) error
 }
 
-func NewDataFillingService(repo DataFillingRepo, datasourceService DataFillingDatasourceService, ddlProvider DDLProvider) *DataFillingService {
-	return &DataFillingService{repo: repo, datasourceService: datasourceService, ddlProvider: ddlProvider}
+type DataFillingService struct {
+	repo                     DataFillingRepo
+	datasourceService        DataFillingDatasourceService
+	ddlProvider              DDLProvider
+	commitLogRepo            CommitLogRepo
+	datasourceConnProvider   DatasourceConnectionProvider
+}
+
+func NewDataFillingService(repo DataFillingRepo, datasourceService DataFillingDatasourceService, ddlProvider DDLProvider, commitLogRepo CommitLogRepo) *DataFillingService {
+	return &DataFillingService{repo: repo, datasourceService: datasourceService, ddlProvider: ddlProvider, commitLogRepo: commitLogRepo}
+}
+
+func (s *DataFillingService) SetDatasourceConnectionProvider(provider DatasourceConnectionProvider) {
+	s.datasourceConnProvider = provider
 }
 
 func (s *DataFillingService) Save(ctx context.Context, req *datafillingdomain.CreateFormRequest, userID int64) (*datafillingdomain.DataFillingForm, error) {
@@ -99,6 +111,7 @@ func (s *DataFillingService) Update(ctx context.Context, req *datafillingdomain.
 	if err != nil {
 		return nil, err
 	}
+	originalFields := strings.TrimSpace(current.Forms)
 	level, err := s.resolveLevel(ctx, req.PID)
 	if err != nil {
 		return nil, err
@@ -114,10 +127,150 @@ func (s *DataFillingService) Update(ctx context.Context, req *datafillingdomain.
 	current.TableIndexes = strings.TrimSpace(req.TableIndexes)
 	current.UpdateBy = userID
 	current.UpdateTime = time.Now().UnixMilli()
+	if normalizeDataFillingNodeType(current.NodeType) == datafillingdomain.NodeTypeForm && originalFields != current.Forms {
+		if err := s.alterPhysicalTableForFieldChanges(ctx, current, originalFields, current.Forms); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.repo.Update(ctx, current); err != nil {
 		return nil, err
 	}
 	return current, nil
+}
+
+func (s *DataFillingService) SearchTableData(ctx context.Context, formID int64, req *datafillingdomain.TableDataRequest) (*datafillingdomain.TableDataResponse, error) {
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return nil, err
+	}
+	currentPage := int64(1)
+	pageSize := int64(20)
+	searchParams := []datafillingdomain.SearchParam{}
+	if req != nil {
+		if req.CurrentPage > 0 {
+			currentPage = req.CurrentPage
+		}
+		if req.PageSize > 0 {
+			pageSize = req.PageSize
+		}
+		searchParams = req.SearchParams
+	}
+	whereClause, args, err := buildWhereClause(searchParams)
+	if err != nil {
+		return nil, err
+	}
+	offset := (currentPage - 1) * pageSize
+	rows, err := s.ddlProvider.SearchRows(ctx, db, form.PhysicalTableName, whereClause, args, pageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	total, err := s.ddlProvider.CountRows(ctx, db, form.PhysicalTableName, whereClause, args)
+	if err != nil {
+		return nil, err
+	}
+	return &datafillingdomain.TableDataResponse{Data: rows, Fields: form.Forms, Total: total, CurrentPage: currentPage, PageSize: pageSize, Key: "id"}, nil
+}
+
+func (s *DataFillingService) SaveRowData(ctx context.Context, formID int64, rowData map[string]interface{}, userID int64, userName string) (*datafillingdomain.TableDataResponse, error) {
+	if len(rowData) == 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return nil, err
+	}
+	rowID := strings.TrimSpace(fmt.Sprint(rowData["id"]))
+	operate := 1
+	if rowID == "" || rowID == "<nil>" {
+		delete(rowData, "id")
+		if err := s.ddlProvider.InsertRow(ctx, db, form.PhysicalTableName, rowData); err != nil {
+			return nil, err
+		}
+		rowID = strings.TrimSpace(fmt.Sprint(rowData["id"]))
+	} else {
+		operate = 2
+		if err := s.ddlProvider.UpdateRow(ctx, db, form.PhysicalTableName, rowID, rowData); err != nil {
+			return nil, err
+		}
+	}
+	if err := s.writeCommitLog(ctx, formID, rowID, operate, userID, userName, 1); err != nil {
+		return nil, err
+	}
+	return &datafillingdomain.TableDataResponse{Data: []map[string]interface{}{rowData}, Fields: form.Forms, Total: 1, CurrentPage: 1, PageSize: 1, Key: "id"}, nil
+}
+
+func (s *DataFillingService) DeleteRowData(ctx context.Context, formID int64, rowID string, userID int64, userName string) error {
+	if strings.TrimSpace(rowID) == "" {
+		return gorm.ErrInvalidData
+	}
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return err
+	}
+	if err := s.ddlProvider.DeleteRows(ctx, db, form.PhysicalTableName, []string{rowID}); err != nil {
+		return err
+	}
+	return s.writeCommitLog(ctx, formID, rowID, 0, userID, userName, 1)
+}
+
+func (s *DataFillingService) BatchDeleteRowData(ctx context.Context, formID int64, ids []string, userID int64, userName string) error {
+	cleaned := cleanRowIDs(ids)
+	if len(cleaned) == 0 {
+		return gorm.ErrInvalidData
+	}
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return err
+	}
+	for start := 0; start < len(cleaned); start += 500 {
+		end := start + 500
+		if end > len(cleaned) {
+			end = len(cleaned)
+		}
+		if err := s.ddlProvider.DeleteRows(ctx, db, form.PhysicalTableName, cleaned[start:end]); err != nil {
+			return err
+		}
+	}
+	return s.writeCommitLog(ctx, formID, "", 0, userID, userName, len(cleaned))
+}
+
+func (s *DataFillingService) TruncateTableData(ctx context.Context, formID int64) error {
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return err
+	}
+	return s.ddlProvider.TruncateTable(ctx, db, form.PhysicalTableName)
+}
+
+func (s *DataFillingService) ListColumnData(ctx context.Context, formID int64, columnName string) ([]string, error) {
+	if !isValidDDLIdentifier(columnName) {
+		return nil, gorm.ErrInvalidData
+	}
+	form, db, err := s.loadFormAndDatasource(ctx, formID)
+	if err != nil {
+		return nil, err
+	}
+	return s.ddlProvider.ListColumnData(ctx, db, form.PhysicalTableName, columnName)
+}
+
+func (s *DataFillingService) ListCommitLogs(ctx context.Context, formID int64, page, pageSize int) ([]*datafillingdomain.DfCommitLog, int64, error) {
+	if s.commitLogRepo == nil {
+		return nil, 0, fmt.Errorf("commit log repository not configured")
+	}
+	if formID <= 0 || page <= 0 || pageSize <= 0 {
+		return nil, 0, gorm.ErrInvalidData
+	}
+	return s.commitLogRepo.ListByFormID(ctx, formID, page, pageSize)
+}
+
+func (s *DataFillingService) ClearCommitLogs(ctx context.Context, formID int64) error {
+	if s.commitLogRepo == nil {
+		return fmt.Errorf("commit log repository not configured")
+	}
+	if formID <= 0 {
+		return gorm.ErrInvalidData
+	}
+	return s.commitLogRepo.DeleteByFormID(ctx, formID)
 }
 
 func (s *DataFillingService) Delete(ctx context.Context, id int64) error {
@@ -208,6 +361,9 @@ func (s *DataFillingService) GetBuiltInTables(ctx context.Context) ([]datafillin
 }
 
 func (s *DataFillingService) GetDatasourceConnection(ctx context.Context, datasourceID int64) (*gorm.DB, error) {
+	if s.datasourceConnProvider != nil {
+		return s.datasourceConnProvider.GetDatasourceConnection(ctx, datasourceID)
+	}
 	_ = ctx
 	if s.datasourceService == nil {
 		return nil, fmt.Errorf("datasource service not configured")
@@ -248,6 +404,117 @@ func (s *DataFillingService) createPhysicalTable(ctx context.Context, form *data
 		return err
 	}
 	return s.ddlProvider.CreateTable(ctx, db, form.PhysicalTableName, fields)
+}
+
+func (s *DataFillingService) loadFormAndDatasource(ctx context.Context, formID int64) (*datafillingdomain.DataFillingForm, *gorm.DB, error) {
+	if formID <= 0 {
+		return nil, nil, gorm.ErrInvalidData
+	}
+	if s.ddlProvider == nil {
+		return nil, nil, fmt.Errorf("ddl provider not configured")
+	}
+	form, err := s.repo.GetByID(ctx, formID)
+	if err != nil {
+		return nil, nil, err
+	}
+	db, err := s.GetDatasourceConnection(ctx, form.DatasourceID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return form, db, nil
+}
+
+func (s *DataFillingService) alterPhysicalTableForFieldChanges(ctx context.Context, form *datafillingdomain.DataFillingForm, oldForms, newForms string) error {
+	if s.ddlProvider == nil || form == nil || strings.TrimSpace(form.PhysicalTableName) == "" || form.DatasourceID <= 0 {
+		return nil
+	}
+	oldFields, err := parseExtTableFields(oldForms)
+	if err != nil {
+		return err
+	}
+	newFields, err := parseExtTableFields(newForms)
+	if err != nil {
+		return err
+	}
+	toAdd, toDrop := diffExtTableFields(oldFields, newFields)
+	if len(toAdd) == 0 && len(toDrop) == 0 {
+		return nil
+	}
+	db, err := s.GetDatasourceConnection(ctx, form.DatasourceID)
+	if err != nil {
+		return err
+	}
+	if len(toAdd) > 0 {
+		if err := s.ddlProvider.AddTableColumns(ctx, db, form.PhysicalTableName, toAdd); err != nil {
+			return err
+		}
+	}
+	if len(toDrop) > 0 {
+		if err := s.ddlProvider.DropTableColumns(ctx, db, form.PhysicalTableName, toDrop); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *DataFillingService) writeCommitLog(ctx context.Context, formID int64, dataID string, operate int, userID int64, userName string, count int) error {
+	if s.commitLogRepo == nil {
+		return nil
+	}
+	return s.commitLogRepo.Create(ctx, &datafillingdomain.DfCommitLog{FormID: formID, DataID: dataID, Operate: operate, CommitBy: userID, Committer: userName, CommitTime: time.Now().UnixMilli(), Count: count})
+}
+
+func parseExtTableFields(raw string) ([]datafillingdomain.ExtTableField, error) {
+	if strings.TrimSpace(raw) == "" {
+		return []datafillingdomain.ExtTableField{}, nil
+	}
+	fields := make([]datafillingdomain.ExtTableField, 0)
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+		return nil, fmt.Errorf("parse form fields: %w", err)
+	}
+	return fields, nil
+}
+
+func diffExtTableFields(oldFields, newFields []datafillingdomain.ExtTableField) ([]datafillingdomain.ExtTableField, []string) {
+	oldMap := make(map[string]datafillingdomain.ExtTableField)
+	newMap := make(map[string]datafillingdomain.ExtTableField)
+	for _, field := range oldFields {
+		column := strings.TrimSpace(field.Settings.Mapping.ColumnName)
+		if column != "" && !field.Removed {
+			oldMap[column] = field
+		}
+	}
+	for _, field := range newFields {
+		column := strings.TrimSpace(field.Settings.Mapping.ColumnName)
+		if column != "" && !field.Removed {
+			newMap[column] = field
+		}
+	}
+	toAdd := make([]datafillingdomain.ExtTableField, 0)
+	toDrop := make([]string, 0)
+	for column, field := range newMap {
+		if _, ok := oldMap[column]; !ok {
+			toAdd = append(toAdd, field)
+		}
+	}
+	for column := range oldMap {
+		if _, ok := newMap[column]; !ok {
+			toDrop = append(toDrop, column)
+		}
+	}
+	sort.Slice(toAdd, func(i, j int) bool { return toAdd[i].Settings.Mapping.ColumnName < toAdd[j].Settings.Mapping.ColumnName })
+	sort.Strings(toDrop)
+	return toAdd, toDrop
+}
+
+func cleanRowIDs(ids []string) []string {
+	cleaned := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if trimmed := strings.TrimSpace(id); trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	return cleaned
 }
 
 func (s *DataFillingService) resolveLevel(ctx context.Context, pid int64) (int, error) {

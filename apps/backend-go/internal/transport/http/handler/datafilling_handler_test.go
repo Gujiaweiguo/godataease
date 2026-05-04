@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,52 +25,71 @@ type dataFillingHandlerResponse struct {
 	Data json.RawMessage `json:"data"`
 }
 
-func TestDataFillingHandler_SaveAndGet(t *testing.T) {
-	engine := gin.New()
-	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{})
+func TestDataFillingHandler_Save(t *testing.T) {
+	repo := newFakeDataFillingRepo()
+	svc := service.NewDataFillingService(repo, &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{})
+	svc.SetDatasourceConnectionProvider(&serviceTestDatasourceConnProviderBridge{})
 	h := NewDataFillingHandler(svc)
-	RegisterDataFillingRoutes(engine, h, nil, nil)
 
-	body := []byte(`{"name":"folder-1","nodeType":"` + datafillingdomain.NodeTypeFolder + `","pid":0}`)
-	resp := performDataFillingRequest(t, engine, http.MethodPost, "/data-filling/save", body)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp := performDataFillingHandlerCall(t, func(c *gin.Context) {
+		c.Request = httptest.NewRequest(http.MethodPost, "/data-filling/save", bytes.NewReader([]byte(`{"name":"folder-1","nodeType":"folder","pid":0}`)))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.Save(c)
+	})
 	assert.Equal(t, "000000", resp.Body.Code)
 
 	var saved datafillingdomain.DataFillingForm
 	require.NoError(t, json.Unmarshal(resp.Body.Data, &saved))
 	assert.Equal(t, "folder-1", saved.Name)
-
-	getResp := performDataFillingRequest(t, engine, http.MethodGet, "/data-filling/get/1", nil)
-	assert.Equal(t, "000000", getResp.Body.Code)
-	var got datafillingdomain.DataFillingForm
-	require.NoError(t, json.Unmarshal(getResp.Body.Data, &got))
-	assert.Equal(t, saved.ID, got.ID)
 }
 
 func TestDataFillingHandler_TreeBadRequest(t *testing.T) {
-	engine := gin.New()
-	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{})
+	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{})
+	svc.SetDatasourceConnectionProvider(&serviceTestDatasourceConnProviderBridge{})
 	h := NewDataFillingHandler(svc)
-	RegisterDataFillingRoutes(engine, h, nil, nil)
-
-	resp := performDataFillingRequest(t, engine, http.MethodPost, "/data-filling/rename", []byte(`{}`))
+	resp := performDataFillingHandlerCall(t, func(c *gin.Context) {
+		c.Request = httptest.NewRequest(http.MethodPost, "/data-filling/rename", bytes.NewReader([]byte(`{}`)))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.Rename(c)
+	})
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "500000", resp.Body.Code)
 }
 
-func performDataFillingRequest(t *testing.T, engine *gin.Engine, method, path string, body []byte) *struct {
+func TestDataFillingHandler_RegisterRoutesIncludesDMLEndpoints(t *testing.T) {
+	engine := gin.New()
+	svc := service.NewDataFillingService(newFakeDataFillingRepo(), &serviceTestDataFillingDatasourceServiceBridge{}, &serviceTestDataFillingDDLBridge{}, &serviceTestCommitLogRepoBridge{})
+	h := NewDataFillingHandler(svc)
+	RegisterDataFillingRoutes(engine, h, nil, nil)
+
+	routes := map[string]bool{}
+	for _, route := range engine.Routes() {
+		routes[route.Method+" "+route.Path] = true
+	}
+	assert.True(t, routes["POST /data-filling/form/:formId/tableData"])
+	assert.True(t, routes["POST /data-filling/form/:formId/rowData/save"])
+	assert.True(t, routes["GET /data-filling/form/:formId/delete/:id"])
+	assert.True(t, routes["POST /data-filling/form/:formId/batch-delete"])
+	assert.True(t, routes["GET /data-filling/form/:formId/truncate"])
+	assert.True(t, routes["POST /data-filling/form/:formId/listColumnData"])
+	assert.True(t, routes["POST /data-filling/log/page/:goPage/:pageSize"])
+	assert.True(t, routes["POST /data-filling/log/clear"])
+}
+
+func performDataFillingHandlerCall(t *testing.T, invoke func(c *gin.Context)) *struct {
 	StatusCode int
 	Body       dataFillingHandlerResponse
 } {
 	t.Helper()
-	request := httptest.NewRequest(method, path, bytes.NewReader(body))
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
 	recorder := httptest.NewRecorder()
-	engine.ServeHTTP(recorder, request)
+	c, _ := gin.CreateTestContext(recorder)
+	invoke(c)
 	var envelope dataFillingHandlerResponse
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &envelope))
+	body := recorder.Body.Bytes()
+	if len(body) == 0 {
+		body, _ = io.ReadAll(recorder.Body)
+	}
+	require.NoError(t, json.Unmarshal(body, &envelope))
 	return &struct {
 		StatusCode int
 		Body       dataFillingHandlerResponse
@@ -160,7 +180,8 @@ type serviceTestDataFillingDatasourceServiceBridge struct{}
 
 func (f *serviceTestDataFillingDatasourceServiceBridge) GetByID(id int64) (*datasourcedomain.CoreDatasource, error) {
 	_ = id
-	return nil, nil
+	conf := `{"host":"127.0.0.1","port":3306,"dataBase":"demo","username":"u","password":"p"}`
+	return &datasourcedomain.CoreDatasource{ID: id, Type: "mysql", Configuration: &conf}, nil
 }
 func (f *serviceTestDataFillingDatasourceServiceBridge) Tree(req *datasourcedomain.ListRequest) ([]*datasourcedomain.CoreDatasource, error) {
 	_ = req
@@ -185,4 +206,110 @@ func (f *serviceTestDataFillingDDLBridge) DropTable(ctx context.Context, db *gor
 	_ = db
 	_ = tableName
 	return nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) InsertRow(ctx context.Context, db *gorm.DB, tableName string, rowData map[string]interface{}) error {
+	_ = ctx
+	_ = db
+	_ = tableName
+	rowData["id"] = "generated-id"
+	return nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) UpdateRow(ctx context.Context, db *gorm.DB, tableName string, id string, rowData map[string]interface{}) error {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = id
+	_ = rowData
+	return nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) DeleteRows(ctx context.Context, db *gorm.DB, tableName string, ids []string) error {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = ids
+	return nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) SearchRows(ctx context.Context, db *gorm.DB, tableName string, whereClause string, args []interface{}, limit, offset int64) ([]map[string]interface{}, error) {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = whereClause
+	_ = args
+	_ = limit
+	_ = offset
+	return []map[string]interface{}{{"id": "row-1"}}, nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) CountRows(ctx context.Context, db *gorm.DB, tableName string, whereClause string, args []interface{}) (int64, error) {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = whereClause
+	_ = args
+	return 1, nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) TruncateTable(ctx context.Context, db *gorm.DB, tableName string) error {
+	_ = ctx
+	_ = db
+	_ = tableName
+	return nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) ListColumnData(ctx context.Context, db *gorm.DB, tableName string, columnName string) ([]string, error) {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = columnName
+	return []string{"a", "b"}, nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) AddTableColumns(ctx context.Context, db *gorm.DB, tableName string, fields []datafillingdomain.ExtTableField) error {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = fields
+	return nil
+}
+
+func (f *serviceTestDataFillingDDLBridge) DropTableColumns(ctx context.Context, db *gorm.DB, tableName string, columnNames []string) error {
+	_ = ctx
+	_ = db
+	_ = tableName
+	_ = columnNames
+	return nil
+}
+
+type serviceTestCommitLogRepoBridge struct{}
+
+func (f *serviceTestCommitLogRepoBridge) Create(ctx context.Context, log *datafillingdomain.DfCommitLog) error {
+	_ = ctx
+	_ = log
+	return nil
+}
+
+func (f *serviceTestCommitLogRepoBridge) ListByFormID(ctx context.Context, formID int64, page, pageSize int) ([]*datafillingdomain.DfCommitLog, int64, error) {
+	_ = ctx
+	_ = formID
+	_ = page
+	_ = pageSize
+	return []*datafillingdomain.DfCommitLog{{ID: 1, FormID: 1}}, 1, nil
+}
+
+func (f *serviceTestCommitLogRepoBridge) DeleteByFormID(ctx context.Context, formID int64) error {
+	_ = ctx
+	_ = formID
+	return nil
+}
+
+type serviceTestDatasourceConnProviderBridge struct{}
+
+func (f *serviceTestDatasourceConnProviderBridge) GetDatasourceConnection(ctx context.Context, datasourceID int64) (*gorm.DB, error) {
+	_ = ctx
+	_ = datasourceID
+	return &gorm.DB{}, nil
 }

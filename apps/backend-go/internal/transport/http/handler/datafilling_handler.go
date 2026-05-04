@@ -33,6 +33,14 @@ func RegisterDataFillingRoutes(r gin.IRouter, h *DataFillingHandler, authMiddlew
 	group.POST("/rename", h.Rename)
 	group.POST("/move", h.Move)
 	group.GET("/delete/:id", h.Delete)
+	group.POST("/form/:formId/tableData", h.TableData)
+	group.POST("/form/:formId/rowData/save", h.SaveRowData)
+	group.GET("/form/:formId/delete/:id", h.DeleteRowData)
+	group.POST("/form/:formId/batch-delete", h.BatchDeleteRowData)
+	group.GET("/form/:formId/truncate", h.TruncateTableData)
+	group.POST("/form/:formId/listColumnData", h.ListColumnData)
+	group.POST("/log/page/:goPage/:pageSize", h.LogPage)
+	group.POST("/log/clear", h.LogClear)
 	group.GET("/datasource/list", h.ListDatasourceList)
 	group.GET("/datasource/listAll", h.ListDatasourceListAll)
 	group.POST("/getBuiltInTables", h.GetBuiltInTables)
@@ -89,6 +97,141 @@ func (h *DataFillingHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.service.Delete(c.Request.Context(), id); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) TableData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	id, ok := parseIDParamBadRequest(c, "id")
+	if !ok {
+		return
+	}
+	var req datafillingdomain.TableDataRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.SearchTableData(c.Request.Context(), id, &req)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) SaveRowData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req map[string]interface{}
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.SaveRowData(c.Request.Context(), formID, req, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c))
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) DeleteRowData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	rowID := c.Param("id")
+	if err := h.service.DeleteRowData(c.Request.Context(), formID, rowID, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c)); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) BatchDeleteRowData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req datafillingdomain.BatchDeleteRowDataRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.BatchDeleteRowData(c.Request.Context(), formID, req.IDs, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c)); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) TruncateTableData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	if err := h.service.TruncateTableData(c.Request.Context(), formID); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *DataFillingHandler) ListColumnData(c *gin.Context) {
+	defer recoverServicePanic(c)
+	formID, ok := parseIDParamBadRequest(c, "formId")
+	if !ok {
+		return
+	}
+	var req datafillingdomain.ListColumnDataRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.service.ListColumnData(c.Request.Context(), formID, req.ColumnName)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *DataFillingHandler) LogPage(c *gin.Context) {
+	defer recoverServicePanic(c)
+	goPage, pageSize, ok := parseThresholdPageParams(c)
+	if !ok {
+		return
+	}
+	var req datafillingdomain.CommitLogPageRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	rows, total, err := h.service.ListCommitLogs(c.Request.Context(), req.FormID, goPage, pageSize)
+	if err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+	response.Success(c, gin.H{"records": rows, "total": total, "current": goPage, "size": pageSize})
+}
+
+func (h *DataFillingHandler) LogClear(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req datafillingdomain.ClearCommitLogRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.ClearCommitLogs(c.Request.Context(), req.FormID); err != nil {
 		response.Error(c, "500000", err.Error())
 		return
 	}

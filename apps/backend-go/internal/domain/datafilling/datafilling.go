@@ -26,6 +26,20 @@ type DataFillingForm struct {
 
 func (DataFillingForm) TableName() string { return "data_filling_forms" }
 
+// DfCommitLog is the GORM model for df_commit_log table.
+type DfCommitLog struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	FormID     int64  `gorm:"column:form_id;index" json:"formId"`
+	DataID     string `gorm:"column:data_id;type:varchar(64)" json:"dataId"`
+	Operate    int    `gorm:"column:operate" json:"operate"`
+	CommitBy   int64  `gorm:"column:commit_by" json:"commitBy"`
+	Committer  string `gorm:"column:committer;type:varchar(255)" json:"committer"`
+	CommitTime int64  `gorm:"column:commit_time" json:"commitTime"`
+	Count      int    `gorm:"column:count" json:"count"`
+}
+
+func (DfCommitLog) TableName() string { return "df_commit_log" }
+
 const (
 	NodeTypeFolder = "folder"
 	NodeTypeForm   = "form"
@@ -104,6 +118,48 @@ type CreateFormRequest struct {
 type UpdateFormRequest struct {
 	ID int64 `json:"id"`
 	CreateFormRequest
+}
+
+type TableDataRequest struct {
+	ID           int64         `json:"id"`
+	CurrentPage  int64         `json:"currentPage"`
+	PageSize     int64         `json:"pageSize"`
+	SearchParams []SearchParam `json:"searchParams"`
+}
+
+type SearchParam struct {
+	Term     string        `json:"term"`
+	Field    string        `json:"field"`
+	Value    interface{}   `json:"value"`
+	Values   []interface{} `json:"values"`
+	Multiple bool          `json:"multiple"`
+}
+
+type TableDataResponse struct {
+	Data        []map[string]interface{} `json:"data"`
+	Fields      string                   `json:"fields"`
+	Total       int64                    `json:"total"`
+	CurrentPage int64                    `json:"currentPage"`
+	PageSize    int64                    `json:"pageSize"`
+	Key         string                   `json:"key"`
+}
+
+type BatchDeleteRowDataRequest struct {
+	IDs []string `json:"ids"`
+}
+
+type ListColumnDataRequest struct {
+	ColumnName string `json:"columnName"`
+}
+
+type CommitLogPageRequest struct {
+	FormID  int64 `json:"formId"`
+	Operate *int  `json:"operate,omitempty"`
+}
+
+type ClearCommitLogRequest struct {
+	FormID    int64  `json:"formId"`
+	ClearType string `json:"clearType,omitempty"`
 }
 
 type RenameRequest struct {
