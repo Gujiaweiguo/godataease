@@ -327,6 +327,57 @@ type SubTaskUserItem struct {
 	Status     int    `json:"status"`
 }
 
+type UserTaskPageRequest struct {
+	Type     *int   `json:"type"`
+	TaskName string `json:"taskName"`
+}
+
+type UserTaskVO struct {
+	ID          int64  `json:"id"`
+	TaskID      int64  `json:"taskId"`
+	TaskName    string `json:"taskName"`
+	FormID      int64  `json:"formId"`
+	StartTime   int64  `json:"startTime"`
+	EndTime     int64  `json:"endTime"`
+	Status      int    `json:"status"`
+	FinishTime  *int64 `json:"finishTime"`
+	FillType    int    `json:"fillType"`
+	Expired     bool   `json:"expired"`
+	TotalCount  int64  `json:"totalCount"`
+	FinishCount int64  `json:"finishCount"`
+}
+
+type UserTaskData struct {
+	FormID         int64             `json:"formId"`
+	FormTitle      string            `json:"formTitle"`
+	DataIDs        []string          `json:"dataIds"`
+	SubInstances   []SubInstanceItem `json:"subInstances"`
+	Form           string            `json:"form"`
+	FormExtSetting string            `json:"formExtSetting"`
+	FillType       int               `json:"fillType"`
+}
+
+type SubInstanceItem struct {
+	ID         int64  `json:"id"`
+	TaskID     int64  `json:"taskId"`
+	PID        int64  `json:"pid"`
+	UID        int64  `json:"uid"`
+	FormID     int64  `json:"formId"`
+	DataID     string `json:"dataId"`
+	FinishTime *int64 `json:"finishTime"`
+	Status     int    `json:"status"`
+}
+
+type UserTaskSaveRequest struct {
+	SubTaskID int64                    `json:"subTaskId"`
+	Data      []map[string]interface{} `json:"data"`
+}
+
+type UserTaskDeleteRequest struct {
+	SubTaskID int64    `json:"subTaskId"`
+	DataIDs   []string `json:"dataIds"`
+}
+
 type ExecuteNowRequest struct {
 	TaskID int64 `json:"taskId"`
 }
