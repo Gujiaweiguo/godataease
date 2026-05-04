@@ -194,7 +194,7 @@ func TestDatasourceService_TreeAndSyncHelpers(t *testing.T) {
 	})
 }
 
-func TestDatasourceService_GetTableStatus(t *testing.T) {
+func TestDatasourceService_GetTableStatus_Unit(t *testing.T) {
 	svc, db := setupDatasourceServiceRepoTest(t)
 	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 1, DatasourceID: 9, Name: "Orders", PhysicalTableName: "orders", Type: "db"}).Error)
 	require.NoError(t, db.Create(&auto.CoreDatasetTable{ID: 2, DatasourceID: 9, Name: "Users", PhysicalTableName: "users", Type: "db"}).Error)
