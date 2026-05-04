@@ -304,81 +304,77 @@ func (s *DataFillingService) ClearCommitLogs(ctx context.Context, formID int64) 
 	return s.commitLogRepo.DeleteByFormID(ctx, formID)
 }
 
-func (s *DataFillingService) SaveTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64) (int64, error) {
-	if s.taskRepo == nil {
-		return 0, fmt.Errorf("task repository not configured")
+func marshalTaskLists(req *datafillingdomain.TaskSaveRequest) (reciFlagList, uidList, ridList string, err error) {
+	rf, err := json.Marshal(req.ReciFlagList)
+	if err != nil {
+		return "", "", "", err
 	}
-	if req == nil || req.FormID <= 0 || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.RateVal) == "" {
-		return 0, gorm.ErrInvalidData
+	ul, err := json.Marshal(req.UIDList)
+	if err != nil {
+		return "", "", "", err
 	}
-	if _, err := s.repo.GetByID(ctx, req.FormID); err != nil {
-		return 0, err
+	rl, err := json.Marshal(req.RIDList)
+	if err != nil {
+		return "", "", "", err
 	}
-	now := time.Now().UnixMilli()
-	reciFlagList, err := json.Marshal(req.ReciFlagList)
+	return string(rf), string(ul), string(rl), nil
+}
+
+func (s *DataFillingService) updateExistingTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64, reciFlagList, uidList, ridList string) (int64, error) {
+	current, err := s.taskRepo.GetTaskByID(ctx, *req.ID)
 	if err != nil {
 		return 0, err
 	}
-	uidList, err := json.Marshal(req.UIDList)
-	if err != nil {
+	wasStarted := current.Status == datafillingdomain.TaskStatusStarted
+	current.FormID = req.FormID
+	current.Name = strings.TrimSpace(req.Name)
+	current.ReciFlagList = reciFlagList
+	current.UIDList = uidList
+	current.RIDList = ridList
+	current.FillType = req.FillType
+	current.FitType = req.FitType
+	current.FitColumn = strings.TrimSpace(req.FitColumn)
+	current.RateType = req.RateType
+	current.RateVal = strings.TrimSpace(req.RateVal)
+	current.OneTimeType = req.OneTimeType
+	current.StartTime = req.StartTime
+	current.EndTime = req.EndTime
+	current.PublishRangeTime = req.PublishRangeTime
+	current.PublishRangeTimeType = req.PublishRangeTimeType
+	current.FormExtSetting = strings.TrimSpace(req.FormExtSetting)
+	current.FormFilterSetting = strings.TrimSpace(req.FormFilterSetting)
+	current.UpdateBy = userID
+	current.UpdateTime = time.Now().UnixMilli()
+	if wasStarted && s.scheduler != nil {
+		s.scheduler.UnregisterTask(current.ID)
+	}
+	if err := s.taskRepo.UpdateTask(ctx, current); err != nil {
 		return 0, err
 	}
-	ridList, err := json.Marshal(req.RIDList)
-	if err != nil {
-		return 0, err
-	}
-	if req.ID != nil && *req.ID > 0 {
-		current, err := s.taskRepo.GetTaskByID(ctx, *req.ID)
+	if wasStarted && s.scheduler != nil {
+		nextExecTime, err := s.scheduler.computeNextExecTime(current)
 		if err != nil {
 			return 0, err
 		}
-		wasStarted := current.Status == datafillingdomain.TaskStatusStarted
-		current.FormID = req.FormID
-		current.Name = strings.TrimSpace(req.Name)
-		current.ReciFlagList = string(reciFlagList)
-		current.UIDList = string(uidList)
-		current.RIDList = string(ridList)
-		current.FillType = req.FillType
-		current.FitType = req.FitType
-		current.FitColumn = strings.TrimSpace(req.FitColumn)
-		current.RateType = req.RateType
-		current.RateVal = strings.TrimSpace(req.RateVal)
-		current.OneTimeType = req.OneTimeType
-		current.StartTime = req.StartTime
-		current.EndTime = req.EndTime
-		current.PublishRangeTime = req.PublishRangeTime
-		current.PublishRangeTimeType = req.PublishRangeTimeType
-		current.FormExtSetting = strings.TrimSpace(req.FormExtSetting)
-		current.FormFilterSetting = strings.TrimSpace(req.FormFilterSetting)
-		current.UpdateBy = userID
-		current.UpdateTime = now
-		if wasStarted && s.scheduler != nil {
-			s.scheduler.UnregisterTask(current.ID)
-		}
+		current.NextExecTime = nextExecTime
 		if err := s.taskRepo.UpdateTask(ctx, current); err != nil {
 			return 0, err
 		}
-		if wasStarted && s.scheduler != nil {
-			nextExecTime, err := s.scheduler.computeNextExecTime(current)
-			if err != nil {
-				return 0, err
-			}
-			current.NextExecTime = nextExecTime
-			if err := s.taskRepo.UpdateTask(ctx, current); err != nil {
-				return 0, err
-			}
-			if err := s.scheduler.RegisterTask(ctx, current.ID); err != nil {
-				return 0, err
-			}
+		if err := s.scheduler.RegisterTask(ctx, current.ID); err != nil {
+			return 0, err
 		}
-		return current.ID, nil
 	}
+	return current.ID, nil
+}
+
+func (s *DataFillingService) createNewTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64, reciFlagList, uidList, ridList string) (int64, error) {
+	now := time.Now().UnixMilli()
 	task := &datafillingdomain.DataFillingTask{
 		FormID:               req.FormID,
 		Name:                 strings.TrimSpace(req.Name),
-		ReciFlagList:         string(reciFlagList),
-		UIDList:              string(uidList),
-		RIDList:              string(ridList),
+		ReciFlagList:         reciFlagList,
+		UIDList:              uidList,
+		RIDList:              ridList,
 		FillType:             req.FillType,
 		FitType:              req.FitType,
 		FitColumn:            strings.TrimSpace(req.FitColumn),
@@ -401,6 +397,26 @@ func (s *DataFillingService) SaveTask(ctx context.Context, req *datafillingdomai
 		return 0, err
 	}
 	return task.ID, nil
+}
+
+func (s *DataFillingService) SaveTask(ctx context.Context, req *datafillingdomain.TaskSaveRequest, userID int64) (int64, error) {
+	if s.taskRepo == nil {
+		return 0, fmt.Errorf("task repository not configured")
+	}
+	if req == nil || req.FormID <= 0 || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.RateVal) == "" {
+		return 0, gorm.ErrInvalidData
+	}
+	if _, err := s.repo.GetByID(ctx, req.FormID); err != nil {
+		return 0, err
+	}
+	reciFlagList, uidList, ridList, err := marshalTaskLists(req)
+	if err != nil {
+		return 0, err
+	}
+	if req.ID != nil && *req.ID > 0 {
+		return s.updateExistingTask(ctx, req, userID, reciFlagList, uidList, ridList)
+	}
+	return s.createNewTask(ctx, req, userID, reciFlagList, uidList, ridList)
 }
 
 func (s *DataFillingService) GetTaskInfo(ctx context.Context, taskID int64) (*datafillingdomain.TaskInfoVO, error) {

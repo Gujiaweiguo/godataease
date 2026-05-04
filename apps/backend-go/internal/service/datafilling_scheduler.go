@@ -136,31 +136,57 @@ func (s *DataFillingScheduler) UnregisterTask(taskID int64) {
 	delete(s.entries, taskID)
 }
 
-func (s *DataFillingScheduler) FireTask(ctx context.Context, taskID int64) error {
+func (s *DataFillingScheduler) validateFireTaskPreconditions(ctx context.Context, taskID int64) (*datafillingdomain.DataFillingTask, error) {
 	if s == nil || s.taskRepo == nil || s.subTaskRepo == nil || s.subInstanceRepo == nil {
-		return fmt.Errorf("task scheduler repositories not configured")
+		return nil, fmt.Errorf("task scheduler repositories not configured")
 	}
 	task, err := s.taskRepo.GetTaskByID(ctx, taskID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if task.FormID <= 0 {
-		return gorm.ErrInvalidData
+		return nil, gorm.ErrInvalidData
 	}
 	if s.formRepo != nil {
 		if _, err := s.formRepo.GetByID(ctx, task.FormID); err != nil {
-			return err
+			return nil, err
 		}
 	}
+	return task, nil
+}
+
+func (s *DataFillingScheduler) resolveUserIDs(ctx context.Context, task *datafillingdomain.DataFillingTask) ([]int64, error) {
 	uidList, err := parseJSONInt64List(task.UIDList)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ridList, err := parseJSONInt64List(task.RIDList)
 	if err != nil {
+		return nil, err
+	}
+	return s.resolveRecipients(ctx, uidList, ridList)
+}
+
+func buildSubInstances(taskID, subTaskID, formID int64, userIDs []int64) []*datafillingdomain.DataFillingSubInstance {
+	instances := make([]*datafillingdomain.DataFillingSubInstance, 0, len(userIDs))
+	for _, uid := range userIDs {
+		instances = append(instances, &datafillingdomain.DataFillingSubInstance{
+			TaskID: taskID,
+			PID:    subTaskID,
+			UID:    uid,
+			FormID: formID,
+			Status: datafillingdomain.SubInstanceStatusOpen,
+		})
+	}
+	return instances
+}
+
+func (s *DataFillingScheduler) FireTask(ctx context.Context, taskID int64) error {
+	task, err := s.validateFireTaskPreconditions(ctx, taskID)
+	if err != nil {
 		return err
 	}
-	userIDs, err := s.resolveRecipients(ctx, uidList, ridList)
+	userIDs, err := s.resolveUserIDs(ctx, task)
 	if err != nil {
 		return err
 	}
@@ -180,16 +206,7 @@ func (s *DataFillingScheduler) FireTask(ctx context.Context, taskID int64) error
 	if err := s.subTaskRepo.CreateSubTask(ctx, subTask); err != nil {
 		return err
 	}
-	instances := make([]*datafillingdomain.DataFillingSubInstance, 0, len(userIDs))
-	for _, uid := range userIDs {
-		instances = append(instances, &datafillingdomain.DataFillingSubInstance{
-			TaskID: task.ID,
-			PID:    subTask.ID,
-			UID:    uid,
-			FormID: task.FormID,
-			Status: datafillingdomain.SubInstanceStatusOpen,
-		})
-	}
+	instances := buildSubInstances(task.ID, subTask.ID, task.FormID, userIDs)
 	if err := s.subInstanceRepo.BatchCreateSubInstances(ctx, instances); err != nil {
 		return err
 	}
