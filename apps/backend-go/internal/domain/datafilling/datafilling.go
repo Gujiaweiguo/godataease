@@ -45,9 +45,9 @@ type DataFillingTask struct {
 	ID                   int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	FormID               int64  `gorm:"column:form_id;index" json:"formId"`
 	Name                 string `gorm:"column:name;type:varchar(255)" json:"name"`
-	ReciFlagList         string `gorm:"column:reci_flag_list;type:json" json:"reciFlagList"`
-	UIDList              string `gorm:"column:uid_list;type:json" json:"uidList"`
-	RIDList              string `gorm:"column:rid_list;type:json" json:"ridList"`
+	ReciFlagList         string `gorm:"column:reci_flag_list;type:longtext" json:"reciFlagList"`
+	UIDList              string `gorm:"column:uid_list;type:longtext" json:"uidList"`
+	RIDList              string `gorm:"column:rid_list;type:longtext" json:"ridList"`
 	FillType             int    `gorm:"column:fill_type" json:"fillType"`
 	FitType              int    `gorm:"column:fit_type" json:"fitType"`
 	FitColumn            string `gorm:"column:fit_column;type:varchar(255)" json:"fitColumn"`
