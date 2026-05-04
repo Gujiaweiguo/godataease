@@ -52,10 +52,12 @@ type TaskRepository interface {
 
 type SubTaskRepository interface {
 	CreateSubTask(ctx context.Context, subTask *datafillingdomain.DataFillingSubTask) error
+	GetSubTaskByID(ctx context.Context, subTaskID int64) (*datafillingdomain.DataFillingSubTask, error)
 	UpdateSubTaskCounts(ctx context.Context, subTaskID int64, totalCount, unfinishedCount, totalUserCount, unfinishedUserCount int) error
 	ListSubTasksByTaskID(ctx context.Context, taskID int64, page, pageSize int) ([]*datafillingdomain.DataFillingSubTask, int64, error)
 	DeleteSubTasksByIDs(ctx context.Context, subTaskIDs []int64) error
 	ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs []int64) ([]int64, error)
+	DecrementSubTaskUnfinishedCount(ctx context.Context, subTaskID int64) error
 }
 
 type SubInstanceRepository interface {
@@ -64,6 +66,11 @@ type SubInstanceRepository interface {
 	DeleteSubInstancesByPIDs(ctx context.Context, pids []int64) error
 	DeleteSubInstancesByTaskIDs(ctx context.Context, taskIDs []int64) error
 	ListSubInstancesByPID(ctx context.Context, pid int64, statusFilter *int) ([]*datafillingdomain.DataFillingSubInstance, error)
+	ListSubInstancesByUID(ctx context.Context, uid int64, page, pageSize int, req *datafillingdomain.UserTaskPageRequest) ([]*datafillingdomain.UserTaskVO, int64, error)
+	CountOpenSubInstancesByUID(ctx context.Context, uid int64) (int64, error)
+	GetSubInstanceByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingSubInstance, error)
+	GetSubInstanceByPIDAndUID(ctx context.Context, pid, uid int64) ([]*datafillingdomain.DataFillingSubInstance, error)
+	UpdateSubInstanceStatus(ctx context.Context, id int64, status int, finishTime int64) error
 }
 
 type DataFillingService struct {
@@ -575,6 +582,135 @@ func (s *DataFillingService) SubTaskUsersList(ctx context.Context, subTaskID int
 	return result, nil
 }
 
+func (s *DataFillingService) UserTaskPageList(ctx context.Context, userID int64, page, pageSize int, req *datafillingdomain.UserTaskPageRequest) ([]*datafillingdomain.UserTaskVO, int64, error) {
+	if s.subInstanceRepo == nil || userID <= 0 || page <= 0 || pageSize <= 0 {
+		return nil, 0, gorm.ErrInvalidData
+	}
+	rows, total, err := s.subInstanceRepo.ListSubInstancesByUID(ctx, userID, page, pageSize, req)
+	if err != nil {
+		return nil, 0, err
+	}
+	now := time.Now().UnixMilli()
+	for _, row := range rows {
+		if row != nil {
+			row.Expired = row.EndTime > 0 && row.EndTime < now
+		}
+	}
+	return rows, total, nil
+}
+
+func (s *DataFillingService) UserTaskTodoCount(ctx context.Context, userID int64) (int64, error) {
+	if s.subInstanceRepo == nil || userID <= 0 {
+		return 0, gorm.ErrInvalidData
+	}
+	return s.subInstanceRepo.CountOpenSubInstancesByUID(ctx, userID)
+}
+
+func (s *DataFillingService) GetUserTaskData(ctx context.Context, userID, subTaskID int64) (*datafillingdomain.UserTaskData, error) {
+	if s.subInstanceRepo == nil || s.subTaskRepo == nil || s.taskRepo == nil || userID <= 0 || subTaskID <= 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	instances, err := s.subInstanceRepo.GetSubInstanceByPIDAndUID(ctx, subTaskID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	subTask, err := s.getSubTaskByID(ctx, subTaskID)
+	if err != nil {
+		return nil, err
+	}
+	task, err := s.taskRepo.GetTaskByID(ctx, subTask.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	form, err := s.repo.GetByID(ctx, task.FormID)
+	if err != nil {
+		return nil, err
+	}
+	dataIDs := make([]string, 0, len(instances))
+	subInstances := make([]datafillingdomain.SubInstanceItem, 0, len(instances))
+	for _, instance := range instances {
+		if instance == nil {
+			continue
+		}
+		if trimmed := strings.TrimSpace(instance.DataID); trimmed != "" {
+			dataIDs = append(dataIDs, trimmed)
+		}
+		subInstances = append(subInstances, buildSubInstanceItem(instance))
+	}
+	return &datafillingdomain.UserTaskData{
+		FormID:         form.ID,
+		FormTitle:      form.Name,
+		DataIDs:        dataIDs,
+		SubInstances:   subInstances,
+		Form:           form.Forms,
+		FormExtSetting: task.FormExtSetting,
+		FillType:       task.FillType,
+	}, nil
+}
+
+func (s *DataFillingService) SaveUserTaskData(ctx context.Context, userID, subTaskID int64, data []map[string]interface{}) error {
+	if len(data) == 0 {
+		return gorm.ErrInvalidData
+	}
+	instanceSet, form, err := s.loadUserTaskForm(ctx, userID, subTaskID)
+	if err != nil {
+		return err
+	}
+	for _, row := range data {
+		if len(row) == 0 {
+			return gorm.ErrInvalidData
+		}
+		if _, err := s.SaveRowData(ctx, form.ID, row, userID, ""); err != nil {
+			return err
+		}
+	}
+	return s.finishUserTaskIfOpen(ctx, instanceSet)
+}
+
+func (s *DataFillingService) AppendUserTaskData(ctx context.Context, userID, subTaskID int64, data []map[string]interface{}) error {
+	if len(data) == 0 {
+		return gorm.ErrInvalidData
+	}
+	instanceSet, form, err := s.loadUserTaskForm(ctx, userID, subTaskID)
+	if err != nil {
+		return err
+	}
+	_, db, err := s.loadFormAndDatasource(ctx, form.ID)
+	if err != nil {
+		return err
+	}
+	for _, row := range data {
+		if len(row) == 0 {
+			return gorm.ErrInvalidData
+		}
+		delete(row, "id")
+		if err := s.ddlProvider.InsertRow(ctx, db, form.PhysicalTableName, row); err != nil {
+			return err
+		}
+	}
+	return s.finishUserTaskIfOpen(ctx, instanceSet)
+}
+
+func (s *DataFillingService) DeleteUserTaskData(ctx context.Context, userID, subTaskID int64, dataIDs []string) error {
+	cleaned := cleanRowIDs(dataIDs)
+	if len(cleaned) == 0 {
+		return gorm.ErrInvalidData
+	}
+	_, form, err := s.loadUserTaskForm(ctx, userID, subTaskID)
+	if err != nil {
+		return err
+	}
+	for _, dataID := range cleaned {
+		if err := s.DeleteRowData(ctx, form.ID, dataID, userID, ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *DataFillingService) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return gorm.ErrInvalidData
@@ -819,6 +955,89 @@ func cleanRowIDs(ids []string) []string {
 		}
 	}
 	return cleaned
+}
+
+func (s *DataFillingService) getSubTaskByID(ctx context.Context, subTaskID int64) (*datafillingdomain.DataFillingSubTask, error) {
+	return s.subTaskRepo.GetSubTaskByID(ctx, subTaskID)
+}
+
+type userTaskInstanceSet struct {
+	current   *datafillingdomain.DataFillingSubInstance
+	instances []*datafillingdomain.DataFillingSubInstance
+	subTaskID int64
+}
+
+func (s *DataFillingService) loadUserTaskForm(ctx context.Context, userID, subTaskID int64) (*userTaskInstanceSet, *datafillingdomain.DataFillingForm, error) {
+	if s.subInstanceRepo == nil || s.taskRepo == nil || userID <= 0 || subTaskID <= 0 {
+		return nil, nil, gorm.ErrInvalidData
+	}
+	instances, err := s.subInstanceRepo.GetSubInstanceByPIDAndUID(ctx, subTaskID, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(instances) == 0 {
+		return nil, nil, gorm.ErrRecordNotFound
+	}
+	current := firstActiveSubInstance(instances)
+	if current == nil {
+		current = instances[0]
+	}
+	task, err := s.taskRepo.GetTaskByID(ctx, current.TaskID)
+	if err != nil {
+		return nil, nil, err
+	}
+	form, err := s.repo.GetByID(ctx, task.FormID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &userTaskInstanceSet{current: current, instances: instances, subTaskID: subTaskID}, form, nil
+}
+
+func firstActiveSubInstance(instances []*datafillingdomain.DataFillingSubInstance) *datafillingdomain.DataFillingSubInstance {
+	for _, instance := range instances {
+		if instance != nil && instance.Status == datafillingdomain.SubInstanceStatusOpen {
+			return instance
+		}
+	}
+	return nil
+}
+
+func (s *DataFillingService) finishUserTaskIfOpen(ctx context.Context, instanceSet *userTaskInstanceSet) error {
+	if instanceSet == nil || instanceSet.current == nil {
+		return gorm.ErrInvalidData
+	}
+	if instanceSet.current.Status != datafillingdomain.SubInstanceStatusOpen {
+		return nil
+	}
+	finishTime := time.Now().UnixMilli()
+	if err := s.subInstanceRepo.UpdateSubInstanceStatus(ctx, instanceSet.current.ID, datafillingdomain.SubInstanceStatusFinished, finishTime); err != nil {
+		return err
+	}
+	if s.subTaskRepo != nil {
+		if err := s.subTaskRepo.DecrementSubTaskUnfinishedCount(ctx, instanceSet.subTaskID); err != nil {
+			return err
+		}
+	}
+	instanceSet.current.Status = datafillingdomain.SubInstanceStatusFinished
+	instanceSet.current.FinishTime = finishTime
+	return nil
+}
+
+func buildSubInstanceItem(instance *datafillingdomain.DataFillingSubInstance) datafillingdomain.SubInstanceItem {
+	item := datafillingdomain.SubInstanceItem{
+		ID:     instance.ID,
+		TaskID: instance.TaskID,
+		PID:    instance.PID,
+		UID:    instance.UID,
+		FormID: instance.FormID,
+		DataID: instance.DataID,
+		Status: instance.Status,
+	}
+	if instance.FinishTime > 0 {
+		finishTime := instance.FinishTime
+		item.FinishTime = &finishTime
+	}
+	return item
 }
 
 func (s *DataFillingService) resolveLevel(ctx context.Context, pid int64) (int, error) {

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	datafillingdomain "dataease/backend/internal/domain/datafilling"
 
@@ -19,10 +21,12 @@ type TaskRepositoryInterface interface {
 
 type SubTaskRepositoryInterface interface {
 	CreateSubTask(ctx context.Context, subTask *datafillingdomain.DataFillingSubTask) error
+	GetSubTaskByID(ctx context.Context, subTaskID int64) (*datafillingdomain.DataFillingSubTask, error)
 	UpdateSubTaskCounts(ctx context.Context, subTaskID int64, totalCount, unfinishedCount, totalUserCount, unfinishedUserCount int) error
 	ListSubTasksByTaskID(ctx context.Context, taskID int64, page, pageSize int) ([]*datafillingdomain.DataFillingSubTask, int64, error)
 	DeleteSubTasksByIDs(ctx context.Context, subTaskIDs []int64) error
 	ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs []int64) ([]int64, error)
+	DecrementSubTaskUnfinishedCount(ctx context.Context, subTaskID int64) error
 }
 
 type SubInstanceRepositoryInterface interface {
@@ -31,6 +35,11 @@ type SubInstanceRepositoryInterface interface {
 	DeleteSubInstancesByPIDs(ctx context.Context, pids []int64) error
 	DeleteSubInstancesByTaskIDs(ctx context.Context, taskIDs []int64) error
 	ListSubInstancesByPID(ctx context.Context, pid int64, statusFilter *int) ([]*datafillingdomain.DataFillingSubInstance, error)
+	ListSubInstancesByUID(ctx context.Context, uid int64, page, pageSize int, req *datafillingdomain.UserTaskPageRequest) ([]*datafillingdomain.UserTaskVO, int64, error)
+	CountOpenSubInstancesByUID(ctx context.Context, uid int64) (int64, error)
+	GetSubInstanceByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingSubInstance, error)
+	GetSubInstanceByPIDAndUID(ctx context.Context, pid, uid int64) ([]*datafillingdomain.DataFillingSubInstance, error)
+	UpdateSubInstanceStatus(ctx context.Context, id int64, status int, finishTime int64) error
 }
 
 var _ TaskRepositoryInterface = (*TaskRepository)(nil)
@@ -103,6 +112,14 @@ func (r *SubTaskRepository) CreateSubTask(ctx context.Context, subTask *datafill
 	return r.db.WithContext(ctx).Create(subTask).Error
 }
 
+func (r *SubTaskRepository) GetSubTaskByID(ctx context.Context, subTaskID int64) (*datafillingdomain.DataFillingSubTask, error) {
+	var subTask datafillingdomain.DataFillingSubTask
+	if err := r.db.WithContext(ctx).Where("id = ?", subTaskID).First(&subTask).Error; err != nil {
+		return nil, err
+	}
+	return &subTask, nil
+}
+
 func (r *SubTaskRepository) UpdateSubTaskCounts(ctx context.Context, subTaskID int64, totalCount, unfinishedCount, totalUserCount, unfinishedUserCount int) error {
 	return r.db.WithContext(ctx).Model(&datafillingdomain.DataFillingSubTask{}).Where("id = ?", subTaskID).Updates(map[string]any{
 		"total_count":           totalCount,
@@ -143,6 +160,16 @@ func (r *SubTaskRepository) ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs
 	rows := make([]int64, 0)
 	err := r.db.WithContext(ctx).Model(&datafillingdomain.DataFillingSubTask{}).Where("task_id IN ?", taskIDs).Pluck("id", &rows).Error
 	return rows, err
+}
+
+func (r *SubTaskRepository) DecrementSubTaskUnfinishedCount(ctx context.Context, subTaskID int64) error {
+	return r.db.WithContext(ctx).
+		Model(&datafillingdomain.DataFillingSubTask{}).
+		Where("id = ? AND unfinished_count > 0", subTaskID).
+		Updates(map[string]any{
+			"unfinished_count":      gorm.Expr("unfinished_count - 1"),
+			"unfinished_user_count": gorm.Expr("CASE WHEN unfinished_user_count > 0 THEN unfinished_user_count - 1 ELSE 0 END"),
+		}).Error
 }
 
 type SubInstanceRepository struct {
@@ -186,4 +213,86 @@ func (r *SubInstanceRepository) ListSubInstancesByPID(ctx context.Context, pid i
 	rows := make([]*datafillingdomain.DataFillingSubInstance, 0)
 	err := query.Order("id ASC").Find(&rows).Error
 	return rows, err
+}
+
+func (r *SubInstanceRepository) ListSubInstancesByUID(ctx context.Context, uid int64, page, pageSize int, req *datafillingdomain.UserTaskPageRequest) ([]*datafillingdomain.UserTaskVO, int64, error) {
+	query := r.db.WithContext(ctx).
+		Table("data_filling_sub_instance si").
+		Joins("INNER JOIN data_filling_sub_task st ON si.pid = st.id").
+		Joins("INNER JOIN data_filling_task t ON st.task_id = t.id").
+		Where("si.uid = ?", uid)
+	if req != nil {
+		if req.Type != nil {
+			query = query.Where("si.status = ?", *req.Type)
+		}
+		if keyword := strings.TrimSpace(req.TaskName); keyword != "" {
+			query = query.Where("t.name LIKE ?", "%"+keyword+"%")
+		}
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	offset := 0
+	if page > 1 {
+		offset = (page - 1) * pageSize
+	}
+	rows := make([]*datafillingdomain.UserTaskVO, 0)
+	err := query.Select([]string{
+		"si.id AS id",
+		"st.task_id AS task_id",
+		"t.name AS task_name",
+		"t.form_id AS form_id",
+		"st.start_time AS start_time",
+		"st.end_time AS end_time",
+		"si.status AS status",
+		"NULLIF(si.finish_time, 0) AS finish_time",
+		"t.fill_type AS fill_type",
+		"st.total_count AS total_count",
+		"(st.total_count - st.unfinished_count) AS finish_count",
+		"0 AS expired",
+	}).
+		Order("st.start_time DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	now := time.Now().UnixMilli()
+	for _, row := range rows {
+		if row != nil {
+			row.Expired = row.EndTime > 0 && row.EndTime < now
+		}
+	}
+	return rows, total, nil
+}
+
+func (r *SubInstanceRepository) CountOpenSubInstancesByUID(ctx context.Context, uid int64) (int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).Model(&datafillingdomain.DataFillingSubInstance{}).
+		Where("uid = ? AND status = ?", uid, datafillingdomain.SubInstanceStatusOpen).
+		Count(&total).Error
+	return total, err
+}
+
+func (r *SubInstanceRepository) GetSubInstanceByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingSubInstance, error) {
+	var instance datafillingdomain.DataFillingSubInstance
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&instance).Error; err != nil {
+		return nil, err
+	}
+	return &instance, nil
+}
+
+func (r *SubInstanceRepository) GetSubInstanceByPIDAndUID(ctx context.Context, pid, uid int64) ([]*datafillingdomain.DataFillingSubInstance, error) {
+	rows := make([]*datafillingdomain.DataFillingSubInstance, 0)
+	err := r.db.WithContext(ctx).Where("pid = ? AND uid = ?", pid, uid).Order("id ASC").Find(&rows).Error
+	return rows, err
+}
+
+func (r *SubInstanceRepository) UpdateSubInstanceStatus(ctx context.Context, id int64, status int, finishTime int64) error {
+	return r.db.WithContext(ctx).
+		Model(&datafillingdomain.DataFillingSubInstance{}).
+		Where("id = ?", id).
+		Updates(map[string]any{"status": status, "finish_time": finishTime}).Error
 }

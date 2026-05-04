@@ -150,6 +150,7 @@ type Router struct {
 	resourceGovernanceHandler      *handler.ResourceGovernanceHandler
 	thresholdHandler               *handler.ThresholdHandler
 	dataFillingHandler             *handler.DataFillingHandler
+	dataFillingUserTaskHandler     *handler.UserTaskHandler
 	menuAuthMiddleware             *middleware.MenuAuthMiddleware
 	scheduler                      *scheduler.Scheduler
 	dataFillingScheduler           *service.DataFillingScheduler
@@ -403,6 +404,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	dataFillingScheduler := service.NewDataFillingScheduler(taskRepo, subTaskRepo, subInstanceRepo, dataFillingRepo)
 	dataFillingService := service.NewDataFillingService(dataFillingRepo, datasourceService, service.NewMySQLDDLProvider(), commitLogRepo, taskRepo, subTaskRepo, subInstanceRepo, dataFillingScheduler)
 	dataFillingHandler := handler.NewDataFillingHandler(dataFillingService)
+	dataFillingUserTaskHandler := handler.NewUserTaskHandler(dataFillingService)
 
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
 	visualService.SetDatasetRepository(datasetRepo)
@@ -475,6 +477,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 		resourceGovernanceHandler:      resourceGovernanceHandler,
 		thresholdHandler:               thresholdHandler,
 		dataFillingHandler:             dataFillingHandler,
+		dataFillingUserTaskHandler:     dataFillingUserTaskHandler,
 		menuAuthMiddleware:             menuAuthMiddleware,
 		scheduler:                      jobScheduler,
 		dataFillingScheduler:           dataFillingScheduler,
@@ -757,6 +760,8 @@ func (r *Router) registerAPIRoutes() {
 		handler.RegisterThresholdRoutes(thresholdDe2API, r.thresholdHandler, nil, thresholdMenuAuth)
 		handler.RegisterDataFillingRoutes(dataFillingAPI, r.dataFillingHandler, nil, nil)
 		handler.RegisterDataFillingRoutes(dataFillingDe2API, r.dataFillingHandler, nil, nil)
+		handler.RegisterDataFillingUserTaskRoutes(dataFillingAPI, r.dataFillingUserTaskHandler, nil, nil)
+		handler.RegisterDataFillingUserTaskRoutes(dataFillingDe2API, r.dataFillingUserTaskHandler, nil, nil)
 		handler.RegisterEngineRoutes(api, r.engineHandler)
 		handler.RegisterDriverRoutes(api, r.driverHandler)
 		handler.RegisterTemplateRoutes(api, r.templateHandler)

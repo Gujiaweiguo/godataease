@@ -60,12 +60,15 @@ type fakeTaskRepo struct {
 }
 
 type fakeSubTaskRepo struct {
-	records map[int64]*datafillingdomain.DataFillingSubTask
-	nextID  int64
+	records     map[int64]*datafillingdomain.DataFillingSubTask
+	nextID      int64
+	decremented []int64
 }
 
 type fakeSubInstanceRepo struct {
-	records []*datafillingdomain.DataFillingSubInstance
+	records           []*datafillingdomain.DataFillingSubInstance
+	statusUpdates     []int64
+	statusUpdateValue []int
 }
 
 func newFakeDataFillingRepo() *fakeDataFillingRepo {
@@ -403,6 +406,16 @@ func (r *fakeSubTaskRepo) CreateSubTask(ctx context.Context, subTask *datafillin
 	return nil
 }
 
+func (r *fakeSubTaskRepo) GetSubTaskByID(ctx context.Context, subTaskID int64) (*datafillingdomain.DataFillingSubTask, error) {
+	_ = ctx
+	row, ok := r.records[subTaskID]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	cloned := *row
+	return &cloned, nil
+}
+
 func (r *fakeSubTaskRepo) UpdateSubTaskCounts(ctx context.Context, subTaskID int64, totalCount, unfinishedCount, totalUserCount, unfinishedUserCount int) error {
 	_ = ctx
 	row, ok := r.records[subTaskID]
@@ -463,6 +476,22 @@ func (r *fakeSubTaskRepo) ListSubTaskIDsByTaskIDs(ctx context.Context, taskIDs [
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	return result, nil
+}
+
+func (r *fakeSubTaskRepo) DecrementSubTaskUnfinishedCount(ctx context.Context, subTaskID int64) error {
+	_ = ctx
+	row, ok := r.records[subTaskID]
+	if !ok {
+		return gorm.ErrRecordNotFound
+	}
+	if row.UnfinishedCount > 0 {
+		row.UnfinishedCount--
+	}
+	if row.UnfinishedUserCount > 0 {
+		row.UnfinishedUserCount--
+	}
+	r.decremented = append(r.decremented, subTaskID)
+	return nil
 }
 
 func (r *fakeSubInstanceRepo) BatchCreateSubInstances(ctx context.Context, instances []*datafillingdomain.DataFillingSubInstance) error {
@@ -527,6 +556,80 @@ func (r *fakeSubInstanceRepo) ListSubInstancesByPID(ctx context.Context, pid int
 		rows = append(rows, &cloned)
 	}
 	return rows, nil
+}
+
+func (r *fakeSubInstanceRepo) ListSubInstancesByUID(ctx context.Context, uid int64, page, pageSize int, req *datafillingdomain.UserTaskPageRequest) ([]*datafillingdomain.UserTaskVO, int64, error) {
+	_ = ctx
+	_ = page
+	_ = pageSize
+	result := make([]*datafillingdomain.UserTaskVO, 0)
+	for _, row := range r.records {
+		if row.UID != uid {
+			continue
+		}
+		if req != nil && req.Type != nil && row.Status != *req.Type {
+			continue
+		}
+		finishCount := int64(0)
+		if row.Status == datafillingdomain.SubInstanceStatusFinished {
+			finishCount = 1
+		}
+		var finishTime *int64
+		if row.FinishTime > 0 {
+			value := row.FinishTime
+			finishTime = &value
+		}
+		result = append(result, &datafillingdomain.UserTaskVO{ID: row.ID, TaskID: row.TaskID, FormID: row.FormID, Status: row.Status, FinishTime: finishTime, TotalCount: 1, FinishCount: finishCount})
+	}
+	return result, int64(len(result)), nil
+}
+
+func (r *fakeSubInstanceRepo) CountOpenSubInstancesByUID(ctx context.Context, uid int64) (int64, error) {
+	_ = ctx
+	var total int64
+	for _, row := range r.records {
+		if row.UID == uid && row.Status == datafillingdomain.SubInstanceStatusOpen {
+			total++
+		}
+	}
+	return total, nil
+}
+
+func (r *fakeSubInstanceRepo) GetSubInstanceByID(ctx context.Context, id int64) (*datafillingdomain.DataFillingSubInstance, error) {
+	_ = ctx
+	for _, row := range r.records {
+		if row.ID == id {
+			cloned := *row
+			return &cloned, nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (r *fakeSubInstanceRepo) GetSubInstanceByPIDAndUID(ctx context.Context, pid, uid int64) ([]*datafillingdomain.DataFillingSubInstance, error) {
+	_ = ctx
+	rows := make([]*datafillingdomain.DataFillingSubInstance, 0)
+	for _, row := range r.records {
+		if row.PID == pid && row.UID == uid {
+			cloned := *row
+			rows = append(rows, &cloned)
+		}
+	}
+	return rows, nil
+}
+
+func (r *fakeSubInstanceRepo) UpdateSubInstanceStatus(ctx context.Context, id int64, status int, finishTime int64) error {
+	_ = ctx
+	for _, row := range r.records {
+		if row.ID == id {
+			row.Status = status
+			row.FinishTime = finishTime
+			r.statusUpdates = append(r.statusUpdates, id)
+			r.statusUpdateValue = append(r.statusUpdateValue, status)
+			return nil
+		}
+	}
+	return gorm.ErrRecordNotFound
 }
 
 func TestDataFillingService_SaveFolderSkipsDDL(t *testing.T) {
@@ -710,6 +813,91 @@ func TestDataFillingService_TaskLifecycle(t *testing.T) {
 	assert.Empty(t, taskRepo.records)
 	assert.Empty(t, subTaskRepo.records)
 	assert.Empty(t, subInstanceRepo.records)
+}
+
+func TestDataFillingService_SaveUserTaskData_TransitionsOpenInstance(t *testing.T) {
+	formRepo := newFakeDataFillingRepo()
+	formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_demo", DatasourceID: 8, Forms: "[]"}
+	taskRepo := newFakeTaskRepo()
+	taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1, FillType: 0}
+	subTaskRepo := newFakeSubTaskRepo()
+	subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1, UnfinishedCount: 1, UnfinishedUserCount: 1}
+	subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, PID: 10, UID: 9, FormID: 1, Status: datafillingdomain.SubInstanceStatusOpen}}}
+	ddl := &fakeDDLProvider{}
+	svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, ddl, &fakeCommitLogRepo{}, taskRepo, subTaskRepo, subInstanceRepo, nil)
+	svc.datasourceConnProvider = &fakeDatasourceConnProvider{}
+
+	err := svc.SaveUserTaskData(context.Background(), 9, 10, []map[string]interface{}{{"name": "alice"}})
+	require.NoError(t, err)
+	assert.Len(t, ddl.insertedRows, 1)
+	assert.Equal(t, []int64{100}, subInstanceRepo.statusUpdates)
+	assert.Equal(t, datafillingdomain.SubInstanceStatusFinished, subInstanceRepo.records[0].Status)
+	assert.Equal(t, []int64{10}, subTaskRepo.decremented)
+}
+
+func TestDataFillingService_SaveUserTaskData_ReSaveFinishedInstance(t *testing.T) {
+	formRepo := newFakeDataFillingRepo()
+	formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_demo", DatasourceID: 8, Forms: "[]"}
+	taskRepo := newFakeTaskRepo()
+	taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1}
+	subTaskRepo := newFakeSubTaskRepo()
+	subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1, UnfinishedCount: 0, UnfinishedUserCount: 0}
+	subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, PID: 10, UID: 9, FormID: 1, Status: datafillingdomain.SubInstanceStatusFinished, FinishTime: 123}}}
+	ddl := &fakeDDLProvider{}
+	svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, ddl, &fakeCommitLogRepo{}, taskRepo, subTaskRepo, subInstanceRepo, nil)
+	svc.datasourceConnProvider = &fakeDatasourceConnProvider{}
+
+	err := svc.SaveUserTaskData(context.Background(), 9, 10, []map[string]interface{}{{"id": "row-1", "name": "updated"}})
+	require.NoError(t, err)
+	assert.Len(t, ddl.updatedRows, 1)
+	assert.Empty(t, subInstanceRepo.statusUpdates)
+	assert.Empty(t, subTaskRepo.decremented)
+}
+
+func TestDataFillingService_SaveUserTaskData_RejectsWrongUID(t *testing.T) {
+	svc := NewDataFillingService(newFakeDataFillingRepo(), &fakeDataFillingDatasourceService{}, &fakeDDLProvider{}, &fakeCommitLogRepo{}, newFakeTaskRepo(), newFakeSubTaskRepo(), &fakeSubInstanceRepo{}, nil)
+	err := svc.SaveUserTaskData(context.Background(), 99, 10, []map[string]interface{}{{"name": "alice"}})
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func TestDataFillingService_AppendUserTaskData_AppendsAndTransitions(t *testing.T) {
+	formRepo := newFakeDataFillingRepo()
+	formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_demo", DatasourceID: 8, Forms: "[]"}
+	taskRepo := newFakeTaskRepo()
+	taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1}
+	subTaskRepo := newFakeSubTaskRepo()
+	subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1, UnfinishedCount: 1, UnfinishedUserCount: 1}
+	subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, PID: 10, UID: 9, FormID: 1, Status: datafillingdomain.SubInstanceStatusOpen}}}
+	ddl := &fakeDDLProvider{}
+	svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, ddl, &fakeCommitLogRepo{}, taskRepo, subTaskRepo, subInstanceRepo, nil)
+	svc.datasourceConnProvider = &fakeDatasourceConnProvider{}
+
+	err := svc.AppendUserTaskData(context.Background(), 9, 10, []map[string]interface{}{{"name": "alice"}})
+	require.NoError(t, err)
+	assert.Len(t, ddl.insertedRows, 1)
+	assert.Equal(t, []int64{100}, subInstanceRepo.statusUpdates)
+	assert.Equal(t, []int64{10}, subTaskRepo.decremented)
+}
+
+func TestDataFillingService_DeleteUserTaskData(t *testing.T) {
+	formRepo := newFakeDataFillingRepo()
+	formRepo.records[1] = &datafillingdomain.DataFillingForm{ID: 1, Name: "form", NodeType: datafillingdomain.NodeTypeForm, PhysicalTableName: "df_demo", DatasourceID: 8, Forms: "[]"}
+	taskRepo := newFakeTaskRepo()
+	taskRepo.records[1] = &datafillingdomain.DataFillingTask{ID: 1, FormID: 1}
+	subTaskRepo := newFakeSubTaskRepo()
+	subTaskRepo.records[10] = &datafillingdomain.DataFillingSubTask{ID: 10, TaskID: 1}
+	subInstanceRepo := &fakeSubInstanceRepo{records: []*datafillingdomain.DataFillingSubInstance{{ID: 100, TaskID: 1, PID: 10, UID: 9, FormID: 1, Status: datafillingdomain.SubInstanceStatusFinished}}}
+	ddl := &fakeDDLProvider{}
+	svc := NewDataFillingService(formRepo, &fakeDataFillingDatasourceService{}, ddl, &fakeCommitLogRepo{}, taskRepo, subTaskRepo, subInstanceRepo, nil)
+	svc.datasourceConnProvider = &fakeDatasourceConnProvider{}
+
+	err := svc.DeleteUserTaskData(context.Background(), 9, 10, []string{"row-1", "row-2"})
+	require.NoError(t, err)
+	assert.Equal(t, [][]string{{"row-1"}, {"row-2"}}, ddl.deletedBatches)
+	assert.Empty(t, subInstanceRepo.statusUpdates)
+
+	err = svc.DeleteUserTaskData(context.Background(), 99, 10, []string{"row-1"})
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func TestDataFillingScheduler_ComputeNextExecTime(t *testing.T) {
