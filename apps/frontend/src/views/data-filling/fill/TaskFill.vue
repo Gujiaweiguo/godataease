@@ -15,6 +15,7 @@ import {
 } from '@/api/datafilling'
 import FormSchemaRenderer from '@/views/data-filling/components/FormSchemaRenderer.vue'
 import type { DataFillingFormSchema, FormFieldValue } from '@/views/data-filling/types'
+import { isBlankPayload, isEmptyFieldValue } from '@/views/data-filling/utils/dataHelpers'
 import { isRecord, parseFormSchema as parseSchema, resolveFieldKey } from '@/views/data-filling/utils/schemaParser'
 
 interface FillRowItem {
@@ -108,13 +109,6 @@ const buildRowModel = (row: Record<string, unknown>) => {
   return nextModel
 }
 
-const isEmptyFieldValue = (value: FormFieldValue | undefined) => {
-  if (Array.isArray(value)) {
-    return value.length === 0
-  }
-  return value === undefined || value === null || value === ''
-}
-
 const sanitizeRowPayload = (row: FillRowItem) => {
   const payload = formSchema.value.reduce<Record<string, FormFieldValue>>((result, field, index) => {
     const fieldKey = resolveFieldKey(field, index)
@@ -128,14 +122,6 @@ const sanitizeRowPayload = (row: FillRowItem) => {
     payload.id = row.model.id
   }
   return payload
-}
-
-const isBlankPayload = (payload: Record<string, FormFieldValue>) => {
-  const keys = Object.keys(payload).filter(key => key !== 'id')
-  if (!keys.length) {
-    return true
-  }
-  return keys.every(key => isEmptyFieldValue(payload[key]))
 }
 
 const validateRows = (payloadRows: Record<string, FormFieldValue>[]) => {

@@ -6,6 +6,10 @@ import icon_back from '@/assets/svg/icon_left_outlined.svg'
 import FormSchemaRenderer from '@/views/data-filling/components/FormSchemaRenderer.vue'
 import type { DataFillingFormSchema, FormFieldConfig } from '@/views/data-filling/types'
 import {
+  normalizeBuiltInTableOptions,
+  normalizeDatasourceOptions
+} from '@/views/data-filling/utils/dataHelpers'
+import {
   isRecord,
   normalizeFieldType,
   resolveFieldTypeFromMapping
@@ -302,53 +306,6 @@ const canShowIndexSection = computed(() => !useExistsTable.value)
 
 const handleFieldsUpdate = (value: FormFieldConfig[]) => {
   fields.value = value
-}
-
-const normalizeDatasourceOptions = (value: unknown): DatasourceOption[] => {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value.reduce<DatasourceOption[]>((result, item) => {
-    if (!item || typeof item !== 'object') {
-      return result
-    }
-    const record = item as Record<string, unknown>
-    const id = record.id ?? record.value
-    const label = record.name ?? record.label
-    if (typeof id === 'number' && (typeof label === 'string' || typeof label === 'number')) {
-      result.push({
-        value: id,
-        label: String(label)
-      })
-    }
-    return result
-  }, [])
-}
-
-const normalizeBuiltInTableOptions = (value: unknown): BuiltInTableOption[] => {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value.reduce<BuiltInTableOption[]>((result, item) => {
-    if (typeof item === 'string') {
-      result.push({ label: item, value: item })
-      return result
-    }
-    if (!item || typeof item !== 'object') {
-      return result
-    }
-    const record = item as Record<string, unknown>
-    const candidate = record.tableName ?? record.name ?? record.label ?? record.value
-    if (typeof candidate === 'string') {
-      result.push({
-        label: candidate,
-        value: candidate
-      })
-    }
-    return result
-  }, [])
 }
 
 const loadDatasourceOptions = async () => {

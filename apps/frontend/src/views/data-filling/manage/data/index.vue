@@ -23,6 +23,11 @@ import type {
   FormFieldValue
 } from '@/views/data-filling/types'
 import {
+  isCancelableAction,
+  isEmptyFieldValue,
+  parseRouteFormId
+} from '@/views/data-filling/utils/dataHelpers'
+import {
   parseFormSchema,
   resolveFieldKey
 } from '@/views/data-filling/utils/schemaParser'
@@ -89,20 +94,6 @@ const pageReady = computed(() => Boolean(currentFormId.value && formDetail.value
 const hasSelection = computed(() => selectedRows.value.length > 0)
 const canEditRows = computed(() => pageReady.value && formSchema.value.length > 0)
 const rowDialogTitle = computed(() => (rowDialogMode.value === 'add' ? '新增数据行' : '编辑数据行'))
-
-const isCancelableAction = (error: unknown) => {
-  return error === 'cancel' || error === 'close'
-}
-
-const parseRouteFormId = (value: unknown) => {
-  const rawValue = Array.isArray(value) ? value[0] : value
-  if (typeof rawValue !== 'string' || !rawValue.trim()) {
-    return null
-  }
-
-  const parsedValue = Number(rawValue)
-  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null
-}
 
 const buildColumns = (schema: DataFillingFormSchema): DataFillingColumnConfig[] => {
   return schema.map((field, index) => ({
@@ -282,13 +273,6 @@ const resetRowDialog = () => {
   editingRow.value = null
   rowFormModel.value = {}
   rowDialogMode.value = 'add'
-}
-
-const isEmptyFieldValue = (value: FormFieldValue | undefined) => {
-  if (Array.isArray(value)) {
-    return value.length === 0
-  }
-  return value === undefined || value === null || value === ''
 }
 
 const validateRowForm = () => {
