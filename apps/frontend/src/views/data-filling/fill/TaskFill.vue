@@ -16,6 +16,26 @@ import {
 import FormSchemaRenderer from '@/views/data-filling/components/FormSchemaRenderer.vue'
 import type { DataFillingFormSchema, FormFieldConfig, FormFieldOption, FormFieldValue } from '@/views/data-filling/types'
 
+type BackendFieldOption = {
+  name?: unknown
+  value?: unknown
+}
+
+type BackendFieldMapping = {
+  columnName?: unknown
+  type?: unknown
+  accuracy?: unknown
+}
+
+type BackendFieldSettings = {
+  name?: unknown
+  required?: unknown
+  mapping?: BackendFieldMapping
+  placeholder?: unknown
+  multiple?: unknown
+  options?: BackendFieldOption[]
+}
+
 interface FillRowItem {
   localId: string
   dataId?: string
@@ -78,6 +98,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+const normalizeFieldType = (value: unknown): string => {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'text'
+}
+
+const resolveFieldTypeFromMapping = (value: unknown): string => {
+  const mappingType = normalizeFieldType(value)
+
+  if (mappingType === 'nvarchar') {
+    return 'text'
+  }
+
+  return ['text', 'number', 'decimal', 'date', 'datetime', 'select'].includes(mappingType) ? mappingType : 'text'
+}
+
 const normalizeOptions = (value: unknown): FormFieldOption[] => {
   if (!Array.isArray(value)) {
     return []
@@ -113,20 +147,30 @@ const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null =>
     return null
   }
 
-  const directLabel = value.label ?? value.name ?? value.field
-  const settings = isRecord(value.settings) ? value.settings : null
-  const mapping = settings && isRecord(settings.mapping) ? settings.mapping : null
-  const name = String(mapping?.columnName ?? value.field ?? value.name ?? `field_${index + 1}`)
-  const label = String(settings?.name ?? directLabel ?? name)
+  const settings = isRecord(value.settings) ? (value.settings as BackendFieldSettings) : undefined
+  const mapping = settings && isRecord(settings.mapping) ? (settings.mapping as BackendFieldMapping) : undefined
+  const fieldName = typeof mapping?.columnName === 'string' && mapping.columnName.trim() ? mapping.columnName.trim() : undefined
+  const legacyName = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined
+  const legacyField = typeof value.field === 'string' && value.field.trim() ? value.field.trim() : undefined
+  const labelSource = typeof settings?.name === 'string' && settings.name.trim() ? settings.name.trim() : undefined
+  const legacyLabel = typeof value.label === 'string' && value.label.trim() ? value.label.trim() : undefined
+  const name = fieldName ?? legacyName ?? legacyField ?? `field_${index + 1}`
+  const label = labelSource ?? legacyLabel ?? legacyName ?? `字段 ${index + 1}`
+  const explicitType = value.type ?? value.fieldType
 
   return {
     id: typeof value.id === 'string' || typeof value.id === 'number' ? value.id : undefined,
-    field: name,
+    field: fieldName ?? legacyField ?? name,
     name,
     label,
-    type: String(mapping?.type ?? value.type ?? value.fieldType ?? 'text'),
-    required: Boolean(value.required ?? settings?.required),
-    placeholder: settings?.placeholder ? String(settings.placeholder) : undefined,
+    type: explicitType != null ? normalizeFieldType(explicitType) : resolveFieldTypeFromMapping(mapping?.type),
+    required: settings ? Boolean(settings.required) : Boolean(value.required),
+    placeholder:
+      typeof settings?.placeholder === 'string'
+        ? settings.placeholder
+        : typeof value.placeholder === 'string'
+        ? value.placeholder
+        : undefined,
     defaultValue:
       typeof value.defaultValue === 'string' ||
       typeof value.defaultValue === 'number' ||
@@ -138,9 +182,14 @@ const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null =>
         : undefined,
     order: typeof value.order === 'number' ? value.order : index,
     options: normalizeOptions(value.options ?? value.optionList ?? settings?.options),
-    precision: typeof value.precision === 'number' ? value.precision : undefined,
+    precision:
+      typeof value.precision === 'number'
+        ? value.precision
+        : typeof mapping?.accuracy === 'number'
+        ? mapping.accuracy
+        : undefined,
     format: value.format ? String(value.format) : undefined,
-    multiple: Boolean(value.multiple),
+    multiple: settings ? Boolean(settings.multiple) : Boolean(value.multiple),
     extra: isRecord(value.extra) ? value.extra : undefined
   }
 }

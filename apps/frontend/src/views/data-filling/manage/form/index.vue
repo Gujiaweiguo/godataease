@@ -45,6 +45,191 @@ const builtInTableOptions = ref<BuiltInTableOption[]>([])
 
 const previewModel = ref<Record<string, string | number | boolean | null>>({})
 
+type BackendFieldOption = {
+  name?: unknown
+  value?: unknown
+}
+
+type BackendFieldMapping = {
+  columnName?: unknown
+  type?: unknown
+  size?: unknown
+  accuracy?: unknown
+}
+
+type BackendFieldSettings = {
+  name?: unknown
+  required?: unknown
+  mapping?: BackendFieldMapping
+  inputType?: unknown
+  placeholder?: unknown
+  optionDatasource?: unknown
+  optionTable?: unknown
+  optionColumn?: unknown
+  optionOrder?: unknown
+  multiple?: unknown
+  options?: BackendFieldOption[]
+}
+
+const fieldTypeMeta: Record<
+  string,
+  {
+    typeName: string
+    mappingType: string
+    size?: number
+    accuracy?: number
+  }
+> = {
+  text: {
+    typeName: '文本',
+    mappingType: 'nvarchar',
+    size: 255
+  },
+  nvarchar: {
+    typeName: '长文本',
+    mappingType: 'nvarchar',
+    size: 255
+  },
+  number: {
+    typeName: '整数',
+    mappingType: 'number'
+  },
+  decimal: {
+    typeName: '小数',
+    mappingType: 'decimal',
+    size: 12,
+    accuracy: 2
+  },
+  date: {
+    typeName: '日期',
+    mappingType: 'date'
+  },
+  datetime: {
+    typeName: '日期时间',
+    mappingType: 'datetime'
+  },
+  select: {
+    typeName: '下拉选择',
+    mappingType: 'nvarchar',
+    size: 255
+  }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+const normalizeFieldType = (value: unknown): string => {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'text'
+}
+
+const getFieldTypeMeta = (value: unknown) => {
+  const normalizedType = normalizeFieldType(value)
+  return {
+    normalizedType,
+    meta: fieldTypeMeta[normalizedType] ?? fieldTypeMeta.text
+  }
+}
+
+const resolveFieldTypeFromMapping = (value: unknown): string => {
+  const mappingType = normalizeFieldType(value)
+
+  if (mappingType === 'nvarchar') {
+    return 'text'
+  }
+
+  return fieldTypeMeta[mappingType] ? mappingType : 'text'
+}
+
+const normalizeOptions = (value: unknown): FormFieldConfig['options'] => {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const options = value.reduce<NonNullable<FormFieldConfig['options']>>((result, item) => {
+    if (!isRecord(item)) {
+      return result
+    }
+
+    const optionName = item.name ?? item.label ?? item.value
+    const optionValue = item.value ?? item.name ?? item.label
+
+    if (optionName == null || optionValue == null) {
+      return result
+    }
+
+    result.push({
+      name: String(optionName),
+      value: String(optionValue)
+    })
+    return result
+  }, [])
+
+  return options.length ? options : undefined
+}
+
+const toFormFieldConfig = (value: unknown, index: number): FormFieldConfig | null => {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const settings = isRecord(value.settings) ? (value.settings as BackendFieldSettings) : undefined
+  const mapping = settings && isRecord(settings.mapping) ? (settings.mapping as BackendFieldMapping) : undefined
+  const legacyName = value.name
+  const legacyLabel = value.label
+  const explicitType = value.type ?? settings?.inputType
+  const normalizedType = explicitType != null ? getFieldTypeMeta(explicitType).normalizedType : resolveFieldTypeFromMapping(mapping?.type)
+  const fieldName = typeof mapping?.columnName === 'string' && mapping.columnName.trim() ? mapping.columnName.trim() : undefined
+  const legacyFieldName = typeof legacyName === 'string' && legacyName.trim() ? legacyName.trim() : undefined
+  const labelSource = typeof settings?.name === 'string' && settings.name.trim() ? settings.name.trim() : undefined
+  const legacyFieldLabel = typeof legacyLabel === 'string' && legacyLabel.trim() ? legacyLabel.trim() : undefined
+  const name = fieldName ?? legacyFieldName ?? `field_${index + 1}`
+  const label = labelSource ?? legacyFieldLabel ?? name
+
+  return {
+    id: typeof value.id === 'string' || typeof value.id === 'number' ? value.id : undefined,
+    name,
+    label,
+    type: normalizedType,
+    required: settings ? Boolean(settings.required) : Boolean(value.required),
+    placeholder:
+      typeof settings?.placeholder === 'string'
+        ? settings.placeholder
+        : typeof value.placeholder === 'string'
+        ? value.placeholder
+        : undefined,
+    order: typeof value.order === 'number' ? value.order : index,
+    options: normalizeOptions(settings?.options ?? value.options),
+    optionDatasource:
+      settings?.optionDatasource != null ? String(settings.optionDatasource) : value.optionDatasource ? String(value.optionDatasource) : undefined,
+    optionTable:
+      typeof settings?.optionTable === 'string'
+        ? settings.optionTable
+        : typeof value.optionTable === 'string'
+        ? value.optionTable
+        : undefined,
+    optionColumn:
+      typeof settings?.optionColumn === 'string'
+        ? settings.optionColumn
+        : typeof value.optionColumn === 'string'
+        ? value.optionColumn
+        : undefined,
+    optionOrder:
+      typeof settings?.optionOrder === 'string'
+        ? settings.optionOrder
+        : typeof value.optionOrder === 'string'
+        ? value.optionOrder
+        : undefined,
+    precision:
+      typeof value.precision === 'number'
+        ? value.precision
+        : typeof mapping?.accuracy === 'number'
+        ? mapping.accuracy
+        : undefined,
+    multiple: settings ? Boolean(settings.multiple) : Boolean(value.multiple)
+  }
+}
+
 const parseForms = (forms: string): DataFillingFormSchema => {
   if (!forms.trim()) {
     return []
@@ -52,18 +237,17 @@ const parseForms = (forms: string): DataFillingFormSchema => {
 
   try {
     const parsed = JSON.parse(forms) as unknown
-    if (Array.isArray(parsed)) {
-      return parsed as DataFillingFormSchema
-    }
-    if (parsed && typeof parsed === 'object') {
-      const record = parsed as Record<string, unknown>
-      if (Array.isArray(record.fields)) {
-        return record.fields as DataFillingFormSchema
-      }
-      if (Array.isArray(record.forms)) {
-        return record.forms as DataFillingFormSchema
-      }
-    }
+    const source = Array.isArray(parsed)
+      ? parsed
+      : isRecord(parsed) && Array.isArray(parsed.fields)
+      ? parsed.fields
+      : isRecord(parsed) && Array.isArray(parsed.forms)
+      ? parsed.forms
+      : []
+
+    return source
+      .map((item, index) => toFormFieldConfig(item, index))
+      .filter((item): item is FormFieldConfig => item !== null)
   } catch {
     return []
   }
@@ -72,6 +256,48 @@ const parseForms = (forms: string): DataFillingFormSchema => {
 }
 
 const formsJson = computed(() => {
+  return JSON.stringify(
+    fields.value.map((field, index) => {
+      const name = field.name.trim()
+      const label = field.label.trim()
+      const placeholder = field.placeholder?.trim() || undefined
+      const options = field.options?.length
+        ? field.options.map(option => ({
+            name: String(option.name),
+            value: String(option.value)
+          }))
+        : undefined
+      const { normalizedType, meta } = getFieldTypeMeta(field.type)
+
+      return {
+        type: normalizedType,
+        typeName: meta.typeName,
+        icon: '',
+        id: field.id != null ? String(field.id) : `field-${index + 1}`,
+        settings: {
+          name: label,
+          required: Boolean(field.required),
+          inputType: normalizedType,
+          placeholder,
+          optionDatasource: field.optionDatasource ? Number(field.optionDatasource) : undefined,
+          optionTable: field.optionTable?.trim() || undefined,
+          optionColumn: field.optionColumn?.trim() || undefined,
+          optionOrder: field.optionOrder?.trim() || undefined,
+          multiple: Boolean(field.multiple),
+          options,
+          mapping: {
+            columnName: name,
+            type: meta.mappingType,
+            size: meta.size,
+            accuracy: meta.accuracy
+          }
+        }
+      }
+    })
+  )
+})
+
+const previewFormsJson = computed(() => {
   return JSON.stringify(
     fields.value.map((field, index) => ({
       ...field,
@@ -404,7 +630,7 @@ onMounted(() => {
           <template #header>
             <span>表单预览</span>
           </template>
-          <FormSchemaRenderer :forms="formsJson" :model-value="previewModel" disabled />
+          <FormSchemaRenderer :forms="previewFormsJson" :model-value="previewModel" disabled />
         </el-card>
       </div>
     </div>
