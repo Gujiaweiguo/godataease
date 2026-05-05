@@ -11,12 +11,16 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/areamap"
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
 	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/driver"
 	"dataease/backend/internal/domain/embedded"
+	"dataease/backend/internal/domain/engine"
+	"dataease/backend/internal/domain/geo"
 	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
@@ -72,6 +76,12 @@ func TestMain(m *testing.M) {
 		&permission.SysPerm{},
 		&visualization.DataVisualizationInfo{},
 		&visualization.Watermark{},
+		&driver.Driver{}, &driver.DriverJar{},
+		&engine.Engine{},
+		&auto.CoreStore{},
+		&auto.VisualizationSubject{},
+		&auto.VisualizationTemplateExtendDatum{},
+		&auto.VisualizationBackground{},
 		&auto.VisualizationLinkJump{},
 		&auto.VisualizationLinkJumpInfo{},
 		&auto.VisualizationLinkJumpTargetViewInfo{},
@@ -92,6 +102,7 @@ func TestMain(m *testing.M) {
 		&datafillingdomain.DataFillingForm{}, &datafillingdomain.DfCommitLog{},
 		&datafillingdomain.DataFillingTask{}, &datafillingdomain.DataFillingSubTask{}, &datafillingdomain.DataFillingSubInstance{},
 		&permission.DataPermRow{}, &permission.DataPermColumn{},
+		&geo.GeometryArea{}, &areamap.Area{}, &areamap.CoreAreaCustom{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
