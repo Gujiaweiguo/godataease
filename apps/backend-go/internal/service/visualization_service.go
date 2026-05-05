@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -186,33 +187,87 @@ func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy str
 
 	source, err := s.repo.GetByID(req.ID)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("source visualization not found: %w", err)
 	}
+
+	newDvID := int64(uuid.New().ID())
+	copyID := int64(uuid.New().ID()) / 100
+
+	if err := s.repo.CopyChartViews(req.ID, newDvID, copyID, "core"); err != nil {
+		return 0, fmt.Errorf("copy chart views (core): %w", err)
+	}
+	if err := s.repo.CopyChartViews(req.ID, newDvID, copyID, "snapshot"); err != nil {
+		// snapshot data is optional for copied dashboards
+	}
+
+	componentData := source.ComponentData
+	viewMapping, err := s.repo.GetCopiedChartViewMapping(copyID)
+	if err == nil && len(viewMapping) > 0 && source.ComponentData != nil {
+		remapped := *source.ComponentData
+		for oldID, newID := range viewMapping {
+			remapped = strings.ReplaceAll(remapped, strconv.FormatInt(oldID, 10), strconv.FormatInt(newID, 10))
+		}
+		componentData = &remapped
+	}
+
+	_ = s.repo.CopyLinkages(copyID)
+	_ = s.repo.CopyLinkageFields(copyID)
+	_ = s.repo.CopyLinkJumps(copyID)
+	_ = s.repo.CopyLinkJumpInfos(copyID)
+	_ = s.repo.CopyLinkJumpTargetInfos(copyID)
 
 	nodeType := source.NodeType
 	if req.NodeType != nil && *req.NodeType != "" {
 		nodeType = req.NodeType
 	}
-	typ := source.Type
+	if nodeType != nil && *nodeType != visualizationNodeTypeFolder {
+		leaf := "leaf"
+		nodeType = &leaf
+	}
+
+	visualizationType := source.Type
 	if req.Type != nil && *req.Type != "" {
-		typ = req.Type
+		visualizationType = req.Type
 	}
 	mobileLayout := source.MobileLayout
 	if req.MobileLayout != nil {
 		mobileLayout = req.MobileLayout
 	}
 
-	return s.Save(&visualization.SaveRequest{
+	now := time.Now().UnixMilli()
+	status := source.Status
+	if nodeType != nil && *nodeType == visualizationNodeTypeFolder {
+		folderStatus := 1
+		status = &folderStatus
+	}
+
+	newViz := &visualization.DataVisualizationInfo{
+		ID:              newDvID,
 		Name:            req.Name,
 		PID:             req.PID,
-		Type:            typ,
 		NodeType:        nodeType,
+		Type:            visualizationType,
 		CanvasStyleData: source.CanvasStyleData,
-		ComponentData:   source.ComponentData,
+		ComponentData:   componentData,
 		MobileLayout:    mobileLayout,
+		Status:          status,
 		ContentID:       source.ContentID,
 		CheckVersion:    source.CheckVersion,
-	}, updateBy)
+		CreateTime:      &now,
+		UpdateTime:      &now,
+		CreateBy:        &updateBy,
+		UpdateBy:        &updateBy,
+	}
+
+	if err := s.repo.Create(newViz); err != nil {
+		return 0, fmt.Errorf("create copied visualization: %w", err)
+	}
+	if err := s.applyInheritedPermissionsOnCreate(newViz.ID, req.Name, req.PID, visualizationType); err != nil {
+		_ = s.repo.DeleteLogic(newViz.ID, updateBy)
+		return 0, err
+	}
+
+	return newViz.ID, nil
 }
 
 func (s *VisualizationService) Update(req *visualization.UpdateRequest, updateBy string) error {

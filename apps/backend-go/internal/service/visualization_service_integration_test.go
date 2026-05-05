@@ -231,7 +231,7 @@ func TestVisualizationServiceIntegration_Copy(t *testing.T) {
 	assert.Equal(t, "Copy Target", copied.Name)
 	assert.Equal(t, newPID, *copied.PID)
 	assert.Equal(t, "dashboard", *copied.Type)
-	assert.Equal(t, "panel", *copied.NodeType)
+	assert.Equal(t, "leaf", *copied.NodeType)
 	assert.Equal(t, "{\"style\":\"source\"}", *copied.CanvasStyleData)
 	assert.Equal(t, "{\"components\":[1]}", *copied.ComponentData)
 	assert.Equal(t, "content-1", *copied.ContentID)
