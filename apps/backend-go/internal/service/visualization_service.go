@@ -107,6 +107,7 @@ func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy str
 	if err := s.repo.Create(v); err != nil {
 		return 0, err
 	}
+	s.saveChartViewsFromVisualization(req.ComponentData, v.ID, req.CanvasViewInfo)
 	if err := s.applyInheritedPermissionsOnCreate(v.ID, req.Name, req.PID, req.Type); err != nil {
 		_ = s.repo.DeleteLogic(v.ID, updateBy)
 		return 0, err
@@ -305,8 +306,269 @@ func (s *VisualizationService) Update(req *visualization.UpdateRequest, updateBy
 	now := time.Now().UnixMilli()
 	v.UpdateTime = &now
 	v.UpdateBy = &updateBy
+	s.saveChartViewsFromVisualization(req.ComponentData, req.ID, req.CanvasViewInfo)
 
 	return s.repo.Update(v)
+}
+
+func (s *VisualizationService) saveChartViewsFromVisualization(componentData *string, dvID int64, canvasViewInfo map[string]map[string]interface{}) {
+	if len(canvasViewInfo) == 0 || componentData == nil {
+		return
+	}
+
+	componentDataStr := *componentData
+	now := time.Now().UnixMilli()
+
+	for chartIDStr, chartData := range canvasViewInfo {
+		if !strings.Contains(componentDataStr, chartIDStr) {
+			continue
+		}
+
+		chartID, err := strconv.ParseInt(chartIDStr, 10, 64)
+		if err != nil || chartID <= 0 {
+			continue
+		}
+
+		view := buildSnapshotChartViewFromMap(chartData)
+		if view == nil {
+			continue
+		}
+
+		view.ID = chartID
+		view.SceneID = &dvID
+		view.UpdateTime = &now
+		if view.CreateTime == nil || *view.CreateTime == 0 {
+			view.CreateTime = &now
+		}
+
+		_ = s.repo.SaveSnapshotChartView(view)
+	}
+}
+
+func buildSnapshotChartViewFromMap(data map[string]interface{}) *visualization.SnapshotCanvasChartView { //nolint:gocyclo // mirrors chart view DTO-to-record mapping
+	if len(data) == 0 {
+		return nil
+	}
+
+	view := &visualization.SnapshotCanvasChartView{}
+
+	if v, ok := stringFromAnyMap(data, "title"); ok {
+		view.Title = &v
+	}
+	if v, ok := stringFromAnyMap(data, "type"); ok {
+		view.Type = &v
+	}
+	if v, ok := stringFromAnyMap(data, "render"); ok {
+		view.Render = &v
+	}
+	if v, ok := stringFromAnyMap(data, "resultMode"); ok {
+		view.ResultMode = &v
+	}
+	if v, ok := stringFromAnyMap(data, "dataFrom"); ok {
+		view.DataFrom = &v
+	}
+	if v, ok := stringFromAnyMap(data, "stylePriority"); ok {
+		view.StylePriority = &v
+	}
+	if v, ok := stringFromAnyMap(data, "chartType"); ok {
+		view.ChartType = &v
+	}
+	if v, ok := stringFromAnyMap(data, "refreshUnit"); ok {
+		view.RefreshUnit = &v
+	}
+	if v, ok := stringFromAnyMap(data, "flowMapStartName"); ok {
+		view.FlowMapStartName = &v
+	}
+	if v, ok := stringFromAnyMap(data, "flowMapEndName"); ok {
+		view.FlowMapEndName = &v
+	}
+	if v, ok := stringFromAnyMap(data, "createBy"); ok {
+		view.CreateBy = &v
+	}
+
+	if v, ok := int64FromAnyMap(data, "tableId"); ok {
+		view.TableID = &v
+	}
+	if v, ok := int64FromAnyMap(data, "createTime"); ok {
+		view.CreateTime = &v
+	}
+
+	if v, ok := intFromAnyMap(data, "resultCount"); ok {
+		view.ResultCount = &v
+	}
+	if v, ok := intFromAnyMap(data, "refreshTime"); ok {
+		view.RefreshTime = &v
+	}
+
+	if v, ok := data["isPlugin"]; ok {
+		b := boolFromAnyMap(v)
+		view.IsPlugin = &b
+	}
+	if v, ok := data["refreshViewEnable"]; ok {
+		b := boolFromAnyMap(v)
+		view.RefreshViewEnable = &b
+	}
+	if v, ok := data["linkageActive"]; ok {
+		b := boolFromAnyMap(v)
+		view.LinkageActive = &b
+	}
+	if v, ok := data["jumpActive"]; ok {
+		b := boolFromAnyMap(v)
+		view.JumpActive = &b
+	}
+	if v, ok := data["aggregate"]; ok {
+		b := boolFromAnyMap(v)
+		view.Aggregate = &b
+	}
+
+	if v, ok := marshalJSONFieldFromMap(data, "xAxis"); ok {
+		view.XAxis = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "xAxisExt"); ok {
+		view.XAxisExt = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "yAxis"); ok {
+		view.YAxis = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "yAxisExt"); ok {
+		view.YAxisExt = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "extStack"); ok {
+		view.ExtStack = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "extBubble"); ok {
+		view.ExtBubble = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "extLabel"); ok {
+		view.ExtLabel = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "extTooltip"); ok {
+		view.ExtTooltip = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "customAttr"); ok {
+		view.CustomAttr = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "customAttrMobile"); ok {
+		view.CustomAttrMobile = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "customStyle"); ok {
+		view.CustomStyle = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "customStyleMobile"); ok {
+		view.CustomStyleMobile = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "customFilter"); ok {
+		view.CustomFilter = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "drillFields"); ok {
+		view.DrillFields = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "senior"); ok {
+		view.Senior = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "snapshot"); ok {
+		view.Snapshot = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "viewFields"); ok {
+		view.ViewFields = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "extColor"); ok {
+		view.ExtColor = &v
+	}
+	if v, ok := marshalJSONFieldFromMap(data, "sortPriority"); ok {
+		view.SortPriority = &v
+	}
+
+	return view
+}
+
+func stringFromAnyMap(m map[string]interface{}, key string) (string, bool) {
+	v, exists := m[key]
+	if !exists {
+		return "", false
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", false
+	}
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return "", false
+	}
+	return trimmed, true
+}
+
+func int64FromAnyMap(m map[string]interface{}, key string) (int64, bool) {
+	v, exists := m[key]
+	if !exists {
+		return 0, false
+	}
+	return int64FromVisualizationAny(v)
+}
+
+func intFromAnyMap(m map[string]interface{}, key string) (int, bool) {
+	v, ok := int64FromAnyMap(m, key)
+	if !ok {
+		return 0, false
+	}
+	return int(v), true
+}
+
+func boolFromAnyMap(v interface{}) bool {
+	switch b := v.(type) {
+	case bool:
+		return b
+	case string:
+		return strings.EqualFold(strings.TrimSpace(b), "true") || strings.TrimSpace(b) == "1"
+	case float64:
+		return b != 0
+	case int:
+		return b != 0
+	case int64:
+		return b != 0
+	case json.Number:
+		s := strings.ToLower(strings.TrimSpace(b.String()))
+		return s == "true" || s == "1"
+	default:
+		return false
+	}
+}
+
+func marshalJSONFieldFromMap(m map[string]interface{}, key string) (string, bool) {
+	v, exists := m[key]
+	if !exists {
+		return "", false
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", false
+	}
+	return string(b), true
+}
+
+func int64FromVisualizationAny(v interface{}) (int64, bool) {
+	switch n := v.(type) {
+	case int64:
+		return n, true
+	case int:
+		return int64(n), true
+	case float64:
+		return int64(n), true
+	case json.Number:
+		parsed, err := n.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	case string:
+		parsed, err := json.Number(strings.TrimSpace(n)).Int64()
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
 }
 
 func (s *VisualizationService) Detail(req *visualization.DetailRequest) (*visualization.DataVisualizationInfo, error) {

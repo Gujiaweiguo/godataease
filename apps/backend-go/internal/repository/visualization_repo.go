@@ -27,6 +27,10 @@ func (r *VisualizationRepository) Update(v *visualization.DataVisualizationInfo)
 	return r.db.Save(v).Error
 }
 
+func (r *VisualizationRepository) SaveSnapshotChartView(view *visualization.SnapshotCanvasChartView) error {
+	return r.db.Save(view).Error
+}
+
 func (r *VisualizationRepository) GetByID(id int64) (*visualization.DataVisualizationInfo, error) {
 	var item visualization.DataVisualizationInfo
 	err := r.db.Model(&visualization.DataVisualizationInfo{}).
