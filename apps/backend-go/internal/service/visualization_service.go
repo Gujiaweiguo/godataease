@@ -282,6 +282,15 @@ func (s *VisualizationService) List(req *visualization.ListRequest) (*visualizat
 	}, nil
 }
 
+func (s *VisualizationService) FindRecent(req *visualization.WorkbranchQueryRequest, uid int64) ([]visualization.VisualizationResourceVO, error) {
+	results, err := s.repo.FindRecent(uid, req)
+	if err != nil {
+		return nil, err
+	}
+	// The VO fields are already strings from SQL scan.
+	return results, nil
+}
+
 func (s *VisualizationService) InteractiveTree(busiFlag string) ([]*visualization.DataVisualizationInfo, error) {
 	types, err := resolveInteractiveVisualizationTypes(busiFlag)
 	if err != nil {
@@ -653,8 +662,20 @@ const (
 	newFromInnerTemplate  = "new_inner_template"
 	newFromOuterTemplate  = "new_outer_template"
 	newFromMarketTemplate = "new_market_template"
+	newFromLocalFile      = "localFile"
 	compatResultSuccess   = "success"
 )
+
+type localTemplateFileDTO struct {
+	Name            json.RawMessage `json:"name"`
+	DvType          string          `json:"dvType"`
+	Version         int             `json:"version"`
+	CanvasStyleData json.RawMessage `json:"canvasStyleData"`
+	ComponentData   json.RawMessage `json:"componentData"`
+	DynamicData     json.RawMessage `json:"dynamicData"`
+	StaticResource  json.RawMessage `json:"staticResource"`
+	AppData         json.RawMessage `json:"appData"`
+}
 
 func (s *VisualizationService) Decompression(req *visualization.DecompressionRequest) (*visualization.DecompressionResponse, error) {
 	if req == nil {
@@ -695,6 +716,18 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		dvType = req.Type
 		version = 3
 
+	case newFromLocalFile:
+		templateStyle = req.CanvasStyleData
+		templateData = req.ComponentData
+		dynamicData = req.DynamicData
+		appDataStr = req.AppData
+		name = req.Name
+		dvType = req.Type
+		version = req.Version
+		if version <= 0 {
+			version = 3
+		}
+
 	case newFromMarketTemplate:
 		tmpl, err := fetchMarketTemplate(req.TemplateURL)
 		if err != nil {
@@ -730,6 +763,29 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		AppData:         appDataStr,
 		CanvasViewInfo:  canvasViewInfo,
 	}, nil
+}
+
+func (s *VisualizationService) DecompressionLocalFile(fileContent []byte) (*visualization.DecompressionResponse, error) {
+	if len(fileContent) == 0 {
+		return nil, fmt.Errorf("upload file is empty")
+	}
+
+	var payload localTemplateFileDTO
+	if err := json.Unmarshal(fileContent, &payload); err != nil {
+		return nil, fmt.Errorf("failed to parse template file JSON: %w", err)
+	}
+
+	return s.Decompression(&visualization.DecompressionRequest{
+		NewFrom:         newFromLocalFile,
+		Name:            normalizeTemplateFileName(payload.Name),
+		Type:            payload.DvType,
+		Version:         payload.Version,
+		CanvasStyleData: normalizeJSONPayload(payload.CanvasStyleData),
+		ComponentData:   normalizeJSONPayload(payload.ComponentData),
+		DynamicData:     normalizeJSONPayload(payload.DynamicData),
+		AppData:         normalizeJSONPayload(payload.AppData),
+		StaticResource:  normalizeJSONPayload(payload.StaticResource),
+	})
 }
 
 func processAppData(appDataStr string, newDvID int64) string {
@@ -799,6 +855,27 @@ func normalizeJSONPayload(raw json.RawMessage) string {
 	var plain string
 	if err := json.Unmarshal(raw, &plain); err == nil {
 		return plain
+	}
+
+	return trimmed
+}
+
+func normalizeTemplateFileName(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return ""
+	}
+
+	var plain string
+	if err := json.Unmarshal(raw, &plain); err == nil {
+		return plain
+	}
+
+	var wrapped struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(raw, &wrapped); err == nil {
+		return wrapped.Name
 	}
 
 	return trimmed

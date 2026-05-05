@@ -111,3 +111,33 @@ type ChartFieldListResponse struct {
 	DimensionList []ChartField `json:"dimensionList"`
 	QuotaList     []ChartField `json:"quotaList"`
 }
+
+// ViewSelectorVO is returned by /chart/viewOption — a lightweight chart selector item
+type ViewSelectorVO struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
+	PID   *int64 `json:"pid"`
+}
+
+// ChartBaseVO is returned by /chart/chartBaseInfo — full chart metadata with parsed axis fields
+type ChartBaseVO struct {
+	ChartID          int64                    `json:"chartId"`
+	ChartType        string                   `json:"chartType"`
+	ChartName        string                   `json:"chartName"`
+	ResourceID       int64                    `json:"resourceId"`
+	ResourceType     string                   `json:"resourceType"`
+	ResourceName     string                   `json:"resourceName"`
+	TableID          *int64                   `json:"tableId"`
+	XAxis            []map[string]interface{} `json:"xAxis"`
+	XAxisExt         []map[string]interface{} `json:"xAxisExt"`
+	YAxis            []map[string]interface{} `json:"yAxis"`
+	YAxisExt         []map[string]interface{} `json:"yAxisExt"`
+	ExtStack         []map[string]interface{} `json:"extStack"`
+	ExtBubble        []map[string]interface{} `json:"extBubble"`
+	FlowMapStartName []map[string]interface{} `json:"flowMapStartName"`
+	FlowMapEndName   []map[string]interface{} `json:"flowMapEndName"`
+	ExtColor         []map[string]interface{} `json:"extColor"`
+	ExtLabel         []map[string]interface{} `json:"extLabel"`
+	ExtTooltip       []map[string]interface{} `json:"extTooltip"`
+}

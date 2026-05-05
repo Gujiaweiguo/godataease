@@ -42,6 +42,37 @@ func (h *ChartHandler) Query(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *ChartHandler) ViewOption(c *gin.Context) {
+	defer recoverServicePanic(c)
+	resourceId, err := strconv.ParseInt(c.Param("resourceId"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid resource ID")
+		return
+	}
+	result, err := h.service.ViewOption(resourceId)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *ChartHandler) ChartBaseInfo(c *gin.Context) {
+	defer recoverServicePanic(c)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, "500000", "Invalid chart ID")
+		return
+	}
+	resourceTable := c.Param("resourceTable")
+	result, err := h.service.ChartBaseInfo(id, resourceTable)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *ChartHandler) Data(c *gin.Context) {
 	defer recoverServicePanic(c)
 

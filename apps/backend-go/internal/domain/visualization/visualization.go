@@ -135,12 +135,13 @@ type ListResponse struct {
 
 // DecompressionRequest represents the template import request sent by the frontend.
 type DecompressionRequest struct {
-	NewFrom         string `json:"newFrom"`         // "new_inner_template" | "new_outer_template" | "new_market_template"
+	NewFrom         string `json:"newFrom"`         // "new_inner_template" | "new_outer_template" | "new_market_template" | "localFile"
 	TemplateID      *int64 `json:"templateId"`      // required for new_inner_template
 	ResourceName    string `json:"resourceName"`    // used by new_market_template
 	TemplateURL     string `json:"templateUrl"`     // used by new_market_template
 	Name            string `json:"name"`            // used by new_outer_template
 	Type            string `json:"type"`            // visualization type (dashboard/dataV)
+	Version         int    `json:"version"`         // used by local template file import
 	CanvasStyleData string `json:"canvasStyleData"` // used by new_outer_template
 	ComponentData   string `json:"componentData"`   // used by new_outer_template
 	DynamicData     string `json:"dynamicData"`     // used by new_outer_template
@@ -192,4 +193,26 @@ type DecompressionResponse struct {
 	ComponentData   string                            `json:"componentData"`   // JSON string (frontend does JSON.parse)
 	AppData         string                            `json:"appData"`         // JSON string or empty
 	CanvasViewInfo  map[string]map[string]interface{} `json:"canvasViewInfo"`  // keyed by new view ID string
+}
+
+// WorkbranchQueryRequest is the request body for /dataVisualization/findRecent
+type WorkbranchQueryRequest struct {
+	Type      string `json:"type"`      // "panel" | "screen" | "dataset" | "datasource"
+	Keyword   string `json:"keyword"`   // optional search filter
+	QueryFrom string `json:"queryFrom"` // server sets to "recent"
+	Asc       bool   `json:"asc"`       // sort direction (false = DESC)
+}
+
+// VisualizationResourceVO is a resource item for the workbranch recent list
+type VisualizationResourceVO struct {
+	ID           string `json:"id"`
+	ResourceID   string `json:"resourceId"`
+	Name         string `json:"name"`
+	Type         string `json:"type"` // "panel" | "screen" | "dataset" | "datasource"
+	Creator      string `json:"creator"`
+	LastEditor   string `json:"lastEditor"`
+	LastEditTime int64  `json:"lastEditTime"`
+	Favorite     bool   `json:"favorite"`
+	Weight       int    `json:"weight"`
+	ExtFlag      int    `json:"extFlag"`
 }

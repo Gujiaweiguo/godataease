@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -177,6 +178,56 @@ func TestVisualizationHandler_Decompression_OuterTemplate_APIAlias(t *testing.T)
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "000000", resp.Code)
+}
+
+func TestVisualizationHandler_DecompressionLocalFile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	repo := repository.NewVisualizationRepository(db)
+	h := NewVisualizationHandler(service.NewVisualizationService(repo))
+
+	r := gin.New()
+	r.POST("/dataVisualization/decompressionLocalFile", h.DecompressionLocalFile)
+
+	body := &strings.Builder{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "demo.DET2")
+	require.NoError(t, err)
+	_, err = part.Write([]byte(`{
+		"name":"Uploaded Template",
+		"dvType":"dashboard",
+		"version":5,
+		"canvasStyleData":{"scale":100},
+		"componentData":[{"id":"view_upload_1","component":"VChart"}],
+		"dynamicData":{"view_upload_1":{"title":"Upload Sales","type":"bar","tableId":5}}
+	}`))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/dataVisualization/decompressionLocalFile", strings.NewReader(body.String()))
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp struct {
+		Code string                              `json:"code"`
+		Data visualization.DecompressionResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, "Uploaded Template", resp.Data.Name)
+	assert.Equal(t, 5, resp.Data.Version)
+	require.Len(t, resp.Data.CanvasViewInfo, 1)
+	for viewID, view := range resp.Data.CanvasViewInfo {
+		assert.Contains(t, resp.Data.ComponentData, viewID)
+		assert.Equal(t, "Upload Sales", view["title"])
+	}
 }
 
 func TestVisualizationHandler_Export2AppCheck(t *testing.T) {

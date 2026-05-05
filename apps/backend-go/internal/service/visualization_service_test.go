@@ -909,6 +909,31 @@ func TestVisualizationService_Decompression(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.CanvasViewInfo, 1)
 	})
+
+	t.Run("local file import reuses decompression flow", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+
+		resp, err := svc.DecompressionLocalFile([]byte(`{
+			"name":"Local Template",
+			"dvType":"dashboard",
+			"version":7,
+			"canvasStyleData":{"scale":100},
+			"componentData":[{"id":"view_local_1","component":"VChart"}],
+			"dynamicData":{"view_local_1":{"title":"Local Sales","type":"bar","tableId":5}},
+			"appData":{"visualizationInfo":{"id":1}}
+		}`))
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, "Local Template", resp.Name)
+		assert.Equal(t, "dashboard", resp.Type)
+		assert.Equal(t, 7, resp.Version)
+		require.Len(t, resp.CanvasViewInfo, 1)
+		for viewID, view := range resp.CanvasViewInfo {
+			assert.Contains(t, resp.ComponentData, viewID)
+			assert.Equal(t, int64(5), view["sourceTableId"])
+			assert.Equal(t, int64(5), view["tableId"])
+		}
+	})
 }
 
 func setupExport2AppCheckTest(t *testing.T) (*VisualizationService, *gorm.DB) {

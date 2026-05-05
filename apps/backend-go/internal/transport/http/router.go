@@ -951,6 +951,8 @@ func (r *Router) registerChartRoutes(api *gin.RouterGroup) {
 		chartGroup.POST("/copyField/:id/:chartId", r.chartHandler.CopyField)
 		chartGroup.POST("/deleteField/:id", r.chartHandler.DeleteField)
 		chartGroup.POST("/deleteFieldByChart/:chartId", r.chartHandler.DeleteFieldByChart)
+		chartGroup.GET("/viewOption/:resourceId", r.chartHandler.ViewOption)
+		chartGroup.GET("/chartBaseInfo/:id/:resourceTable", r.chartHandler.ChartBaseInfo)
 	}
 	datasetFieldGroup := api.Group("/datasetField")
 	{
@@ -980,6 +982,7 @@ func (r *Router) registerVisualizationRoutes(api *gin.RouterGroup) {
 			visualGroup.POST("/saveCanvas", r.visualHandler.SaveCanvas)
 		}
 		visualGroup.POST("/list", r.visualHandler.List)
+		visualGroup.POST("/findRecent", r.visualHandler.FindRecent)
 		visualGroup.POST("/decompression", r.visualHandler.Decompression)
 	}
 }
