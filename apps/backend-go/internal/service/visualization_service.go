@@ -1121,7 +1121,14 @@ func (s *VisualizationService) RecoverToPublished(id int64, updateBy string) (*v
 }
 
 func (s *VisualizationService) ViewDetailList(dvID int64) ([]chart.CoreChartView, error) {
-	return s.repo.GetChartViewsBySceneID(dvID)
+	rows, err := s.repo.GetChartViewsBySceneID(dvID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) > 0 {
+		return rows, nil
+	}
+	return s.repo.GetSnapshotChartViewsBySceneID(dvID)
 }
 
 func (s *VisualizationService) AppCanvasNameCheck(req *visualization.AppCanvasNameCheckRequest) (string, error) {
@@ -1444,7 +1451,9 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 	}
 
 	if s.staticService != nil && strings.TrimSpace(staticResourceStr) != "" {
-		s.staticService.SaveFilesToServe(staticResourceStr)
+		if err := s.staticService.SaveFilesToServe(staticResourceStr); err != nil {
+			return nil, err
+		}
 	}
 
 	return resp, nil

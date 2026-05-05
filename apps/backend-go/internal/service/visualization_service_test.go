@@ -533,6 +533,29 @@ func TestVisualizationService_SaveChartViewsFromVisualization(t *testing.T) {
 	})
 }
 
+func TestVisualizationService_ViewDetailList_FallsBackToSnapshot(t *testing.T) {
+	svc, _, db := setupVisualizationServiceRepoTest(t)
+
+	title := "Snapshot Only View"
+	typ := "bar"
+	render := "antv"
+	sceneID := int64(501)
+	require.NoError(t, db.Table("snapshot_core_chart_view").Create(&visualization.SnapshotCanvasChartView{
+		ID:      9001,
+		Title:   &title,
+		Type:    &typ,
+		Render:  &render,
+		SceneID: &sceneID,
+	}).Error)
+
+	rows, err := svc.ViewDetailList(sceneID)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, int64(9001), rows[0].ID)
+	require.NotNil(t, rows[0].Title)
+	assert.Equal(t, title, *rows[0].Title)
+}
+
 func TestVisualizationService_Copy_Validation(t *testing.T) {
 	svc, _, _ := setupVisualizationServiceRepoTest(t)
 
@@ -1261,6 +1284,26 @@ func TestVisualizationService_Decompression(t *testing.T) {
 		}
 		_, err = os.Stat(filepath.Join(tmpDir, "outer-template.png"))
 		assert.NoError(t, err)
+	})
+
+	t.Run("new_outer_template returns error when static resources cannot be written", func(t *testing.T) {
+		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		blockedDir := filepath.Join(t.TempDir(), "blocked")
+		require.NoError(t, os.WriteFile(blockedDir, []byte("not-a-dir"), 0o644))
+		t.Setenv("STATIC_RESOURCE_DIR", filepath.Join(blockedDir, "child"))
+		svc.SetStaticService(NewStaticService(nil, nil, nil))
+
+		_, err := svc.Decompression(&visualization.DecompressionRequest{
+			NewFrom:         "new_outer_template",
+			Name:            "Broken Static",
+			Type:            "dashboard",
+			CanvasStyleData: `{}`,
+			ComponentData:   `[]`,
+			DynamicData:     `{}`,
+			StaticResource:  `{"/static-resource/broken.png":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}`,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "create static resource dir")
 	})
 
 	t.Run("appData keeps tableId for imported app templates", func(t *testing.T) {

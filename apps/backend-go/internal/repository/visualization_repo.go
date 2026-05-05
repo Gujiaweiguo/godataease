@@ -208,6 +208,12 @@ func (r *VisualizationRepository) GetChartViewsBySceneID(sceneID int64) ([]chart
 	return results, err
 }
 
+func (r *VisualizationRepository) GetSnapshotChartViewsBySceneID(sceneID int64) ([]chart.CoreChartView, error) {
+	var results []chart.CoreChartView
+	err := r.db.Table("snapshot_core_chart_view").Where("scene_id = ?", sceneID).Scan(&results).Error
+	return results, err
+}
+
 func (r *VisualizationRepository) FindChartViewsByIDs(viewIDs []int64) ([]map[string]interface{}, error) {
 	if len(viewIDs) == 0 {
 		return []map[string]interface{}{}, nil
