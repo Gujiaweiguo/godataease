@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,8 @@ import (
 type VisualizationHandler struct {
 	service *service.VisualizationService
 }
+
+const maxVisualizationTemplateUploadBytes = 35 << 20
 
 func NewVisualizationHandler(service *service.VisualizationService) *VisualizationHandler {
 	return &VisualizationHandler{service: service}
@@ -706,6 +709,40 @@ func (h *VisualizationHandler) Decompression(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *VisualizationHandler) DecompressionLocalFile(c *gin.Context) {
+	defer recoverServicePanic(c)
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, "500000", "Failed to read upload file: "+err.Error())
+		return
+	}
+
+	opened, err := file.Open()
+	if err != nil {
+		response.Error(c, "500000", "Failed to open upload file: "+err.Error())
+		return
+	}
+	defer opened.Close()
+
+	content, err := io.ReadAll(io.LimitReader(opened, maxVisualizationTemplateUploadBytes+1))
+	if err != nil {
+		response.Error(c, "500000", "Failed to read file content: "+err.Error())
+		return
+	}
+	if len(content) > maxVisualizationTemplateUploadBytes {
+		response.Error(c, "500000", fmt.Sprintf("Template file exceeds %d bytes", maxVisualizationTemplateUploadBytes))
+		return
+	}
+
+	result, err := h.service.DecompressionLocalFile(content)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, permMiddleware *middleware.PermissionMiddleware) {
 	vg := r.Group("/dataVisualization")
 	{
@@ -753,6 +790,7 @@ func RegisterVisualizationRoutes(r *gin.RouterGroup, h *VisualizationHandler, pe
 		vg.GET("/viewDetailList/:dvId", h.ViewDetailList)
 		vg.POST("/appCanvasNameCheck", h.AppCanvasNameCheck)
 		vg.POST("/decompression", h.Decompression)
+		vg.POST("/decompressionLocalFile", h.DecompressionLocalFile)
 		vg.POST("/export2AppCheck", h.Export2AppCheck)
 		vg.POST("/exportLogApp", h.ExportLogApp)
 		vg.POST("/exportLogTemplate", h.ExportLogTemplate)

@@ -135,12 +135,13 @@ type ListResponse struct {
 
 // DecompressionRequest represents the template import request sent by the frontend.
 type DecompressionRequest struct {
-	NewFrom         string `json:"newFrom"`         // "new_inner_template" | "new_outer_template" | "new_market_template"
+	NewFrom         string `json:"newFrom"`         // "new_inner_template" | "new_outer_template" | "new_market_template" | "localFile"
 	TemplateID      *int64 `json:"templateId"`      // required for new_inner_template
 	ResourceName    string `json:"resourceName"`    // used by new_market_template
 	TemplateURL     string `json:"templateUrl"`     // used by new_market_template
 	Name            string `json:"name"`            // used by new_outer_template
 	Type            string `json:"type"`            // visualization type (dashboard/dataV)
+	Version         int    `json:"version"`         // used by local template file import
 	CanvasStyleData string `json:"canvasStyleData"` // used by new_outer_template
 	ComponentData   string `json:"componentData"`   // used by new_outer_template
 	DynamicData     string `json:"dynamicData"`     // used by new_outer_template
