@@ -24,7 +24,7 @@ import ShareGrid from '@/views/share/share/ShareGrid.vue'
 import ShareHandler from '@/views/share/share/ShareHandler.vue'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import { useEmbedded } from '@/store/modules/embedded'
-import { XpackComponent } from '@/components/plugin'
+import FillTaskList from '@/views/data-filling/fill/index.vue'
 const userStore = useUserStoreWithOut()
 const { resolve } = useRouter()
 const { t } = useI18n()
@@ -153,12 +153,11 @@ const baseTablePaneList = ref([
 
 const dfTablePaneList = ref([])
 
-const loadedDataFilling = data => {
-  if (!data?.name || !data?.title) {
-    return
-  }
-  dfTablePaneList.value.push(data)
-}
+dfTablePaneList.value.push({
+  title: '数据填报',
+  name: 'data-filling',
+  disabled: false
+})
 
 const busiAuthList = getBusiListWithPermission()
 
@@ -499,19 +498,12 @@ const getEmptyDesc = (): string => {
         </GridTable>
       </div>
     </template>
-    <XpackComponent
-      jsname="L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvZmlsbC9UYWJQYW5lVGFibGU="
-      v-if="activeName === 'data-filling'"
-    />
+    <FillTaskList v-if="activeName === 'data-filling'" />
   </div>
   <el-empty
     class="dashboard-type"
     v-else
     :description="t('work_branch.administrator_for_authorization')"
-  />
-  <XpackComponent
-    jsname="L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvZmlsbC9UYWJQYW5l"
-    @loaded="loadedDataFilling"
   />
 </template>
 

@@ -16,8 +16,10 @@ import { useEmbedded } from '@/store/modules/embedded'
 import { useTokenLifecycle } from '@/hooks/embedded/useTokenLifecycle'
 import { embeddedInitIframeApi } from '@/api/embedded'
 import { resolveEmbeddedOrigin } from '@/utils/embedded'
+import { useRouter } from 'vue-router_2'
 
 const { close } = useLoading()
+const router = useRouter()
 const embeddedStore = useEmbedded()
 const tokenLifecycle = useTokenLifecycle()
 const currentComponent = shallowRef()
@@ -38,8 +40,6 @@ const DashboardPanel = defineAsyncComponent(
   () => import('@/views/dashboard/DashboardPreviewShow.vue')
 )
 const TemplateManage = defineAsyncComponent(() => import('@/views/template/indexInject.vue'))
-
-const AsyncXpackComponent = defineAsyncComponent(() => import('@/components/plugin/src/index.vue'))
 
 const componentMap = {
   DashboardEditor,
@@ -72,7 +72,6 @@ onBeforeUnmount(() => {
 })
 
 const showComponent = ref(false)
-const dataFillingPath = ref('')
 
 const initIframe = async (name: string) => {
   if (embeddedStore.getToken) {
@@ -98,22 +97,18 @@ const initIframe = async (name: string) => {
   showComponent.value = false
   if (name && name.includes('DataFilling')) {
     if (name === 'DataFilling') {
-      dataFillingPath.value = 'L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvbWFuYWdlL2luZGV4'
+      router.push('/data-filling-manage')
     } else if (name === 'DataFillingEditor') {
-      dataFillingPath.value = 'L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvbWFuYWdlL2Zvcm0vaW5kZXg='
+      router.push({ path: '/data-filling-editor' })
     } else if (name === 'DataFillingHandler') {
-      dataFillingPath.value = 'L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvZmlsbC9UYWJQYW5lVGFibGU='
+      router.push('/data-filling-fill')
     }
-    nextTick(() => {
-      currentComponent.value = AsyncXpackComponent
-      showComponent.value = true
-    })
-  } else {
-    nextTick(() => {
-      currentComponent.value = componentMap[name || 'ViewWrapper']
-      showComponent.value = true
-    })
+    return
   }
+  nextTick(() => {
+    currentComponent.value = componentMap[name || 'ViewWrapper']
+    showComponent.value = true
+  })
 }
 
 useEmitt({
@@ -128,6 +123,6 @@ useEmitt({
     @init-iframe="initIframe"
   />
   <div :style="iframeStyle">
-    <component :is="currentComponent" :jsname="dataFillingPath" v-if="showComponent"></component>
+    <component :is="currentComponent" v-if="showComponent"></component>
   </div>
 </template>
