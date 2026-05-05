@@ -24,6 +24,7 @@ type VisualizationService struct {
 	repo                   *repository.VisualizationRepository
 	datasetRepo            *repository.DatasetRepository
 	resourcePermService    *ResourcePermissionService
+	staticService          *StaticService
 	templateService        *TemplateService
 	templateExtendDataRepo *repository.TemplateExtendDataRepository
 	auditService           *AuditService
@@ -38,6 +39,7 @@ type marketTemplateDTO struct {
 	ComponentData   json.RawMessage `json:"componentData"`
 	DynamicData     json.RawMessage `json:"dynamicData"`
 	AppData         json.RawMessage `json:"appData"`
+	StaticResource  json.RawMessage `json:"staticResource"`
 }
 
 const (
@@ -58,6 +60,10 @@ func (s *VisualizationService) SetResourcePermissionService(resourcePermSvc *Res
 
 func (s *VisualizationService) SetTemplateService(ts *TemplateService) {
 	s.templateService = ts
+}
+
+func (s *VisualizationService) SetStaticService(ss *StaticService) {
+	s.staticService = ss
 }
 
 func (s *VisualizationService) SetTemplateExtendDataRepo(r *repository.TemplateExtendDataRepository) {
@@ -999,7 +1005,7 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 	}
 	newDvID := int64(uuid.New().ID())
 
-	var templateStyle, templateData, dynamicData, name, dvType, appDataStr string
+	var templateStyle, templateData, dynamicData, name, dvType, appDataStr, staticResourceStr string
 	var version int
 
 	switch req.NewFrom {
@@ -1028,6 +1034,7 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		templateData = req.ComponentData
 		dynamicData = req.DynamicData
 		appDataStr = req.AppData
+		staticResourceStr = req.StaticResource
 		name = req.Name
 		dvType = req.Type
 		version = 3
@@ -1037,6 +1044,7 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		templateData = req.ComponentData
 		dynamicData = req.DynamicData
 		appDataStr = req.AppData
+		staticResourceStr = req.StaticResource
 		name = req.Name
 		dvType = req.Type
 		version = req.Version
@@ -1053,6 +1061,7 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		templateData = normalizeJSONPayload(tmpl.ComponentData)
 		dynamicData = normalizeJSONPayload(tmpl.DynamicData)
 		appDataStr = normalizeJSONPayload(tmpl.AppData)
+		staticResourceStr = normalizeJSONPayload(tmpl.StaticResource)
 		name = tmpl.Name
 		dvType = tmpl.DvType
 		version = tmpl.Version
@@ -1069,7 +1078,7 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		return nil, err
 	}
 
-	return &visualization.DecompressionResponse{
+	resp := &visualization.DecompressionResponse{
 		ID:              fmt.Sprintf("%d", newDvID),
 		Name:            name,
 		Type:            dvType,
@@ -1078,7 +1087,13 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 		ComponentData:   templateData,
 		AppData:         appDataStr,
 		CanvasViewInfo:  canvasViewInfo,
-	}, nil
+	}
+
+	if s.staticService != nil && strings.TrimSpace(staticResourceStr) != "" {
+		s.staticService.SaveFilesToServe(staticResourceStr)
+	}
+
+	return resp, nil
 }
 
 func (s *VisualizationService) DecompressionLocalFile(fileContent []byte) (*visualization.DecompressionResponse, error) {

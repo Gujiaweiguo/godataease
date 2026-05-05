@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -213,12 +215,15 @@ func TestVisualizationServiceHelpers(t *testing.T) {
 	t.Run("setter helpers wire dependencies", func(t *testing.T) {
 		svc, _, db := setupVisualizationServiceRepoTest(t)
 		templateSvc := &TemplateService{}
+		staticSvc := NewStaticService(nil, nil, nil)
 		tplRepo := repository.NewTemplateExtendDataRepository(db)
 
 		svc.SetTemplateService(templateSvc)
+		svc.SetStaticService(staticSvc)
 		svc.SetTemplateExtendDataRepo(tplRepo)
 
 		assert.Same(t, templateSvc, svc.templateService)
+		assert.Same(t, staticSvc, svc.staticService)
 		assert.Same(t, tplRepo, svc.templateExtendDataRepo)
 	})
 
@@ -1041,6 +1046,9 @@ func TestVisualizationService_Decompression(t *testing.T) {
 
 	t.Run("new_market_template fetches remote template payload", func(t *testing.T) {
 		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		tmpDir := t.TempDir()
+		t.Setenv("STATIC_RESOURCE_DIR", tmpDir)
+		svc.SetStaticService(NewStaticService(nil, nil, nil))
 		originalClient := marketTemplateHTTPClient
 		originalValidator := marketTemplateURLValidator
 		marketTemplateHTTPClient = &http.Client{Timeout: 10 * time.Second}
@@ -1052,7 +1060,7 @@ func TestVisualizationService_Decompression(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"name":"Market Template","dvType":"dashboard","version":3,"canvasStyleData":{"bg":"black"},"componentData":[{"id":"view_market_1"}],"dynamicData":{"view_market_1":{"title":"Remote Chart","type":"bar","tableId":9}},"appData":{"visualizationInfo":{"id":1}}}`))
+			_, _ = w.Write([]byte(`{"name":"Market Template","dvType":"dashboard","version":3,"canvasStyleData":{"bg":"black"},"componentData":[{"id":"view_market_1"}],"dynamicData":{"view_market_1":{"title":"Remote Chart","type":"bar","tableId":9}},"appData":{"visualizationInfo":{"id":1}},"staticResource":{"/static-resource/market-template.png":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}}`))
 		}))
 		defer server.Close()
 
@@ -1064,6 +1072,8 @@ func TestVisualizationService_Decompression(t *testing.T) {
 		assert.Equal(t, 3, resp.Version)
 		assert.Contains(t, resp.CanvasStyleData, `"bg":"black"`)
 		assert.Len(t, resp.CanvasViewInfo, 1)
+		_, err = os.Stat(filepath.Join(tmpDir, "market-template.png"))
+		assert.NoError(t, err)
 	})
 
 	t.Run("new_market_template rejects oversized response", func(t *testing.T) {
@@ -1096,6 +1106,9 @@ func TestVisualizationService_Decompression(t *testing.T) {
 
 	t.Run("new_outer_template returns correct response shape", func(t *testing.T) {
 		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		tmpDir := t.TempDir()
+		t.Setenv("STATIC_RESOURCE_DIR", tmpDir)
+		svc.SetStaticService(NewStaticService(nil, nil, nil))
 
 		dynamicData := `{"view_100": {"title": "Chart1", "type": "bar", "tableId": 5}}`
 		componentData := `[{"id":"view_100","type":"bar"}]`
@@ -1108,6 +1121,7 @@ func TestVisualizationService_Decompression(t *testing.T) {
 			CanvasStyleData: canvasStyleData,
 			ComponentData:   componentData,
 			DynamicData:     dynamicData,
+			StaticResource:  `{"/static-resource/outer-template.png":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}`,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -1130,6 +1144,8 @@ func TestVisualizationService_Decompression(t *testing.T) {
 			assert.Contains(t, resp.ComponentData, viewIDStr)
 			assert.NotContains(t, resp.ComponentData, "view_100")
 		}
+		_, err = os.Stat(filepath.Join(tmpDir, "outer-template.png"))
+		assert.NoError(t, err)
 	})
 
 	t.Run("appData keeps tableId for imported app templates", func(t *testing.T) {
@@ -1197,6 +1213,9 @@ func TestVisualizationService_Decompression(t *testing.T) {
 
 	t.Run("local file import reuses decompression flow", func(t *testing.T) {
 		svc, _, _ := setupVisualizationServiceRepoTest(t)
+		tmpDir := t.TempDir()
+		t.Setenv("STATIC_RESOURCE_DIR", tmpDir)
+		svc.SetStaticService(NewStaticService(nil, nil, nil))
 
 		resp, err := svc.DecompressionLocalFile([]byte(`{
 			"name":"Local Template",
@@ -1205,7 +1224,8 @@ func TestVisualizationService_Decompression(t *testing.T) {
 			"canvasStyleData":{"scale":100},
 			"componentData":[{"id":"view_local_1","component":"VChart"}],
 			"dynamicData":{"view_local_1":{"title":"Local Sales","type":"bar","tableId":5}},
-			"appData":{"visualizationInfo":{"id":1}}
+			"appData":{"visualizationInfo":{"id":1}},
+			"staticResource":{"/static-resource/local-template.svg":"PHN2Zz48L3N2Zz4="}
 		}`))
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -1218,6 +1238,8 @@ func TestVisualizationService_Decompression(t *testing.T) {
 			assert.Equal(t, int64(5), view["sourceTableId"])
 			assert.Equal(t, int64(5), view["tableId"])
 		}
+		_, err = os.Stat(filepath.Join(tmpDir, "local-template.svg"))
+		assert.NoError(t, err)
 	})
 }
 
