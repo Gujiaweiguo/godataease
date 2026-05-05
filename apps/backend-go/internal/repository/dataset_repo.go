@@ -100,6 +100,17 @@ func (r *DatasetRepository) CreateGroup(group *dataset.CoreDatasetGroup) error {
 	return r.db.Create(group).Error
 }
 
+func (r *DatasetRepository) CreateTable(table *dataset.CoreDatasetTable) error {
+	return r.db.Create(table).Error
+}
+
+func (r *DatasetRepository) BatchCreateFields(fields []dataset.CoreDatasetTableField) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Create(&fields).Error
+}
+
 func (r *DatasetRepository) UpdateGroup(group *dataset.CoreDatasetGroup) error {
 	return r.db.Save(group).Error
 }

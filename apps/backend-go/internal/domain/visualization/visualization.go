@@ -63,16 +63,20 @@ func (DataVisualizationInfo) TableName() string {
 }
 
 type SaveRequest struct {
-	Name            string                            `json:"name" binding:"required"`
-	PID             *int64                            `json:"pid"`
-	Type            *string                           `json:"type"`
-	NodeType        *string                           `json:"nodeType"`
-	CanvasStyleData *string                           `json:"canvasStyleData"`
-	ComponentData   *string                           `json:"componentData"`
-	MobileLayout    *bool                             `json:"mobileLayout"`
-	ContentID       *string                           `json:"contentId"`
-	CheckVersion    *string                           `json:"checkVersion"`
-	CanvasViewInfo  map[string]map[string]interface{} `json:"canvasViewInfo"`
+	Name              string                            `json:"name" binding:"required"`
+	PID               *int64                            `json:"pid"`
+	Type              *string                           `json:"type"`
+	NodeType          *string                           `json:"nodeType"`
+	CanvasStyleData   *string                           `json:"canvasStyleData"`
+	ComponentData     *string                           `json:"componentData"`
+	MobileLayout      *bool                             `json:"mobileLayout"`
+	ContentID         *string                           `json:"contentId"`
+	CheckVersion      *string                           `json:"checkVersion"`
+	CanvasViewInfo    map[string]map[string]interface{} `json:"canvasViewInfo"`
+	AppData           string                            `json:"appData"`
+	DataType          *string                           `json:"dataType"`
+	DatasetFolderPID  *int64                            `json:"datasetFolderPid"`
+	DatasetFolderName *string                           `json:"datasetFolderName"`
 }
 
 type CopyRequest struct {

@@ -12,6 +12,7 @@ type CoreDatasetGroup struct {
 	Level          *int    `gorm:"column:level" json:"level"`
 	NodeType       *string `gorm:"column:node_type" json:"nodeType"`
 	Type           *string `gorm:"column:type" json:"type"`
+	Info           *string `gorm:"column:info" json:"info"`
 	DelFlag        *int    `gorm:"column:del_flag" json:"delFlag"`
 	CreateBy       string  `gorm:"column:create_by" json:"createBy"`
 	CreateTime     int64   `gorm:"column:create_time" json:"createTime"`
@@ -30,6 +31,7 @@ type CoreDatasetTable struct {
 	DatasetGroupID int64   `gorm:"column:dataset_group_id" json:"datasetGroupId"`
 	PhysicalTable  *string `gorm:"column:table_name" json:"tableName"`
 	Type           *string `gorm:"column:type" json:"type"`
+	Info           *string `gorm:"column:info" json:"info"`
 	SQLVariables   *string `gorm:"column:sql_variable_details" json:"sqlVariableDetails"`
 }
 
