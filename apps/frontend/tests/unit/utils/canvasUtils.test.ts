@@ -99,7 +99,9 @@ import {
   filterEmptyFolderTree,
   findParentIdByChildIdRecursive,
   componentPreSort,
-  getMapElementIds
+  getMapElementIds,
+  findComponentIndexByIdWithFilterHidden,
+  findComponentIndexById
 } from '@/utils/canvasUtils'
 
 describe('canvasUtils', () => {
@@ -188,11 +190,36 @@ describe('canvasUtils', () => {
     })
 
     it('should return true for tab canvas', () => {
-      expect(isTabCanvas('tab-456')).toBe(true)
+      expect(isGroupOrTabCanvas('tab-456')).toBe(true)
     })
 
     it('should return false for main canvas', () => {
       expect(isGroupOrTabCanvas('canvas-main')).toBe(false)
+    })
+  })
+
+  describe('component location helpers', () => {
+    it('should return filtered index for visible components', () => {
+      const components = [
+        { id: 'hidden-1', dashboardHidden: true },
+        { id: 'visible-1', dashboardHidden: false },
+        { id: 'visible-2' }
+      ]
+
+      expect(findComponentIndexByIdWithFilterHidden('visible-1', components)).toBe(0)
+      expect(findComponentIndexByIdWithFilterHidden('visible-2', components)).toBe(1)
+      expect(findComponentIndexByIdWithFilterHidden('hidden-1', components)).toBe(-1)
+    })
+
+    it('should return raw index for components', () => {
+      const components = [
+        { id: 'first' },
+        { id: 'second' },
+        { id: 'third' }
+      ]
+
+      expect(findComponentIndexById('second', components)).toBe(1)
+      expect(findComponentIndexById('missing', components)).toBe(-1)
     })
   })
 

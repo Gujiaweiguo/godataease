@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { dvMainStore } from '@/store/modules/data-visualization/dvMain'
+import { useEmitt } from '@/hooks/web/useEmitt'
 
 // Mock dependencies
 vi.mock('@/hooks/web/useEmitt', async () => {
@@ -246,6 +247,123 @@ describe('dvMain Store', () => {
       }
       store.setCanvasViewInfo(viewInfo)
       expect(store.canvasViewInfo).toEqual(viewInfo)
+    })
+  })
+
+  describe('setCanvasStyleScale', () => {
+    it('should update canvas scale', () => {
+      const store = dvMainStore()
+      store.setCanvasStyleScale(1.5)
+      expect(store.canvasStyleData.scale).toBe(1.5)
+    })
+  })
+
+  describe('setLastHiddenComponent', () => {
+    it('should set and clear last hidden component', () => {
+      const store = dvMainStore()
+      store.setLastHiddenComponent({ id: 'hidden-1' })
+      expect(store.lastHiddenComponent).toEqual([{ id: 'hidden-1' }])
+
+      store.setLastHiddenComponent()
+      expect(store.lastHiddenComponent).toEqual([])
+    })
+  })
+
+  describe('setCurComponent', () => {
+    it('should update current component and index', () => {
+      const store = dvMainStore()
+      const components = [
+        { id: 'comp-1', canvasId: 'canvas-main', category: 'base', style: {} },
+        { id: 'comp-2', canvasId: 'canvas-main', category: 'base', style: {} }
+      ]
+      store.setComponentData(components)
+      store.setCurComponent({ component: components[1], index: 1 })
+
+      expect(store.curComponent).toEqual(components[1])
+      expect(store.curComponentIndex).toBe(1)
+      expect(store.canvasState.curPointArea).toBe('base')
+    })
+  })
+
+  describe('copy component helpers', () => {
+    it('should add copied component on main canvas and remap canvas view info', () => {
+      const store = dvMainStore()
+      store.setComponentData([])
+      store.setCanvasViewInfo({
+        'old-view-1': { id: 'old-view-1', title: 'Old Chart' }
+      })
+
+      store.addCopyComponent(
+        { id: 'new-view-1', canvasId: 'canvas-main', component: 'UserView' },
+        { 'old-view-1': 'new-view-1' },
+        store.canvasViewInfo
+      )
+
+      expect(store.componentData).toHaveLength(1)
+      expect(store.componentData[0].id).toBe('new-view-1')
+      expect(store.canvasViewInfo['new-view-1']).toEqual({
+        id: 'new-view-1',
+        title: 'Old Chart',
+        linkageActive: false,
+        jumpActive: false,
+        customAttrMobile: null,
+        customStyleMobile: null
+      })
+    })
+
+    it('should remap multiple canvas view infos directly', () => {
+      const store = dvMainStore()
+      store.setCanvasViewInfo({
+        'old-a': { id: 'old-a', title: 'A' },
+        'old-b': { id: 'old-b', title: 'B' }
+      })
+
+      store.updateCopyCanvasView(
+        {
+          'old-a': 'new-a',
+          'old-b': 'new-b'
+        },
+        store.canvasViewInfo
+      )
+
+      expect(store.canvasViewInfo['new-a'].id).toBe('new-a')
+      expect(store.canvasViewInfo['new-b'].id).toBe('new-b')
+      expect(store.canvasViewInfo['new-a'].linkageActive).toBe(false)
+      expect(store.canvasViewInfo['new-b'].jumpActive).toBe(false)
+    })
+  })
+
+  describe('deletion and linkage helpers', () => {
+    it('should delete component by id', () => {
+      const store = dvMainStore()
+      store.setComponentData([
+        { id: 'keep', component: 'UserView' },
+        { id: 'remove', component: 'UserView' }
+      ])
+
+      store.deleteComponentById('remove')
+
+      expect(store.componentData).toHaveLength(1)
+      expect(store.componentData[0].id).toBe('keep')
+    })
+
+    it('should clear matching linkage filters and emit refresh', () => {
+      const store = dvMainStore()
+      store.setComponentData([
+        {
+          id: 'view-1',
+          component: 'UserView',
+          innerType: 'bar',
+          linkageFilters: [{ sourceViewId: 'source-1' }, { sourceViewId: 'source-2' }]
+        }
+      ])
+
+      store.clearViewLinkage('source-1')
+
+      expect(store.componentData[0].linkageFilters).toEqual([
+        { sourceViewId: 'source-2' }
+      ])
+      expect(useEmitt().emitter.emit).toHaveBeenCalledWith('query-data-view-1')
     })
   })
 
