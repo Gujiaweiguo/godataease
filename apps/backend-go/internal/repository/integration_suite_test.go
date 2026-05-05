@@ -16,6 +16,7 @@ import (
 	datafillingdomain "dataease/backend/internal/domain/datafilling"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/domain/embedded"
 	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
@@ -79,11 +80,18 @@ func TestMain(m *testing.M) {
 		&auto.SnapshotVisualizationLinkJumpTargetViewInfo{},
 		&system.SysVariable{}, &system.SysVariableValue{},
 		&coreShare{}, &coreShareTicket{},
+		&coreExportTask{},
 		&coreVisualizationTemplate{},
+		&embedded.CoreEmbedded{},
+		&coreTicket{},
+		&auto.CoreDatasourceTask{},
 		&auto.CoreDatasourceTaskLog{},
+		&auto.SnapshotVisualizationLinkage{}, &auto.SnapshotVisualizationLinkageField{},
+		&coreSysSettingMigration{},
 		&auto.XpackThresholdInfo{}, &auto.XpackThresholdInstance{},
 		&datafillingdomain.DataFillingForm{}, &datafillingdomain.DfCommitLog{},
 		&datafillingdomain.DataFillingTask{}, &datafillingdomain.DataFillingSubTask{}, &datafillingdomain.DataFillingSubInstance{},
+		&permission.DataPermRow{}, &permission.DataPermColumn{},
 	); err != nil {
 		log.Fatalf("Failed to migrate: %v", err)
 	}
@@ -117,4 +125,16 @@ func cleanupTables(tables ...string) {
 			panic(fmt.Sprintf("truncate table %s failed: %v", table, err))
 		}
 	}
+}
+
+type coreSysSettingMigration struct {
+	ID   int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	Pkey string `gorm:"column:pkey;type:varchar(255)"`
+	Pval string `gorm:"column:pval;type:text"`
+	Type string `gorm:"column:type;type:varchar(64)"`
+	Sort int    `gorm:"column:sort"`
+}
+
+func (coreSysSettingMigration) TableName() string {
+	return "core_sys_setting"
 }
