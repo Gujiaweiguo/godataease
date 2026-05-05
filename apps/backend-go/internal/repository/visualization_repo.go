@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -302,4 +303,99 @@ func (r *VisualizationRepository) FindLinkJumpTargetViewInfosByDvID(dvID int64) 
 		INNER JOIN visualization_link_jump ON visualization_link_jump.id = visualization_link_jump_info.link_jump_id
 		WHERE visualization_link_jump.source_dv_id = ?`, dvID).Scan(&results).Error
 	return results, err
+}
+
+func (r *VisualizationRepository) CopyChartViews(sourceDvID, newDvID, copyID int64, resourceTable string) error {
+	sourceTable := "core_chart_view"
+	targetTable := "core_chart_view"
+	if resourceTable == "snapshot" {
+		sourceTable = "snapshot_core_chart_view"
+		targetTable = "snapshot_core_chart_view"
+	}
+
+	sql := fmt.Sprintf(`
+		INSERT INTO %s (id, title, scene_id, table_id, type, render, result_count, result_mode,
+			x_axis, x_axis_ext, y_axis, y_axis_ext, ext_stack, ext_bubble, ext_label, ext_tooltip,
+			custom_attr, custom_attr_mobile, custom_style, custom_style_mobile, custom_filter,
+			drill_fields, senior, create_by, create_time, update_time, snapshot, style_priority,
+			chart_type, is_plugin, data_from, view_fields, refresh_view_enable, refresh_unit, refresh_time,
+			linkage_active, jump_active, copy_from, copy_id, flow_map_start_name, flow_map_end_name, ext_color)
+		SELECT ccv.id + ?, title, ? AS scene_id, table_id, type, render, result_count, result_mode,
+			x_axis, x_axis_ext, y_axis, y_axis_ext, ext_stack, ext_bubble, ext_label, ext_tooltip,
+			custom_attr, custom_attr_mobile, custom_style, custom_style_mobile, custom_filter,
+			drill_fields, senior, create_by, create_time, update_time, snapshot, style_priority,
+			chart_type, is_plugin, data_from, view_fields, refresh_view_enable, refresh_unit, refresh_time,
+			linkage_active, jump_active, ccv.id AS copy_from, ? AS copy_id,
+			flow_map_start_name, flow_map_end_name, ext_color
+		FROM %s ccv WHERE ccv.scene_id = ?`, targetTable, sourceTable)
+
+	return r.db.Exec(sql, copyID, newDvID, copyID, sourceDvID).Error
+}
+
+func (r *VisualizationRepository) GetCopiedChartViewMapping(copyID int64) (map[int64]int64, error) {
+	type viewMapping struct {
+		CopyFrom int64 `gorm:"column:copy_from"`
+		ID       int64 `gorm:"column:id"`
+	}
+
+	var rows []viewMapping
+	if err := r.db.Raw(`SELECT copy_from, id FROM core_chart_view WHERE copy_id = ?`, copyID).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	mapping := make(map[int64]int64, len(rows))
+	for _, row := range rows {
+		mapping[row.CopyFrom] = row.ID
+	}
+	return mapping, nil
+}
+
+func (r *VisualizationRepository) CopyLinkages(copyID int64) error {
+	return r.db.Exec(`
+		INSERT INTO visualization_linkage (id, dv_id, source_view_id, target_view_id, update_time, update_people, linkage_active, ext1, ext2, copy_from, copy_id)
+		SELECT vl.id + ?, pv_source.t_dv_id, pv_source.t_chart_view_id, pv_target.t_chart_view_id, vl.update_time, vl.update_people, vl.linkage_active, vl.ext1, vl.ext2, vl.id, ?
+		FROM visualization_linkage vl
+		INNER JOIN (SELECT pvs.scene_id AS s_dv_id, pvs.id AS s_chart_view_id, pvt.scene_id AS t_dv_id, pvt.id AS t_chart_view_id
+			FROM core_chart_view pvt INNER JOIN core_chart_view pvs ON pvt.copy_from = pvs.id WHERE pvt.copy_id = ?) pv_source
+			ON vl.dv_id = pv_source.s_dv_id AND vl.source_view_id = pv_source.s_chart_view_id
+		INNER JOIN (SELECT pvs.scene_id AS s_dv_id, pvs.id AS s_chart_view_id, pvt.scene_id AS t_dv_id, pvt.id AS t_chart_view_id
+			FROM core_chart_view pvt INNER JOIN core_chart_view pvs ON pvt.copy_from = pvs.id WHERE pvt.copy_id = ?) pv_target
+			ON vl.dv_id = pv_target.s_dv_id AND vl.target_view_id = pv_target.s_chart_view_id`, copyID, copyID, copyID, copyID).Error
+}
+
+func (r *VisualizationRepository) CopyLinkageFields(copyID int64) error {
+	return r.db.Exec(`
+		INSERT INTO visualization_linkage_field (id, linkage_id, source_field, target_field, update_time, copy_from, copy_id)
+		SELECT vlf.id + ?, pvlf_copy.t_id, vlf.source_field, vlf.target_field, vlf.update_time, vlf.id, ?
+		FROM visualization_linkage_field vlf
+		INNER JOIN (SELECT id AS t_id, copy_from AS s_id FROM visualization_linkage WHERE copy_id = ?) pvlf_copy
+			ON vlf.linkage_id = pvlf_copy.s_id`, copyID, copyID, copyID).Error
+}
+
+func (r *VisualizationRepository) CopyLinkJumps(copyID int64) error {
+	return r.db.Exec(`
+		INSERT INTO visualization_link_jump (id, source_dv_id, source_view_id, link_jump_info, checked, copy_from, copy_id)
+		SELECT vlj.id + ?, dv_view_copy.t_dv_id, dv_view_copy.t_chart_view_id, vlj.link_jump_info, vlj.checked, vlj.id, ?
+		FROM visualization_link_jump vlj
+		INNER JOIN (SELECT pvs.scene_id AS s_dv_id, pvs.id AS s_chart_view_id, pvt.scene_id AS t_dv_id, pvt.id AS t_chart_view_id
+			FROM core_chart_view pvt INNER JOIN core_chart_view pvs ON pvt.copy_from = pvs.id WHERE pvt.copy_id = ?) dv_view_copy
+			ON vlj.source_dv_id = dv_view_copy.s_dv_id AND vlj.source_view_id = dv_view_copy.s_chart_view_id`, copyID, copyID, copyID).Error
+}
+
+func (r *VisualizationRepository) CopyLinkJumpInfos(copyID int64) error {
+	return r.db.Exec(`
+		INSERT INTO visualization_link_jump_info (id, link_jump_id, link_type, jump_type, target_dv_id, source_field_id, content, checked, attach_params, copy_from, copy_id)
+		SELECT vlji.id + ?, plj_copy.t_id, vlji.link_type, vlji.jump_type, vlji.target_dv_id, vlji.source_field_id, vlji.content, vlji.checked, vlji.attach_params, vlji.id, ?
+		FROM visualization_link_jump_info vlji
+		INNER JOIN (SELECT id AS t_id, copy_from AS s_id FROM visualization_link_jump WHERE copy_id = ?) plj_copy
+			ON vlji.link_jump_id = plj_copy.s_id`, copyID, copyID, copyID).Error
+}
+
+func (r *VisualizationRepository) CopyLinkJumpTargetInfos(copyID int64) error {
+	return r.db.Exec(`
+		INSERT INTO visualization_link_jump_target_view_info (target_id, link_jump_info_id, source_field_active_id, target_view_id, target_field_id, copy_from, copy_id)
+		SELECT vljtvi.target_id + ?, plji_copy.t_id, vljtvi.source_field_active_id, vljtvi.target_view_id, vljtvi.target_field_id, vljtvi.target_id, ?
+		FROM visualization_link_jump_target_view_info vljtvi
+		INNER JOIN (SELECT id AS t_id, copy_from AS s_id FROM visualization_link_jump_info WHERE copy_id = ?) plji_copy
+			ON vljtvi.link_jump_info_id = plji_copy.s_id`, copyID, copyID, copyID).Error
 }

@@ -25,9 +25,120 @@ func setupVisualizationServiceRepoTest(t *testing.T) (*VisualizationService, *re
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&visualization.DataVisualizationInfo{}))
+	require.NoError(t, createVisualizationCopyTables(db))
 
 	repo := repository.NewVisualizationRepository(db)
 	return NewVisualizationService(repo), repo, db
+}
+
+func createVisualizationCopyTables(db *gorm.DB) error {
+	statements := []string{
+		`CREATE TABLE core_chart_view (
+			id INTEGER PRIMARY KEY,
+			title TEXT,
+			scene_id INTEGER,
+			table_id INTEGER,
+			type TEXT,
+			render TEXT,
+			result_count INTEGER,
+			result_mode TEXT,
+			x_axis TEXT,
+			x_axis_ext TEXT,
+			y_axis TEXT,
+			y_axis_ext TEXT,
+			ext_stack TEXT,
+			ext_bubble TEXT,
+			ext_label TEXT,
+			ext_tooltip TEXT,
+			custom_attr TEXT,
+			custom_attr_mobile TEXT,
+			custom_style TEXT,
+			custom_style_mobile TEXT,
+			custom_filter TEXT,
+			drill_fields TEXT,
+			senior TEXT,
+			create_by TEXT,
+			create_time INTEGER,
+			update_time INTEGER,
+			snapshot TEXT,
+			style_priority INTEGER,
+			chart_type TEXT,
+			is_plugin INTEGER,
+			data_from TEXT,
+			view_fields TEXT,
+			refresh_view_enable INTEGER,
+			refresh_unit TEXT,
+			refresh_time INTEGER,
+			linkage_active INTEGER,
+			jump_active INTEGER,
+			copy_from INTEGER,
+			copy_id INTEGER,
+			flow_map_start_name TEXT,
+			flow_map_end_name TEXT,
+			ext_color TEXT
+		)`,
+		`CREATE TABLE snapshot_core_chart_view AS SELECT * FROM core_chart_view WHERE 1 = 0`,
+		`CREATE TABLE visualization_linkage (
+			id INTEGER PRIMARY KEY,
+			dv_id INTEGER,
+			source_view_id INTEGER,
+			target_view_id INTEGER,
+			update_time INTEGER,
+			update_people TEXT,
+			linkage_active INTEGER,
+			ext1 TEXT,
+			ext2 TEXT,
+			copy_from INTEGER,
+			copy_id INTEGER
+		)`,
+		`CREATE TABLE visualization_linkage_field (
+			id INTEGER PRIMARY KEY,
+			linkage_id INTEGER,
+			source_field TEXT,
+			target_field TEXT,
+			update_time INTEGER,
+			copy_from INTEGER,
+			copy_id INTEGER
+		)`,
+		`CREATE TABLE visualization_link_jump (
+			id INTEGER PRIMARY KEY,
+			source_dv_id INTEGER,
+			source_view_id INTEGER,
+			link_jump_info TEXT,
+			checked INTEGER,
+			copy_from INTEGER,
+			copy_id INTEGER
+		)`,
+		`CREATE TABLE visualization_link_jump_info (
+			id INTEGER PRIMARY KEY,
+			link_jump_id INTEGER,
+			link_type TEXT,
+			jump_type TEXT,
+			target_dv_id INTEGER,
+			source_field_id INTEGER,
+			content TEXT,
+			checked INTEGER,
+			attach_params TEXT,
+			copy_from INTEGER,
+			copy_id INTEGER
+		)`,
+		`CREATE TABLE visualization_link_jump_target_view_info (
+			target_id INTEGER PRIMARY KEY,
+			link_jump_info_id INTEGER,
+			source_field_active_id INTEGER,
+			target_view_id INTEGER,
+			target_field_id INTEGER,
+			copy_from INTEGER,
+			copy_id INTEGER
+		)`,
+	}
+
+	for _, statement := range statements {
+		if err := db.Exec(statement).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setupVisualizationServiceWithPermTest(t *testing.T) (*VisualizationService, *repository.VisualizationRepository, *mockResourcePermRepo, *gorm.DB) {
@@ -352,6 +463,8 @@ func TestVisualizationService_CopyNameCheckCanvasAndBackfill(t *testing.T) {
 		assert.Equal(t, newPID, *item.PID)
 		require.NotNil(t, item.Type)
 		assert.Equal(t, "dashboard", *item.Type)
+		require.NotNil(t, item.NodeType)
+		assert.Equal(t, "leaf", *item.NodeType)
 		require.NotNil(t, item.ContentID)
 		assert.Equal(t, "cid-1", *item.ContentID)
 	})
@@ -656,6 +769,7 @@ func TestVisualizationService_CopyAndUpdateExtraBranches(t *testing.T) {
 
 		_, err := svc.Copy(&visualization.CopyRequest{ID: 999, Name: "missing"}, "tester")
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "source visualization not found")
 
 		typ := "dashboard"
 		nodeType := "panel"
@@ -676,7 +790,7 @@ func TestVisualizationService_CopyAndUpdateExtraBranches(t *testing.T) {
 		require.NotNil(t, copied.Type)
 		assert.Equal(t, "dataV", *copied.Type)
 		require.NotNil(t, copied.NodeType)
-		assert.Equal(t, "screen", *copied.NodeType)
+		assert.Equal(t, "leaf", *copied.NodeType)
 		require.NotNil(t, copied.MobileLayout)
 		assert.True(t, *copied.MobileLayout)
 	})
