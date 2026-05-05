@@ -197,9 +197,8 @@ func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy str
 	if err := s.repo.CopyChartViews(req.ID, newDvID, copyID, "core"); err != nil {
 		return 0, fmt.Errorf("copy chart views (core): %w", err)
 	}
-	if err := s.repo.CopyChartViews(req.ID, newDvID, copyID, "snapshot"); err != nil {
-		// snapshot data is optional for copied dashboards
-	}
+	// Snapshot table copy is best-effort; the source may have no snapshot rows.
+	_ = s.repo.CopyChartViews(req.ID, newDvID, copyID, "snapshot")
 
 	componentData := source.ComponentData
 	viewMapping, err := s.repo.GetCopiedChartViewMapping(copyID)
