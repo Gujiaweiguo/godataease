@@ -17,7 +17,7 @@ import 'vant/es/tab/style'
 import 'vant/es/nav-bar/style'
 import 'vant/es/tabs/style'
 import { cloneDeep, map } from 'lodash-es'
-import { XpackComponent } from '@/components/plugin'
+import FillTaskList from '@/views/data-filling/fill/index.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -105,13 +105,12 @@ const shortName = {
   share: '分享'
 }
 
-const loadedDataFilling = data => {
-  if (!data?.name || !data?.title) {
-    return
-  }
-  dfTablePaneList.value.push(data)
-  shortName[data.name] = data.shortName
-}
+dfTablePaneList.value.push({
+  title: '数据填报',
+  name: 'data-filling',
+  disabled: false
+})
+shortName['data-filling'] = '填报'
 
 const setEmptyTips = () => {
   emptyTips.value = state.tableData.length ? '' : `暂无${shortName[activeTab.value]}`
@@ -193,10 +192,7 @@ const formatterTime = val => {
           :time="formatterTime(ele.lastEditTime || ele.time)"
         />
       </template>
-      <XpackComponent
-        jsname="L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvZmlsbC9UYWJQYW5lVGFibGU="
-        v-else-if="activeTab === 'data-filling'"
-      />
+      <FillTaskList v-else-if="activeTab === 'data-filling'" />
     </div>
     <div class="empty-img-mobile" v-if="!!emptyTips">
       <img width="125" height="125" :src="nothingNone" alt="" />
@@ -206,10 +202,6 @@ const formatterTime = val => {
     </div>
   </div>
 
-  <XpackComponent
-    jsname="L21lbnUvZGF0YS9kYXRhLWZpbGxpbmcvZmlsbC9UYWJQYW5l"
-    @loaded="loadedDataFilling"
-  />
 </template>
 
 <style lang="less" scoped>

@@ -239,6 +239,48 @@ export const routes: AppRouteRecordRaw[] = [
     hidden: true,
     meta: {},
     component: () => import('@/views/visualized/data/datasource/index.vue')
+  },
+  {
+    path: '/data-filling-manage',
+    name: 'data-filling-manage',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/data-filling/manage/index.vue')
+  },
+  {
+    path: '/data-filling-editor',
+    name: 'data-filling-editor',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/data-filling/manage/form/index.vue')
+  },
+  {
+    path: '/data-filling-data',
+    name: 'data-filling-data',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/data-filling/manage/data/index.vue')
+  },
+  {
+    path: '/data-filling-tasks',
+    name: 'data-filling-tasks',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/data-filling/manage/task/index.vue')
+  },
+  {
+    path: '/data-filling-fill',
+    name: 'data-filling-fill',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/data-filling/fill/index.vue')
+  },
+  {
+    path: '/data-filling-fill-task',
+    name: 'data-filling-fill-task',
+    hidden: true,
+    meta: {},
+    component: () => import('@/views/data-filling/fill/TaskFill.vue')
   }
 ]
 
