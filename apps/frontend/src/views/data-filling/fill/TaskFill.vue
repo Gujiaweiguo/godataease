@@ -14,27 +14,9 @@ import {
   userTaskConfirmUpload
 } from '@/api/datafilling'
 import FormSchemaRenderer from '@/views/data-filling/components/FormSchemaRenderer.vue'
-import type { DataFillingFormSchema, FormFieldConfig, FormFieldOption, FormFieldValue } from '@/views/data-filling/types'
-
-type BackendFieldOption = {
-  name?: unknown
-  value?: unknown
-}
-
-type BackendFieldMapping = {
-  columnName?: unknown
-  type?: unknown
-  accuracy?: unknown
-}
-
-type BackendFieldSettings = {
-  name?: unknown
-  required?: unknown
-  mapping?: BackendFieldMapping
-  placeholder?: unknown
-  multiple?: unknown
-  options?: BackendFieldOption[]
-}
+import type { DataFillingFormSchema, FormFieldValue } from '@/views/data-filling/types'
+import { isBlankPayload, isEmptyFieldValue } from '@/views/data-filling/utils/dataHelpers'
+import { isRecord, parseFormSchema as parseSchema, resolveFieldKey } from '@/views/data-filling/utils/schemaParser'
 
 interface FillRowItem {
   localId: string
@@ -94,134 +76,6 @@ const pageDescription = computed(() => {
   return '支持逐行新增、编辑、删除与 Excel 追加，提交后会同步更新当前任务。'
 })
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-const normalizeFieldType = (value: unknown): string => {
-  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'text'
-}
-
-const resolveFieldTypeFromMapping = (value: unknown): string => {
-  const mappingType = normalizeFieldType(value)
-
-  if (mappingType === 'nvarchar') {
-    return 'text'
-  }
-
-  return ['text', 'number', 'decimal', 'date', 'datetime', 'select'].includes(mappingType) ? mappingType : 'text'
-}
-
-const normalizeOptions = (value: unknown): FormFieldOption[] => {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value.reduce<FormFieldOption[]>((result, item) => {
-    if (isRecord(item)) {
-      const optionName = item.name ?? item.label ?? item.value
-      const optionValue = item.value ?? item.name ?? item.label
-      if (optionName != null && optionValue != null) {
-        result.push({
-          name: String(optionName),
-          value: String(optionValue),
-          disabled: Boolean(item.disabled),
-          description: item.description ? String(item.description) : undefined
-        })
-      }
-      return result
-    }
-
-    if (typeof item === 'string' || typeof item === 'number') {
-      result.push({
-        name: String(item),
-        value: String(item)
-      })
-    }
-    return result
-  }, [])
-}
-
-const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null => {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  const settings = isRecord(value.settings) ? (value.settings as BackendFieldSettings) : undefined
-  const mapping = settings && isRecord(settings.mapping) ? (settings.mapping as BackendFieldMapping) : undefined
-  const fieldName = typeof mapping?.columnName === 'string' && mapping.columnName.trim() ? mapping.columnName.trim() : undefined
-  const legacyName = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined
-  const legacyField = typeof value.field === 'string' && value.field.trim() ? value.field.trim() : undefined
-  const labelSource = typeof settings?.name === 'string' && settings.name.trim() ? settings.name.trim() : undefined
-  const legacyLabel = typeof value.label === 'string' && value.label.trim() ? value.label.trim() : undefined
-  const name = fieldName ?? legacyName ?? legacyField ?? `field_${index + 1}`
-  const label = labelSource ?? legacyLabel ?? legacyName ?? `字段 ${index + 1}`
-  const explicitType = value.type ?? value.fieldType
-
-  return {
-    id: typeof value.id === 'string' || typeof value.id === 'number' ? value.id : undefined,
-    field: fieldName ?? legacyField ?? name,
-    name,
-    label,
-    type: explicitType != null ? normalizeFieldType(explicitType) : resolveFieldTypeFromMapping(mapping?.type),
-    required: settings ? Boolean(settings.required) : Boolean(value.required),
-    placeholder:
-      typeof settings?.placeholder === 'string'
-        ? settings.placeholder
-        : typeof value.placeholder === 'string'
-        ? value.placeholder
-        : undefined,
-    defaultValue:
-      typeof value.defaultValue === 'string' ||
-      typeof value.defaultValue === 'number' ||
-      typeof value.defaultValue === 'boolean' ||
-      value.defaultValue == null ||
-      Array.isArray(value.defaultValue) ||
-      isRecord(value.defaultValue)
-        ? (value.defaultValue as FormFieldValue)
-        : undefined,
-    order: typeof value.order === 'number' ? value.order : index,
-    options: normalizeOptions(value.options ?? value.optionList ?? settings?.options),
-    precision:
-      typeof value.precision === 'number'
-        ? value.precision
-        : typeof mapping?.accuracy === 'number'
-        ? mapping.accuracy
-        : undefined,
-    format: value.format ? String(value.format) : undefined,
-    multiple: settings ? Boolean(settings.multiple) : Boolean(value.multiple),
-    extra: isRecord(value.extra) ? value.extra : undefined
-  }
-}
-
-const parseSchema = (forms: string): DataFillingFormSchema => {
-  if (!forms.trim()) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(forms) as unknown
-    const source = Array.isArray(parsed)
-      ? parsed
-      : isRecord(parsed) && Array.isArray(parsed.fields)
-      ? parsed.fields
-      : isRecord(parsed) && Array.isArray(parsed.forms)
-      ? parsed.forms
-      : []
-
-    return source
-      .map((item, index) => toFieldConfig(item, index))
-      .filter((item): item is FormFieldConfig => item !== null)
-      .sort((prev, next) => (prev.order ?? 0) - (next.order ?? 0))
-  } catch {
-    return []
-  }
-}
-
-const resolveFieldKey = (field: FormFieldConfig, index: number) => {
-  return field.field || field.name || `field_${index + 1}`
-}
-
 const createEmptyModel = () => {
   return formSchema.value.reduce<Record<string, FormFieldValue>>((result, field, index) => {
     const fieldKey = resolveFieldKey(field, index)
@@ -255,13 +109,6 @@ const buildRowModel = (row: Record<string, unknown>) => {
   return nextModel
 }
 
-const isEmptyFieldValue = (value: FormFieldValue | undefined) => {
-  if (Array.isArray(value)) {
-    return value.length === 0
-  }
-  return value === undefined || value === null || value === ''
-}
-
 const sanitizeRowPayload = (row: FillRowItem) => {
   const payload = formSchema.value.reduce<Record<string, FormFieldValue>>((result, field, index) => {
     const fieldKey = resolveFieldKey(field, index)
@@ -275,14 +122,6 @@ const sanitizeRowPayload = (row: FillRowItem) => {
     payload.id = row.model.id
   }
   return payload
-}
-
-const isBlankPayload = (payload: Record<string, FormFieldValue>) => {
-  const keys = Object.keys(payload).filter(key => key !== 'id')
-  if (!keys.length) {
-    return true
-  }
-  return keys.every(key => isEmptyFieldValue(payload[key]))
 }
 
 const validateRows = (payloadRows: Record<string, FormFieldValue>[]) => {
