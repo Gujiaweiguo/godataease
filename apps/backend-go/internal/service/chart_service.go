@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,9 @@ type ChartRepository interface {
 	GetByID(id int64) (*chart.CoreChartView, error)
 	Update(view *chart.CoreChartView) error
 	QueryRows(chartID int64, limit int) ([]map[string]interface{}, int64, error)
+	QueryViewOption(resourceId int64) ([]chart.ViewSelectorVO, error)
+	GetVisualizationComponentData(resourceId int64) (string, error)
+	QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error)
 	ListDatasetFieldsByGroup(datasetGroupID int64) ([]*dataset.CoreDatasetTableField, error)
 	ListDatasetFieldsByChart(chartID int64) ([]*dataset.CoreDatasetTableField, error)
 	GetDatasetFieldByID(id int64) (*dataset.CoreDatasetTableField, error)
@@ -56,6 +60,28 @@ func (s *ChartService) SetColumnPermissionService(columnPermSvc *ColumnPermissio
 
 func (s *ChartService) Query(req *chart.ChartQueryRequest) (*chart.CoreChartView, error) {
 	return s.repo.GetByID(req.ID)
+}
+
+func (s *ChartService) ViewOption(resourceId int64) ([]chart.ViewSelectorVO, error) {
+	views, err := s.repo.QueryViewOption(resourceId)
+	if err != nil {
+		return nil, err
+	}
+	componentData, err := s.repo.GetVisualizationComponentData(resourceId)
+	if err != nil || componentData == "" {
+		return views, nil
+	}
+	filtered := make([]chart.ViewSelectorVO, 0, len(views))
+	for _, v := range views {
+		if strings.Contains(componentData, strconv.FormatInt(v.ID, 10)) {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered, nil
+}
+
+func (s *ChartService) ChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
+	return s.repo.QueryChartBaseInfo(id, resourceTable)
 }
 
 func (s *ChartService) QueryData(req *chart.ChartDataRequest) (*chart.ChartDataResponse, error) {

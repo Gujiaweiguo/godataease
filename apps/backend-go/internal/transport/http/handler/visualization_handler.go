@@ -163,6 +163,23 @@ func (h *VisualizationHandler) List(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *VisualizationHandler) FindRecent(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req visualization.WorkbranchQueryRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	req.QueryFrom = "recent"
+	uid := int64(middleware.GetUserID(c))
+	result, err := h.service.FindRecent(&req, uid)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 type treeRequest struct {
 	BusiFlag string `json:"busiFlag"`
 	Leaf     *bool  `json:"leaf"`

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strings"
 	"time"
 
 	"dataease/backend/internal/domain/chart"
@@ -84,6 +85,64 @@ func (r *VisualizationRepository) Query(req *visualization.ListRequest) ([]*visu
 	}
 
 	return list, total, nil
+}
+
+func (r *VisualizationRepository) FindRecent(uid int64, req *visualization.WorkbranchQueryRequest) ([]visualization.VisualizationResourceVO, error) {
+	baseSQL := `
+		SELECT dvResource.id, dvResource.resource_id, dvResource.name, dvResource.ext_flag,
+		       dvResource.type, dvResource.creator,
+		       core_opt_recent.uid AS last_editor, core_opt_recent.time AS last_edit_time,
+		       CASE WHEN core_store.resource_id IS NULL THEN 0 ELSE 1 END AS favorite,
+		       0 AS weight
+		FROM (
+		    SELECT id, id AS resource_id, name, 0 AS ext_flag, 'dataset' AS type, create_by AS creator
+		    FROM core_dataset_group WHERE node_type = 'dataset'
+		    UNION ALL
+		    SELECT id, id AS resource_id, name, 0 AS ext_flag, 'datasource' AS type, create_by AS creator
+		    FROM core_datasource WHERE type != 'folder'
+		    UNION ALL
+		    SELECT id, id AS resource_id, name, COALESCE(CAST(mobile_layout AS SIGNED), 0) AS ext_flag,
+		           CASE WHEN type = 'dataV' THEN 'screen' ELSE 'panel' END AS type, create_by AS creator
+		    FROM data_visualization_info WHERE COALESCE(delete_flag, 0) = 0 AND node_type = 'leaf' AND status != 0
+		) dvResource
+		INNER JOIN core_opt_recent ON dvResource.resource_id = core_opt_recent.resource_id AND core_opt_recent.uid = ?
+		LEFT JOIN core_store ON dvResource.id = core_store.resource_id AND core_store.uid = ?`
+
+	query := strings.Builder{}
+	query.WriteString(baseSQL)
+
+	args := []interface{}{uid, uid}
+	conditions := make([]string, 0, 2)
+	if req != nil {
+		typeMap := map[string]string{
+			"panel":      "panel",
+			"screen":     "screen",
+			"dataset":    "dataset",
+			"datasource": "datasource",
+		}
+		if resourceType, ok := typeMap[req.Type]; ok {
+			conditions = append(conditions, "dvResource.type = ?")
+			args = append(args, resourceType)
+		}
+		if req.Keyword != "" {
+			conditions = append(conditions, "LOWER(dvResource.name) LIKE LOWER(CONCAT('%', ?, '%'))")
+			args = append(args, req.Keyword)
+		}
+	}
+	if len(conditions) > 0 {
+		query.WriteString(" WHERE ")
+		query.WriteString(strings.Join(conditions, " AND "))
+	}
+	query.WriteString(" ORDER BY core_opt_recent.time ")
+	if req != nil && req.Asc {
+		query.WriteString("ASC")
+	} else {
+		query.WriteString("DESC")
+	}
+
+	var results []visualization.VisualizationResourceVO
+	err := r.db.Raw(query.String(), args...).Scan(&results).Error
+	return results, err
 }
 
 func (r *VisualizationRepository) ListAllByTypes(types []string) ([]*visualization.DataVisualizationInfo, error) {

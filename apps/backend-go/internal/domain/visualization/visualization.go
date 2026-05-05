@@ -193,3 +193,25 @@ type DecompressionResponse struct {
 	AppData         string                            `json:"appData"`         // JSON string or empty
 	CanvasViewInfo  map[string]map[string]interface{} `json:"canvasViewInfo"`  // keyed by new view ID string
 }
+
+// WorkbranchQueryRequest is the request body for /dataVisualization/findRecent
+type WorkbranchQueryRequest struct {
+	Type      string `json:"type"`      // "panel" | "screen" | "dataset" | "datasource"
+	Keyword   string `json:"keyword"`   // optional search filter
+	QueryFrom string `json:"queryFrom"` // server sets to "recent"
+	Asc       bool   `json:"asc"`       // sort direction (false = DESC)
+}
+
+// VisualizationResourceVO is a resource item for the workbranch recent list
+type VisualizationResourceVO struct {
+	ID           string `json:"id"`
+	ResourceID   string `json:"resourceId"`
+	Name         string `json:"name"`
+	Type         string `json:"type"` // "panel" | "screen" | "dataset" | "datasource"
+	Creator      string `json:"creator"`
+	LastEditor   string `json:"lastEditor"`
+	LastEditTime int64  `json:"lastEditTime"`
+	Favorite     bool   `json:"favorite"`
+	Weight       int    `json:"weight"`
+	ExtFlag      int    `json:"extFlag"`
+}

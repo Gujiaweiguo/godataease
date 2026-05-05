@@ -282,6 +282,15 @@ func (s *VisualizationService) List(req *visualization.ListRequest) (*visualizat
 	}, nil
 }
 
+func (s *VisualizationService) FindRecent(req *visualization.WorkbranchQueryRequest, uid int64) ([]visualization.VisualizationResourceVO, error) {
+	results, err := s.repo.FindRecent(uid, req)
+	if err != nil {
+		return nil, err
+	}
+	// The VO fields are already strings from SQL scan.
+	return results, nil
+}
+
 func (s *VisualizationService) InteractiveTree(busiFlag string) ([]*visualization.DataVisualizationInfo, error) {
 	types, err := resolveInteractiveVisualizationTypes(busiFlag)
 	if err != nil {

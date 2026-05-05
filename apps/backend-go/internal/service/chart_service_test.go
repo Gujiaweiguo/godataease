@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -40,6 +41,9 @@ type chartRegressionSet struct {
 type fakeChartRepo struct {
 	byID               map[int64]*chart.CoreChartView
 	data               map[int64]chartRegressionSample
+	viewOptions        map[int64][]chart.ViewSelectorVO
+	componentData      map[int64]string
+	chartBaseInfo      map[string]*chart.ChartBaseVO
 	dsFieldsByGroup    map[int64][]*dataset.CoreDatasetTableField
 	chartFieldsByChart map[int64][]*dataset.CoreDatasetTableField
 	fieldsByID         map[int64]*dataset.CoreDatasetTableField
@@ -87,6 +91,35 @@ func (r *fakeChartRepo) QueryRows(chartID int64, limit int) ([]map[string]interf
 		result = append(result, rowCopy)
 	}
 	return result, s.Total, nil
+}
+
+func (r *fakeChartRepo) QueryViewOption(resourceId int64) ([]chart.ViewSelectorVO, error) {
+	if r.viewOptions == nil {
+		return []chart.ViewSelectorVO{}, nil
+	}
+	list := r.viewOptions[resourceId]
+	result := make([]chart.ViewSelectorVO, len(list))
+	copy(result, list)
+	return result, nil
+}
+
+func (r *fakeChartRepo) GetVisualizationComponentData(resourceId int64) (string, error) {
+	if r.componentData == nil {
+		return "", nil
+	}
+	return r.componentData[resourceId], nil
+}
+
+func (r *fakeChartRepo) QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
+	if r.chartBaseInfo == nil {
+		return nil, nil
+	}
+	item := r.chartBaseInfo[resourceTable+":"+strconv.FormatInt(id, 10)]
+	if item == nil {
+		return nil, nil
+	}
+	clone := *item
+	return &clone, nil
 }
 
 func (r *fakeChartRepo) Update(view *chart.CoreChartView) error {

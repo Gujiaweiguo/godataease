@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 
@@ -31,6 +32,123 @@ func (r *ChartRepository) GetByID(id int64) (*chart.CoreChartView, error) {
 
 func (r *ChartRepository) Update(view *chart.CoreChartView) error {
 	return r.db.Save(view).Error
+}
+
+func (r *ChartRepository) QueryViewOption(resourceId int64) ([]chart.ViewSelectorVO, error) {
+	var results []chart.ViewSelectorVO
+	err := r.db.Raw(
+		"SELECT id, scene_id AS pid, title, type FROM core_chart_view WHERE type != 'VQuery' AND scene_id = ?",
+		resourceId,
+	).Scan(&results).Error
+	return results, err
+}
+
+func (r *ChartRepository) GetVisualizationComponentData(resourceId int64) (string, error) {
+	var result struct{ ComponentData *string }
+	err := r.db.Raw(
+		"SELECT component_data FROM data_visualization_info WHERE id = ?",
+		resourceId,
+	).Scan(&result).Error
+	if err != nil {
+		return "", err
+	}
+	if result.ComponentData == nil {
+		return "", nil
+	}
+	return *result.ComponentData, nil
+}
+
+func (r *ChartRepository) QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
+	chartTable := "core_chart_view"
+	dvTable := "data_visualization_info"
+	if resourceTable == "snapshot" {
+		chartTable = "snapshot_core_chart_view"
+		dvTable = "snapshot_data_visualization_info"
+	}
+
+	type rawChartBase struct {
+		ChartID          int64   `gorm:"column:chart_id"`
+		ChartType        *string `gorm:"column:chart_type"`
+		ChartName        *string `gorm:"column:chart_name"`
+		TableID          *int64  `gorm:"column:table_id"`
+		ResourceID       *int64  `gorm:"column:resource_id"`
+		ResourceType     *string `gorm:"column:resource_type"`
+		ResourceName     *string `gorm:"column:resource_name"`
+		XAxis            *string `gorm:"column:x_axis"`
+		XAxisExt         *string `gorm:"column:x_axis_ext"`
+		YAxis            *string `gorm:"column:y_axis"`
+		YAxisExt         *string `gorm:"column:y_axis_ext"`
+		ExtStack         *string `gorm:"column:ext_stack"`
+		ExtBubble        *string `gorm:"column:ext_bubble"`
+		FlowMapStartName *string `gorm:"column:flow_map_start_name"`
+		FlowMapEndName   *string `gorm:"column:flow_map_end_name"`
+		ExtColor         *string `gorm:"column:ext_color"`
+		ExtLabel         *string `gorm:"column:ext_label"`
+		ExtTooltip       *string `gorm:"column:ext_tooltip"`
+	}
+
+	sql := fmt.Sprintf(`SELECT ccv.id AS chart_id, ccv.title AS chart_name, ccv.type AS chart_type, ccv.table_id,
+		dvi.id AS resource_id, dvi.name AS resource_name, dvi.type AS resource_type,
+		ccv.x_axis, ccv.x_axis_ext, ccv.y_axis, ccv.y_axis_ext,
+		ccv.ext_stack, ccv.ext_bubble, ccv.flow_map_start_name, ccv.flow_map_end_name,
+		ccv.ext_color, ccv.ext_label, ccv.ext_tooltip
+		FROM %s ccv LEFT JOIN %s dvi ON dvi.id = ccv.scene_id WHERE ccv.id = ?`, chartTable, dvTable)
+
+	var raw rawChartBase
+	if err := r.db.Raw(sql, id).Scan(&raw).Error; err != nil {
+		return nil, err
+	}
+	if raw.ChartID == 0 {
+		return nil, nil
+	}
+
+	parseAxis := func(s *string) []map[string]interface{} {
+		if s == nil || *s == "" || *s == "null" {
+			return []map[string]interface{}{}
+		}
+		var result []map[string]interface{}
+		if err := json.Unmarshal([]byte(*s), &result); err != nil {
+			return []map[string]interface{}{}
+		}
+		return result
+	}
+
+	vo := &chart.ChartBaseVO{
+		ChartID:          raw.ChartID,
+		TableID:          raw.TableID,
+		ResourceID:       ptrInt64(raw.ResourceID, 0),
+		XAxis:            parseAxis(raw.XAxis),
+		XAxisExt:         parseAxis(raw.XAxisExt),
+		YAxis:            parseAxis(raw.YAxis),
+		YAxisExt:         parseAxis(raw.YAxisExt),
+		ExtStack:         parseAxis(raw.ExtStack),
+		ExtBubble:        parseAxis(raw.ExtBubble),
+		FlowMapStartName: parseAxis(raw.FlowMapStartName),
+		FlowMapEndName:   parseAxis(raw.FlowMapEndName),
+		ExtColor:         parseAxis(raw.ExtColor),
+		ExtLabel:         parseAxis(raw.ExtLabel),
+		ExtTooltip:       parseAxis(raw.ExtTooltip),
+	}
+	if raw.ChartType != nil {
+		vo.ChartType = *raw.ChartType
+	}
+	if raw.ChartName != nil {
+		vo.ChartName = *raw.ChartName
+	}
+	if raw.ResourceType != nil {
+		vo.ResourceType = *raw.ResourceType
+	}
+	if raw.ResourceName != nil {
+		vo.ResourceName = *raw.ResourceName
+	}
+	return vo, nil
+}
+
+func ptrInt64(p *int64, defaultVal int64) int64 {
+	if p == nil {
+		return defaultVal
+	}
+	return *p
 }
 
 func (r *ChartRepository) QueryRows(chartID int64, limit int) ([]map[string]interface{}, int64, error) {

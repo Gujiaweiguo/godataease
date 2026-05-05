@@ -243,6 +243,9 @@ func startMockBridgeCalciteServer(t *testing.T, srv calcitev1.CalciteServiceServ
 
 type fakeBridgeChartRepo struct {
 	charts             map[int64]*chart.CoreChartView
+	viewOptions        map[int64][]chart.ViewSelectorVO
+	componentData      map[int64]string
+	chartBaseInfo      map[string]*chart.ChartBaseVO
 	dsFields           map[int64][]*dataset.CoreDatasetTableField
 	chartFields        map[int64][]*dataset.CoreDatasetTableField
 	nextFieldID        int64
@@ -305,6 +308,35 @@ func (r *fakeBridgeChartRepo) Update(view *chart.CoreChartView) error {
 
 func (r *fakeBridgeChartRepo) QueryRows(chartID int64, limit int) ([]map[string]interface{}, int64, error) {
 	return []map[string]interface{}{}, 0, nil
+}
+
+func (r *fakeBridgeChartRepo) QueryViewOption(resourceId int64) ([]chart.ViewSelectorVO, error) {
+	if r.viewOptions == nil {
+		return []chart.ViewSelectorVO{}, nil
+	}
+	list := r.viewOptions[resourceId]
+	result := make([]chart.ViewSelectorVO, len(list))
+	copy(result, list)
+	return result, nil
+}
+
+func (r *fakeBridgeChartRepo) GetVisualizationComponentData(resourceId int64) (string, error) {
+	if r.componentData == nil {
+		return "", nil
+	}
+	return r.componentData[resourceId], nil
+}
+
+func (r *fakeBridgeChartRepo) QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
+	if r.chartBaseInfo == nil {
+		return nil, nil
+	}
+	item := r.chartBaseInfo[resourceTable+":"+strconv.FormatInt(id, 10)]
+	if item == nil {
+		return nil, nil
+	}
+	clone := *item
+	return &clone, nil
 }
 
 func (r *fakeBridgeChartRepo) QueryRowsWithFilter(chartID int64, selectColumns string, whereClause string, whereArgs []interface{}, limit int) ([]map[string]interface{}, int64, error) {

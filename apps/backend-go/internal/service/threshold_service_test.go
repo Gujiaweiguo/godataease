@@ -74,6 +74,22 @@ func (r *fakeThresholdChartRepo) QueryRows(chartID int64, limit int) ([]map[stri
 	return r.rows, int64(len(r.rows)), nil
 }
 
+func (r *fakeThresholdChartRepo) QueryViewOption(resourceId int64) ([]chart.ViewSelectorVO, error) {
+	_ = resourceId
+	return []chart.ViewSelectorVO{}, nil
+}
+
+func (r *fakeThresholdChartRepo) GetVisualizationComponentData(resourceId int64) (string, error) {
+	_ = resourceId
+	return "", nil
+}
+
+func (r *fakeThresholdChartRepo) QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
+	_ = id
+	_ = resourceTable
+	return nil, nil
+}
+
 func (r *fakeThresholdChartRepo) ListDatasetFieldsByGroup(datasetGroupID int64) ([]*dataset.CoreDatasetTableField, error) {
 	_ = datasetGroupID
 	return nil, nil
