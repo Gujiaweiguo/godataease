@@ -73,11 +73,58 @@ func createVisualizationCopyTables(db *gorm.DB) error {
 			jump_active INTEGER,
 			copy_from INTEGER,
 			copy_id INTEGER,
+			aggregate INTEGER,
 			flow_map_start_name TEXT,
 			flow_map_end_name TEXT,
-			ext_color TEXT
+			ext_color TEXT,
+			sort_priority TEXT
 		)`,
-		`CREATE TABLE snapshot_core_chart_view AS SELECT * FROM core_chart_view WHERE 1 = 0`,
+		`CREATE TABLE snapshot_core_chart_view (
+			id INTEGER PRIMARY KEY,
+			title TEXT,
+			scene_id INTEGER,
+			table_id INTEGER,
+			type TEXT,
+			render TEXT,
+			result_count INTEGER,
+			result_mode TEXT,
+			x_axis TEXT,
+			x_axis_ext TEXT,
+			y_axis TEXT,
+			y_axis_ext TEXT,
+			ext_stack TEXT,
+			ext_bubble TEXT,
+			ext_label TEXT,
+			ext_tooltip TEXT,
+			custom_attr TEXT,
+			custom_attr_mobile TEXT,
+			custom_style TEXT,
+			custom_style_mobile TEXT,
+			custom_filter TEXT,
+			drill_fields TEXT,
+			senior TEXT,
+			create_by TEXT,
+			create_time INTEGER,
+			update_time INTEGER,
+			snapshot TEXT,
+			style_priority INTEGER,
+			chart_type TEXT,
+			is_plugin INTEGER,
+			data_from TEXT,
+			view_fields TEXT,
+			refresh_view_enable INTEGER,
+			refresh_unit TEXT,
+			refresh_time INTEGER,
+			linkage_active INTEGER,
+			jump_active INTEGER,
+			copy_from INTEGER,
+			copy_id INTEGER,
+			aggregate INTEGER,
+			flow_map_start_name TEXT,
+			flow_map_end_name TEXT,
+			ext_color TEXT,
+			sort_priority TEXT
+		)`,
 		`CREATE TABLE visualization_linkage (
 			id INTEGER PRIMARY KEY,
 			dv_id INTEGER,
@@ -239,6 +286,130 @@ func TestVisualizationService_Save_Defaults(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, item.Status)
 		assert.Equal(t, 1, *item.Status)
+	})
+}
+
+func TestVisualizationService_SaveChartViewsFromVisualization(t *testing.T) {
+	t.Run("save persists snapshot chart views referenced by component data", func(t *testing.T) {
+		svc, _, db := setupVisualizationServiceRepoTest(t)
+
+		name := "Test Canvas"
+		typ := "dashboard"
+		componentData := `[{"component":"UserView","id":1001}]`
+		pid := int64(0)
+
+		dvID, err := svc.Save(&visualization.SaveRequest{
+			Name:          name,
+			PID:           &pid,
+			Type:          &typ,
+			ComponentData: &componentData,
+			CanvasViewInfo: map[string]map[string]interface{}{
+				"1001": {
+					"id":         float64(1001),
+					"title":      "My Chart",
+					"type":       "bar",
+					"render":     "antv",
+					"resultMode": "custom",
+					"isPlugin":   true,
+					"xAxis":      []map[string]interface{}{{"id": "field1", "name": "Category"}},
+					"customAttr": map[string]interface{}{"color": "blue"},
+				},
+				"9999": {
+					"id":    float64(9999),
+					"title": "Disused Chart",
+					"type":  "line",
+				},
+			},
+		}, "tester")
+		require.NoError(t, err)
+
+		var count int64
+		require.NoError(t, db.Table("snapshot_core_chart_view").Where("id = ?", 1001).Count(&count).Error)
+		assert.Equal(t, int64(1), count)
+
+		require.NoError(t, db.Table("snapshot_core_chart_view").Where("id = ?", 9999).Count(&count).Error)
+		assert.Equal(t, int64(0), count)
+
+		var view visualization.SnapshotCanvasChartView
+		require.NoError(t, db.Table("snapshot_core_chart_view").Where("id = ?", 1001).First(&view).Error)
+		require.NotNil(t, view.Title)
+		assert.Equal(t, "My Chart", *view.Title)
+		require.NotNil(t, view.Type)
+		assert.Equal(t, "bar", *view.Type)
+		require.NotNil(t, view.Render)
+		assert.Equal(t, "antv", *view.Render)
+		require.NotNil(t, view.SceneID)
+		assert.Equal(t, dvID, *view.SceneID)
+		require.NotNil(t, view.XAxis)
+		assert.JSONEq(t, `[{"id":"field1","name":"Category"}]`, *view.XAxis)
+		require.NotNil(t, view.CustomAttr)
+		assert.JSONEq(t, `{"color":"blue"}`, *view.CustomAttr)
+		require.NotNil(t, view.IsPlugin)
+		assert.True(t, *view.IsPlugin)
+	})
+
+	t.Run("update upserts existing snapshot chart view", func(t *testing.T) {
+		svc, _, db := setupVisualizationServiceRepoTest(t)
+
+		componentData := `[{"component":"UserView","id":1001}]`
+		typ := "dashboard"
+		dvID, err := svc.Save(&visualization.SaveRequest{
+			Name:          "Snapshot Update",
+			Type:          &typ,
+			ComponentData: &componentData,
+			CanvasViewInfo: map[string]map[string]interface{}{
+				"1001": {
+					"title":      "Original Chart",
+					"type":       "bar",
+					"customAttr": map[string]interface{}{"color": "blue"},
+				},
+			},
+		}, "creator")
+		require.NoError(t, err)
+
+		updatedComponentData := `[{"component":"UserView","id":1001},{"component":"UserView","id":2002}]`
+		updatedName := "Snapshot Update 2"
+		err = svc.Update(&visualization.UpdateRequest{
+			ID:            dvID,
+			Name:          &updatedName,
+			ComponentData: &updatedComponentData,
+			CanvasViewInfo: map[string]map[string]interface{}{
+				"1001": {
+					"title":      "Updated Chart",
+					"type":       "line",
+					"render":     "echarts",
+					"customAttr": map[string]interface{}{"color": "green"},
+				},
+				"2002": {
+					"title":    "New Chart",
+					"type":     "pie",
+					"isPlugin": "1",
+				},
+			},
+		}, "updater")
+		require.NoError(t, err)
+
+		var existing visualization.SnapshotCanvasChartView
+		require.NoError(t, db.Table("snapshot_core_chart_view").Where("id = ?", 1001).First(&existing).Error)
+		require.NotNil(t, existing.Title)
+		assert.Equal(t, "Updated Chart", *existing.Title)
+		require.NotNil(t, existing.Type)
+		assert.Equal(t, "line", *existing.Type)
+		require.NotNil(t, existing.Render)
+		assert.Equal(t, "echarts", *existing.Render)
+		require.NotNil(t, existing.SceneID)
+		assert.Equal(t, dvID, *existing.SceneID)
+		require.NotNil(t, existing.CustomAttr)
+		assert.JSONEq(t, `{"color":"green"}`, *existing.CustomAttr)
+
+		var inserted visualization.SnapshotCanvasChartView
+		require.NoError(t, db.Table("snapshot_core_chart_view").Where("id = ?", 2002).First(&inserted).Error)
+		require.NotNil(t, inserted.Title)
+		assert.Equal(t, "New Chart", *inserted.Title)
+		require.NotNil(t, inserted.Type)
+		assert.Equal(t, "pie", *inserted.Type)
+		require.NotNil(t, inserted.IsPlugin)
+		assert.True(t, *inserted.IsPlugin)
 	})
 }
 
