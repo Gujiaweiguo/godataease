@@ -174,18 +174,28 @@ func TestStaticService_SaveFilesToServe(t *testing.T) {
 		"/static-resource/test-img2.svg": "PHN2Zz48L3N2Zz4="
 	}`
 
-	svc.SaveFilesToServe(staticJSON)
+	require.NoError(t, svc.SaveFilesToServe(staticJSON))
 
 	_, err := os.Stat(filepath.Join(tmpDir, "test-img.png"))
 	assert.NoError(t, err)
 	_, err = os.Stat(filepath.Join(tmpDir, "test-img2.svg"))
 	assert.NoError(t, err)
 
-	svc.SaveFilesToServe(staticJSON)
-	svc.SaveFilesToServe("")
-	svc.SaveFilesToServe("{}")
-	svc.SaveFilesToServe(`{"/static-resource/bad.png":"not-base64"}`)
+	require.NoError(t, svc.SaveFilesToServe(staticJSON))
+	require.NoError(t, svc.SaveFilesToServe(""))
+	require.NoError(t, svc.SaveFilesToServe("{}"))
+	require.NoError(t, svc.SaveFilesToServe(`{"/static-resource/bad.png":"not-base64"}`))
 
 	_, err = os.Stat(filepath.Join(tmpDir, "bad.png"))
 	assert.Error(t, err)
+
+	t.Run("returns error when static directory cannot be created", func(t *testing.T) {
+		blockedPath := filepath.Join(tmpDir, "blocked")
+		require.NoError(t, os.WriteFile(blockedPath, []byte("not-a-dir"), 0o644))
+		t.Setenv("STATIC_RESOURCE_DIR", filepath.Join(blockedPath, "child"))
+
+		err := svc.SaveFilesToServe(staticJSON)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "create static resource dir")
+	})
 }
