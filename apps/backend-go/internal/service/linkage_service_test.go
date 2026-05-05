@@ -84,7 +84,7 @@ func TestLinkageService_SaveLinkage(t *testing.T) {
 			DvID:         1,
 			SourceViewID: 100,
 			LinkageInfo: []LinkageInfoDTO{{
-				TargetViewID: 200,
+				TargetViewID:  200,
 				LinkageActive: true,
 				LinkageFields: []LinkageFieldVO{{SourceField: 10, TargetField: 20}},
 			}},
