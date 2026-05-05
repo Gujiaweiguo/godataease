@@ -20,38 +20,16 @@ import type {
   DataFillingColumnConfig,
   DataFillingFormSchema,
   DataFillingTableRow,
-  FormFieldConfig,
-  FormFieldOption,
   FormFieldValue
 } from '@/views/data-filling/types'
+import {
+  parseFormSchema,
+  resolveFieldKey
+} from '@/views/data-filling/utils/schemaParser'
 import CommitLog from './CommitLog.vue'
 import ExcelUploader from './ExcelUploader.vue'
 
 type RowDialogMode = 'add' | 'edit'
-
-type BackendFieldOption = {
-  name?: unknown
-  value?: unknown
-}
-
-type BackendFieldMapping = {
-  columnName?: unknown
-  type?: unknown
-  accuracy?: unknown
-}
-
-type BackendFieldSettings = {
-  name?: unknown
-  required?: unknown
-  mapping?: BackendFieldMapping
-  placeholder?: unknown
-  optionDatasource?: unknown
-  optionTable?: unknown
-  optionColumn?: unknown
-  optionOrder?: unknown
-  multiple?: unknown
-  options?: BackendFieldOption[]
-}
 
 const route = useRoute()
 
@@ -112,26 +90,8 @@ const hasSelection = computed(() => selectedRows.value.length > 0)
 const canEditRows = computed(() => pageReady.value && formSchema.value.length > 0)
 const rowDialogTitle = computed(() => (rowDialogMode.value === 'add' ? '新增数据行' : '编辑数据行'))
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
 const isCancelableAction = (error: unknown) => {
   return error === 'cancel' || error === 'close'
-}
-
-const normalizeFieldType = (value: unknown): string => {
-  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'text'
-}
-
-const resolveFieldTypeFromMapping = (value: unknown): string => {
-  const mappingType = normalizeFieldType(value)
-
-  if (mappingType === 'nvarchar') {
-    return 'text'
-  }
-
-  return ['text', 'number', 'decimal', 'date', 'datetime', 'select'].includes(mappingType) ? mappingType : 'text'
 }
 
 const parseRouteFormId = (value: unknown) => {
@@ -142,137 +102,6 @@ const parseRouteFormId = (value: unknown) => {
 
   const parsedValue = Number(rawValue)
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null
-}
-
-const normalizeOptions = (value: unknown): FormFieldOption[] => {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value.reduce<FormFieldOption[]>((result, item) => {
-    if (isRecord(item)) {
-      const optionName = item.name ?? item.label ?? item.value
-      const optionValue = item.value ?? item.name ?? item.label
-      if (optionName != null && optionValue != null) {
-        result.push({
-          name: String(optionName),
-          value: String(optionValue),
-          disabled: Boolean(item.disabled),
-          description: item.description ? String(item.description) : undefined
-        })
-      }
-      return result
-    }
-
-    if (typeof item === 'string' || typeof item === 'number') {
-      result.push({
-        name: String(item),
-        value: String(item)
-      })
-    }
-
-    return result
-  }, [])
-}
-
-const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null => {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  const settings = isRecord(value.settings) ? (value.settings as BackendFieldSettings) : undefined
-  const mapping = settings && isRecord(settings.mapping) ? (settings.mapping as BackendFieldMapping) : undefined
-  const fieldName = typeof mapping?.columnName === 'string' && mapping.columnName.trim() ? mapping.columnName.trim() : undefined
-  const legacyName = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined
-  const legacyField = typeof value.field === 'string' && value.field.trim() ? value.field.trim() : undefined
-  const labelSource = typeof settings?.name === 'string' && settings.name.trim() ? settings.name.trim() : undefined
-  const legacyLabel = typeof value.label === 'string' && value.label.trim() ? value.label.trim() : undefined
-  const name = fieldName ?? legacyName ?? legacyField ?? `field_${index + 1}`
-  const label = labelSource ?? legacyLabel ?? legacyName ?? `字段 ${index + 1}`
-  const explicitType = value.type ?? value.fieldType
-
-  return {
-    id: typeof value.id === 'string' || typeof value.id === 'number' ? value.id : undefined,
-    field: fieldName ?? legacyField ?? name,
-    name,
-    label,
-    type: explicitType != null ? normalizeFieldType(explicitType) : resolveFieldTypeFromMapping(mapping?.type),
-    required: settings ? Boolean(settings.required) : Boolean(value.required),
-    placeholder:
-      typeof settings?.placeholder === 'string'
-        ? settings.placeholder
-        : typeof value.placeholder === 'string'
-        ? value.placeholder
-        : undefined,
-    defaultValue:
-      typeof value.defaultValue === 'string' ||
-      typeof value.defaultValue === 'number' ||
-      typeof value.defaultValue === 'boolean' ||
-      value.defaultValue == null ||
-      Array.isArray(value.defaultValue) ||
-      isRecord(value.defaultValue)
-        ? (value.defaultValue as FormFieldValue)
-        : undefined,
-    order: typeof value.order === 'number' ? value.order : index,
-    options: normalizeOptions(settings?.options ?? value.options ?? value.optionList),
-    optionDatasource:
-      settings?.optionDatasource != null ? String(settings.optionDatasource) : value.optionDatasource ? String(value.optionDatasource) : undefined,
-    optionTable:
-      typeof settings?.optionTable === 'string'
-        ? settings.optionTable
-        : typeof value.optionTable === 'string'
-        ? value.optionTable
-        : undefined,
-    optionColumn:
-      typeof settings?.optionColumn === 'string'
-        ? settings.optionColumn
-        : typeof value.optionColumn === 'string'
-        ? value.optionColumn
-        : undefined,
-    optionOrder:
-      typeof settings?.optionOrder === 'string'
-        ? settings.optionOrder
-        : typeof value.optionOrder === 'string'
-        ? value.optionOrder
-        : undefined,
-    precision:
-      typeof value.precision === 'number'
-        ? value.precision
-        : typeof mapping?.accuracy === 'number'
-        ? mapping.accuracy
-        : undefined,
-    format: value.format ? String(value.format) : undefined,
-    multiple: settings ? Boolean(settings.multiple) : Boolean(value.multiple),
-    extra: isRecord(value.extra) ? value.extra : undefined
-  }
-}
-
-const parseFormSchema = (forms: string): DataFillingFormSchema => {
-  if (!forms.trim()) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(forms) as unknown
-    const source = Array.isArray(parsed)
-      ? parsed
-      : isRecord(parsed) && Array.isArray(parsed.fields)
-      ? parsed.fields
-      : isRecord(parsed) && Array.isArray(parsed.forms)
-      ? parsed.forms
-      : []
-
-    return source
-      .map((item, index) => toFieldConfig(item, index))
-      .filter((item): item is FormFieldConfig => item !== null)
-      .sort((prev, next) => (prev.order ?? 0) - (next.order ?? 0))
-  } catch {
-    return []
-  }
-}
-
-const resolveFieldKey = (field: FormFieldConfig, index: number) => {
-  return field.field || field.name || `field_${index + 1}`
 }
 
 const buildColumns = (schema: DataFillingFormSchema): DataFillingColumnConfig[] => {

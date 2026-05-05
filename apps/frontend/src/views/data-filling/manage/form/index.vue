@@ -6,6 +6,11 @@ import icon_back from '@/assets/svg/icon_left_outlined.svg'
 import FormSchemaRenderer from '@/views/data-filling/components/FormSchemaRenderer.vue'
 import type { DataFillingFormSchema, FormFieldConfig } from '@/views/data-filling/types'
 import {
+  isRecord,
+  normalizeFieldType,
+  resolveFieldTypeFromMapping
+} from '@/views/data-filling/utils/schemaParser'
+import {
   createForm,
   getBuiltInTables,
   getFormById,
@@ -115,30 +120,12 @@ const fieldTypeMeta: Record<
   }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-const normalizeFieldType = (value: unknown): string => {
-  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'text'
-}
-
 const getFieldTypeMeta = (value: unknown) => {
   const normalizedType = normalizeFieldType(value)
   return {
     normalizedType,
     meta: fieldTypeMeta[normalizedType] ?? fieldTypeMeta.text
   }
-}
-
-const resolveFieldTypeFromMapping = (value: unknown): string => {
-  const mappingType = normalizeFieldType(value)
-
-  if (mappingType === 'nvarchar') {
-    return 'text'
-  }
-
-  return fieldTypeMeta[mappingType] ? mappingType : 'text'
 }
 
 const normalizeOptions = (value: unknown): FormFieldConfig['options'] => {

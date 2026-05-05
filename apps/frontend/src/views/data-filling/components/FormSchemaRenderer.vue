@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type {
-  DataFillingFormSchema,
   FormFieldConfig,
-  FormFieldOption,
   FormFieldValue
 } from '@/views/data-filling/types'
+import {
+  buildPlaceholder,
+  parseFormSchema as parseSchema,
+  resolveComponentType
+} from '@/views/data-filling/utils/schemaParser'
 
 interface RenderableField extends FormFieldConfig {
   key: string
@@ -31,185 +34,6 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update:modelValue', value: Record<string, FormFieldValue>): void
 }>()
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-const normalizeOptions = (value: unknown): FormFieldOption[] => {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value.reduce<FormFieldOption[]>((result, item) => {
-    if (isRecord(item)) {
-      const optionName = item.name ?? item.label ?? item.value
-      const optionValue = item.value ?? item.name ?? item.label
-      if (optionName != null && optionValue != null) {
-        result.push({
-          name: String(optionName),
-          value: String(optionValue),
-          disabled: Boolean(item.disabled),
-          description: item.description ? String(item.description) : undefined
-        })
-      }
-      return result
-    }
-
-    if (typeof item === 'string' || typeof item === 'number') {
-      result.push({
-        name: String(item),
-        value: String(item)
-      })
-    }
-
-    return result
-  }, [])
-}
-
-const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null => {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  // Extract nested settings/mapping from backend ExtTableField format
-  const settings = isRecord(value.settings) ? (value.settings as Record<string, unknown>) : undefined
-  const mapping =
-    settings && isRecord(settings.mapping) ? (settings.mapping as Record<string, unknown>) : undefined
-  const fieldName =
-    typeof mapping?.columnName === 'string' && mapping.columnName.trim()
-      ? mapping.columnName.trim()
-      : undefined
-  const legacyName =
-    typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined
-  const legacyField =
-    typeof value.field === 'string' && value.field.trim() ? value.field.trim() : undefined
-  const labelSource =
-    typeof settings?.name === 'string' && settings.name.trim() ? settings.name.trim() : undefined
-  const legacyLabel =
-    typeof value.label === 'string' && value.label.trim() ? value.label.trim() : undefined
-
-  const name = fieldName ?? legacyName ?? legacyField ?? `field_${index + 1}`
-  const label = labelSource ?? legacyLabel ?? legacyName ?? `Field ${index + 1}`
-
-  return {
-    id: typeof value.id === 'string' || typeof value.id === 'number' ? value.id : undefined,
-    field: fieldName ?? legacyField ?? name,
-    name,
-    label,
-    type: String(value.type ?? value.fieldType ?? 'text'),
-    required: settings ? Boolean(settings.required) : Boolean(value.required),
-    placeholder:
-      typeof settings?.placeholder === 'string'
-        ? settings.placeholder
-        : typeof value.placeholder === 'string'
-        ? value.placeholder
-        : undefined,
-    defaultValue:
-      typeof value.defaultValue === 'string' ||
-      typeof value.defaultValue === 'number' ||
-      typeof value.defaultValue === 'boolean' ||
-      value.defaultValue == null ||
-      Array.isArray(value.defaultValue) ||
-      isRecord(value.defaultValue)
-        ? (value.defaultValue as FormFieldValue)
-        : undefined,
-    order: typeof value.order === 'number' ? value.order : index,
-    options: normalizeOptions(settings?.options ?? value.options ?? value.optionList),
-    optionDatasource:
-      settings?.optionDatasource != null
-        ? String(settings.optionDatasource)
-        : value.optionDatasource
-        ? String(value.optionDatasource)
-        : undefined,
-    optionTable:
-      typeof settings?.optionTable === 'string'
-        ? settings.optionTable
-        : typeof value.optionTable === 'string'
-        ? value.optionTable
-        : undefined,
-    optionColumn:
-      typeof settings?.optionColumn === 'string'
-        ? settings.optionColumn
-        : typeof value.optionColumn === 'string'
-        ? value.optionColumn
-        : undefined,
-    optionOrder:
-      typeof settings?.optionOrder === 'string'
-        ? settings.optionOrder
-        : typeof value.optionOrder === 'string'
-        ? value.optionOrder
-        : undefined,
-    precision:
-      typeof value.precision === 'number'
-        ? value.precision
-        : typeof mapping?.accuracy === 'number'
-        ? mapping.accuracy
-        : undefined,
-    format: value.format ? String(value.format) : undefined,
-    multiple: settings ? Boolean(settings.multiple) : Boolean(value.multiple),
-    extra: isRecord(value.extra) ? value.extra : undefined
-  }
-}
-
-const parseSchema = (forms: string): DataFillingFormSchema => {
-  if (!forms.trim()) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(forms) as unknown
-    const source = Array.isArray(parsed)
-      ? parsed
-      : isRecord(parsed) && Array.isArray(parsed.fields)
-      ? parsed.fields
-      : isRecord(parsed) && Array.isArray(parsed.forms)
-      ? parsed.forms
-      : []
-
-    return source
-      .map((item, index) => toFieldConfig(item, index))
-      .filter((item): item is FormFieldConfig => item !== null)
-  } catch {
-    return []
-  }
-}
-
-const resolveComponentType = (type: string): RenderableField['componentType'] => {
-  const normalizedType = type.toLowerCase()
-  if (normalizedType === 'number') {
-    return 'number'
-  }
-  if (normalizedType === 'decimal') {
-    return 'decimal'
-  }
-  if (normalizedType === 'date') {
-    return 'date'
-  }
-  if (normalizedType === 'datetime') {
-    return 'datetime'
-  }
-  if (normalizedType === 'select') {
-    return 'select'
-  }
-  return 'input'
-}
-
-const buildPlaceholder = (field: FormFieldConfig, componentType: RenderableField['componentType']) => {
-  if (field.placeholder) {
-    return field.placeholder
-  }
-
-  if (componentType === 'select') {
-    return `请选择${field.label}`
-  }
-
-  if (componentType === 'date' || componentType === 'datetime') {
-    return `请选择${field.label}`
-  }
-
-  return `请输入${field.label}`
-}
 
 const renderedFields = computed<RenderableField[]>(() => {
   return parseSchema(props.forms)
