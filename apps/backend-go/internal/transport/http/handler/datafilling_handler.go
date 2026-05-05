@@ -124,7 +124,7 @@ func (h *DataFillingHandler) Delete(c *gin.Context) {
 
 func (h *DataFillingHandler) TableData(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamBadRequest(c, "id")
+	id, ok := parseIDParamBadRequest(c, "formId")
 	if !ok {
 		return
 	}

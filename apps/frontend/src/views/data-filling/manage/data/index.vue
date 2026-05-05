@@ -29,6 +29,30 @@ import ExcelUploader from './ExcelUploader.vue'
 
 type RowDialogMode = 'add' | 'edit'
 
+type BackendFieldOption = {
+  name?: unknown
+  value?: unknown
+}
+
+type BackendFieldMapping = {
+  columnName?: unknown
+  type?: unknown
+  accuracy?: unknown
+}
+
+type BackendFieldSettings = {
+  name?: unknown
+  required?: unknown
+  mapping?: BackendFieldMapping
+  placeholder?: unknown
+  optionDatasource?: unknown
+  optionTable?: unknown
+  optionColumn?: unknown
+  optionOrder?: unknown
+  multiple?: unknown
+  options?: BackendFieldOption[]
+}
+
 const route = useRoute()
 
 const props = withDefaults(
@@ -96,6 +120,20 @@ const isCancelableAction = (error: unknown) => {
   return error === 'cancel' || error === 'close'
 }
 
+const normalizeFieldType = (value: unknown): string => {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'text'
+}
+
+const resolveFieldTypeFromMapping = (value: unknown): string => {
+  const mappingType = normalizeFieldType(value)
+
+  if (mappingType === 'nvarchar') {
+    return 'text'
+  }
+
+  return ['text', 'number', 'decimal', 'date', 'datetime', 'select'].includes(mappingType) ? mappingType : 'text'
+}
+
 const parseRouteFormId = (value: unknown) => {
   const rawValue = Array.isArray(value) ? value[0] : value
   if (typeof rawValue !== 'string' || !rawValue.trim()) {
@@ -142,17 +180,30 @@ const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null =>
     return null
   }
 
-  const label = String(value.label ?? value.name ?? value.field ?? `字段 ${index + 1}`)
-  const name = String(value.name ?? value.field ?? value.label ?? `field_${index + 1}`)
+  const settings = isRecord(value.settings) ? (value.settings as BackendFieldSettings) : undefined
+  const mapping = settings && isRecord(settings.mapping) ? (settings.mapping as BackendFieldMapping) : undefined
+  const fieldName = typeof mapping?.columnName === 'string' && mapping.columnName.trim() ? mapping.columnName.trim() : undefined
+  const legacyName = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined
+  const legacyField = typeof value.field === 'string' && value.field.trim() ? value.field.trim() : undefined
+  const labelSource = typeof settings?.name === 'string' && settings.name.trim() ? settings.name.trim() : undefined
+  const legacyLabel = typeof value.label === 'string' && value.label.trim() ? value.label.trim() : undefined
+  const name = fieldName ?? legacyName ?? legacyField ?? `field_${index + 1}`
+  const label = labelSource ?? legacyLabel ?? legacyName ?? `字段 ${index + 1}`
+  const explicitType = value.type ?? value.fieldType
 
   return {
     id: typeof value.id === 'string' || typeof value.id === 'number' ? value.id : undefined,
-    field: value.field ? String(value.field) : undefined,
+    field: fieldName ?? legacyField ?? name,
     name,
     label,
-    type: String(value.type ?? value.fieldType ?? 'text'),
-    required: Boolean(value.required),
-    placeholder: value.placeholder ? String(value.placeholder) : undefined,
+    type: explicitType != null ? normalizeFieldType(explicitType) : resolveFieldTypeFromMapping(mapping?.type),
+    required: settings ? Boolean(settings.required) : Boolean(value.required),
+    placeholder:
+      typeof settings?.placeholder === 'string'
+        ? settings.placeholder
+        : typeof value.placeholder === 'string'
+        ? value.placeholder
+        : undefined,
     defaultValue:
       typeof value.defaultValue === 'string' ||
       typeof value.defaultValue === 'number' ||
@@ -163,14 +214,35 @@ const toFieldConfig = (value: unknown, index: number): FormFieldConfig | null =>
         ? (value.defaultValue as FormFieldValue)
         : undefined,
     order: typeof value.order === 'number' ? value.order : index,
-    options: normalizeOptions(value.options ?? value.optionList),
-    optionDatasource: value.optionDatasource ? String(value.optionDatasource) : undefined,
-    optionTable: value.optionTable ? String(value.optionTable) : undefined,
-    optionColumn: value.optionColumn ? String(value.optionColumn) : undefined,
-    optionOrder: value.optionOrder ? String(value.optionOrder) : undefined,
-    precision: typeof value.precision === 'number' ? value.precision : undefined,
+    options: normalizeOptions(settings?.options ?? value.options ?? value.optionList),
+    optionDatasource:
+      settings?.optionDatasource != null ? String(settings.optionDatasource) : value.optionDatasource ? String(value.optionDatasource) : undefined,
+    optionTable:
+      typeof settings?.optionTable === 'string'
+        ? settings.optionTable
+        : typeof value.optionTable === 'string'
+        ? value.optionTable
+        : undefined,
+    optionColumn:
+      typeof settings?.optionColumn === 'string'
+        ? settings.optionColumn
+        : typeof value.optionColumn === 'string'
+        ? value.optionColumn
+        : undefined,
+    optionOrder:
+      typeof settings?.optionOrder === 'string'
+        ? settings.optionOrder
+        : typeof value.optionOrder === 'string'
+        ? value.optionOrder
+        : undefined,
+    precision:
+      typeof value.precision === 'number'
+        ? value.precision
+        : typeof mapping?.accuracy === 'number'
+        ? mapping.accuracy
+        : undefined,
     format: value.format ? String(value.format) : undefined,
-    multiple: Boolean(value.multiple),
+    multiple: settings ? Boolean(settings.multiple) : Boolean(value.multiple),
     extra: isRecord(value.extra) ? value.extra : undefined
   }
 }
