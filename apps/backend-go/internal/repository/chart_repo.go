@@ -11,6 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	chartTableCore     = "core_chart_view"
+	chartTableSnapshot = "snapshot_core_chart_view"
+)
+
 var chartTableNamePattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
 type ChartRepository struct {
@@ -59,10 +64,10 @@ func (r *ChartRepository) GetVisualizationComponentData(resourceId int64) (strin
 }
 
 func (r *ChartRepository) QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
-	chartTable := "core_chart_view"
+	chartTable := chartTableCore
 	dvTable := "data_visualization_info"
 	if resourceTable == "snapshot" {
-		chartTable = "snapshot_core_chart_view"
+		chartTable = chartTableSnapshot
 		dvTable = "snapshot_data_visualization_info"
 	}
 
