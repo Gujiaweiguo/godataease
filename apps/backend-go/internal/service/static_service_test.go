@@ -1,6 +1,8 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"dataease/backend/internal/domain/static"
@@ -160,4 +162,30 @@ func TestStaticService_ListTypefaces_Unit(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, items)
 	})
+}
+
+func TestStaticService_SaveFilesToServe(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("STATIC_RESOURCE_DIR", tmpDir)
+
+	svc := NewStaticService(nil, nil, nil)
+	staticJSON := `{
+		"/static-resource/test-img.png": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+		"/static-resource/test-img2.svg": "PHN2Zz48L3N2Zz4="
+	}`
+
+	svc.SaveFilesToServe(staticJSON)
+
+	_, err := os.Stat(filepath.Join(tmpDir, "test-img.png"))
+	assert.NoError(t, err)
+	_, err = os.Stat(filepath.Join(tmpDir, "test-img2.svg"))
+	assert.NoError(t, err)
+
+	svc.SaveFilesToServe(staticJSON)
+	svc.SaveFilesToServe("")
+	svc.SaveFilesToServe("{}")
+	svc.SaveFilesToServe(`{"/static-resource/bad.png":"not-base64"}`)
+
+	_, err = os.Stat(filepath.Join(tmpDir, "bad.png"))
+	assert.Error(t, err)
 }

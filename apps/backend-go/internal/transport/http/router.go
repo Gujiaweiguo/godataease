@@ -409,6 +409,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	templateExtendDataRepo := repository.NewTemplateExtendDataRepository(db)
 	visualService.SetDatasetRepository(datasetRepo)
 	visualService.SetTemplateService(templateService)
+	visualService.SetStaticService(staticService)
 	visualService.SetTemplateExtendDataRepo(templateExtendDataRepo)
 	visualService.SetAuditService(auditService)
 	visualService.SetThresholdService(thresholdService)
