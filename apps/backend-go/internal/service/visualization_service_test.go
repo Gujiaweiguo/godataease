@@ -7,10 +7,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
@@ -27,6 +29,7 @@ func setupVisualizationServiceRepoTest(t *testing.T) (*VisualizationService, *re
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&visualization.DataVisualizationInfo{}))
+	require.NoError(t, db.AutoMigrate(&dataset.CoreDatasetGroup{}, &dataset.CoreDatasetTable{}, &dataset.CoreDatasetTableField{}))
 	require.NoError(t, createVisualizationCopyTables(db))
 
 	repo := repository.NewVisualizationRepository(db)
@@ -209,6 +212,8 @@ func closeVisualizationDB(t *testing.T, db *gorm.DB) {
 
 func int64Ptr(v int64) *int64 { return &v }
 
+func int64ToString(v int64) string { return strconv.FormatInt(v, 10) }
+
 func intPtrVisualization(v int) *int { return &v }
 
 func TestVisualizationServiceHelpers(t *testing.T) {
@@ -291,6 +296,116 @@ func TestVisualizationService_Save_Defaults(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, item.Status)
 		assert.Equal(t, 1, *item.Status)
+	})
+}
+
+func TestVisualizationService_Save_AppImport(t *testing.T) {
+	t.Run("app import creates remapped dataset assets", func(t *testing.T) {
+		svc, repo, db := setupVisualizationServiceRepoTest(t)
+		svc.SetDatasetRepository(repository.NewDatasetRepository(db))
+
+		dashboardType := "dashboard"
+		dataType := "app"
+		folderPID := int64(88)
+		folderName := "Imported Folder"
+		componentData := `[{"component":"UserView","id":1001,"datasetGroupId":101,"tableId":201,"fieldId":301,"datasourceId":501}]`
+		appData := `{
+			"datasourceInfo":[{"id":501,"systemDatasourceId":9001}],
+			"datasetGroupsInfo":[{"id":101,"name":"Orders","nodeType":"dataset","type":"sql","info":"{\"datasetId\":101,\"tableId\":201,\"fieldId\":301,\"datasourceId\":501}"}],
+			"datasetTablesInfo":[{"id":201,"name":"OrdersTable","datasetGroupId":101,"datasourceId":501,"tableName":"orders","type":"db","info":"{\"tableId\":201}","sqlVariableDetails":"[]"}],
+			"datasetTableFieldsInfo":[{"id":301,"datasetGroupId":101,"datasetTableId":201,"datasourceId":501,"originName":"[301]","name":"amount","dataeaseName":"amount","fieldShortName":"amt","groupType":"d","type":"INT","deType":2,"deExtractType":0,"extField":2,"params":"{}"}]
+		}`
+
+		req := &visualization.SaveRequest{
+			Name:              "Imported Dashboard",
+			Type:              &dashboardType,
+			AppData:           appData,
+			DataType:          &dataType,
+			DatasetFolderPID:  &folderPID,
+			DatasetFolderName: &folderName,
+			ComponentData:     &componentData,
+			CanvasViewInfo: map[string]map[string]interface{}{
+				"1001": {
+					"id":             float64(1001),
+					"title":          "Chart",
+					"tableId":        nil,
+					"sourceTableId":  float64(201),
+					"datasetGroupId": float64(101),
+					"fieldId":        float64(301),
+					"datasourceId":   float64(501),
+				},
+			},
+		}
+
+		id, err := svc.Save(req, "tester")
+		require.NoError(t, err)
+
+		var groups []dataset.CoreDatasetGroup
+		require.NoError(t, db.Order("id asc").Find(&groups).Error)
+		require.Len(t, groups, 2)
+		var folderGroup dataset.CoreDatasetGroup
+		var dataGroup dataset.CoreDatasetGroup
+		for _, group := range groups {
+			if group.Name == folderName {
+				folderGroup = group
+				continue
+			}
+			if group.Name == "Orders" {
+				dataGroup = group
+			}
+		}
+		assert.Equal(t, folderName, folderGroup.Name)
+		require.NotNil(t, folderGroup.PID)
+		assert.Equal(t, folderPID, *folderGroup.PID)
+		assert.Equal(t, "Orders", dataGroup.Name)
+		require.NotNil(t, dataGroup.PID)
+		assert.Equal(t, folderGroup.ID, *dataGroup.PID)
+
+		var tables []dataset.CoreDatasetTable
+		require.NoError(t, db.Find(&tables).Error)
+		require.Len(t, tables, 1)
+		assert.Equal(t, dataGroup.ID, tables[0].DatasetGroupID)
+		require.NotNil(t, tables[0].DatasourceID)
+		assert.Equal(t, int64(9001), *tables[0].DatasourceID)
+
+		var fields []dataset.CoreDatasetTableField
+		require.NoError(t, db.Find(&fields).Error)
+		require.Len(t, fields, 1)
+		assert.Equal(t, dataGroup.ID, fields[0].DatasetGroupID)
+		require.NotNil(t, fields[0].DatasetTableID)
+		assert.Equal(t, tables[0].ID, *fields[0].DatasetTableID)
+		require.NotNil(t, fields[0].DatasourceID)
+		assert.Equal(t, int64(9001), *fields[0].DatasourceID)
+		require.NotNil(t, fields[0].OriginName)
+		assert.Contains(t, *fields[0].OriginName, int64ToString(fields[0].ID))
+		assert.NotContains(t, *fields[0].OriginName, "[301]")
+
+		require.NotNil(t, dataGroup.Info)
+		var groupInfo map[string]interface{}
+		require.NoError(t, json.Unmarshal([]byte(*dataGroup.Info), &groupInfo))
+		assert.Equal(t, float64(dataGroup.ID), groupInfo["datasetId"])
+		assert.Equal(t, float64(tables[0].ID), groupInfo["tableId"])
+		assert.Equal(t, float64(fields[0].ID), groupInfo["fieldId"])
+		assert.Equal(t, float64(9001), groupInfo["datasourceId"])
+
+		created, err := repo.GetByID(id)
+		require.NoError(t, err)
+		require.NotNil(t, created.ComponentData)
+		var componentItems []map[string]interface{}
+		require.NoError(t, json.Unmarshal([]byte(*created.ComponentData), &componentItems))
+		require.Len(t, componentItems, 1)
+		assert.Equal(t, float64(dataGroup.ID), componentItems[0]["datasetGroupId"])
+		assert.Equal(t, float64(tables[0].ID), componentItems[0]["tableId"])
+		assert.Equal(t, float64(fields[0].ID), componentItems[0]["fieldId"])
+		assert.Equal(t, float64(9001), componentItems[0]["datasourceId"])
+
+		view := req.CanvasViewInfo["1001"]
+		assert.Equal(t, "dataset", view["dataFrom"])
+		assert.Equal(t, float64(tables[0].ID), view["tableId"])
+		assert.Equal(t, float64(tables[0].ID), view["sourceTableId"])
+		assert.Equal(t, float64(dataGroup.ID), view["datasetGroupId"])
+		assert.Equal(t, float64(fields[0].ID), view["fieldId"])
+		assert.Equal(t, float64(9001), view["datasourceId"])
 	})
 }
 

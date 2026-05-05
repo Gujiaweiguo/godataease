@@ -13,6 +13,7 @@ import (
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/chart"
+	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/visualization"
 	"dataease/backend/internal/repository"
@@ -83,6 +84,10 @@ func (s *VisualizationService) SetThresholdService(ts *ThresholdService) {
 }
 
 func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy string) (int64, error) {
+	if err := s.processAppImport(req, updateBy); err != nil {
+		return 0, fmt.Errorf("app import: %w", err)
+	}
+
 	now := time.Now().UnixMilli()
 	nodeType := visualizationNodeTypePanel
 	if req.NodeType != nil && *req.NodeType != "" {
@@ -119,6 +124,273 @@ func (s *VisualizationService) Save(req *visualization.SaveRequest, updateBy str
 		return 0, err
 	}
 	return v.ID, nil
+}
+
+func (s *VisualizationService) processAppImport(req *visualization.SaveRequest, updateBy string) error {
+	if req == nil || req.AppData == "" {
+		return nil
+	}
+	if req.DataType != nil && *req.DataType == "dataset" {
+		return nil
+	}
+	if s.datasetRepo == nil {
+		return nil
+	}
+
+	var appData map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(req.AppData), &appData); err != nil {
+		return nil
+	}
+
+	now := time.Now().UnixMilli()
+	datasourceIDMap := make(map[int64]int64)
+	if raw, ok := appData["datasourceInfo"]; ok {
+		var datasourceInfo []map[string]interface{}
+		if err := json.Unmarshal(raw, &datasourceInfo); err == nil {
+			for _, ds := range datasourceInfo {
+				oldID, okOld := extractInt64Value(ds["id"])
+				systemID, okSystem := extractInt64Value(ds["systemDatasourceId"])
+				if okOld && okSystem && oldID > 0 && systemID > 0 {
+					datasourceIDMap[oldID] = systemID
+				}
+			}
+		}
+	}
+
+	var datasetFolderID int64
+	if req.DatasetFolderName != nil && strings.TrimSpace(*req.DatasetFolderName) != "" {
+		datasetFolderID = int64(uuid.New().ID())
+		folderNodeType := dataset.NodeTypeFolder
+		folderLevel := 0
+		folder := &dataset.CoreDatasetGroup{
+			ID:             datasetFolderID,
+			Name:           strings.TrimSpace(*req.DatasetFolderName),
+			PID:            req.DatasetFolderPID,
+			Level:          &folderLevel,
+			NodeType:       &folderNodeType,
+			CreateBy:       updateBy,
+			CreateTime:     now,
+			UpdateBy:       updateBy,
+			LastUpdateTime: now,
+		}
+		if err := s.datasetRepo.CreateGroup(folder); err != nil {
+			return fmt.Errorf("create dataset folder: %w", err)
+		}
+	}
+
+	var datasetGroupsInfo []map[string]interface{}
+	if raw, ok := appData["datasetGroupsInfo"]; ok {
+		if err := json.Unmarshal(raw, &datasetGroupsInfo); err != nil {
+			return fmt.Errorf("parse dataset groups: %w", err)
+		}
+	}
+
+	datasetGroupIDMap := make(map[int64]int64)
+	newDatasetGroups := make([]dataset.CoreDatasetGroup, 0, len(datasetGroupsInfo))
+	for _, groupInfo := range datasetGroupsInfo {
+		nodeType, _ := groupInfo["nodeType"].(string)
+		if nodeType != dataset.NodeTypeDataset {
+			continue
+		}
+		oldID, ok := extractInt64Value(groupInfo["id"])
+		if !ok || oldID <= 0 {
+			continue
+		}
+		newID := int64(uuid.New().ID())
+		datasetGroupIDMap[oldID] = newID
+		name, _ := groupInfo["name"].(string)
+		groupType, _ := groupInfo["type"].(string)
+		info, _ := groupInfo["info"].(string)
+		groupNodeType := dataset.NodeTypeDataset
+		groupLevel := 0
+		parentID := datasetFolderID
+		newDatasetGroups = append(newDatasetGroups, dataset.CoreDatasetGroup{
+			ID:             newID,
+			Name:           name,
+			PID:            &parentID,
+			Level:          &groupLevel,
+			NodeType:       &groupNodeType,
+			Type:           stringPtrIfNotEmpty(groupType),
+			Info:           stringPtrAllowEmpty(info),
+			CreateBy:       updateBy,
+			CreateTime:     now,
+			UpdateBy:       updateBy,
+			LastUpdateTime: now,
+		})
+	}
+
+	var datasetTablesInfo []map[string]interface{}
+	if raw, ok := appData["datasetTablesInfo"]; ok {
+		if err := json.Unmarshal(raw, &datasetTablesInfo); err != nil {
+			return fmt.Errorf("parse dataset tables: %w", err)
+		}
+	}
+
+	datasetTableIDMap := make(map[int64]int64)
+	for _, tableInfo := range datasetTablesInfo {
+		oldID, ok := extractInt64Value(tableInfo["id"])
+		if !ok || oldID <= 0 {
+			continue
+		}
+		newID := int64(uuid.New().ID())
+		datasetTableIDMap[oldID] = newID
+
+		oldGroupID, _ := extractInt64Value(tableInfo["datasetGroupId"])
+		oldDatasourceID, _ := extractInt64Value(tableInfo["datasourceId"])
+		newGroupID, ok := datasetGroupIDMap[oldGroupID]
+		if !ok {
+			newGroupID = datasetFolderID
+		}
+		newDatasourceID := oldDatasourceID
+		if mappedID, ok := datasourceIDMap[oldDatasourceID]; ok {
+			newDatasourceID = mappedID
+		}
+
+		name, _ := tableInfo["name"].(string)
+		physicalTable, _ := tableInfo["tableName"].(string)
+		tableType, _ := tableInfo["type"].(string)
+		info, _ := tableInfo["info"].(string)
+		sqlVariables, _ := tableInfo["sqlVariableDetails"].(string)
+		table := &dataset.CoreDatasetTable{
+			ID:             newID,
+			Name:           stringPtrIfNotEmpty(name),
+			DatasourceID:   int64PtrIfPositive(newDatasourceID),
+			DatasetGroupID: newGroupID,
+			PhysicalTable:  stringPtrIfNotEmpty(physicalTable),
+			Type:           stringPtrIfNotEmpty(tableType),
+			Info:           stringPtrIfNotEmpty(info),
+			SQLVariables:   stringPtrIfNotEmpty(sqlVariables),
+		}
+		if err := s.datasetRepo.CreateTable(table); err != nil {
+			return fmt.Errorf("create dataset table: %w", err)
+		}
+	}
+
+	var datasetTableFieldsInfo []map[string]interface{}
+	if raw, ok := appData["datasetTableFieldsInfo"]; ok {
+		if err := json.Unmarshal(raw, &datasetTableFieldsInfo); err != nil {
+			return fmt.Errorf("parse dataset table fields: %w", err)
+		}
+	}
+
+	datasetTableFieldIDMap := make(map[int64]int64)
+	fields := make([]dataset.CoreDatasetTableField, 0, len(datasetTableFieldsInfo))
+	for _, fieldInfo := range datasetTableFieldsInfo {
+		oldID, ok := extractInt64Value(fieldInfo["id"])
+		if !ok || oldID <= 0 {
+			continue
+		}
+		newID := int64(uuid.New().ID())
+		datasetTableFieldIDMap[oldID] = newID
+
+		oldGroupID, _ := extractInt64Value(fieldInfo["datasetGroupId"])
+		oldTableID, _ := extractInt64Value(fieldInfo["datasetTableId"])
+		oldDatasourceID, _ := extractInt64Value(fieldInfo["datasourceId"])
+		newGroupID, ok := datasetGroupIDMap[oldGroupID]
+		if !ok {
+			newGroupID = datasetFolderID
+		}
+		newTableID := oldTableID
+		if mappedID, ok := datasetTableIDMap[oldTableID]; ok {
+			newTableID = mappedID
+		}
+		newDatasourceID := oldDatasourceID
+		if mappedID, ok := datasourceIDMap[oldDatasourceID]; ok {
+			newDatasourceID = mappedID
+		}
+
+		originName, _ := fieldInfo["originName"].(string)
+		name, _ := fieldInfo["name"].(string)
+		dataeaseName, _ := fieldInfo["dataeaseName"].(string)
+		fieldShortName, _ := fieldInfo["fieldShortName"].(string)
+		groupType, _ := fieldInfo["groupType"].(string)
+		fieldType, _ := fieldInfo["type"].(string)
+		params, _ := fieldInfo["params"].(string)
+
+		deType := extractIntValueOrDefault(fieldInfo["deType"], 0)
+		deExtractType := extractIntValueOrDefault(fieldInfo["deExtractType"], 0)
+		extField := extractIntValueOrDefault(fieldInfo["extField"], 0)
+		checked := true
+
+		fields = append(fields, dataset.CoreDatasetTableField{
+			ID:             newID,
+			DatasourceID:   int64PtrIfPositive(newDatasourceID),
+			DatasetTableID: int64PtrIfPositive(newTableID),
+			DatasetGroupID: newGroupID,
+			OriginName:     stringPtrAllowEmpty(originName),
+			Name:           stringPtrIfNotEmpty(name),
+			DataeaseName:   stringPtrIfNotEmpty(dataeaseName),
+			FieldShortName: stringPtrIfNotEmpty(fieldShortName),
+			GroupType:      stringPtrIfNotEmpty(groupType),
+			Type:           stringPtrIfNotEmpty(fieldType),
+			DeType:         &deType,
+			DeExtractType:  &deExtractType,
+			ExtField:       &extField,
+			Checked:        &checked,
+			Params:         stringPtrIfNotEmpty(params),
+		})
+	}
+
+	for i := range fields {
+		if fields[i].OriginName == nil {
+			continue
+		}
+		origin := replaceIDs(*fields[i].OriginName, datasetTableFieldIDMap)
+		fields[i].OriginName = &origin
+	}
+	if err := s.datasetRepo.BatchCreateFields(fields); err != nil {
+		return fmt.Errorf("create dataset fields: %w", err)
+	}
+
+	for i := range newDatasetGroups {
+		if newDatasetGroups[i].Info != nil {
+			info := replaceIDs(*newDatasetGroups[i].Info, datasetGroupIDMap)
+			info = replaceIDs(info, datasetTableIDMap)
+			info = replaceIDs(info, datasetTableFieldIDMap)
+			info = replaceIDs(info, datasourceIDMap)
+			newDatasetGroups[i].Info = &info
+		}
+		if err := s.datasetRepo.CreateGroup(&newDatasetGroups[i]); err != nil {
+			return fmt.Errorf("create dataset group: %w", err)
+		}
+	}
+
+	if req.ComponentData != nil {
+		componentData := *req.ComponentData
+		componentData = replaceIDs(componentData, datasetGroupIDMap)
+		componentData = replaceIDs(componentData, datasetTableIDMap)
+		componentData = replaceIDs(componentData, datasetTableFieldIDMap)
+		componentData = replaceIDs(componentData, datasourceIDMap)
+		req.ComponentData = &componentData
+	}
+
+	if req.CanvasViewInfo != nil {
+		for viewID, viewData := range req.CanvasViewInfo {
+			viewJSON, err := json.Marshal(viewData)
+			if err != nil {
+				continue
+			}
+			viewStr := string(viewJSON)
+			viewStr = replaceIDs(viewStr, datasourceIDMap)
+			viewStr = replaceIDs(viewStr, datasetTableIDMap)
+			viewStr = replaceIDs(viewStr, datasetTableFieldIDMap)
+			viewStr = replaceIDs(viewStr, datasetGroupIDMap)
+
+			var newViewData map[string]interface{}
+			if err := json.Unmarshal([]byte(viewStr), &newViewData); err != nil {
+				continue
+			}
+			newViewData["dataFrom"] = "dataset"
+			if tableID, ok := newViewData["tableId"]; !ok || tableID == nil || tableID == float64(0) {
+				if sourceTableID, ok := newViewData["sourceTableId"]; ok {
+					newViewData["tableId"] = sourceTableID
+				}
+			}
+			req.CanvasViewInfo[viewID] = newViewData
+		}
+	}
+
+	return nil
 }
 
 func (s *VisualizationService) applyInheritedPermissionsOnCreate(resourceID int64, resourceName string, pid *int64, visualizationType *string) error {
@@ -1295,8 +1567,45 @@ func extractInt64Value(value interface{}) (int64, bool) {
 		if err == nil {
 			return parsed, true
 		}
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		if err == nil {
+			return parsed, true
+		}
 	}
 	return 0, false
+}
+
+func extractIntValueOrDefault(value interface{}, defaultValue int) int {
+	if parsed, ok := extractInt64Value(value); ok {
+		return int(parsed)
+	}
+	return defaultValue
+}
+
+func stringPtrIfNotEmpty(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func stringPtrAllowEmpty(value string) *string {
+	return &value
+}
+
+func int64PtrIfPositive(value int64) *int64 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func replaceIDs(value string, idMap map[int64]int64) string {
+	for oldID, newID := range idMap {
+		value = strings.ReplaceAll(value, strconv.FormatInt(oldID, 10), strconv.FormatInt(newID, 10))
+	}
+	return value
 }
 
 func parseDynamicData(raw string) (map[string]string, error) {
