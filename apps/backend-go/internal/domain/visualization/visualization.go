@@ -63,15 +63,16 @@ func (DataVisualizationInfo) TableName() string {
 }
 
 type SaveRequest struct {
-	Name            string  `json:"name" binding:"required"`
-	PID             *int64  `json:"pid"`
-	Type            *string `json:"type"`
-	NodeType        *string `json:"nodeType"`
-	CanvasStyleData *string `json:"canvasStyleData"`
-	ComponentData   *string `json:"componentData"`
-	MobileLayout    *bool   `json:"mobileLayout"`
-	ContentID       *string `json:"contentId"`
-	CheckVersion    *string `json:"checkVersion"`
+	Name            string                            `json:"name" binding:"required"`
+	PID             *int64                            `json:"pid"`
+	Type            *string                           `json:"type"`
+	NodeType        *string                           `json:"nodeType"`
+	CanvasStyleData *string                           `json:"canvasStyleData"`
+	ComponentData   *string                           `json:"componentData"`
+	MobileLayout    *bool                             `json:"mobileLayout"`
+	ContentID       *string                           `json:"contentId"`
+	CheckVersion    *string                           `json:"checkVersion"`
+	CanvasViewInfo  map[string]map[string]interface{} `json:"canvasViewInfo"`
 }
 
 type CopyRequest struct {
@@ -84,16 +85,17 @@ type CopyRequest struct {
 }
 
 type UpdateRequest struct {
-	ID              int64   `json:"id" binding:"required"`
-	Name            *string `json:"name"`
-	PID             *int64  `json:"pid"`
-	Type            *string `json:"type"`
-	CanvasStyleData *string `json:"canvasStyleData"`
-	ComponentData   *string `json:"componentData"`
-	MobileLayout    *bool   `json:"mobileLayout"`
-	Status          *int    `json:"status"`
-	ContentID       *string `json:"contentId"`
-	CheckVersion    *string `json:"checkVersion"`
+	ID              int64                             `json:"id" binding:"required"`
+	Name            *string                           `json:"name"`
+	PID             *int64                            `json:"pid"`
+	Type            *string                           `json:"type"`
+	CanvasStyleData *string                           `json:"canvasStyleData"`
+	ComponentData   *string                           `json:"componentData"`
+	MobileLayout    *bool                             `json:"mobileLayout"`
+	Status          *int                              `json:"status"`
+	ContentID       *string                           `json:"contentId"`
+	CheckVersion    *string                           `json:"checkVersion"`
+	CanvasViewInfo  map[string]map[string]interface{} `json:"canvasViewInfo"`
 }
 
 type NameCheckRequest struct {
