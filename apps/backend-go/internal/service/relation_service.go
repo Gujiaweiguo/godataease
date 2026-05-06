@@ -33,7 +33,7 @@ func (s *RelationService) GetDatasourceRelationship(_ context.Context, id int64)
 	return &relation.RelationResponse{
 		ID:           id,
 		BusiFlag:     "datasource",
-		RelationList: buildForwardTree(rows),
+		RelationList: buildThreeLevelTree(rows, forwardLevels[0], forwardLevels[1], forwardLevels[2]),
 	}, nil
 }
 
@@ -48,7 +48,7 @@ func (s *RelationService) GetDatasetRelationship(_ context.Context, id int64) (*
 	return &relation.RelationResponse{
 		ID:           id,
 		BusiFlag:     "dataset",
-		RelationList: buildForwardTree(rows),
+		RelationList: buildThreeLevelTree(rows, forwardLevels[0], forwardLevels[1], forwardLevels[2]),
 	}, nil
 }
 
@@ -63,7 +63,7 @@ func (s *RelationService) GetPanelRelationship(_ context.Context, id int64) (*re
 	return &relation.RelationResponse{
 		ID:           id,
 		BusiFlag:     "dashboard",
-		RelationList: buildReverseTree(rows),
+		RelationList: buildThreeLevelTree(rows, reverseLevels[0], reverseLevels[1], reverseLevels[2]),
 	}, nil
 }
 
@@ -71,107 +71,116 @@ func (s *RelationService) CheckPermission(_ context.Context, id int64) (*relatio
 	return &relation.CheckPermissionResponse{ID: id, Editable: true, Creatable: true}, nil
 }
 
-func buildForwardTree(rows []repository.RelationQueryRow) []*relation.RelationDTO {
+type relationLevel struct {
+	idFunc      func(row repository.RelationQueryRow) *int64
+	nameFunc    func(row repository.RelationQueryRow) *string
+	creatorFunc func(row repository.RelationQueryRow) *string
+	updateFunc  func(row repository.RelationQueryRow) *int64
+	typeLabel   string
+}
+
+func buildThreeLevelTree(rows []repository.RelationQueryRow, l1, l2, l3 relationLevel) []*relation.RelationDTO {
 	root := make([]*relation.RelationDTO, 0)
-	datasets := make(map[int64]*relation.RelationDTO)
-	chartNodes := make(map[int64]map[int64]*relation.RelationDTO)
-	dashboardNodes := make(map[int64]map[int64]*relation.RelationDTO)
+	level1Map := make(map[int64]*relation.RelationDTO)
+	level2Map := make(map[int64]map[int64]*relation.RelationDTO)
+	level3Map := make(map[int64]map[int64]*relation.RelationDTO)
 
 	for _, row := range rows {
-		if row.DatasetID == nil {
+		if l1.idFunc(row) == nil {
 			continue
 		}
 
-		datasetNode, ok := datasets[*row.DatasetID]
+		level1ID := *l1.idFunc(row)
+		level1Node, ok := level1Map[level1ID]
 		if !ok {
-			datasetNode = newRelationDTO(*row.DatasetID, row.DatasetName, row.DatasetCreator, "dataset", row.DatasetUpdate)
-			datasets[*row.DatasetID] = datasetNode
-			root = append(root, datasetNode)
+			level1Node = newRelationDTO(level1ID, l1.nameFunc(row), l1.creatorFunc(row), l1.typeLabel, l1.updateFunc(row))
+			level1Map[level1ID] = level1Node
+			root = append(root, level1Node)
 		}
 
-		if row.ChartID == nil {
+		if l2.idFunc(row) == nil {
 			continue
 		}
 
-		if chartNodes[*row.DatasetID] == nil {
-			chartNodes[*row.DatasetID] = make(map[int64]*relation.RelationDTO)
+		level2ID := *l2.idFunc(row)
+		if level2Map[level1ID] == nil {
+			level2Map[level1ID] = make(map[int64]*relation.RelationDTO)
 		}
-		chartNode, ok := chartNodes[*row.DatasetID][*row.ChartID]
+		level2Node, ok := level2Map[level1ID][level2ID]
 		if !ok {
-			chartNode = newRelationDTO(*row.ChartID, row.ChartName, row.ChartCreator, "chart", row.ChartUpdate)
-			chartNodes[*row.DatasetID][*row.ChartID] = chartNode
-			datasetNode.SubRelation = append(datasetNode.SubRelation, chartNode)
+			level2Node = newRelationDTO(level2ID, l2.nameFunc(row), l2.creatorFunc(row), l2.typeLabel, l2.updateFunc(row))
+			level2Map[level1ID][level2ID] = level2Node
+			level1Node.SubRelation = append(level1Node.SubRelation, level2Node)
 		}
 
-		if row.DashboardID == nil {
+		if l3.idFunc(row) == nil {
 			continue
 		}
 
-		if dashboardNodes[*row.ChartID] == nil {
-			dashboardNodes[*row.ChartID] = make(map[int64]*relation.RelationDTO)
+		level3ID := *l3.idFunc(row)
+		if level3Map[level2ID] == nil {
+			level3Map[level2ID] = make(map[int64]*relation.RelationDTO)
 		}
-		if _, ok := dashboardNodes[*row.ChartID][*row.DashboardID]; ok {
+		if _, ok := level3Map[level2ID][level3ID]; ok {
 			continue
 		}
 
-		dashboardNode := newRelationDTO(*row.DashboardID, row.DashboardName, row.DashboardCreator, "dashboard", row.DashboardUpdate)
-		dashboardNodes[*row.ChartID][*row.DashboardID] = dashboardNode
-		chartNode.SubRelation = append(chartNode.SubRelation, dashboardNode)
+		level3Node := newRelationDTO(level3ID, l3.nameFunc(row), l3.creatorFunc(row), l3.typeLabel, l3.updateFunc(row))
+		level3Map[level2ID][level3ID] = level3Node
+		level2Node.SubRelation = append(level2Node.SubRelation, level3Node)
 	}
 
 	return root
 }
 
-func buildReverseTree(rows []repository.RelationQueryRow) []*relation.RelationDTO {
-	root := make([]*relation.RelationDTO, 0)
-	charts := make(map[int64]*relation.RelationDTO)
-	datasets := make(map[int64]map[int64]*relation.RelationDTO)
-	datasources := make(map[int64]map[int64]*relation.RelationDTO)
-
-	for _, row := range rows {
-		if row.ChartID == nil {
-			continue
-		}
-
-		chartNode, ok := charts[*row.ChartID]
-		if !ok {
-			chartNode = newRelationDTO(*row.ChartID, row.ChartName, row.ChartCreator, "chart", row.ChartUpdate)
-			charts[*row.ChartID] = chartNode
-			root = append(root, chartNode)
-		}
-
-		if row.DatasetID == nil {
-			continue
-		}
-
-		if datasets[*row.ChartID] == nil {
-			datasets[*row.ChartID] = make(map[int64]*relation.RelationDTO)
-		}
-		datasetNode, ok := datasets[*row.ChartID][*row.DatasetID]
-		if !ok {
-			datasetNode = newRelationDTO(*row.DatasetID, row.DatasetName, row.DatasetCreator, "dataset", row.DatasetUpdate)
-			datasets[*row.ChartID][*row.DatasetID] = datasetNode
-			chartNode.SubRelation = append(chartNode.SubRelation, datasetNode)
-		}
-
-		if row.DatasourceID == nil {
-			continue
-		}
-
-		if datasources[*row.DatasetID] == nil {
-			datasources[*row.DatasetID] = make(map[int64]*relation.RelationDTO)
-		}
-		if _, ok := datasources[*row.DatasetID][*row.DatasourceID]; ok {
-			continue
-		}
-
-		datasourceNode := newRelationDTO(*row.DatasourceID, row.DatasourceName, row.DatasourceCreator, "datasource", row.DatasourceUpdate)
-		datasources[*row.DatasetID][*row.DatasourceID] = datasourceNode
-		datasetNode.SubRelation = append(datasetNode.SubRelation, datasourceNode)
+var (
+	forwardLevels = [3]relationLevel{
+		{
+			idFunc:      func(r repository.RelationQueryRow) *int64 { return r.DatasetID },
+			nameFunc:    func(r repository.RelationQueryRow) *string { return r.DatasetName },
+			creatorFunc: func(r repository.RelationQueryRow) *string { return r.DatasetCreator },
+			updateFunc:  func(r repository.RelationQueryRow) *int64 { return r.DatasetUpdate },
+			typeLabel:   "dataset",
+		},
+		{
+			idFunc:      func(r repository.RelationQueryRow) *int64 { return r.ChartID },
+			nameFunc:    func(r repository.RelationQueryRow) *string { return r.ChartName },
+			creatorFunc: func(r repository.RelationQueryRow) *string { return r.ChartCreator },
+			updateFunc:  func(r repository.RelationQueryRow) *int64 { return r.ChartUpdate },
+			typeLabel:   "chart",
+		},
+		{
+			idFunc:      func(r repository.RelationQueryRow) *int64 { return r.DashboardID },
+			nameFunc:    func(r repository.RelationQueryRow) *string { return r.DashboardName },
+			creatorFunc: func(r repository.RelationQueryRow) *string { return r.DashboardCreator },
+			updateFunc:  func(r repository.RelationQueryRow) *int64 { return r.DashboardUpdate },
+			typeLabel:   "dashboard",
+		},
 	}
-
-	return root
-}
+	reverseLevels = [3]relationLevel{
+		{
+			idFunc:      func(r repository.RelationQueryRow) *int64 { return r.ChartID },
+			nameFunc:    func(r repository.RelationQueryRow) *string { return r.ChartName },
+			creatorFunc: func(r repository.RelationQueryRow) *string { return r.ChartCreator },
+			updateFunc:  func(r repository.RelationQueryRow) *int64 { return r.ChartUpdate },
+			typeLabel:   "chart",
+		},
+		{
+			idFunc:      func(r repository.RelationQueryRow) *int64 { return r.DatasetID },
+			nameFunc:    func(r repository.RelationQueryRow) *string { return r.DatasetName },
+			creatorFunc: func(r repository.RelationQueryRow) *string { return r.DatasetCreator },
+			updateFunc:  func(r repository.RelationQueryRow) *int64 { return r.DatasetUpdate },
+			typeLabel:   "dataset",
+		},
+		{
+			idFunc:      func(r repository.RelationQueryRow) *int64 { return r.DatasourceID },
+			nameFunc:    func(r repository.RelationQueryRow) *string { return r.DatasourceName },
+			creatorFunc: func(r repository.RelationQueryRow) *string { return r.DatasourceCreator },
+			updateFunc:  func(r repository.RelationQueryRow) *int64 { return r.DatasourceUpdate },
+			typeLabel:   "datasource",
+		},
+	}
+)
 
 func newRelationDTO(id int64, name, creator *string, relationType string, update *int64) *relation.RelationDTO {
 	return &relation.RelationDTO{
