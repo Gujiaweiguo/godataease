@@ -33,14 +33,14 @@ func main() {
 		logger.Fatal("Failed to connect database", zap.String("error", err.Error()))
 		os.Exit(1)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	redisClient, err := cache.Init(&application.Config.Redis)
 	if err != nil {
 		logger.Fatal("Failed to connect redis", zap.String("error", err.Error()))
 		os.Exit(1)
 	}
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	if err := database.AutoMigrate(db); err != nil {
 		logger.Fatal("Failed to migrate database", zap.String("error", err.Error()))

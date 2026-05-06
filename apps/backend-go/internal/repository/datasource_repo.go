@@ -251,7 +251,7 @@ func (r *DatasourceRepository) ListSchemas() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make([]string, 0)
 	for rows.Next() {

@@ -603,7 +603,7 @@ func TestPermissionCompatHandler_SaveBusiTargetPerReplacesResourcePermissionUnio
 	if len(repo.replacedResourcePerms) != 3 {
 		t.Fatalf("expected dashboard-only union to be persisted, got %#v", repo.replacedResourcePerms)
 	}
-	if !(containsPerm(repo.replacedResourcePerms, 3) && containsPerm(repo.replacedResourcePerms, 4) && containsPerm(repo.replacedResourcePerms, 6)) {
+	if !containsPerm(repo.replacedResourcePerms, 3) || !containsPerm(repo.replacedResourcePerms, 4) || !containsPerm(repo.replacedResourcePerms, 6) {
 		t.Fatalf("expected resource perms [3 4 6], got %#v", repo.replacedResourcePerms)
 	}
 }

@@ -96,7 +96,7 @@ func (s *ExcelService) parseExcelFile(filename string, reader io.Reader) ([]*dat
 	if err != nil {
 		return nil, fmt.Errorf("failed to open excel file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	sheetList := f.GetSheetList()
 	result := make([]*datasource.ExcelSheetData, 0, len(sheetList))
@@ -191,7 +191,7 @@ func (s *ExcelService) saveFile(file multipart.File, header *multipart.FileHeade
 	if err != nil {
 		return "", fmt.Errorf("failed to create file: %w", err)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	if _, err = file.Seek(0, 0); err != nil {
 		return "", err
@@ -248,7 +248,7 @@ func (s *ExcelService) LoadRemoteFile(req *RemoteExcelRequest) (*datasource.Exce
 	if err != nil {
 		return nil, fmt.Errorf("failed to download remote file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Parse the file
 	filename := filepath.Base(req.URL)
@@ -312,7 +312,7 @@ func (s *ExcelService) downloadFile(url, userName, password string) (*http.Respo
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("failed to download file: status %d", resp.StatusCode)
 	}
 

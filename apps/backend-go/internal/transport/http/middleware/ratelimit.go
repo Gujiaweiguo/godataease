@@ -74,11 +74,6 @@ func newTokenBucketLimiter(name string, maxRequests int, window time.Duration, n
 	}
 }
 
-func (l *tokenBucketLimiter) allow(key string) bool {
-	allowed, _, _ := l.allowWithDetails(key, time.Second)
-	return allowed
-}
-
 func (l *tokenBucketLimiter) allowWithDetails(key string, window time.Duration) (bool, int, time.Time) {
 	current := l.now()
 	l.mu.Lock()

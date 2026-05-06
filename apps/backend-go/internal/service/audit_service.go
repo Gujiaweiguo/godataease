@@ -193,7 +193,7 @@ func (s *AuditService) exportToCSV(logs []*audit.AuditLog, filePath string) erro
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()

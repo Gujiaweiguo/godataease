@@ -14,7 +14,6 @@ import (
 	scheduler "dataease/backend/internal/job"
 	"dataease/backend/internal/job/jobs"
 	pkgauth "dataease/backend/internal/pkg/auth"
-	"dataease/backend/internal/pkg/cache"
 	pkgcache "dataease/backend/internal/pkg/cache"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/metrics"
@@ -543,7 +542,7 @@ func (r *Router) registerRootRoutes() {
 			Expire: r.app.Config.JWT.Expire,
 		})
 		protected.Use(middleware.Auth(jwtInstance))
-		rateLimitOpts = &middleware.RouteRateLimitOptions{Config: r.app.Config.RateLimit, Backend: middleware.NewRateLimiterBackend(r.app.Config.RateLimit, cache.GetClient())}
+		rateLimitOpts = &middleware.RouteRateLimitOptions{Config: r.app.Config.RateLimit, Backend: middleware.NewRateLimiterBackend(r.app.Config.RateLimit, pkgcache.GetClient())}
 	}
 
 	r.engine.GET("/health", func(c *gin.Context) {
@@ -608,7 +607,7 @@ func (r *Router) registerAPIRoutes() {
 	var routeRateLimitOpts *middleware.RouteRateLimitOptions
 	if r.app != nil && r.app.Config != nil {
 		rateLimitCfg := r.app.Config.RateLimit
-		rateLimitBackend := middleware.NewRateLimiterBackend(rateLimitCfg, cache.GetClient())
+		rateLimitBackend := middleware.NewRateLimiterBackend(rateLimitCfg, pkgcache.GetClient())
 		routeRateLimitOpts = &middleware.RouteRateLimitOptions{Config: rateLimitCfg, Backend: rateLimitBackend}
 		jwtInstance := pkgauth.NewJWT(&pkgauth.JWTConfig{
 			Secret: r.app.Config.JWT.Secret,

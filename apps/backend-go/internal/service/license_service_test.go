@@ -674,7 +674,7 @@ func TestLicense_ShortHash_IsStableUppercaseLength(t *testing.T) {
 		t.Fatalf("expected 16-char hash, got %q", first)
 	}
 	for _, r := range first {
-		if !(r >= '0' && r <= '9') && !(r >= 'A' && r <= 'F') {
+		if (r < '0' || r > '9') && (r < 'A' || r > 'F') {
 			t.Fatalf("expected uppercase hex hash, got %q", first)
 		}
 	}

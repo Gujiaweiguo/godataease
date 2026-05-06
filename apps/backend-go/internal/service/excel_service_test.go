@@ -206,10 +206,10 @@ func TestExcelService_UploadFileAndLoadRemoteFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	_, _ = tmp.WriteString(csvContent)
 	_, _ = tmp.Seek(0, 0)
-	defer tmp.Close()
+	defer func() { _ = tmp.Close() }()
 
 	header := &multipart.FileHeader{Filename: "upload.csv", Size: int64(len(csvContent))}
 	uploaded, err := svc.UploadFile(tmp, header, 1, 0)
@@ -355,10 +355,10 @@ func TestExcelService_UploadFile_WithXLSX(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	_, _ = tmp.WriteString(csvContent)
 	_, _ = tmp.Seek(0, 0)
-	defer tmp.Close()
+	defer func() { _ = tmp.Close() }()
 
 	header := &multipart.FileHeader{Filename: "test.csv", Size: int64(len(csvContent))}
 	uploaded, err := svc.UploadFile(tmp, header, 1, 0)
@@ -474,15 +474,15 @@ func TestExcelService_SaveFile_SeekError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.Remove(tmp.Name())
-	tmp.Close()
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	_ = tmp.Close()
 
 	// Open file for reading (this will work)
 	file, err := os.Open(tmp.Name())
 	if err != nil {
 		t.Fatalf("open temp file failed: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// This should work since we're using a real file
 	header := &multipart.FileHeader{Filename: "test.csv", Size: 10}
@@ -546,7 +546,7 @@ func TestExcelService_SaveFile_CreateFileError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	_ = tmp.Close()
 
 	svc := &ExcelService{uploadDir: tmp.Name()}

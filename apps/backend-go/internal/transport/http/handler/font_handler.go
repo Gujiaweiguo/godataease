@@ -181,7 +181,7 @@ func (h *FontHandler) UploadFile(c *gin.Context) {
 		response.Error(c, "500000", "Failed to read upload file: "+err.Error())
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	filename := header.Filename
 	if filename == "" || !strings.HasSuffix(strings.ToLower(filename), ".ttf") {

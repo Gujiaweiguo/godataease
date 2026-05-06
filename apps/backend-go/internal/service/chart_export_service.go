@@ -42,7 +42,7 @@ type ChartViewInfo struct {
 // InnerExportDetails exports chart data to Excel
 func (s *ChartExportService) InnerExportDetails(req *ExportChartRequest) (*bytes.Buffer, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	sheetName := "数据"
 	index, err := f.NewSheet(sheetName)

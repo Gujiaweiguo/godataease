@@ -723,7 +723,7 @@ func (h *VisualizationHandler) DecompressionLocalFile(c *gin.Context) {
 		response.Error(c, "500000", "Failed to open upload file: "+err.Error())
 		return
 	}
-	defer opened.Close()
+	defer func() { _ = opened.Close() }()
 
 	content, err := io.ReadAll(io.LimitReader(opened, maxVisualizationTemplateUploadBytes+1))
 	if err != nil {

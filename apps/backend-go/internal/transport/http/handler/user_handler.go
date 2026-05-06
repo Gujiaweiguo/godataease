@@ -337,7 +337,7 @@ func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if header.Size > service.MaxUserImportFileSize {
 		response.Error(c, "500000", "file size exceeds 10MB limit")

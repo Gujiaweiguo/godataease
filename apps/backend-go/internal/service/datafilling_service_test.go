@@ -1221,7 +1221,7 @@ func TestDataFillingService_ExcelTemplateDownload(t *testing.T) {
 
 	book, err := excelize.OpenReader(bytes.NewReader(buf.Bytes()))
 	require.NoError(t, err)
-	defer book.Close()
+	defer func() { _ = book.Close() }()
 	rows, err := book.GetRows(book.GetSheetName(book.GetActiveSheetIndex()))
 	require.NoError(t, err)
 	require.NotEmpty(t, rows)
@@ -1329,7 +1329,7 @@ func TestDataFillingService_ExportFormData(t *testing.T) {
 	require.NoError(t, err)
 	book, err := excelize.OpenReader(bytes.NewReader(buf.Bytes()))
 	require.NoError(t, err)
-	defer book.Close()
+	defer func() { _ = book.Close() }()
 	rows, err := book.GetRows(book.GetSheetName(book.GetActiveSheetIndex()))
 	require.NoError(t, err)
 	require.Len(t, rows, 3)
@@ -1845,7 +1845,7 @@ func TestDataFillingService_PureHelpersAndEdgeCases(t *testing.T) {
 		assert.Equal(t, "name", metas[0].DisplayName)
 
 		book := excelize.NewFile()
-		defer book.Close()
+		defer func() { _ = book.Close() }()
 		require.NoError(t, writeExcelHeaders(book, metas))
 		require.NoError(t, writeExcelDataRows(book, metas, []map[string]interface{}{{"name": "alice"}}))
 		rows, err := book.GetRows(book.GetSheetName(book.GetActiveSheetIndex()))
@@ -1991,7 +1991,7 @@ func localStringPtr(v string) *string { return &v }
 func newExcelUploadFileHeader(t *testing.T, filename string, rows [][]string) *multipart.FileHeader {
 	t.Helper()
 	file := excelize.NewFile()
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	sheet := file.GetSheetName(file.GetActiveSheetIndex())
 	for rowIndex, row := range rows {
 		for colIndex, value := range row {
