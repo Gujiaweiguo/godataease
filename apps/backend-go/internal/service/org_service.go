@@ -70,49 +70,65 @@ func (s *OrgService) TransferUserOrg(sourceOrgID, targetOrgID, userID, actorID i
 }
 
 func (s *OrgService) validateTransferPrerequisites(sourceOrgID, targetOrgID, userID int64) (*org.SysOrg, *org.SysOrg, error) {
-	if sourceOrgID <= 0 || targetOrgID <= 0 || userID <= 0 {
-		return nil, nil, fmt.Errorf("source org, target org, and user id are required")
+	if err := s.validateTransferInput(sourceOrgID, targetOrgID, userID); err != nil {
+		return nil, nil, err
 	}
-	if sourceOrgID == targetOrgID {
-		return nil, nil, fmt.Errorf("source and target organizations must be different")
-	}
-	if s.orgRepo == nil || s.orgRepo.DB() == nil {
-		return nil, nil, fmt.Errorf("organization repository is not configured")
-	}
-	if s.roleRepo == nil {
-		return nil, nil, fmt.Errorf("role repository is not configured")
-	}
-	if s.userRoleRepo == nil {
-		return nil, nil, fmt.Errorf("user role repository is not configured")
-	}
-
-	sourceOrgInfo, err := s.orgRepo.GetByID(sourceOrgID)
+	sourceOrgInfo, err := s.requireOrgExists(sourceOrgID, "source")
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, fmt.Errorf("source organization not found")
-		}
-		return nil, nil, fmt.Errorf("failed to load source organization: %w", err)
+		return nil, nil, err
 	}
-	targetOrgInfo, err := s.orgRepo.GetByID(targetOrgID)
+	targetOrgInfo, err := s.requireOrgExists(targetOrgID, "target")
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, fmt.Errorf("target organization not found")
-		}
-		return nil, nil, fmt.Errorf("failed to load target organization: %w", err)
+		return nil, nil, err
 	}
 	if targetOrgInfo.Status != org.StatusEnabled {
 		return nil, nil, fmt.Errorf("target organization is disabled")
 	}
+	if err := s.requireUserInOrg(userID, sourceOrgID, "source"); err != nil {
+		return nil, nil, err
+	}
+	return sourceOrgInfo, targetOrgInfo, nil
+}
 
-	isMember, err := s.userRoleRepo.IsUserInOrg(userID, sourceOrgID)
+func (s *OrgService) validateTransferInput(sourceOrgID, targetOrgID, userID int64) error {
+	if sourceOrgID <= 0 || targetOrgID <= 0 || userID <= 0 {
+		return fmt.Errorf("source org, target org, and user id are required")
+	}
+	if sourceOrgID == targetOrgID {
+		return fmt.Errorf("source and target organizations must be different")
+	}
+	if s.orgRepo == nil || s.orgRepo.DB() == nil {
+		return fmt.Errorf("organization repository is not configured")
+	}
+	if s.roleRepo == nil {
+		return fmt.Errorf("role repository is not configured")
+	}
+	if s.userRoleRepo == nil {
+		return fmt.Errorf("user role repository is not configured")
+	}
+	return nil
+}
+
+func (s *OrgService) requireOrgExists(orgID int64, label string) (*org.SysOrg, error) {
+	info, err := s.orgRepo.GetByID(orgID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to validate source organization membership: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%s organization not found", label)
+		}
+		return nil, fmt.Errorf("failed to load %s organization: %w", label, err)
+	}
+	return info, nil
+}
+
+func (s *OrgService) requireUserInOrg(userID, orgID int64, label string) error {
+	isMember, err := s.userRoleRepo.IsUserInOrg(userID, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to validate %s organization membership: %w", label, err)
 	}
 	if !isMember {
-		return nil, nil, fmt.Errorf("user is not a member of source organization")
+		return fmt.Errorf("user is not a member of %s organization", label)
 	}
-
-	return sourceOrgInfo, targetOrgInfo, nil
+	return nil
 }
 
 func (s *OrgService) evaluateTransferLastRolePolicy(sourceOrgID, userID int64) (governance.LastRolePolicy, error) {
