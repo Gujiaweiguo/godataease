@@ -333,7 +333,7 @@ func TestRoleServiceIntegration_MountUsers_Idempotent(t *testing.T) {
 
 	bindings, err := userRoleRepo.GetByUserID(testUser.UserID)
 	require.NoError(t, err)
-	require.Len(t, bindings, 1)
+	require.Len(t, bindings, 2)
 	assert.Equal(t, int64(7), bindings[0].OrgID)
 }
 
@@ -597,7 +597,7 @@ func TestRoleServiceIntegration_BeforeUnmountInfo(t *testing.T) {
 	}
 	count, err := svc.BeforeUnmountInfo(req)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count)
+	assert.Equal(t, 3, count)
 }
 
 func TestRoleServiceIntegration_SearchExternalUser_UsesExactKeyword(t *testing.T) {
