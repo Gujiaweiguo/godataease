@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"dataease/backend/internal/pkg/errno"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -88,13 +89,13 @@ func (s *UserImportService) GenerateTemplate() ([]byte, string, error) {
 
 func (s *UserImportService) ImportUsers(file multipart.File, header *multipart.FileHeader, _ string, orgID int64) (*UserImportResult, error) {
 	if s.userService == nil {
-		return nil, fmt.Errorf("user import service is not configured")
+		return nil, fmt.Errorf(errno.ErrUserImportServiceNotConfigured)
 	}
 	if file == nil || header == nil {
 		return nil, fmt.Errorf("file is required")
 	}
 	if header.Size > MaxUserImportFileSize {
-		return nil, fmt.Errorf("file size exceeds 10MB limit")
+		return nil, fmt.Errorf(errno.ErrFileSizeExceedsLimit)
 	}
 
 	content, err := io.ReadAll(file)

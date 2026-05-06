@@ -57,7 +57,7 @@ func (h *ThresholdHandler) Save(c *gin.Context) {
 	userID, userName, oid := getThresholdUserInfo(c)
 	result, err := h.thresholdService.Create(c.Request.Context(), &req, userID, userName, oid)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *ThresholdHandler) Edit(c *gin.Context) {
 
 	result, err := h.thresholdService.Edit(c.Request.Context(), &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *ThresholdHandler) Pager(c *gin.Context) {
 
 	result, err := h.thresholdService.Pager(c.Request.Context(), &req, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *ThresholdHandler) FormInfo(c *gin.Context) {
 
 	result, err := h.thresholdService.FormInfo(c.Request.Context(), id, strings.TrimSpace(c.Param("resourceTable")))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *ThresholdHandler) SwitchEnable(c *gin.Context) {
 	}
 
 	if err := h.thresholdService.SwitchEnable(c.Request.Context(), &req); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -145,7 +145,7 @@ func (h *ThresholdHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.thresholdService.Delete(c.Request.Context(), ids, resourceTable); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -161,7 +161,7 @@ func (h *ThresholdHandler) BatchReci(c *gin.Context) {
 	}
 
 	if err := h.thresholdService.BatchReci(c.Request.Context(), &req); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -183,7 +183,7 @@ func (h *ThresholdHandler) InstancePager(c *gin.Context) {
 
 	result, err := h.thresholdService.InstancePager(c.Request.Context(), &req, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -200,7 +200,7 @@ func (h *ThresholdHandler) Preview(c *gin.Context) {
 
 	result, err := h.thresholdService.Preview(c.Request.Context(), &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -216,7 +216,7 @@ func (h *ThresholdHandler) AnyThreshold(c *gin.Context) {
 
 	result, err := h.thresholdService.AnyThreshold(c.Request.Context(), chartID, strings.TrimSpace(c.Param("resourceTable")))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *ThresholdHandler) DeleteWithChart(c *gin.Context) {
 	}
 
 	if err := h.thresholdService.DeleteWithChart(c.Request.Context(), chartID, strings.TrimSpace(c.Param("resourceTable"))); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 

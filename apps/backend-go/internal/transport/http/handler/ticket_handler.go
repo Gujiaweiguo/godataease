@@ -22,13 +22,13 @@ func (h *TicketHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req ticket.TicketCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.CreateTicket(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to create ticket: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to create ticket: "+err.Error())
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *TicketHandler) Validate(c *gin.Context) {
 	defer recoverServicePanic(c)
 	ticketStr := c.Param("id")
 	if ticketStr == "" {
-		response.Error(c, "500000", "Ticket ID is required")
+		response.Error(c, response.CodeInternalError, "Ticket ID is required")
 		return
 	}
 
@@ -51,13 +51,13 @@ func (h *TicketHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
 	ticketStr := c.Param("id")
 	if ticketStr == "" {
-		response.Error(c, "500000", "Ticket ID is required")
+		response.Error(c, response.CodeInternalError, "Ticket ID is required")
 		return
 	}
 
 	req := &ticket.TicketDeleteRequest{Ticket: ticketStr}
 	if err := h.service.DeleteTicket(req); err != nil {
-		response.Error(c, "500000", "Failed to delete ticket: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to delete ticket: "+err.Error())
 		return
 	}
 

@@ -16,7 +16,7 @@ func recoverServicePanic(c *gin.Context) {
 
 func recoverServicePanicWithMessage(c *gin.Context, message string) {
 	if r := recover(); r != nil {
-		response.Error(c, "500000", message)
+		response.Error(c, response.CodeInternalError, message)
 	}
 }
 

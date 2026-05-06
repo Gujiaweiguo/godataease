@@ -32,7 +32,7 @@ func (h *VisualizationBackgroundHandler) FindAll(c *gin.Context) {
 	defer recoverServicePanic(c)
 	backgrounds, err := h.repo.FindAll()
 	if err != nil {
-		response.Error(c, "500000", "Failed to query backgrounds: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to query backgrounds: "+err.Error())
 		return
 	}
 

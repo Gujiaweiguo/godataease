@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const errEmbeddedAppNotFound = "embedded app not found: %w"
+
 type EmbeddedService struct {
 	repo *repository.EmbeddedRepository
 }
@@ -48,7 +50,7 @@ func (s *EmbeddedService) Create(req *embedded.EmbeddedCreator, updateBy string)
 func (s *EmbeddedService) Edit(req *embedded.EmbeddedEditor, updateBy string) error {
 	e, err := s.repo.GetByID(req.ID)
 	if err != nil {
-		return fmt.Errorf("embedded app not found: %w", err)
+		return fmt.Errorf(errEmbeddedAppNotFound, err)
 	}
 
 	if req.Name != "" {
@@ -96,7 +98,7 @@ func (s *EmbeddedService) BatchDelete(ids []int64) error {
 func (s *EmbeddedService) ResetSecret(req *embedded.EmbeddedResetRequest, updateBy string) error {
 	e, err := s.repo.GetByID(req.ID)
 	if err != nil {
-		return fmt.Errorf("embedded app not found: %w", err)
+		return fmt.Errorf(errEmbeddedAppNotFound, err)
 	}
 
 	var newSecret string
@@ -177,7 +179,7 @@ func (s *EmbeddedService) InitIframe(token, origin string) ([]string, error) {
 
 	e, err := s.repo.GetByAppId(appId)
 	if err != nil {
-		return nil, fmt.Errorf("embedded app not found: %w", err)
+		return nil, fmt.Errorf(errEmbeddedAppNotFound, err)
 	}
 
 	if !embedded.IsOriginAllowed(origin, e.Domain) {

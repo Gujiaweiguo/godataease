@@ -2,6 +2,7 @@ package calcite
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"errors"
 	"fmt"
 	"strings"
@@ -126,7 +127,7 @@ func (c *Client) Close() error {
 func (c *Client) ParseSQL(ctx context.Context, sql string) (string, error) {
 	text := strings.TrimSpace(sql)
 	if text == "" {
-		return "", fmt.Errorf("sql is required")
+		return "", fmt.Errorf(errno.ErrSQLRequired)
 	}
 
 	resp, err := c.callParseWithRetry(ctx, &calcitev1.ParseSQLRequest{Sql: text})
@@ -151,7 +152,7 @@ func (c *Client) ParseSQL(ctx context.Context, sql string) (string, error) {
 func (c *Client) ValidateSQL(ctx context.Context, sql string) (bool, error) {
 	text := strings.TrimSpace(sql)
 	if text == "" {
-		return false, fmt.Errorf("sql is required")
+		return false, fmt.Errorf(errno.ErrSQLRequired)
 	}
 
 	resp, err := c.callValidateWithRetry(ctx, &calcitev1.ValidateSQLRequest{Sql: text})

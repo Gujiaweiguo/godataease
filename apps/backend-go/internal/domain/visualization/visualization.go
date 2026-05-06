@@ -6,6 +6,27 @@ import (
 	"strconv"
 )
 
+// Node type constants for visualization nodes.
+const (
+	NodeTypePanel  = "panel"
+	NodeTypeFolder = "folder"
+	NodeTypeLeaf   = "leaf"
+)
+
+// Visualization type constants.
+const (
+	TypeDashboard = "dashboard"
+	TypeDataV     = "dataV"
+)
+
+// Workbranch resource type aliases (used in findRecent queries).
+const (
+	ResourceAliasPanel      = "panel"
+	ResourceAliasScreen     = "screen"
+	ResourceAliasDataset    = "dataset"
+	ResourceAliasDatasource = "datasource"
+)
+
 // FlexInt decodes from JSON number or quoted string (frontend sends id as "2").
 type FlexInt int64
 

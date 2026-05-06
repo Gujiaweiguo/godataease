@@ -2,6 +2,7 @@ package seatunnel
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"fmt"
 	"strings"
 	"time"
@@ -253,7 +254,7 @@ func (c *Client) callCancelWithRetry(ctx context.Context, req *seatunnelv1.Cance
 
 func (c *Client) callSubmitWithTimeout(ctx context.Context, req *seatunnelv1.SubmitTaskRequest) (*seatunnelv1.SubmitTaskResponse, error) {
 	if c == nil || c.submitFn == nil {
-		return nil, fmt.Errorf("seatunnel client not initialized")
+		return nil, fmt.Errorf(errno.ErrSeatunnelNotInitialized)
 	}
 	callCtx, cancel := c.withTimeoutContext(ctx)
 	defer cancel()
@@ -262,7 +263,7 @@ func (c *Client) callSubmitWithTimeout(ctx context.Context, req *seatunnelv1.Sub
 
 func (c *Client) callStatusWithTimeout(ctx context.Context, req *seatunnelv1.GetTaskStatusRequest) (*seatunnelv1.GetTaskStatusResponse, error) {
 	if c == nil || c.statusFn == nil {
-		return nil, fmt.Errorf("seatunnel client not initialized")
+		return nil, fmt.Errorf(errno.ErrSeatunnelNotInitialized)
 	}
 	callCtx, cancel := c.withTimeoutContext(ctx)
 	defer cancel()
@@ -271,7 +272,7 @@ func (c *Client) callStatusWithTimeout(ctx context.Context, req *seatunnelv1.Get
 
 func (c *Client) callCancelWithTimeout(ctx context.Context, req *seatunnelv1.CancelTaskRequest) (*seatunnelv1.CancelTaskResponse, error) {
 	if c == nil || c.cancelFn == nil {
-		return nil, fmt.Errorf("seatunnel client not initialized")
+		return nil, fmt.Errorf(errno.ErrSeatunnelNotInitialized)
 	}
 	callCtx, cancel := c.withTimeoutContext(ctx)
 	defer cancel()

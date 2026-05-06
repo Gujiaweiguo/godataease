@@ -48,7 +48,7 @@ func (h *UserTaskHandler) UserTaskList(c *gin.Context) {
 	}
 	rows, total, err := h.service.UserTaskPageList(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), goPage, pageSize, &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"records": rows, "total": total, "current": goPage, "size": pageSize})
@@ -58,7 +58,7 @@ func (h *UserTaskHandler) UserTaskTodoCount(c *gin.Context) {
 	defer recoverServicePanic(c)
 	count, err := h.service.UserTaskTodoCount(c.Request.Context(), int64(transportmiddleware.GetUserID(c)))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, count)
@@ -72,7 +72,7 @@ func (h *UserTaskHandler) UserTaskData(c *gin.Context) {
 	}
 	data, err := h.service.GetUserTaskData(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, data)
@@ -90,7 +90,7 @@ func (h *UserTaskHandler) UserTaskSave(c *gin.Context) {
 		return
 	}
 	if err := h.service.SaveUserTaskData(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID, req.Data); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -108,7 +108,7 @@ func (h *UserTaskHandler) UserTaskAppend(c *gin.Context) {
 		return
 	}
 	if err := h.service.AppendUserTaskData(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID, req.Data); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -122,7 +122,7 @@ func (h *UserTaskHandler) UserTaskDelete(c *gin.Context) {
 	}
 	dataID := c.Param("id")
 	if err := h.service.DeleteUserTaskData(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID, []string{dataID}); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -146,7 +146,7 @@ func (h *UserTaskHandler) UserTaskConfirmUpload(c *gin.Context) {
 		return
 	}
 	if err := h.service.UserTaskConfirmUpload(c.Request.Context(), int64(transportmiddleware.GetUserID(c)), subTaskID, formID, req.ID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)

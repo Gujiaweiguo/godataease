@@ -29,7 +29,7 @@ type orgSwitcher func(userID int64, targetOrgID int64, requestLanguage string) (
 func requireCurrentOrg(c *gin.Context) (int64, bool) {
 	orgID := middleware.GetOrgID(c)
 	if orgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return 0, false
 	}
 	return orgID, true
@@ -66,7 +66,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req user.UserQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	orgID, ok := requireCurrentOrg(c)
@@ -79,7 +79,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 	result, err := h.userService.SearchUsers(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -90,7 +90,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req user.UserCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	orgID, ok := requireCurrentOrg(c)
@@ -103,7 +103,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	id, err := h.userService.CreateUser(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req user.UserUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	orgID, ok := requireCurrentOrg(c)
@@ -122,12 +122,12 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 	if err := h.userService.EnsureUserInOrg(req.ID, orgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	if err := h.userService.UpdateUser(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid user ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidUserID)
 	if !ok {
 		return
 	}
@@ -145,12 +145,12 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 	if err := h.userService.EnsureUserInOrg(id, orgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	if err := h.userService.DeleteUser(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *UserHandler) GetUserOptions(c *gin.Context) {
 
 	result, err := h.userService.SearchUsers(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -182,13 +182,13 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 		return
 	}
 	if h.buildBootstrap == nil {
-		response.Error(c, "500000", "identity bootstrap resolver is not configured")
+		response.Error(c, response.CodeInternalError, "identity bootstrap resolver is not configured")
 		return
 	}
 
 	bootstrap, err := h.buildBootstrap(userID, middleware.GetOrgID(c), c.GetHeader("Accept-Language"))
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -259,11 +259,11 @@ func (h *UserHandler) resolveWatermarkIdentity(userID int64, fallbackUsername st
 func (h *UserHandler) SwitchOrg(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.switchOrg == nil {
-		response.Error(c, "500000", "org switcher is not configured")
+		response.Error(c, response.CodeInternalError, "org switcher is not configured")
 		return
 	}
 
-	targetOrgID, ok := parseIDParamMsg(c, "id", "Invalid organization ID")
+	targetOrgID, ok := parseIDParamMsg(c, "id", errInvalidOrganizationID)
 	if !ok {
 		return
 	}
@@ -276,7 +276,7 @@ func (h *UserHandler) SwitchOrg(c *gin.Context) {
 
 	tokenVO, err := h.switchOrg(userID, targetOrgID, c.GetHeader("Accept-Language"))
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -287,18 +287,18 @@ func (h *UserHandler) SwitchLanguage(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req user.LangSwitchRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
-		response.Error(c, "500000", "Invalid user ID")
+		response.Error(c, response.CodeInternalError, errInvalidUserID)
 		return
 	}
 
 	if err := h.userService.SwitchLanguage(userID, req.Lang); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -308,39 +308,39 @@ func (h *UserHandler) SwitchLanguage(c *gin.Context) {
 func (h *UserHandler) DownloadExcelTemplate(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userImportService == nil {
-		response.Error(c, "500000", "user import service is not configured")
+		response.Error(c, response.CodeInternalError, "user import service is not configured")
 		return
 	}
 
 	content, filename, err := h.userImportService.GenerateTemplate()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Type", mimeExcelOpenXML)
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 	c.Header("Content-Transfer-Encoding", "binary")
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
+	c.Data(200, mimeExcelOpenXML, content)
 }
 
 func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userImportService == nil {
-		response.Error(c, "500000", "user import service is not configured")
+		response.Error(c, response.CodeInternalError, "user import service is not configured")
 		return
 	}
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get uploaded file: "+err.Error())
 		return
 	}
 	defer func() { _ = file.Close() }()
 
 	if header.Size > service.MaxUserImportFileSize {
-		response.Error(c, "500000", "file size exceeds 10MB limit")
+		response.Error(c, response.CodeInternalError, "file size exceeds 10MB limit")
 		return
 	}
 
@@ -357,7 +357,7 @@ func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 
 	result, err := h.userImportService.ImportUsers(file, header, operator, orgID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -367,44 +367,44 @@ func (h *UserHandler) BatchImportUsers(c *gin.Context) {
 func (h *UserHandler) DownloadErrorRecord(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userImportService == nil {
-		response.Error(c, "500000", "user import service is not configured")
+		response.Error(c, response.CodeInternalError, "user import service is not configured")
 		return
 	}
 
 	key := c.Param("key")
 	if key == "" {
-		response.Error(c, "500000", "error report key is required")
+		response.Error(c, response.CodeInternalError, "error report key is required")
 		return
 	}
 
 	content, filename, err := h.userImportService.GetErrorReport(key)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Type", mimeExcelOpenXML)
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 	c.Header("Content-Transfer-Encoding", "binary")
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
+	c.Data(200, mimeExcelOpenXML, content)
 }
 
 func (h *UserHandler) ClearErrorRecord(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userImportService == nil {
-		response.Error(c, "500000", "user import service is not configured")
+		response.Error(c, response.CodeInternalError, "user import service is not configured")
 		return
 	}
 
 	key := c.Param("key")
 	if key == "" {
-		response.Error(c, "500000", "error report key is required")
+		response.Error(c, response.CodeInternalError, "error report key is required")
 		return
 	}
 
 	if err := h.userImportService.ClearErrorReport(key); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -414,7 +414,7 @@ func (h *UserHandler) ClearErrorRecord(c *gin.Context) {
 func (h *UserHandler) GetDefaultPassword(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userService == nil {
-		response.Error(c, "500000", "user service is not configured")
+		response.Error(c, response.CodeInternalError, "user service is not configured")
 		return
 	}
 
@@ -424,7 +424,7 @@ func (h *UserHandler) GetDefaultPassword(c *gin.Context) {
 func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userService == nil {
-		response.Error(c, "500000", "user service is not configured")
+		response.Error(c, response.CodeInternalError, "user service is not configured")
 		return
 	}
 
@@ -433,13 +433,13 @@ func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 		idParam = c.Param("id")
 	}
 	if idParam == "" {
-		response.Error(c, "500000", "Invalid user ID")
+		response.Error(c, response.CodeInternalError, errInvalidUserID)
 		return
 	}
 
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		response.Error(c, "500000", "Invalid user ID")
+		response.Error(c, response.CodeInternalError, errInvalidUserID)
 		return
 	}
 	orgID, ok := requireCurrentOrg(c)
@@ -447,12 +447,12 @@ func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 		return
 	}
 	if err = h.userService.EnsureUserInOrg(id, orgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	if err = h.userService.ResetPassword(id, h.userService.ResolveDefaultPassword()); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -462,17 +462,17 @@ func (h *UserHandler) ResetPasswordCompat(c *gin.Context) {
 func (h *UserHandler) SwitchEnable(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.userService == nil {
-		response.Error(c, "500000", "user service is not configured")
+		response.Error(c, response.CodeInternalError, "user service is not configured")
 		return
 	}
 
 	var req user.UserUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if req.ID <= 0 || req.Status == nil {
-		response.Error(c, "500000", "Invalid request: id and status are required")
+		response.Error(c, response.CodeInternalError, "Invalid request: id and status are required")
 		return
 	}
 	orgID, ok := requireCurrentOrg(c)
@@ -480,12 +480,12 @@ func (h *UserHandler) SwitchEnable(c *gin.Context) {
 		return
 	}
 	if err := h.userService.EnsureUserInOrg(req.ID, orgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	if err := h.userService.UpdateUserStatus(req.ID, *req.Status); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

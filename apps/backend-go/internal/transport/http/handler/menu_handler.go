@@ -21,7 +21,7 @@ func (h *MenuHandler) Query(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.Query()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	applyMenuTitles(result, requestLocale(c, nil))
@@ -66,7 +66,7 @@ func (h *MenuHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req CreateMenuRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *MenuHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(m); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -120,7 +120,7 @@ func (h *MenuHandler) Update(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req UpdateMenuRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -147,7 +147,7 @@ func (h *MenuHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.service.Update(m); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -156,13 +156,13 @@ func (h *MenuHandler) Update(c *gin.Context) {
 
 func (h *MenuHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid menu ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidMenuID)
 	if !ok {
 		return
 	}
 
 	if err := h.service.Delete(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -178,12 +178,12 @@ func (h *MenuHandler) UpdateSort(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req UpdateSortRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.service.UpdateSort(req.ID, req.Sort); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -199,12 +199,12 @@ func (h *MenuHandler) UpdateHidden(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req UpdateHiddenRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.service.UpdateHidden(req.ID, req.Hidden); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -213,7 +213,7 @@ func (h *MenuHandler) UpdateHidden(c *gin.Context) {
 
 func (h *MenuHandler) Detail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid menu ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidMenuID)
 	if !ok {
 		return
 	}
@@ -221,7 +221,7 @@ func (h *MenuHandler) Detail(c *gin.Context) {
 
 	result, err := h.service.GetByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

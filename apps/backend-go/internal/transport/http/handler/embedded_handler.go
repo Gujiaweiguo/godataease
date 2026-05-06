@@ -6,6 +6,7 @@ import (
 	"dataease/backend/internal/domain/embedded"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -34,7 +35,7 @@ func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
 
 	var req embedded.KeywordRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -45,7 +46,7 @@ func (h *EmbeddedHandler) QueryGrid(c *gin.Context) {
 
 	result, err := h.service.QueryGrid(keyword, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -56,14 +57,14 @@ func (h *EmbeddedHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req embedded.EmbeddedCreator
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	updateBy := h.getUpdateBy(c)
 	id, err := h.service.Create(&req, updateBy)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -74,13 +75,13 @@ func (h *EmbeddedHandler) Edit(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req embedded.EmbeddedEditor
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.Edit(&req, updateBy); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -95,7 +96,7 @@ func (h *EmbeddedHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.service.Delete(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -108,17 +109,17 @@ func (h *EmbeddedHandler) BatchDelete(c *gin.Context) {
 		Ids []int64 `json:"ids" binding:"required"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if len(req.Ids) == 0 {
-		response.Error(c, "500000", "IDs list cannot be empty")
+		response.Error(c, response.CodeInternalError, "IDs list cannot be empty")
 		return
 	}
 
 	if err := h.service.BatchDelete(req.Ids); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -129,13 +130,13 @@ func (h *EmbeddedHandler) Reset(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req embedded.EmbeddedResetRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.ResetSecret(&req, updateBy); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -146,7 +147,7 @@ func (h *EmbeddedHandler) DomainList(c *gin.Context) {
 	defer recoverServicePanic(c)
 	domains, err := h.service.GetDomainList()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -157,13 +158,13 @@ func (h *EmbeddedHandler) InitIframe(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req embedded.EmbeddedOrigin
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	domains, err := h.service.InitIframe(req.Token, req.Origin)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -184,7 +185,7 @@ func (h *EmbeddedHandler) GetLimitCount(c *gin.Context) {
 }
 
 func (h *EmbeddedHandler) getUpdateBy(c *gin.Context) string {
-	if userId, exists := c.Get("userId"); exists {
+	if userId, exists := c.Get(middleware.ContextUserID); exists {
 		return toString(userId)
 	}
 	return embeddedDefaultUpdateBy
@@ -193,10 +194,10 @@ func (h *EmbeddedHandler) getUpdateBy(c *gin.Context) string {
 func (h *EmbeddedHandler) getCurrentUser(c *gin.Context) (int64, int64) {
 	userId := int64(1)
 	orgId := int64(1)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		userId = toInt64(uid)
 	}
-	if oid, exists := c.Get("orgId"); exists {
+	if oid, exists := c.Get(middleware.ContextOrgID); exists {
 		orgId = toInt64(oid)
 	}
 	return userId, orgId

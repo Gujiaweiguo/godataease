@@ -120,10 +120,10 @@ func (r *VisualizationRepository) FindRecent(uid int64, req *visualization.Workb
 	conditions := make([]string, 0, 2)
 	if req != nil {
 		typeMap := map[string]string{
-			"panel":      "panel",
-			"screen":     "screen",
-			"dataset":    "dataset",
-			"datasource": "datasource",
+			visualization.ResourceAliasPanel:      visualization.ResourceAliasPanel,
+			visualization.ResourceAliasScreen:     visualization.ResourceAliasScreen,
+			visualization.ResourceAliasDataset:    visualization.ResourceAliasDataset,
+			visualization.ResourceAliasDatasource: visualization.ResourceAliasDatasource,
 		}
 		if resourceType, ok := typeMap[req.Type]; ok {
 			conditions = append(conditions, "dvResource.type = ?")

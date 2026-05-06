@@ -4,6 +4,7 @@ import (
 	"dataease/backend/internal/domain/share"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -26,7 +27,7 @@ func (h *ShareHandler) Create(c *gin.Context) {
 	}
 
 	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			userID = id
 		}
@@ -66,7 +67,7 @@ func (h *ShareHandler) Revoke(c *gin.Context) {
 	}
 
 	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			userID = id
 		}
@@ -83,7 +84,7 @@ func (h *ShareHandler) Revoke(c *gin.Context) {
 
 func (h *ShareHandler) Status(c *gin.Context) {
 	defer recoverServicePanic(c)
-	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", "Invalid resource ID")
+	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", errInvalidResourceID)
 	if !ok {
 		return
 	}
@@ -99,7 +100,7 @@ func (h *ShareHandler) Status(c *gin.Context) {
 
 func (h *ShareHandler) Detail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", "Invalid resource ID")
+	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", errInvalidResourceID)
 	if !ok {
 		return
 	}
@@ -115,13 +116,13 @@ func (h *ShareHandler) Detail(c *gin.Context) {
 
 func (h *ShareHandler) Switcher(c *gin.Context) {
 	defer recoverServicePanic(c)
-	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", "Invalid resource ID")
+	resourceID, ok := parseIDParamMsgBadRequest(c, "resourceId", errInvalidResourceID)
 	if !ok {
 		return
 	}
 
 	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			userID = id
 		}
@@ -236,7 +237,7 @@ func RegisterShareRoutes(r gin.IRouter, h *ShareHandler) {
 }
 
 func shareUserID(c *gin.Context) int64 {
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			return id
 		}

@@ -134,7 +134,7 @@ func (h *AuditHandler) GetAuditLogByID(c *gin.Context) {
 
 func (h *AuditHandler) GetAuditLogsByUserID(c *gin.Context) {
 	defer recoverServicePanic(c)
-	userID, ok := parseIDParamMsgBadRequest(c, "userId", "Invalid user ID")
+	userID, ok := parseIDParamMsgBadRequest(c, middleware.ContextUserID, errInvalidUserID)
 	if !ok {
 		return
 	}
@@ -155,7 +155,7 @@ func (h *AuditHandler) QueryAuditLogs(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var query audit.AuditLogQuery
 
-	if userIDStr := c.Query("userId"); userIDStr != "" {
+	if userIDStr := c.Query(middleware.ContextUserID); userIDStr != "" {
 		if userID, err := strconv.ParseInt(userIDStr, 10, 64); err == nil {
 			query.UserID = &userID
 		}
@@ -304,7 +304,7 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
-		response.BadRequest(c, "Invalid file path")
+		response.BadRequest(c, errInvalidFilePath)
 		return
 	}
 	tempDir, err := filepath.Abs(os.TempDir())
@@ -313,13 +313,13 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 		return
 	}
 	if absPath != tempDir && !strings.HasPrefix(absPath, tempDir+string(os.PathSeparator)) {
-		response.BadRequest(c, "Invalid file path")
+		response.BadRequest(c, errInvalidFilePath)
 		return
 	}
 
 	baseName := filepath.Base(absPath)
 	if !strings.HasPrefix(baseName, "audit_logs_") {
-		response.BadRequest(c, "Invalid file path")
+		response.BadRequest(c, errInvalidFilePath)
 		return
 	}
 
@@ -344,7 +344,7 @@ func (h *AuditHandler) DownloadExportFile(c *gin.Context) {
 		return
 	}
 	if info.IsDir() {
-		response.BadRequest(c, "Invalid file path")
+		response.BadRequest(c, errInvalidFilePath)
 		return
 	}
 

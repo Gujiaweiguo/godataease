@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -494,7 +495,7 @@ func (s *VisualizationService) BackfillGovernedVisualizationResourcesWithOptions
 		return nil, fmt.Errorf("visualization repository not initialized")
 	}
 	if s.resourcePermService == nil {
-		return nil, fmt.Errorf("resource permission service not initialized")
+		return nil, fmt.Errorf(errno.ErrResourcePermNotInitialized)
 	}
 
 	normalized := normalizeGovernanceBackfillOptions(options)

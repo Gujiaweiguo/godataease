@@ -4,6 +4,7 @@ import (
 	"dataease/backend/internal/domain/msgcenter"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -21,7 +22,7 @@ func (h *MsgCenterHandler) Count(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req msgcenter.CountRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	response.Success(c, h.service.Count(&req))
@@ -31,7 +32,7 @@ func (h *MsgCenterHandler) List(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req msgcenter.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	response.Success(c, h.service.List(&req))
@@ -41,12 +42,12 @@ func (h *MsgCenterHandler) Read(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req msgcenter.ReadRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			userID = id
 		}
@@ -59,12 +60,12 @@ func (h *MsgCenterHandler) ReadBatch(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req msgcenter.ReadBatchRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			userID = id
 		}

@@ -24,13 +24,13 @@ func (h *LicenseHandler) Validate(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req license.LicenseRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Validate(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -40,13 +40,13 @@ func (h *LicenseHandler) Update(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req license.LicenseRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Update(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -60,7 +60,7 @@ func (h *LicenseHandler) Version(c *gin.Context) {
 func (h *LicenseHandler) Revert(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if err := h.service.Revert(); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)

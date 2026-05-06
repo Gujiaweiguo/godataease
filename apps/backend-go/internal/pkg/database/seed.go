@@ -311,8 +311,8 @@ func ensureDemoDashboardFolder(db *gorm.DB, now int64) (*visualization.DataVisua
 
 func ensureDemoDashboard(db *gorm.DB, folderID int64, chartViewIDs []int64, now int64) (*visualization.DataVisualizationInfo, error) {
 	var out visualization.DataVisualizationInfo
-	nodeType := "panel"
-	vizType := "dashboard"
+	nodeType := visualization.NodeTypePanel
+	vizType := visualization.TypeDashboard
 	componentData := "[]"
 	if len(chartViewIDs) > 0 {
 		componentDataJSON, err := buildDemoDashboardComponentData(chartViewIDs)
@@ -797,7 +797,7 @@ func ensureUserRole(db *gorm.DB, out *role.SysRole) error {
 			RoleCode:  "user",
 			RoleDesc:  ptrString("普通用户，拥有基本权限"),
 			Level:     ptrInt(1),
-			DataScope: ptrString("self"),
+			DataScope: ptrString(role.DataScopeSelf),
 			Status:    role.StatusEnabled,
 			CreateBy:  ptrString("system"),
 			RoleType:  ptrString(role.RoleTypeOrganization),

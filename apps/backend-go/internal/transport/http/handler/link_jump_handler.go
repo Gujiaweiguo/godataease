@@ -26,7 +26,7 @@ func (h *LinkJumpHandler) GetTableFieldWithViewID(c *gin.Context) {
 	}
 	result, err := h.service.GetTableFieldWithViewID(viewID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get table fields: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get table fields: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -35,7 +35,7 @@ func (h *LinkJumpHandler) GetTableFieldWithViewID(c *gin.Context) {
 // QueryWithViewId returns the jump config for a specific view in a dashboard.
 func (h *LinkJumpHandler) QueryWithViewId(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", errInvalidDvID)
 	if !ok {
 		return
 	}
@@ -45,7 +45,7 @@ func (h *LinkJumpHandler) QueryWithViewId(c *gin.Context) {
 	}
 	result, err := h.service.QueryWithViewId(dvID, viewID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to query jump info: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to query jump info: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -56,11 +56,11 @@ func (h *LinkJumpHandler) UpdateJumpSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto service.LinkJumpDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.UpdateJumpSet(&dto); err != nil {
-		response.Error(c, "500000", "Failed to update jump set: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to update jump set: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -71,12 +71,12 @@ func (h *LinkJumpHandler) QueryTargetVisualizationJumpInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkJumpRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.QueryTargetVisualizationJumpInfo(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to query target jump info: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to query target jump info: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -85,14 +85,14 @@ func (h *LinkJumpHandler) QueryTargetVisualizationJumpInfo(c *gin.Context) {
 // QueryVisualizationJumpInfo returns all active jump info for a dashboard.
 func (h *LinkJumpHandler) QueryVisualizationJumpInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", errInvalidDvID)
 	if !ok {
 		return
 	}
 	resourceTable := c.Param("resourceTable")
 	result, err := h.service.QueryVisualizationJumpInfo(dvID, resourceTable)
 	if err != nil {
-		response.Error(c, "500000", "Failed to query visualization jump info: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to query visualization jump info: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -101,13 +101,13 @@ func (h *LinkJumpHandler) QueryVisualizationJumpInfo(c *gin.Context) {
 // ViewTableDetailList returns chart views with field details for a dashboard.
 func (h *LinkJumpHandler) ViewTableDetailList(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", errInvalidDvID)
 	if !ok {
 		return
 	}
 	result, err := h.service.ViewTableDetailList(dvID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get view table details: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get view table details: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -118,12 +118,12 @@ func (h *LinkJumpHandler) UpdateJumpSetActive(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkJumpRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.UpdateJumpActive(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to update jump active: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to update jump active: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -134,11 +134,11 @@ func (h *LinkJumpHandler) RemoveJumpSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto service.LinkJumpDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.RemoveJumpSet(&dto); err != nil {
-		response.Error(c, "500000", "Failed to remove jump set: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to remove jump set: "+err.Error())
 		return
 	}
 	response.Success(c, nil)

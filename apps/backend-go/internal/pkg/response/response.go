@@ -12,9 +12,27 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+const (
+	CodeSuccess       = "000000"
+	CodeInternalError = "500000"
+	CodeBadRequest    = "10001"
+	CodeUnauthorized  = "20001"
+	CodeTooManyReqs   = "429001"
+	CodeForbidden     = "70001"
+	CodeNotFound      = "50001"
+	CodeForbiddenExp  = "403001"
+	CodeNotFoundExp   = "404001"
+	CodeServerErr     = "40001"
+)
+
+const (
+	MsgAuthenticationRequired = "authentication required"
+	MsgInsufficientPermission = "insufficient permissions"
+)
+
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
-		Code:    "000000",
+		Code:    CodeSuccess,
 		Message: "success",
 		Data:    data,
 	})
@@ -36,13 +54,13 @@ func ErrorWithData(c *gin.Context, code string, message string, data interface{}
 }
 
 func BadRequest(c *gin.Context, message string) {
-	Error(c, "10001", message)
+	Error(c, CodeBadRequest, message)
 }
 
 func Unauthorized(c *gin.Context, message string) {
 	c.Header("DE-GATEWAY-FLAG", "1")
 	c.JSON(http.StatusUnauthorized, Response{
-		Code:    "20001",
+		Code:    CodeUnauthorized,
 		Message: message,
 	})
 	c.Abort()
@@ -50,7 +68,7 @@ func Unauthorized(c *gin.Context, message string) {
 
 func TooManyRequests(c *gin.Context, message string) {
 	c.JSON(http.StatusTooManyRequests, Response{
-		Code:    "429001",
+		Code:    CodeTooManyReqs,
 		Message: message,
 	})
 	c.Abort()
@@ -58,25 +76,24 @@ func TooManyRequests(c *gin.Context, message string) {
 
 func Forbidden(c *gin.Context, message string) {
 	c.JSON(http.StatusForbidden, Response{
-		Code:    "70001",
+		Code:    CodeForbidden,
 		Message: message,
 	})
 	c.Abort()
 }
 
 func NotFound(c *gin.Context, message string) {
-	Error(c, "50001", message)
+	Error(c, CodeNotFound, message)
 }
 
-// Java-compatible error codes for export module
 func ForbiddenExport(c *gin.Context, message string) {
-	Error(c, "403001", message)
+	Error(c, CodeForbiddenExp, message)
 }
 
 func NotFoundExport(c *gin.Context, message string) {
-	Error(c, "404001", message)
+	Error(c, CodeNotFoundExp, message)
 }
 
 func InternalError(c *gin.Context, message string) {
-	Error(c, "40001", message)
+	Error(c, CodeServerErr, message)
 }

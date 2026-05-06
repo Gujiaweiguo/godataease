@@ -23,7 +23,7 @@ func (h *PermHandler) ListPerms(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	var req permission.PermQueryRequest
@@ -34,7 +34,7 @@ func (h *PermHandler) ListPerms(c *gin.Context) {
 
 	result, err := h.permService.ListPerms(&req, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -45,13 +45,13 @@ func (h *PermHandler) CreatePerm(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req permission.PermCreateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	permID, err := h.permService.CreatePerm(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -62,13 +62,13 @@ func (h *PermHandler) UpdatePerm(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req permission.PermUpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	err := h.permService.UpdatePerm(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *PermHandler) DeletePerm(c *gin.Context) {
 
 	err := h.permService.DeletePerm(permID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

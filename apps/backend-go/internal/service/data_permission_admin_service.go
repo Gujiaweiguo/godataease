@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -269,7 +270,7 @@ func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm, s
 
 func (s *DataPermissionAdminService) DeleteRowPermission(id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("id is required")
+		return fmt.Errorf(errno.ErrIDRequired)
 	}
 	return s.rowStore.Delete(id)
 }
@@ -411,7 +412,7 @@ func (s *DataPermissionAdminService) recordPermissionAudit(operation string, sco
 
 func (s *DataPermissionAdminService) DeleteColumnPermission(id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("id is required")
+		return fmt.Errorf(errno.ErrIDRequired)
 	}
 	column, err := s.columnStore.GetByID(id)
 	if err != nil {

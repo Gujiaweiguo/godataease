@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -166,7 +168,7 @@ func (s *DataFillingService) ExcelUpload(ctx context.Context, formID int64, file
 		return nil, gorm.ErrInvalidData
 	}
 	if fileHeader.Size > maxDataFillingExcelUploadSize {
-		return nil, fmt.Errorf("file size exceeds 10MB limit")
+		return nil, fmt.Errorf(errno.ErrFileSizeExceedsLimit)
 	}
 	form, err := s.repo.GetByID(ctx, formID)
 	if err != nil {
@@ -1050,7 +1052,7 @@ func (s *DataFillingService) GetDatasourceConnection(ctx context.Context, dataso
 		return nil, fmt.Errorf("unsupported datasource type: %s", ds.Type)
 	}
 	if ds.Configuration == nil || strings.TrimSpace(*ds.Configuration) == "" {
-		return nil, fmt.Errorf("datasource configuration is empty")
+		return nil, errors.New(errDatasourceConfigEmpty)
 	}
 	cfg, err := decodeConfig(*ds.Configuration)
 	if err != nil {
