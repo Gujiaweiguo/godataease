@@ -186,9 +186,9 @@ func TestFilterTreeItem_FieldIDNumeric(t *testing.T) {
 
 func TestFilterTreeItem_FieldAsAny(t *testing.T) {
 	tests := []struct {
-		name   string
-		field  string
-		want   string
+		name  string
+		field string
+		want  string
 	}{
 		{"string field", `{"field":"name"}`, "name"},
 		{"object field", `{"field":{"id":1,"name":"col"}}`, `{"id":1,"name":"col"}`},

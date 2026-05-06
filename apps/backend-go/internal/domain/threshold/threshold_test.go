@@ -120,53 +120,33 @@ func TestCreateRequest_JSONRoundTrip(t *testing.T) {
 		t.Fatalf("unmarshal CreateRequest: %v", err)
 	}
 
-	if decoded.ID != req.ID {
-		t.Errorf("ID: got %d, want %d", decoded.ID, req.ID)
+	assertCreateRequestFields(t, decoded, req, enable, repeatSend, showField, rateType, msgType)
+}
+
+func assertCreateRequestFields(t *testing.T, decoded, req CreateRequest, enable, repeatSend, showField bool, rateType, msgType int) {
+	t.Helper()
+	checks := []struct{ name string; ok bool }{
+		{"ID", decoded.ID == req.ID},
+		{"Name", decoded.Name == req.Name},
+		{"Enable", decoded.Enable != nil && *decoded.Enable == enable},
+		{"RateType", decoded.RateType != nil && *decoded.RateType == rateType},
+		{"RateValue", decoded.RateValue == req.RateValue},
+		{"ResourceID", decoded.ResourceID == req.ResourceID},
+		{"ResourceType", decoded.ResourceType == req.ResourceType},
+		{"ChartID", decoded.ChartID == req.ChartID},
+		{"ChartType", decoded.ChartType == req.ChartType},
+		{"ThresholdRules", decoded.ThresholdRules == req.ThresholdRules},
+		{"MsgType", decoded.MsgType != nil && *decoded.MsgType == msgType},
+		{"MsgTitle", decoded.MsgTitle == req.MsgTitle},
+		{"MsgContent", decoded.MsgContent == req.MsgContent},
+		{"RepeatSend", decoded.RepeatSend != nil && *decoded.RepeatSend == repeatSend},
+		{"ShowFieldValue", decoded.ShowFieldValue != nil && *decoded.ShowFieldValue == showField},
+		{"ResourceTable", decoded.ResourceTable == req.ResourceTable},
 	}
-	if decoded.Name != req.Name {
-		t.Errorf("Name: got %q, want %q", decoded.Name, req.Name)
-	}
-	if decoded.Enable == nil || *decoded.Enable != enable {
-		t.Errorf("Enable: got %v, want %v", decoded.Enable, enable)
-	}
-	if decoded.RateType == nil || *decoded.RateType != rateType {
-		t.Errorf("RateType: got %v, want %d", decoded.RateType, rateType)
-	}
-	if decoded.RateValue != req.RateValue {
-		t.Errorf("RateValue: got %q, want %q", decoded.RateValue, req.RateValue)
-	}
-	if decoded.ResourceID != req.ResourceID {
-		t.Errorf("ResourceID: got %d, want %d", decoded.ResourceID, req.ResourceID)
-	}
-	if decoded.ResourceType != req.ResourceType {
-		t.Errorf("ResourceType: got %q, want %q", decoded.ResourceType, req.ResourceType)
-	}
-	if decoded.ChartID != req.ChartID {
-		t.Errorf("ChartID: got %d, want %d", decoded.ChartID, req.ChartID)
-	}
-	if decoded.ChartType != req.ChartType {
-		t.Errorf("ChartType: got %q, want %q", decoded.ChartType, req.ChartType)
-	}
-	if decoded.ThresholdRules != req.ThresholdRules {
-		t.Errorf("ThresholdRules: got %q, want %q", decoded.ThresholdRules, req.ThresholdRules)
-	}
-	if decoded.MsgType == nil || *decoded.MsgType != msgType {
-		t.Errorf("MsgType: got %v, want %d", decoded.MsgType, msgType)
-	}
-	if decoded.MsgTitle != req.MsgTitle {
-		t.Errorf("MsgTitle: got %q, want %q", decoded.MsgTitle, req.MsgTitle)
-	}
-	if decoded.MsgContent != req.MsgContent {
-		t.Errorf("MsgContent: got %q, want %q", decoded.MsgContent, req.MsgContent)
-	}
-	if decoded.RepeatSend == nil || *decoded.RepeatSend != repeatSend {
-		t.Errorf("RepeatSend: got %v, want %v", decoded.RepeatSend, repeatSend)
-	}
-	if decoded.ShowFieldValue == nil || *decoded.ShowFieldValue != showField {
-		t.Errorf("ShowFieldValue: got %v, want %v", decoded.ShowFieldValue, showField)
-	}
-	if decoded.ResourceTable != req.ResourceTable {
-		t.Errorf("ResourceTable: got %q, want %q", decoded.ResourceTable, req.ResourceTable)
+	for _, c := range checks {
+		if !c.ok {
+			t.Errorf("%s: mismatch", c.name)
+		}
 	}
 }
 
