@@ -51,8 +51,7 @@
       "REMOVE_ROLE_MEMBER"
     ],
     "safetyPolicies": [
-      "BLOCK: Prevent removal of last role",
-      "DELETE_USER: Auto-delete user when last role removed (if configured)"
+      "BLOCK: Prevent removal of last role (intentional deviation from manual's cascade-delete implication; cascade deferred to C2)"
     ]
   }
 }

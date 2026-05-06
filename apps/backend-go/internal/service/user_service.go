@@ -396,6 +396,9 @@ func requestedOrgID(orgID *int64, organizationID *int64) (int64, bool) {
 	return 0, false
 }
 
+// bindUserToOrgBaseline establishes the user's organization-scoped membership baseline.
+// This is the authoritative entry point for org-scoped user binding that downstream
+// role workflows (MountUsers, UnmountUser, etc.) must reuse through the same org context.
 func (s *UserService) bindUserToOrgBaseline(userID int64, orgID int64) error {
 	if s.orgRepo == nil {
 		return fmt.Errorf("org repository is not configured")
