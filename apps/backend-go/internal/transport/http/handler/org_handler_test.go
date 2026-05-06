@@ -40,6 +40,10 @@ func setupOrgHandlerTestRouter(t *testing.T) *gin.Engine {
 	orgSvc := service.NewOrgService(orgRepo, auditSvc, nil, nil)
 
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("org_id", uint64(1))
+		c.Next()
+	})
 	RegisterOrgRoutes(r.Group("/api"), NewOrgHandler(orgSvc))
 	return r
 }
@@ -67,10 +71,33 @@ func setupOrgHandlerTestRouterWithAudit(t *testing.T) (*gin.Engine, *repository.
 	r.Use(func(c *gin.Context) {
 		c.Set("user_id", uint64(77))
 		c.Set("username", "tester")
+		c.Set("org_id", uint64(1))
 		c.Next()
 	})
 	RegisterOrgRoutes(r.Group("/api"), NewOrgHandler(orgSvc))
 	return r, auditLogRepo
+}
+
+func TestOrgHandler_CreateOrg_RejectsMissingOrgContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{}))
+	orgSvc := service.NewOrgService(repository.NewOrgRepository(db), service.NewAuditService(repository.NewAuditLogRepository(db), repository.NewLoginFailureRepository(db), repository.NewAuditLogDetailRepository(db)), nil, nil)
+	r := gin.New()
+	RegisterOrgRoutes(r.Group("/api"), NewOrgHandler(orgSvc))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/system/organization/create", strings.NewReader(`{"orgName":"NoOrg"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp["code"])
+	assert.Equal(t, "Invalid org context", resp["msg"])
 }
 
 func TestOrgHandler_DeleteOrg_WithChildrenReturnsDeterministicErrorEnvelope(t *testing.T) {

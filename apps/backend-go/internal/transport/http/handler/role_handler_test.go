@@ -23,7 +23,7 @@ import (
 )
 
 func setupRoleHandlerTestRouter(t *testing.T) *gin.Engine {
-	return setupRoleHandlerTestRouterWithOrg(t, 0)
+	return setupRoleHandlerTestRouterWithOrg(t, 1)
 }
 
 func setupRoleHandlerTestRouterWithOrg(t *testing.T, orgID uint64) *gin.Engine {
@@ -187,4 +187,19 @@ func TestRoleHandler_UnmountUser_LastRoleReturnsDeterministicErrorEnvelope(t *te
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "500000", resp["code"])
 	assert.Equal(t, service.ErrLastRoleRemovalBlocked.Error(), resp["msg"])
+}
+
+func TestRoleHandler_Create_RejectsMissingOrgContext(t *testing.T) {
+	r := setupRoleHandlerTestRouterWithOrg(t, 0)
+	body := []byte(`{"name":"NoOrgRole"}`)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/role/create", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "500000", resp["code"])
+	assert.Equal(t, "Invalid org context", resp["msg"])
 }
