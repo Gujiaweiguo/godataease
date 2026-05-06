@@ -35,10 +35,11 @@ type DatasetFieldProvider interface {
 }
 
 type DataPermissionAdminService struct {
-	rowStore    RowPermissionStore
-	columnStore ColumnPermissionStore
-	fieldSource DatasetFieldProvider
-	cache       *permission.PermissionCacheService
+	rowStore        RowPermissionStore
+	columnStore     ColumnPermissionStore
+	fieldSource     DatasetFieldProvider
+	cache           *permission.PermissionCacheService
+	deferredRegistry *permission.DeferredDimensionRegistry
 }
 
 const (
@@ -88,10 +89,11 @@ func NewDataPermissionAdminService(
 	cache *permission.PermissionCacheService,
 ) *DataPermissionAdminService {
 	return &DataPermissionAdminService{
-		rowStore:    rowStore,
-		columnStore: columnStore,
-		fieldSource: fieldSource,
-		cache:       cache,
+		rowStore:        rowStore,
+		columnStore:     columnStore,
+		fieldSource:     fieldSource,
+		cache:           cache,
+		deferredRegistry: permission.NewDeferredDimensionRegistry(),
 	}
 }
 
@@ -105,7 +107,7 @@ func (s *DataPermissionAdminService) RowPermissionPage(datasetID int64, page, si
 
 func (s *DataPermissionAdminService) RowPermissionPageByTarget(datasetID int64, targetType string, targetID int64, page, size int) (*DataPermissionPage, error) {
 	if !isSupportedRowPermissionTargetType(targetType) {
-		return nil, unsupportedRowPermissionTargetTypeError("targetType", targetType)
+		return nil, s.unsupportedRowPermissionTargetTypeError("targetType", targetType)
 	}
 	if targetID <= 0 {
 		return nil, fmt.Errorf("targetId is required")
@@ -157,13 +159,13 @@ func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm) e
 		return fmt.Errorf("targetId is required")
 	}
 	if !isSupportedRowPermissionTargetType(req.FilterType) {
-		return unsupportedRowPermissionTargetTypeError("filterType", req.FilterType)
+		return s.unsupportedRowPermissionTargetTypeError("filterType", req.FilterType)
 	}
 	if strings.TrimSpace(req.FilterField) == "" {
 		return fmt.Errorf("filterField is required")
 	}
 	if len(req.WhiteList) > 0 {
-		return fmt.Errorf("whiteList is deferred and not supported in permission center")
+		return s.deferredRegistry.GetRejectionError("whiteList")
 	}
 
 	_, fieldsByName, err := s.datasetFieldMaps(req.DatasetID)
@@ -216,9 +218,9 @@ func isSupportedRowPermissionTargetType(targetType string) bool {
 	return targetType == permission.AuthTargetTypeUser || targetType == permission.AuthTargetTypeRole
 }
 
-func unsupportedRowPermissionTargetTypeError(fieldName, targetType string) error {
-	if strings.EqualFold(targetType, "sysParams") {
-		return fmt.Errorf("%s sysParams is deferred and not supported in permission center", fieldName)
+func (s *DataPermissionAdminService) unsupportedRowPermissionTargetTypeError(fieldName, targetType string) error {
+	if s.deferredRegistry.IsDeferred(targetType) {
+		return s.deferredRegistry.GetRejectionError(targetType)
 	}
 	return fmt.Errorf("%s %s is not supported", fieldName, targetType)
 }

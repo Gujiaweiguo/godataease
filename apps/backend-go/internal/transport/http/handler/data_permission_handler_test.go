@@ -180,7 +180,7 @@ func TestDataPermissionHandler_RowPermissionPagerByTargetRejectsSysParamsTargetT
 	if resp["code"] != "500000" {
 		t.Fatalf("expected code 500000, got %#v", resp["code"])
 	}
-	if msg, _ := resp["msg"].(string); msg != "Failed: targetType sysParams is deferred and not supported in permission center" {
+	if msg, _ := resp["msg"].(string); msg != "Failed: [DEFERRED_DIMENSION_SYS_PARAMS] system-variable permission assignment is not supported in the current permission center; use system variable management for variable definitions" {
 		t.Fatalf("unexpected sysParams message: %#v", resp["msg"])
 	}
 }

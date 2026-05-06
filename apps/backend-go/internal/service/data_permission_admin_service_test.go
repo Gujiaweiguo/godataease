@@ -246,7 +246,7 @@ func TestDataPermissionAdminService_RowPermissionPageByTarget_RejectsUnsupported
 	if _, err := svc.RowPermissionPageByTarget(9, permission.AuthTargetTypeDept, 7, 1, 10); err == nil {
 		t.Fatal("expected unsupported targetType to fail")
 	}
-	if _, err := svc.RowPermissionPageByTarget(9, "sysParams", 7, 1, 10); err == nil || err.Error() != "targetType sysParams is deferred and not supported in permission center" {
+	if _, err := svc.RowPermissionPageByTarget(9, "sysParams", 7, 1, 10); err == nil || err.Error() != "[DEFERRED_DIMENSION_SYS_PARAMS] system-variable permission assignment is not supported in the current permission center; use system variable management for variable definitions" {
 		t.Fatalf("unexpected sysParams error: %v", err)
 	}
 }
@@ -304,13 +304,13 @@ func TestDataPermissionAdminService_SaveRowPermission_Validation(t *testing.T) {
 	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, FilterType: permission.AuthTargetTypeUser, FilterField: "region"}); err == nil || err.Error() != "targetId is required" {
 		t.Fatalf("unexpected targetId validation error: %v", err)
 	}
-	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeDept, FilterField: "region"}); err == nil || !strings.Contains(err.Error(), "filterType dept is not supported") {
+	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeDept, FilterField: "region"}); err == nil || err.Error() != "[DEFERRED_DIMENSION_DEPT] department-based permission assignment is not supported in the current permission center; this dimension is deferred" {
 		t.Fatalf("unexpected filterType validation error: %v", err)
 	}
-	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: "sysParams", FilterField: "region"}); err == nil || err.Error() != "filterType sysParams is deferred and not supported in permission center" {
+	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: "sysParams", FilterField: "region"}); err == nil || err.Error() != "[DEFERRED_DIMENSION_SYS_PARAMS] system-variable permission assignment is not supported in the current permission center; use system variable management for variable definitions" {
 		t.Fatalf("unexpected sysParams validation error: %v", err)
 	}
-	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "region", WhiteList: []int64{2}}); err == nil || err.Error() != "whiteList is deferred and not supported in permission center" {
+	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "region", WhiteList: []int64{2}}); err == nil || err.Error() != "[DEFERRED_DIMENSION_WHITELIST] whitelist-based row permission is not supported in the current permission center; this dimension is deferred" {
 		t.Fatalf("unexpected whiteList validation error: %v", err)
 	}
 	if err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, TargetID: 1, FilterType: permission.AuthTargetTypeUser, FilterField: "   "}); err == nil || err.Error() != "filterField is required" {
