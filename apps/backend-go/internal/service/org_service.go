@@ -40,82 +40,20 @@ func NewOrgService(orgRepo *repository.OrgRepository, auditSvc *AuditService, us
 
 // TransferUserOrg transfers a user from source org to target org atomically.
 func (s *OrgService) TransferUserOrg(sourceOrgID, targetOrgID, userID, actorID int64) error {
-	if sourceOrgID <= 0 || targetOrgID <= 0 || userID <= 0 {
-		return fmt.Errorf("source org, target org, and user id are required")
-	}
-	if sourceOrgID == targetOrgID {
-		return fmt.Errorf("source and target organizations must be different")
-	}
-	if s.orgRepo == nil || s.orgRepo.DB() == nil {
-		return fmt.Errorf("organization repository is not configured")
-	}
-	if s.roleRepo == nil {
-		return fmt.Errorf("role repository is not configured")
-	}
-	if s.userRoleRepo == nil {
-		return fmt.Errorf("user role repository is not configured")
+	sourceOrgInfo, targetOrgInfo, err := s.validateTransferPrerequisites(sourceOrgID, targetOrgID, userID)
+	if err != nil {
+		return err
 	}
 
-	sourceOrgInfo, err := s.orgRepo.GetByID(sourceOrgID)
+	policy, err := s.evaluateTransferLastRolePolicy(sourceOrgID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("source organization not found")
-		}
-		return fmt.Errorf("failed to load source organization: %w", err)
-	}
-	targetOrgInfo, err := s.orgRepo.GetByID(targetOrgID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("target organization not found")
-		}
-		return fmt.Errorf("failed to load target organization: %w", err)
-	}
-	if targetOrgInfo.Status != org.StatusEnabled {
-		return fmt.Errorf("target organization is disabled")
-	}
-
-	isMember, err := s.userRoleRepo.IsUserInOrg(userID, sourceOrgID)
-	if err != nil {
-		return fmt.Errorf("failed to validate source organization membership: %w", err)
-	}
-	if !isMember {
-		return fmt.Errorf("user is not a member of source organization")
-	}
-
-	sourceRoleCount, err := s.roleRepo.CountUserRolesByOrg(userID, sourceOrgID)
-	if err != nil {
-		return fmt.Errorf("failed to count source organization roles: %w", err)
-	}
-	policy := governance.DefaultLastRolePolicy
-	if sourceRoleCount <= 1 {
-		policy, err = s.getEffectiveLastRolePolicy(sourceOrgID)
-		if err != nil {
-			return fmt.Errorf("failed to resolve last-role policy: %w", err)
-		}
-		if policy == governance.LastRolePolicyBlock {
-			return fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
-		}
+		return err
 	}
 
 	var assignedRoleID int64
 	err = s.orgRepo.DB().Transaction(func(txDB *gorm.DB) error {
-		txOrgRepo := repository.NewOrgRepository(txDB)
-		txRoleRepo := repository.NewRoleRepository(txDB)
-		txUserRoleRepo := repository.NewUserRoleRepository(txDB)
-
-		if err := txDB.Where("user_id = ? AND org_id = ?", userID, sourceOrgID).Delete(&user.SysUserRole{}).Error; err != nil {
-			return fmt.Errorf("failed to remove source organization roles: %w", err)
-		}
-
-		if err := ensureUserOrgBaseline(txDB, txOrgRepo, txRoleRepo, txUserRoleRepo, userID, targetOrgID); err != nil {
-			return err
-		}
-
-		assignedRoleID, err = ensureDefaultOrgUserRole(txRoleRepo)
-		if err != nil {
-			return err
-		}
-		return nil
+		assignedRoleID, err = s.executeTransfer(txDB, sourceOrgID, targetOrgID, userID)
+		return err
 	})
 	if err != nil {
 		return err
@@ -129,6 +67,90 @@ func (s *OrgService) TransferUserOrg(sourceOrgID, targetOrgID, userID, actorID i
 		zap.Int64("assignedRoleId", assignedRoleID),
 	)
 	return nil
+}
+
+func (s *OrgService) validateTransferPrerequisites(sourceOrgID, targetOrgID, userID int64) (*org.SysOrg, *org.SysOrg, error) {
+	if sourceOrgID <= 0 || targetOrgID <= 0 || userID <= 0 {
+		return nil, nil, fmt.Errorf("source org, target org, and user id are required")
+	}
+	if sourceOrgID == targetOrgID {
+		return nil, nil, fmt.Errorf("source and target organizations must be different")
+	}
+	if s.orgRepo == nil || s.orgRepo.DB() == nil {
+		return nil, nil, fmt.Errorf("organization repository is not configured")
+	}
+	if s.roleRepo == nil {
+		return nil, nil, fmt.Errorf("role repository is not configured")
+	}
+	if s.userRoleRepo == nil {
+		return nil, nil, fmt.Errorf("user role repository is not configured")
+	}
+
+	sourceOrgInfo, err := s.orgRepo.GetByID(sourceOrgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, fmt.Errorf("source organization not found")
+		}
+		return nil, nil, fmt.Errorf("failed to load source organization: %w", err)
+	}
+	targetOrgInfo, err := s.orgRepo.GetByID(targetOrgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, fmt.Errorf("target organization not found")
+		}
+		return nil, nil, fmt.Errorf("failed to load target organization: %w", err)
+	}
+	if targetOrgInfo.Status != org.StatusEnabled {
+		return nil, nil, fmt.Errorf("target organization is disabled")
+	}
+
+	isMember, err := s.userRoleRepo.IsUserInOrg(userID, sourceOrgID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to validate source organization membership: %w", err)
+	}
+	if !isMember {
+		return nil, nil, fmt.Errorf("user is not a member of source organization")
+	}
+
+	return sourceOrgInfo, targetOrgInfo, nil
+}
+
+func (s *OrgService) evaluateTransferLastRolePolicy(sourceOrgID, userID int64) (governance.LastRolePolicy, error) {
+	sourceRoleCount, err := s.roleRepo.CountUserRolesByOrg(userID, sourceOrgID)
+	if err != nil {
+		return governance.DefaultLastRolePolicy, fmt.Errorf("failed to count source organization roles: %w", err)
+	}
+	if sourceRoleCount > 1 {
+		return governance.DefaultLastRolePolicy, nil
+	}
+	policy, err := s.getEffectiveLastRolePolicy(sourceOrgID)
+	if err != nil {
+		return governance.DefaultLastRolePolicy, fmt.Errorf("failed to resolve last-role policy: %w", err)
+	}
+	if policy == governance.LastRolePolicyBlock {
+		return governance.DefaultLastRolePolicy, fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
+	}
+	return policy, nil
+}
+
+func (s *OrgService) executeTransfer(txDB *gorm.DB, sourceOrgID, targetOrgID, userID int64) (int64, error) {
+	txOrgRepo := repository.NewOrgRepository(txDB)
+	txRoleRepo := repository.NewRoleRepository(txDB)
+	txUserRoleRepo := repository.NewUserRoleRepository(txDB)
+
+	if err := txDB.Where("user_id = ? AND org_id = ?", userID, sourceOrgID).Delete(&user.SysUserRole{}).Error; err != nil {
+		return 0, fmt.Errorf("failed to remove source organization roles: %w", err)
+	}
+
+	if err := ensureUserOrgBaseline(txDB, txOrgRepo, txRoleRepo, txUserRoleRepo, userID, targetOrgID); err != nil {
+		return 0, err
+	}
+
+	assignedRoleID, err := ensureDefaultOrgUserRole(txRoleRepo)
+	if err != nil {
+		return 0, err
+	}
+	return assignedRoleID, nil
 }
 
 func (s *OrgService) getEffectiveLastRolePolicy(orgID int64) (governance.LastRolePolicy, error) {

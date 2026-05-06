@@ -313,6 +313,21 @@ func (s *RoleService) MountUsers(req *role.MountUserRequest) error {
 // AssignRolesToUser assigns the given roles to a user within an explicit org scope.
 // The operation is transactional and idempotent: duplicate bindings are no-ops.
 func (s *RoleService) AssignRolesToUser(orgID int64, userID int64, roleIDs []int64) error {
+	if err := s.validateAssignmentPrerequisites(orgID, userID, roleIDs); err != nil {
+		return err
+	}
+
+	lockKey := fmt.Sprintf("%d:%d", orgID, userID)
+	assignLock := getRoleAssignmentLock(lockKey)
+	assignLock.Lock()
+	defer assignLock.Unlock()
+
+	return s.repo.DB().Transaction(func(txDB *gorm.DB) error {
+		return s.resolveRoleAssignments(txDB, orgID, userID, roleIDs)
+	})
+}
+
+func (s *RoleService) validateAssignmentPrerequisites(orgID, userID int64, roleIDs []int64) error {
 	if err := requireGovernedOrgContext(orgID); err != nil {
 		return err
 	}
@@ -335,47 +350,43 @@ func (s *RoleService) AssignRolesToUser(orgID int64, userID int64, roleIDs []int
 	if _, err := s.userRepo.GetByID(userID); err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
+	return nil
+}
 
-	lockKey := fmt.Sprintf("%d:%d", orgID, userID)
-	assignLock := getRoleAssignmentLock(lockKey)
-	assignLock.Lock()
-	defer assignLock.Unlock()
+func (s *RoleService) resolveRoleAssignments(txDB *gorm.DB, orgID, userID int64, roleIDs []int64) error {
+	roleRepo := repository.NewRoleRepository(txDB)
+	userRoleRepo := repository.NewUserRoleRepository(txDB)
+	orgRepo := repository.NewOrgRepository(txDB)
 
-	return s.repo.DB().Transaction(func(txDB *gorm.DB) error {
-		roleRepo := repository.NewRoleRepository(txDB)
-		userRoleRepo := repository.NewUserRoleRepository(txDB)
-		orgRepo := repository.NewOrgRepository(txDB)
+	inOrg, err := userRoleRepo.IsUserInOrg(userID, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to validate user organization: %w", err)
+	}
+	if !inOrg {
+		if err := ensureUserOrgBaseline(txDB, orgRepo, roleRepo, userRoleRepo, userID, orgID); err != nil {
+			return err
+		}
+	}
 
-		inOrg, err := userRoleRepo.IsUserInOrg(userID, orgID)
+	for _, roleID := range roleIDs {
+		targetRole, err := roleRepo.GetByID(roleID)
 		if err != nil {
-			return fmt.Errorf("failed to validate user organization: %w", err)
+			return fmt.Errorf("role not found: %w", err)
 		}
-		if !inOrg {
-			if err := ensureUserOrgBaseline(txDB, orgRepo, roleRepo, userRoleRepo, userID, orgID); err != nil {
-				return err
-			}
+		if err := validateRoleOrgScope(targetRole, orgID); err != nil {
+			return err
 		}
 
-		for _, roleID := range roleIDs {
-			targetRole, err := roleRepo.GetByID(roleID)
-			if err != nil {
-				return fmt.Errorf("role not found: %w", err)
-			}
-			if err := validateRoleOrgScope(targetRole, orgID); err != nil {
-				return err
-			}
-
-			created, err := userRoleRepo.CreateIfMissing(&user.SysUserRole{UserID: userID, RoleID: roleID, OrgID: orgID})
-			if err != nil {
-				return fmt.Errorf("failed to assign role %d to user %d: %w", roleID, userID, err)
-			}
-			if created {
-				s.recordRoleAssignmentAudit(orgID, userID, roleID, audit.StatusSuccess, "assigned role to user")
-			}
+		created, err := userRoleRepo.CreateIfMissing(&user.SysUserRole{UserID: userID, RoleID: roleID, OrgID: orgID})
+		if err != nil {
+			return fmt.Errorf("failed to assign role %d to user %d: %w", roleID, userID, err)
 		}
+		if created {
+			s.recordRoleAssignmentAudit(orgID, userID, roleID, audit.StatusSuccess, "assigned role to user")
+		}
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func getRoleAssignmentLock(key string) *sync.Mutex {
