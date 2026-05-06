@@ -14,6 +14,10 @@ func NewRoleRepository(db *gorm.DB) *RoleRepository {
 	return &RoleRepository{db: db}
 }
 
+func (r *RoleRepository) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *RoleRepository) Create(role *role.SysRole) error {
 	return r.db.Create(role).Error
 }

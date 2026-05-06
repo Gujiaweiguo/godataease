@@ -21,7 +21,7 @@ func newTestRoleService(t *testing.T) *RoleService {
 	userRepo := repository.NewUserRepository(testDB)
 	userRoleRepo := repository.NewUserRoleRepository(testDB)
 
-	svc := NewRoleService(repo, userRepo, userRoleRepo)
+	svc := NewRoleService(repo, userRepo, userRoleRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(testDB))
 	return svc
 }

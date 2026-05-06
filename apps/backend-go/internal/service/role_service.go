@@ -1,18 +1,22 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
+	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // ErrLastRoleRemovalBlocked is returned when attempting to remove a user's last role.
@@ -20,14 +24,15 @@ import (
 var ErrLastRoleRemovalBlocked = errors.New("cannot remove user's last role")
 
 type RoleService struct {
-	repo             *repository.RoleRepository
-	userRepo         *repository.UserRepository
-	userRoleRepo     *repository.UserRoleRepository
-	resourcePermRepo *repository.ResourcePermissionRepository
+	repo                *repository.RoleRepository
+	userRepo            *repository.UserRepository
+	userRoleRepo        *repository.UserRoleRepository
+	resourcePermRepo    *repository.ResourcePermissionRepository
+	governancePolicySvc *GovernancePolicyService
 }
 
-func NewRoleService(repo *repository.RoleRepository, userRepo *repository.UserRepository, userRoleRepo *repository.UserRoleRepository) *RoleService {
-	return &RoleService{repo: repo, userRepo: userRepo, userRoleRepo: userRoleRepo}
+func NewRoleService(repo *repository.RoleRepository, userRepo *repository.UserRepository, userRoleRepo *repository.UserRoleRepository, governancePolicySvc *GovernancePolicyService) *RoleService {
+	return &RoleService{repo: repo, userRepo: userRepo, userRoleRepo: userRoleRepo, governancePolicySvc: governancePolicySvc}
 }
 
 func (s *RoleService) SetResourcePermissionRepository(repo *repository.ResourcePermissionRepository) {
@@ -354,8 +359,59 @@ func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
 
 	// 唯一角色安全约束：禁止移除用户的最后一个角色
 	if count <= 1 {
-		logger.Warn("Reject unmount last role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("count", count))
-		return fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
+		policy, err := s.getEffectiveLastRolePolicy(req.OrgId)
+		if err != nil {
+			return fmt.Errorf("failed to resolve last-role policy: %w", err)
+		}
+
+		switch policy {
+		case governance.LastRolePolicyWarnAllow:
+			if err := s.repo.UnbindUserRole(req.Uid, req.Rid, req.OrgId); err != nil {
+				logger.Error("Failed to unbind user from role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Error(err))
+				return fmt.Errorf("failed to unbind user from role: %w", err)
+			}
+			s.recordLastRoleAudit(req, policy, audit.StatusSuccess, "warn_allow: removed user's last role without disabling account")
+			logger.Warn("User last role removed under WARN_ALLOW policy", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("orgId", req.OrgId))
+			return nil
+		case governance.LastRolePolicyCascade:
+			if s.userRepo == nil {
+				return fmt.Errorf("userRepo not initialized")
+			}
+			if s.repo == nil || s.repo.DB() == nil {
+				return fmt.Errorf("role repository is not configured")
+			}
+			if err := s.repo.DB().Transaction(func(txDB *gorm.DB) error {
+				if req.Uid == 1 {
+					return ErrBuiltInUserProtected
+				}
+				roleRepo := repository.NewRoleRepository(txDB)
+				if err := roleRepo.UnbindUserRole(req.Uid, req.Rid, req.OrgId); err != nil {
+					return fmt.Errorf("failed to unbind user from role: %w", err)
+				}
+				userRepo := repository.NewUserRepository(txDB)
+				existing, err := userRepo.GetByID(req.Uid)
+				if err != nil {
+					return fmt.Errorf("user not found: %w", err)
+				}
+				now := time.Now()
+				existing.Status = user.StatusDisabled
+				existing.UpdateTime = &now
+				if err := userRepo.Update(existing); err != nil {
+					return fmt.Errorf("failed to disable user: %w", err)
+				}
+				return nil
+			}); err != nil {
+				s.recordLastRoleAudit(req, policy, audit.StatusFailed, err.Error())
+				return err
+			}
+			s.recordLastRoleAudit(req, policy, audit.StatusSuccess, "cascade: removed user's last role and disabled account")
+			logger.Warn("User last role removed under CASCADE policy", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("orgId", req.OrgId))
+			return nil
+		default:
+			logger.Warn("Reject unmount last role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("count", count), zap.String("policy", string(policy)))
+			s.recordLastRoleAudit(req, policy, audit.StatusFailed, ErrLastRoleRemovalBlocked.Error())
+			return fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
+		}
 	}
 
 	if err := s.repo.UnbindUserRole(req.Uid, req.Rid, req.OrgId); err != nil {
@@ -365,6 +421,45 @@ func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
 
 	logger.Info("User unmounted from role", zap.Int64("uid", req.Uid), zap.Int64("rid", req.Rid), zap.Int64("orgId", req.OrgId))
 	return nil
+}
+
+func (s *RoleService) getEffectiveLastRolePolicy(orgID int64) (governance.LastRolePolicy, error) {
+	if s.governancePolicySvc == nil {
+		return governance.DefaultLastRolePolicy, nil
+	}
+	return s.governancePolicySvc.GetLastRolePolicy(orgID)
+}
+
+func (s *RoleService) recordLastRoleAudit(req *role.UnmountUserRequest, policy governance.LastRolePolicy, status audit.Status, detail string) {
+	if s.governancePolicySvc == nil || s.governancePolicySvc.auditSvc == nil {
+		return
+	}
+	beforeValue, _ := json.Marshal(map[string]interface{}{
+		"uid":            req.Uid,
+		"rid":            req.Rid,
+		"orgId":          req.OrgId,
+		"lastRolePolicy": policy,
+	})
+	afterValue, _ := json.Marshal(map[string]interface{}{
+		"detail": detail,
+	})
+	resourceType := string(audit.ResourceTypeUser)
+	userID := req.Uid
+	username := systemActor
+	_, _ = s.governancePolicySvc.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
+		UserID:         &userID,
+		Username:       &username,
+		ActionType:     audit.ActionTypeUserAction,
+		ActionName:     "移除用户最后角色",
+		ResourceType:   &resourceType,
+		ResourceID:     &req.Uid,
+		OrganizationID: &req.OrgId,
+		Operation:      audit.OperationDelete,
+		Status:         &status,
+		FailureReason:  stringPtrIfNotEmpty(detail),
+		BeforeValue:    stringPtrIfNotEmpty(string(beforeValue)),
+		AfterValue:     stringPtrIfNotEmpty(string(afterValue)),
+	})
 }
 
 // BeforeUnmountInfo 检查解绑前用户的角色数量（用于安全提示）

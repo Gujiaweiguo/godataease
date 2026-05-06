@@ -24,7 +24,7 @@ func setupRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRepositor
 	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	repo := repository.NewRoleRepository(db)
-	svc := NewRoleService(repo, nil, nil)
+	svc := NewRoleService(repo, nil, nil, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, repo
 }
@@ -39,7 +39,7 @@ func setupRoleServiceWithReposTest(t *testing.T) (*RoleService, *repository.Role
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo
 }
@@ -54,7 +54,7 @@ func setupRoleServiceWithReposAndDBTest(t *testing.T) (*RoleService, *repository
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo, db
 }
@@ -69,7 +69,7 @@ func setupRoleServiceWithoutUserRoleTableTest(t *testing.T) (*RoleService, *repo
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo
 }
@@ -84,7 +84,7 @@ func setupRoleServiceWithoutRoleTableTest(t *testing.T) (*RoleService, *reposito
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo
 }
@@ -96,7 +96,7 @@ func setupClosedRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRep
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 	repo := repository.NewRoleRepository(db)
-	svc := NewRoleService(repo, nil, nil)
+	svc := NewRoleService(repo, nil, nil, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
@@ -113,7 +113,7 @@ func setupClosedRoleServiceWithReposTest(t *testing.T) (*RoleService, *repositor
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
