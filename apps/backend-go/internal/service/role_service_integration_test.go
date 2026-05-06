@@ -495,6 +495,7 @@ func TestRoleServiceIntegration_UnmountUser(t *testing.T) {
 func TestRoleServiceIntegration_UnmountUserLastRole(t *testing.T) {
 	svc := newTestRoleService(t)
 	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
 
 	// Create a test user
 	testUser := &user.SysUser{
@@ -506,21 +507,44 @@ func TestRoleServiceIntegration_UnmountUserLastRole(t *testing.T) {
 	err := userRepo.Create(testUser)
 	assert.NoError(t, err)
 
-	// Create one role
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "OnlyRole"}, "tester", 1)
+	// Create a custom role
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "UnmountRole1"}, "tester", 1)
 	assert.NoError(t, err)
 
-	// Mount user to only role
+	// Mount user to the role (AssignRolesToUser also creates default org user role binding)
 	svc.MountUsers(&role.MountUserRequest{Rid: roleID, OrgId: 1, Uids: []int64{testUser.UserID}})
 
-	// Try to unmount (should fail)
+	// Verify user now has exactly 2 roles (custom + default org user)
+	count, err := svc.repo.CountUserRolesByOrg(testUser.UserID, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), count, "user should have custom role + default org user role")
+
+	// Unmount custom role — should succeed (default role remains)
 	req := &role.UnmountUserRequest{
 		Rid:   roleID,
 		Uid:   testUser.UserID,
 		OrgId: 1,
 	}
 	err = svc.UnmountUser(req)
-	assert.Error(t, err)
+	assert.NoError(t, err, "unmounting non-last role should succeed")
+
+	// Verify user now has exactly 1 role (default org user)
+	count, err = svc.repo.CountUserRolesByOrg(testUser.UserID, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), count, "user should have only default role remaining")
+
+	// Now find the remaining default role and try to unmount it (should be blocked)
+	roles, err := userRoleRepo.GetByUserID(testUser.UserID)
+	assert.NoError(t, err)
+	assert.Len(t, roles, 1, "user should have only one remaining role")
+
+	lastReq := &role.UnmountUserRequest{
+		Rid:   roles[0].RoleID,
+		Uid:   testUser.UserID,
+		OrgId: 1,
+	}
+	err = svc.UnmountUser(lastReq)
+	assert.Error(t, err, "unmounting the last remaining role should be blocked")
 	assert.Contains(t, err.Error(), "cannot remove user's last role")
 }
 
