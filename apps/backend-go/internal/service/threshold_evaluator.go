@@ -42,6 +42,7 @@ const (
 	geTerm       = "ge"
 	ltTerm       = "lt"
 	leTerm       = "le"
+	averageMode  = "average"
 )
 
 var nonDigitRegexp = regexp.MustCompile(`\D+`)
@@ -276,13 +277,13 @@ func formatDynamicValue(rows []map[string]any, item *thresholddomain.FilterTreeI
 				tempVal = value
 				hasValue = true
 			}
-		case "average":
+		case averageMode:
 			tempVal += value
 			count++
 		}
 	}
 
-	if mode == "average" {
+	if mode == averageMode {
 		if count == 0 {
 			return "0f"
 		}

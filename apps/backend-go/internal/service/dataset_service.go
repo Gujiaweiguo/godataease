@@ -167,7 +167,7 @@ func (s *DatasetService) Tree(req *dataset.TreeRequest) ([]dataset.TreeNode, err
 	childrenByPID := make(map[int64][]*dataset.TreeNode)
 
 	for _, g := range groups {
-		nodeType := "dataset"
+		nodeType := dataset.NodeTypeDataset
 		if g.NodeType != nil && *g.NodeType != "" {
 			nodeType = *g.NodeType
 		}

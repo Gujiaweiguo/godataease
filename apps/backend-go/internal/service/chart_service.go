@@ -334,7 +334,10 @@ type seriesGroup struct {
 	metrics    map[string]*metricAccumulator
 }
 
-const summaryCount = "count"
+const (
+	summaryCount = "count"
+	summaryAvg   = "avg"
+)
 
 type metricAccumulator struct {
 	summary string
@@ -374,7 +377,7 @@ func (m *metricAccumulator) value() float64 {
 	switch m.summary {
 	case summaryCount, "count_distinct", "countdistinct":
 		return float64(m.count)
-	case "avg", "average":
+	case summaryAvg, "average":
 		if m.count == 0 {
 			return 0
 		}

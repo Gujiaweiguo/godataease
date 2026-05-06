@@ -9,6 +9,15 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	tableChartView             = "core_chart_view"
+	tableSnapshotChartView     = "snapshot_core_chart_view"
+	tableLinkage               = "visualization_linkage"
+	tableSnapshotLinkage       = "snapshot_visualization_linkage"
+	tableLinkageField          = "visualization_linkage_field"
+	tableSnapshotLinkageField  = "snapshot_visualization_linkage_field"
+)
+
 type LinkageGatherRow struct {
 	TargetViewID   int64  `json:"targetViewId"`
 	TargetViewType string `json:"targetViewType"`
@@ -43,13 +52,13 @@ func (r *LinkageRepository) GetViewLinkageGather(dvID, sourceViewID int64, targe
 
 	var chartTable, linkageTable, linkageFieldTable string
 	if snapshot {
-		chartTable = "snapshot_core_chart_view"
-		linkageTable = "snapshot_visualization_linkage"
-		linkageFieldTable = "snapshot_visualization_linkage_field"
+		chartTable = tableSnapshotChartView
+		linkageTable = tableSnapshotLinkage
+		linkageFieldTable = tableSnapshotLinkageField
 	} else {
-		chartTable = "core_chart_view"
-		linkageTable = "visualization_linkage"
-		linkageFieldTable = "visualization_linkage_field"
+		chartTable = tableChartView
+		linkageTable = tableLinkage
+		linkageFieldTable = tableLinkageField
 	}
 
 	query := fmt.Sprintf(`
@@ -84,19 +93,19 @@ func (r *LinkageRepository) GetDatasetFieldsByGroupID(datasetGroupID int64) ([]D
 }
 
 func (r *LinkageRepository) DeleteLinkageAndFields(dvID, sourceViewID int64) error {
-	err := r.db.Exec(`
-		DELETE FROM snapshot_visualization_linkage_field
+	err := r.db.Exec(fmt.Sprintf(`
+		DELETE FROM %s
 		WHERE linkage_id IN (
-			SELECT id FROM snapshot_visualization_linkage
+			SELECT id FROM %s
 			WHERE dv_id = ? AND source_view_id = ?
-		)`, dvID, sourceViewID).Error
+		)`, tableSnapshotLinkageField, tableSnapshotLinkage), dvID, sourceViewID).Error
 	if err != nil {
 		return fmt.Errorf("delete linkage fields: %w", err)
 	}
 
-	err = r.db.Exec(`
-		DELETE FROM snapshot_visualization_linkage
-		WHERE dv_id = ? AND source_view_id = ?`, dvID, sourceViewID).Error
+	err = r.db.Exec(fmt.Sprintf(`
+		DELETE FROM %s
+		WHERE dv_id = ? AND source_view_id = ?`, tableSnapshotLinkage), dvID, sourceViewID).Error
 	if err != nil {
 		return fmt.Errorf("delete linkage records: %w", err)
 	}
@@ -114,13 +123,13 @@ func (r *LinkageRepository) CreateLinkageField(f *auto.SnapshotVisualizationLink
 func (r *LinkageRepository) GetAllLinkageInfo(dvID int64, snapshot bool) (map[string][]string, error) {
 	var linkageTable, chartTable, fieldTable string
 	if snapshot {
-		linkageTable = "snapshot_visualization_linkage"
-		chartTable = "snapshot_core_chart_view"
-		fieldTable = "snapshot_visualization_linkage_field"
+		linkageTable = tableSnapshotLinkage
+		chartTable = tableSnapshotChartView
+		fieldTable = tableSnapshotLinkageField
 	} else {
-		linkageTable = "visualization_linkage"
-		chartTable = "core_chart_view"
-		fieldTable = "visualization_linkage_field"
+		linkageTable = tableLinkage
+		chartTable = tableChartView
+		fieldTable = tableLinkageField
 	}
 
 	query := fmt.Sprintf(`
@@ -154,7 +163,7 @@ func (r *LinkageRepository) GetAllLinkageInfo(dvID int64, snapshot bool) (map[st
 
 func (r *LinkageRepository) UpdateChartLinkageActive(chartViewID int64, active bool) error {
 	now := time.Now().UnixMilli()
-	return r.db.Exec(`
-		UPDATE snapshot_core_chart_view SET linkage_active = ?, update_time = ? WHERE id = ?`,
-		active, now, chartViewID).Error
+	return r.db.Exec(fmt.Sprintf(`
+		UPDATE %s SET linkage_active = ?, update_time = ? WHERE id = ?`,
+		tableSnapshotChartView), active, now, chartViewID).Error
 }
