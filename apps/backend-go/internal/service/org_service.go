@@ -28,7 +28,11 @@ func NewOrgService(orgRepo *repository.OrgRepository, auditSvc *AuditService, us
 	}
 }
 
-func (s *OrgService) CreateOrg(req *org.OrgCreateRequest) error {
+func (s *OrgService) CreateOrg(req *org.OrgCreateRequest, callerOrgID int64) error {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return err
+	}
+
 	count, err := s.orgRepo.CheckNameExists(req.OrgName, 0)
 	if err != nil {
 		return fmt.Errorf("failed to check org name: %w", err)
@@ -67,7 +71,11 @@ func (s *OrgService) CreateOrg(req *org.OrgCreateRequest) error {
 	return nil
 }
 
-func (s *OrgService) UpdateOrg(req *org.OrgUpdateRequest) error {
+func (s *OrgService) UpdateOrg(req *org.OrgUpdateRequest, callerOrgID int64) error {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return err
+	}
+
 	existing, err := s.orgRepo.GetByID(req.OrgID)
 	if err != nil {
 		return fmt.Errorf("organization not found: %w", err)
@@ -130,7 +138,17 @@ func (s *OrgService) UpdateOrg(req *org.OrgUpdateRequest) error {
 	return nil
 }
 
-func (s *OrgService) DeleteOrg(orgID int64, operatorID int64, operatorName string, ipAddress string) error {
+// DeleteOrg deletes an organization with deterministic C1 policy:
+//   1. Child rejection — reject if child organizations exist
+//   2. Soft delete — mark org as deleted without cascade
+//   3. Auditable deferred disposition — record affected users in audit log;
+//      actual resource cleanup is explicitly deferred to downstream lifecycle work (C2+),
+//      not treated as implicitly complete.
+func (s *OrgService) DeleteOrg(orgID int64, callerOrgID int64, operatorID int64, operatorName string, ipAddress string) error {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return err
+	}
+
 	// 1. 获取组织信息
 	orgInfo, err := s.orgRepo.GetByID(orgID)
 	if err != nil {
@@ -255,7 +273,11 @@ func (s *OrgService) GetOrgTree() ([]*org.OrgTreeNode, error) {
 	return rootNodes, nil
 }
 
-func (s *OrgService) UpdateOrgStatus(orgID int64, status int) error {
+func (s *OrgService) UpdateOrgStatus(orgID int64, status int, callerOrgID int64) error {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return err
+	}
+
 	existing, err := s.orgRepo.GetByID(orgID)
 	if err != nil {
 		return fmt.Errorf("organization not found: %w", err)

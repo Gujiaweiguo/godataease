@@ -10,6 +10,7 @@ import (
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create OrgService with all dependencies
@@ -39,7 +40,7 @@ func TestOrgServiceIntegration_CreateRoot(t *testing.T) {
 	orgRepo := repository.NewOrgRepository(testDB)
 
 	req := &org.OrgCreateRequest{OrgName: "Root Org"}
-	err := svc.CreateOrg(req)
+	err := svc.CreateOrg(req, 1)
 	assert.NoError(t, err)
 
 	orgs, err := orgRepo.List()
@@ -69,7 +70,7 @@ func TestOrgServiceIntegration_CreateChild(t *testing.T) {
 
 	// Create child
 	req := &org.OrgCreateRequest{OrgName: "Child", ParentID: &parent.OrgID}
-	err = svc.CreateOrg(req)
+	err = svc.CreateOrg(req, 1)
 	assert.NoError(t, err)
 
 	children, err := orgRepo.ListByParentID(parent.OrgID)
@@ -82,11 +83,11 @@ func TestOrgServiceIntegration_CreateDuplicateName(t *testing.T) {
 	svc := newTestOrgService(t)
 
 	// Create first org
-	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Duplicate"})
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Duplicate"}, 1)
 	assert.NoError(t, err)
 
 	// Try to create with same name
-	err = svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Duplicate"})
+	err = svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Duplicate"}, 1)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "organization name already exists")
 }
@@ -95,7 +96,7 @@ func TestOrgServiceIntegration_CreateParentNotFound(t *testing.T) {
 	svc := newTestOrgService(t)
 
 	notExistParent := int64(9999)
-	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child", ParentID: &notExistParent})
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child", ParentID: &notExistParent}, 1)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "parent organization not found")
 }
@@ -121,7 +122,7 @@ func TestOrgServiceIntegration_Update(t *testing.T) {
 		OrgID:   existing.OrgID,
 		OrgName: "New Name",
 		OrgDesc: &desc,
-	})
+	}, 1)
 	assert.NoError(t, err)
 
 	// Verify
@@ -136,7 +137,7 @@ func TestOrgServiceIntegration_Update(t *testing.T) {
 func TestOrgServiceIntegration_UpdateNotFound(t *testing.T) {
 	svc := newTestOrgService(t)
 
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: 9999, OrgName: "New"})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: 9999, OrgName: "New"}, 1)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "organization not found")
 }
@@ -152,7 +153,7 @@ func TestOrgServiceIntegration_UpdateDuplicateName(t *testing.T) {
 	orgRepo.Create(org2)
 
 	// Try to rename org2 to org1
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: org2.OrgID, OrgName: "Org1"})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: org2.OrgID, OrgName: "Org1"}, 1)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "organization name already exists")
 }
@@ -173,7 +174,7 @@ func TestOrgServiceIntegration_Delete(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Delete
-	err = svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
+	err = svc.DeleteOrg(existing.OrgID, 1, 1, "test-user", "127.0.0.1")
 	assert.NoError(t, err)
 
 	// Verify deleted
@@ -202,7 +203,7 @@ func TestOrgServiceIntegration_Delete_AuditDispositionIncludesAffectedUsers(t *t
 	err = testDB.Create(&user.SysUserRole{UserID: u.UserID, RoleID: 1, OrgID: existing.OrgID}).Error
 	assert.NoError(t, err)
 
-	err = svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
+	err = svc.DeleteOrg(existing.OrgID, 1, 1, "test-user", "127.0.0.1")
 	assert.NoError(t, err)
 
 	logs, total, err := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
@@ -230,7 +231,7 @@ func TestOrgServiceIntegration_DeleteWithChildren(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Try to delete parent
-	err = svc.DeleteOrg(parent.OrgID, 1, "test-user", "127.0.0.1")
+	err = svc.DeleteOrg(parent.OrgID, 1, 1, "test-user", "127.0.0.1")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot delete organization with 1 child organizations")
 }
@@ -332,7 +333,7 @@ func TestOrgServiceIntegration_UpdateStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update status
-	err = svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled)
+	err = svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled, 1)
 	assert.NoError(t, err)
 
 	// Verify
@@ -340,6 +341,25 @@ func TestOrgServiceIntegration_UpdateStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, org.StatusDisabled, updated.Status)
 	assert.NotNil(t, updated.UpdateTime)
+}
+
+func TestOrgServiceIntegration_RejectsInvalidOrgContext(t *testing.T) {
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
+	existing := &org.SysOrg{OrgName: "Scoped", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
+	require.NoError(t, orgRepo.Create(existing))
+
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child"}, 0)
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "Rename"}, 0)
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.DeleteOrg(existing.OrgID, 0, 1, "tester", "127.0.0.1")
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled, 0)
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
 }
 
 func TestOrgServiceIntegration_CheckOrgNameExists(t *testing.T) {
