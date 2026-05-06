@@ -5,7 +5,25 @@ import (
 	"strings"
 
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/domain/role"
+	"dataease/backend/internal/repository"
 )
+
+type scopedResourcePermRepo interface {
+	GetUserResourcesByOrg(userID int64, resourceType string, orgID int64) ([]*permission.UserResourcePermVO, error)
+	GetResourceUsersByOrg(resourceID int64, resourceType string, orgID int64) ([]*permission.ResourceUserPermVO, error)
+	CheckPermissionConsistencyByOrg(orgID int64) (*permission.PermissionConsistencyResult, error)
+	GrantPermToUserInOrg(userID, permID int64, createBy string, orgID int64) error
+	RevokePermFromUserInOrg(userID, permID, orgID int64) error
+}
+
+type roleScopeResolver interface {
+	GetByID(roleID int64) (*role.SysRole, error)
+}
+
+type userOrgMembershipResolver interface {
+	IsUserInOrg(userID, orgID int64) (bool, error)
+}
 
 type ResourcePermRepo interface {
 	GetPermByID(permID int64) (*permission.SysPerm, error)
@@ -39,10 +57,50 @@ type AdminChecker interface {
 type ResourcePermissionService struct {
 	repo         ResourcePermRepo
 	adminChecker AdminChecker
+	auditor      permissionMutationAuditor
+	roleResolver roleScopeResolver
+	userOrgScope userOrgMembershipResolver
 }
 
-func NewResourcePermissionService(repo ResourcePermRepo, adminChecker AdminChecker) *ResourcePermissionService {
-	return &ResourcePermissionService{repo: repo, adminChecker: adminChecker}
+type ResourcePermissionServiceOption func(*ResourcePermissionService)
+
+func WithResourcePermissionAuditor(auditor permissionMutationAuditor) ResourcePermissionServiceOption {
+	return func(s *ResourcePermissionService) {
+		s.auditor = auditor
+	}
+}
+
+func WithResourcePermissionRoleResolver(resolver roleScopeResolver) ResourcePermissionServiceOption {
+	return func(s *ResourcePermissionService) {
+		s.roleResolver = resolver
+	}
+}
+
+func WithResourcePermissionUserOrgResolver(resolver userOrgMembershipResolver) ResourcePermissionServiceOption {
+	return func(s *ResourcePermissionService) {
+		s.userOrgScope = resolver
+	}
+}
+
+func NewResourcePermissionService(repo ResourcePermRepo, adminChecker AdminChecker, opts ...ResourcePermissionServiceOption) *ResourcePermissionService {
+	svc := &ResourcePermissionService{repo: repo, adminChecker: adminChecker}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(svc)
+		}
+	}
+	if repoImpl, ok := repo.(*repository.ResourcePermissionRepository); ok {
+		if svc.auditor == nil {
+			svc.auditor = newPermAuditHelperFromDB(repoImpl.DB())
+		}
+		if svc.roleResolver == nil {
+			svc.roleResolver = repository.NewRoleRepository(repoImpl.DB())
+		}
+		if svc.userOrgScope == nil {
+			svc.userOrgScope = repository.NewUserRoleRepository(repoImpl.DB())
+		}
+	}
+	return svc
 }
 
 func (s *ResourcePermissionService) CheckPermission(userID int64, resourceType string, resourceID int64, permKey string) *permission.PermissionCheckResult {
@@ -127,7 +185,11 @@ func (s *ResourcePermissionService) GetUserPermissionIDs(userID int64) ([]int64,
 	return s.repo.GetUserPerms(userID)
 }
 
-func (s *ResourcePermissionService) GetRolePermissionIDs(roleID int64) ([]int64, error) {
+func (s *ResourcePermissionService) GetRolePermissionIDs(roleID int64, scopes ...PermissionMutationScope) ([]int64, error) {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireRoleMutationScope(roleID, scope); err != nil {
+		return nil, err
+	}
 	return s.repo.GetRolePerms(roleID)
 }
 
@@ -135,44 +197,98 @@ func (s *ResourcePermissionService) GetPermissionByID(permID int64) (*permission
 	return s.repo.GetPermByID(permID)
 }
 
-func (s *ResourcePermissionService) GrantPermissionToUser(userID, permID int64, createBy string) error {
-	return s.repo.GrantPermToUser(userID, permID, createBy)
+func (s *ResourcePermissionService) GrantPermissionToUser(userID, permID int64, createBy string, scopes ...PermissionMutationScope) error {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireUserMutationScope(userID, scope); err != nil {
+		return err
+	}
+	if scopedRepo, ok := s.repo.(scopedResourcePermRepo); ok && scope.OrgID > 0 && !s.isAdminActor(scope) {
+		if err := scopedRepo.GrantPermToUserInOrg(userID, permID, createBy, scope.OrgID); err != nil {
+			return err
+		}
+	} else if err := s.repo.GrantPermToUser(userID, permID, createBy); err != nil {
+		return err
+	}
+	return s.recordMutationAudit("PERM_GRANT", scope, "user", userID, permID, 0, map[string]interface{}{"createBy": createBy})
 }
 
-func (s *ResourcePermissionService) RevokePermissionFromUser(userID, permID int64) error {
-	return s.repo.RevokePermFromUser(userID, permID)
+func (s *ResourcePermissionService) RevokePermissionFromUser(userID, permID int64, scopes ...PermissionMutationScope) error {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireUserMutationScope(userID, scope); err != nil {
+		return err
+	}
+	if scopedRepo, ok := s.repo.(scopedResourcePermRepo); ok && scope.OrgID > 0 && !s.isAdminActor(scope) {
+		if err := scopedRepo.RevokePermFromUserInOrg(userID, permID, scope.OrgID); err != nil {
+			return err
+		}
+	} else if err := s.repo.RevokePermFromUser(userID, permID); err != nil {
+		return err
+	}
+	return s.recordMutationAudit("PERM_REVOKE", scope, "user", userID, permID, 0, nil)
 }
 
-func (s *ResourcePermissionService) GrantPermissionToRole(roleID, permID int64) error {
-	return s.repo.GrantPermToRole(roleID, permID)
+func (s *ResourcePermissionService) GrantPermissionToRole(roleID, permID int64, scopes ...PermissionMutationScope) error {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireRoleMutationScope(roleID, scope); err != nil {
+		return err
+	}
+	if err := s.repo.GrantPermToRole(roleID, permID); err != nil {
+		return err
+	}
+	return s.recordMutationAudit("PERM_GRANT", scope, "role", roleID, permID, 0, nil)
 }
 
-func (s *ResourcePermissionService) RevokePermissionFromRole(roleID, permID int64) error {
-	return s.repo.RevokePermFromRole(roleID, permID)
+func (s *ResourcePermissionService) RevokePermissionFromRole(roleID, permID int64, scopes ...PermissionMutationScope) error {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireRoleMutationScope(roleID, scope); err != nil {
+		return err
+	}
+	if err := s.repo.RevokePermFromRole(roleID, permID); err != nil {
+		return err
+	}
+	return s.recordMutationAudit("PERM_REVOKE", scope, "role", roleID, permID, 0, nil)
 }
 
 // ========== 双视角接口实现 ==========
 
 // GetUserPerspective 获取用户视角的权限列表
-func (s *ResourcePermissionService) GetUserPerspective(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+func (s *ResourcePermissionService) GetUserPerspective(userID int64, resourceType string, scopes ...PermissionMutationScope) ([]*permission.UserResourcePermVO, error) {
 	if s.repo == nil {
 		return nil, fmt.Errorf("repository not initialized")
 	}
+	scope := resolvePermissionScope(scopes)
 
 	// 管理员返回所有权限标识
-	if s.adminChecker != nil && s.adminChecker.IsAdmin(userID) {
+	if s.isAdminActor(scope) || (scope.isZero() && s.adminChecker != nil && s.adminChecker.IsAdmin(userID)) {
 		return []*permission.UserResourcePermVO{
 			{PermKey: "*", PermName: "全部权限", SourceType: "admin"},
 		}, nil
+	}
+	if scope.OrgID > 0 {
+		if err := requireOrgScope(scope); err != nil {
+			return nil, err
+		}
+		if scopedRepo, ok := s.repo.(scopedResourcePermRepo); ok {
+			return scopedRepo.GetUserResourcesByOrg(userID, resourceType, scope.OrgID)
+		}
 	}
 
 	return s.repo.GetUserResources(userID, resourceType)
 }
 
 // GetResourcePerspective 获取资源视角的授权列表
-func (s *ResourcePermissionService) GetResourcePerspective(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+func (s *ResourcePermissionService) GetResourcePerspective(resourceID int64, resourceType string, scopes ...PermissionMutationScope) ([]*permission.ResourceUserPermVO, error) {
 	if s.repo == nil {
 		return nil, fmt.Errorf("repository not initialized")
+	}
+	scope := resolvePermissionScope(scopes)
+	if scope.OrgID > 0 && !s.isAdminActor(scope) {
+		if err := requireOrgScope(scope); err != nil {
+			return nil, err
+		}
+		if scopedRepo, ok := s.repo.(scopedResourcePermRepo); ok {
+			return scopedRepo.GetResourceUsersByOrg(resourceID, resourceType, scope.OrgID)
+		}
 	}
 
 	return s.repo.GetResourceUsers(resourceID, resourceType)
@@ -236,12 +352,75 @@ func (s *ResourcePermissionService) ResolvePermission(resourceType, permKey stri
 }
 
 // CheckPermissionConsistency 校验双视角权限一致性
-func (s *ResourcePermissionService) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+func (s *ResourcePermissionService) CheckPermissionConsistency(scopes ...PermissionMutationScope) (*permission.PermissionConsistencyResult, error) {
 	if s.repo == nil {
 		return nil, fmt.Errorf("repository not initialized")
 	}
+	scope := resolvePermissionScope(scopes)
+	if scope.OrgID > 0 && !s.isAdminActor(scope) {
+		if err := requireOrgScope(scope); err != nil {
+			return nil, err
+		}
+		if scopedRepo, ok := s.repo.(scopedResourcePermRepo); ok {
+			return scopedRepo.CheckPermissionConsistencyByOrg(scope.OrgID)
+		}
+	}
 
 	return s.repo.CheckPermissionConsistency()
+}
+
+func (s *ResourcePermissionService) isAdminActor(scope PermissionMutationScope) bool {
+	return scope.ActorID > 0 && s.adminChecker != nil && s.adminChecker.IsAdmin(scope.ActorID)
+}
+
+func (s *ResourcePermissionService) requireUserMutationScope(userID int64, scope PermissionMutationScope) error {
+	if scope.OrgID <= 0 || s.isAdminActor(scope) {
+		return nil
+	}
+	if err := requireOrgScope(scope); err != nil {
+		return err
+	}
+	if s.userOrgScope == nil {
+		return fmt.Errorf("user organization scope resolver not configured")
+	}
+	inOrg, err := s.userOrgScope.IsUserInOrg(userID, scope.OrgID)
+	if err != nil {
+		return fmt.Errorf("failed to validate user organization scope: %w", err)
+	}
+	if !inOrg {
+		return fmt.Errorf("user does not belong to current organization")
+	}
+	return nil
+}
+
+func (s *ResourcePermissionService) requireRoleMutationScope(roleID int64, scope PermissionMutationScope) error {
+	if scope.OrgID <= 0 || s.isAdminActor(scope) {
+		return nil
+	}
+	if err := requireOrgScope(scope); err != nil {
+		return err
+	}
+	if s.roleResolver == nil {
+		return fmt.Errorf("role organization scope resolver not configured")
+	}
+	rle, err := s.roleResolver.GetByID(roleID)
+	if err != nil {
+		return fmt.Errorf("failed to load role: %w", err)
+	}
+	return validateRoleOrgScope(rle, scope.OrgID)
+}
+
+func (s *ResourcePermissionService) recordMutationAudit(operation string, scope PermissionMutationScope, targetType string, targetID, permID, resourceID int64, details map[string]interface{}) error {
+	if s.auditor == nil {
+		return nil
+	}
+	if details == nil {
+		details = map[string]interface{}{}
+	}
+	details["targetType"] = targetType
+	details["targetId"] = targetID
+	details["permId"] = permID
+	return s.auditor.RecordPermissionMutationAudit(operation, scope, targetType, targetID, permID, resourceID, details)
 }
 
 func (s *ResourcePermissionService) lookupPermission(resourceType, permKey string) (*permission.SysPerm, error) {

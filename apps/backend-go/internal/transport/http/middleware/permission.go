@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"go.uber.org/zap"
 )
 
 func Permission(requiredRole string) gin.HandlerFunc {
@@ -37,6 +38,19 @@ const (
 	RowPermissionFilterKey     = "row_permission_filter"
 )
 
+var (
+	rowPermissionAdminChecker       AdminChecker
+	rowPermissionDatasetOrgVerifier DatasetOrgScopeValidator
+)
+
+func SetRowPermissionAdminChecker(adminChecker AdminChecker) {
+	rowPermissionAdminChecker = adminChecker
+}
+
+func SetRowPermissionDatasetOrgValidator(validator DatasetOrgScopeValidator) {
+	rowPermissionDatasetOrgVerifier = validator
+}
+
 func RowPermissionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
@@ -46,11 +60,48 @@ func RowPermissionMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		orgID := GetOrgID(c)
+		isAdmin := rowPermissionAdminChecker != nil && rowPermissionAdminChecker.IsAdmin(int64(userID))
+		if orgID > 0 {
+			c.Set("org_id", orgID)
+		}
+		if !isAdmin && rowPermissionAdminChecker != nil && orgID <= 0 {
+			response.Forbidden(c, "invalid org context")
+			c.Abort()
+			return
+		}
+
 		datasetIDs, err := extractRowPermissionDatasetIDs(c)
 		if err != nil {
 			response.BadRequest(c, err.Error())
 			c.Abort()
 			return
+		}
+
+		if !isAdmin && orgID > 0 {
+			for _, datasetID := range datasetIDs {
+				if rowPermissionDatasetOrgVerifier == nil {
+					zap.L().Warn("Skipping dataset org validation: validator unavailable",
+						zap.Int64("dataset_id", datasetID),
+						zap.Int64("org_id", orgID),
+					)
+					continue
+				}
+				allowed, validateErr := rowPermissionDatasetOrgVerifier.DatasetBelongsToOrg(datasetID, orgID)
+				if validateErr != nil {
+					zap.L().Warn("Dataset org validation failed; allowing request due to unsupported dataset org boundary",
+						zap.Int64("dataset_id", datasetID),
+						zap.Int64("org_id", orgID),
+						zap.Error(validateErr),
+					)
+					continue
+				}
+				if !allowed {
+					response.Forbidden(c, "dataset does not belong to current organization")
+					c.Abort()
+					return
+				}
+			}
 		}
 
 		c.Set(RowPermissionDatasetIDKey, datasetIDs[0])

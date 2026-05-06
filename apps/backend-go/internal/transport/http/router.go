@@ -284,7 +284,13 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	datasetHandler := handler.NewDatasetHandler(datasetService, chartService)
 
 	chartHandler := handler.NewChartHandler(chartService, datasetService)
-	dataPermissionService := service.NewDataPermissionAdminService(rowPermRepo, columnPermRepo, chartService, permissionCacheService)
+	dataPermissionService := service.NewDataPermissionAdminService(
+		rowPermRepo,
+		columnPermRepo,
+		chartService,
+		permissionCacheService,
+		service.WithDataPermissionAdminChecker(adminChecker),
+	)
 	dataPermissionHandler := handler.NewDataPermissionHandler(dataPermissionService)
 
 	visualRepo := repository.NewVisualizationRepository(db)
@@ -368,8 +374,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	resourceGovernanceAdminService := service.NewResourceGovernanceAdminService(datasourceService, datasetService, visualService)
 	exportPermService := service.NewExportPermissionService(resourcePermService, permissionCacheService)
 	permMiddleware := middleware.NewPermissionMiddleware(resourcePermService, exportPermService, adminChecker)
+	permMiddleware.SetUserOrgResolver(userRoleRepo)
 	permMiddleware.SetChartDatasetResolver(chartRepo)
 	permMiddleware.SetVisualizationTypeResolver(visualService)
+	middleware.SetRowPermissionAdminChecker(adminChecker)
 	permissionCompatHandler := handler.NewPermissionCompatHandler(menuService, permService, roleMenuService, resourcePermService)
 	permissionCompatHandler.SetRoleService(roleService)
 	resourceGovernanceHandler := handler.NewResourceGovernanceHandler(resourceGovernanceAdminService, adminChecker)

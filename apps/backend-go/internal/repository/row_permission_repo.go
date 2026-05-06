@@ -16,6 +16,13 @@ func NewRowPermissionRepository(db *gorm.DB) *RowPermissionRepository {
 	return &RowPermissionRepository{db: db}
 }
 
+func (r *RowPermissionRepository) DB() *gorm.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 func (r *RowPermissionRepository) ListByDatasetID(datasetID int64) ([]*permission.DataPermRow, error) {
 	var perms []*permission.DataPermRow
 	err := r.db.Where("dataset_id = ? AND status = 1", datasetID).
@@ -137,6 +144,13 @@ type ColumnPermissionRepository struct {
 
 func NewColumnPermissionRepository(db *gorm.DB) *ColumnPermissionRepository {
 	return &ColumnPermissionRepository{db: db}
+}
+
+func (r *ColumnPermissionRepository) DB() *gorm.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
 }
 
 func (r *ColumnPermissionRepository) ListByDatasetID(datasetID int64) ([]*permission.DataPermColumn, error) {

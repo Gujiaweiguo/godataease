@@ -28,12 +28,21 @@ type PermissionMiddleware struct {
 	resourcePermSvc       *service.ResourcePermissionService
 	exportPermSvc         *service.ExportPermissionService
 	adminChecker          AdminChecker
+	userOrgResolver       UserOrgMembershipResolver
 	chartDatasetResolver  ChartDatasetGroupResolver
 	visualizationResolver VisualizationTypeResolver
 }
 
 type AdminChecker interface {
 	IsAdmin(userID int64) bool
+}
+
+type UserOrgMembershipResolver interface {
+	IsUserInOrg(userID, orgID int64) (bool, error)
+}
+
+type DatasetOrgScopeValidator interface {
+	DatasetBelongsToOrg(datasetID, orgID int64) (bool, error)
 }
 
 type ChartDatasetGroupResolver interface {
@@ -60,8 +69,48 @@ func (m *PermissionMiddleware) SetChartDatasetResolver(resolver ChartDatasetGrou
 	m.chartDatasetResolver = resolver
 }
 
+func (m *PermissionMiddleware) SetUserOrgResolver(resolver UserOrgMembershipResolver) {
+	m.userOrgResolver = resolver
+}
+
 func (m *PermissionMiddleware) SetVisualizationTypeResolver(resolver VisualizationTypeResolver) {
 	m.visualizationResolver = resolver
+}
+
+func (m *PermissionMiddleware) ensureOrgContext(c *gin.Context, userID int64) (int64, bool, bool) {
+	isAdmin := m.adminChecker != nil && m.adminChecker.IsAdmin(userID)
+	orgID := GetOrgID(c)
+	if orgID > 0 {
+		c.Set("org_id", orgID)
+	}
+	if isAdmin {
+		return orgID, true, true
+	}
+	if m.userOrgResolver == nil {
+		return orgID, false, true
+	}
+	if orgID <= 0 {
+		response.Forbidden(c, "invalid org context")
+		c.Abort()
+		return 0, false, false
+	}
+	inOrg, err := m.userOrgResolver.IsUserInOrg(userID, orgID)
+	if err != nil {
+		logger.Warn("Failed to validate user organization membership",
+			zap.Int64("user_id", userID),
+			zap.Int64("org_id", orgID),
+			zap.Error(err),
+		)
+		response.Forbidden(c, "invalid org context")
+		c.Abort()
+		return 0, false, false
+	}
+	if !inOrg {
+		response.Forbidden(c, "invalid org context")
+		c.Abort()
+		return 0, false, false
+	}
+	return orgID, false, true
 }
 
 func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey string) gin.HandlerFunc {
@@ -73,7 +122,12 @@ func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey str
 			return
 		}
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -119,6 +173,11 @@ func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
 			return
 		}
 
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
 		chartID, err := extractChartID(c)
 		if err != nil {
 			response.BadRequest(c, err.Error())
@@ -151,7 +210,7 @@ func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
 		c.Set(RowPermissionDatasetIDKey, datasetID)
 		c.Set(RowPermissionDatasetIDsKey, []int64{datasetID})
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -238,6 +297,11 @@ func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
 			return
 		}
 
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
 		resourceType, resourceID, err := m.resolveVisualizationParentResource(c)
 		if err != nil {
 			response.Error(c, "500000", "Failed: "+err.Error())
@@ -249,7 +313,7 @@ func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
 		c.Set(ResourceIDKey, resourceID)
 		c.Set(PermissionKeyKey, permission.PermKeyEdit)
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -286,6 +350,11 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 			return
 		}
 
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
 		sourceType, sourceID, destinationType, destinationID, err := m.resolveVisualizationCopyResources(c)
 		if err != nil {
 			response.Error(c, "500000", "Failed: "+err.Error())
@@ -297,7 +366,7 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 		c.Set(ResourceIDKey, destinationID)
 		c.Set(PermissionKeyKey, permission.PermKeyEdit)
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -372,6 +441,11 @@ func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.
 			return
 		}
 
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
 		resourceType, resourceID, err := m.resolveVisualizationResource(c)
 		if err != nil {
 			response.Error(c, "500000", "Failed: "+err.Error())
@@ -383,7 +457,7 @@ func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.
 		c.Set(ResourceIDKey, resourceID)
 		c.Set(PermissionKeyKey, permKey)
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -519,7 +593,12 @@ func (m *PermissionMiddleware) CheckBatchResourcePermission(resourceType, permKe
 			return
 		}
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -564,7 +643,12 @@ func (m *PermissionMiddleware) CheckExportPermission(resourceType string) gin.Ha
 			return
 		}
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -754,7 +838,12 @@ func (m *PermissionMiddleware) CheckBatchExportPermission(resourceType string) g
 			return
 		}
 
-		if m.adminChecker != nil && m.adminChecker.IsAdmin(int64(userID)) {
+		_, isAdmin, ok := m.ensureOrgContext(c, int64(userID))
+		if !ok {
+			return
+		}
+
+		if isAdmin {
 			c.Next()
 			return
 		}
@@ -785,6 +874,10 @@ func (m *PermissionMiddleware) CheckDatasetDataPermission() gin.HandlerFunc {
 		if userID == 0 {
 			response.Unauthorized(c, "authentication required")
 			c.Abort()
+			return
+		}
+
+		if _, _, ok := m.ensureOrgContext(c, int64(userID)); !ok {
 			return
 		}
 

@@ -338,6 +338,37 @@ func TestCheckPermissionConsistency(t *testing.T) {
 	assert.Empty(t, result.Inconsistencies)
 }
 
+func TestCheckPermissionConsistencyByOrg(t *testing.T) {
+	repo := setupResourcePermissionRepositoryTest(t)
+	datasetView := &permission.SysPerm{PermName: "Dataset View", PermKey: "dataset:view", PermType: permission.PermTypeData, Status: permission.StatusEnabled, DelFlag: permission.DelFlagNormal}
+	missingPerm := &permission.SysPerm{PermName: "Dataset Edit", PermKey: "dataset:edit", PermType: permission.PermTypeData, Status: permission.StatusEnabled, DelFlag: permission.DelFlagNormal}
+	require.NoError(t, repo.db.Create(datasetView).Error)
+	require.NoError(t, repo.db.Create(missingPerm).Error)
+	require.NoError(t, repo.db.Create(&user.SysUser{UserID: 801, Username: "org1-user", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+	require.NoError(t, repo.db.Create(&user.SysUser{UserID: 802, Username: "org2-user", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+	require.NoError(t, repo.db.Create(&permission.SysUserPerm{UserID: 801, OrgID: ptrInt64Value(1), PermID: datasetView.PermID, Status: 1, DelFlag: 0}).Error)
+	require.NoError(t, repo.db.Create(&permission.SysUserPerm{UserID: 802, OrgID: ptrInt64Value(2), PermID: missingPerm.PermID, Status: 1, DelFlag: 0}).Error)
+	require.NoError(t, repo.db.Create(&user.SysUserRole{UserID: 801, RoleID: 901, OrgID: 1}).Error)
+	require.NoError(t, repo.db.Create(&user.SysUserRole{UserID: 802, RoleID: 902, OrgID: 2}).Error)
+	require.NoError(t, repo.ReplaceResourcePermissions(101, permission.ResourceTypeDataset, []int64{datasetView.PermID}))
+
+	orgScoped, err := repo.CheckPermissionConsistencyByOrg(1)
+	require.NoError(t, err)
+	assert.True(t, orgScoped.Consistent)
+	assert.Equal(t, 1, orgScoped.UserCount)
+	assert.Equal(t, 1, orgScoped.ResourceCount)
+	assert.Empty(t, orgScoped.Inconsistencies)
+
+	global, err := repo.CheckPermissionConsistency()
+	require.NoError(t, err)
+	assert.False(t, global.Consistent)
+	assert.NotEmpty(t, global.Inconsistencies)
+}
+
+func ptrInt64Value(v int64) *int64 {
+	return &v
+}
+
 func TestGetUserResources(t *testing.T) {
 	t.Run("filters direct and role permissions by resource type prefix", func(t *testing.T) {
 		repo := setupResourcePermissionRepositoryTest(t)

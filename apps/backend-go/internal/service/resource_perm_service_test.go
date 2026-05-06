@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/domain/role"
 )
 
 type mockResourcePermAdminChecker struct {
@@ -19,45 +20,54 @@ func (m *mockResourcePermAdminChecker) IsAdmin(userID int64) bool {
 }
 
 type mockResourcePermRepo struct {
-	permByID          map[int64]*permission.SysPerm
-	permByIDErr       error
-	userPerms         map[int64][]int64
-	userPermsErr      error
-	rolePerms         map[int64][]int64
-	rolePermsErr      error
-	userRoles         map[int64][]int64
-	userRoleErr       error
-	permKeys          map[string]*permission.SysPerm
-	userPermOk        map[int64]map[int64]bool
-	rolePermOk        map[int64]map[int64]bool
-	rolePermCheckErr  error
-	resourcePerms     map[string][]int64
-	userResources     []*permission.UserResourcePermVO
-	resourceUsers     []*permission.ResourceUserPermVO
-	applyGroupErr     error
-	resourcePermErr   error
-	registerErr       error
-	replaceErr        error
-	userResourcesErr  error
-	resourceUsersErr  error
-	consistencyErr    error
-	consistencyResult *permission.PermissionConsistencyResult
-	applyGroupCalls   int
-	registerCalls     int
-	replaceCalls      int
-	lastParentID      *int64
+	permByID           map[int64]*permission.SysPerm
+	permByIDErr        error
+	userPerms          map[int64][]int64
+	userPermsErr       error
+	rolePerms          map[int64][]int64
+	rolePermsErr       error
+	userRoles          map[int64][]int64
+	userRoleErr        error
+	permKeys           map[string]*permission.SysPerm
+	userPermOk         map[int64]map[int64]bool
+	rolePermOk         map[int64]map[int64]bool
+	rolePermCheckErr   error
+	resourcePerms      map[string][]int64
+	userResources      []*permission.UserResourcePermVO
+	resourceUsers      []*permission.ResourceUserPermVO
+	applyGroupErr      error
+	resourcePermErr    error
+	registerErr        error
+	replaceErr         error
+	userResourcesErr   error
+	resourceUsersErr   error
+	consistencyErr     error
+	consistencyResult  *permission.PermissionConsistencyResult
+	applyGroupCalls    int
+	registerCalls      int
+	replaceCalls       int
+	lastParentID       *int64
+	userResourcesByOrg map[int64][]*permission.UserResourcePermVO
+	resourceUsersByOrg map[int64][]*permission.ResourceUserPermVO
+	consistencyByOrg   map[int64]*permission.PermissionConsistencyResult
+	lastUserOrgID      int64
+	lastResourceOrgID  int64
+	lastConsistencyOrg int64
 }
 
 func newMockResourcePermRepo() *mockResourcePermRepo {
 	return &mockResourcePermRepo{
-		permByID:      make(map[int64]*permission.SysPerm),
-		userPerms:     make(map[int64][]int64),
-		rolePerms:     make(map[int64][]int64),
-		userRoles:     make(map[int64][]int64),
-		permKeys:      make(map[string]*permission.SysPerm),
-		userPermOk:    make(map[int64]map[int64]bool),
-		rolePermOk:    make(map[int64]map[int64]bool),
-		resourcePerms: make(map[string][]int64),
+		permByID:           make(map[int64]*permission.SysPerm),
+		userPerms:          make(map[int64][]int64),
+		rolePerms:          make(map[int64][]int64),
+		userRoles:          make(map[int64][]int64),
+		permKeys:           make(map[string]*permission.SysPerm),
+		userPermOk:         make(map[int64]map[int64]bool),
+		rolePermOk:         make(map[int64]map[int64]bool),
+		resourcePerms:      make(map[string][]int64),
+		userResourcesByOrg: make(map[int64][]*permission.UserResourcePermVO),
+		resourceUsersByOrg: make(map[int64][]*permission.ResourceUserPermVO),
+		consistencyByOrg:   make(map[int64]*permission.PermissionConsistencyResult),
 	}
 }
 
@@ -144,8 +154,18 @@ func (m *mockResourcePermRepo) GrantPermToUser(userID, permID int64, createBy st
 	return nil
 }
 
+func (m *mockResourcePermRepo) GrantPermToUserInOrg(userID, permID int64, createBy string, orgID int64) error {
+	m.lastUserOrgID = orgID
+	return m.GrantPermToUser(userID, permID, createBy)
+}
+
 func (m *mockResourcePermRepo) RevokePermFromUser(userID, permID int64) error {
 	return nil
+}
+
+func (m *mockResourcePermRepo) RevokePermFromUserInOrg(userID, permID, orgID int64) error {
+	m.lastUserOrgID = orgID
+	return m.RevokePermFromUser(userID, permID)
 }
 
 func (m *mockResourcePermRepo) GrantPermToRole(roleID, permID int64) error {
@@ -226,6 +246,67 @@ func (m *mockResourcePermRepo) CheckPermissionConsistency() (*permission.Permiss
 		return m.consistencyResult, nil
 	}
 	return &permission.PermissionConsistencyResult{Consistent: true}, nil
+}
+
+func (m *mockResourcePermRepo) GetUserResourcesByOrg(userID int64, resourceType string, orgID int64) ([]*permission.UserResourcePermVO, error) {
+	m.lastUserOrgID = orgID
+	if items, ok := m.userResourcesByOrg[orgID]; ok {
+		return items, nil
+	}
+	return m.GetUserResources(userID, resourceType)
+}
+
+func (m *mockResourcePermRepo) GetResourceUsersByOrg(resourceID int64, resourceType string, orgID int64) ([]*permission.ResourceUserPermVO, error) {
+	m.lastResourceOrgID = orgID
+	if items, ok := m.resourceUsersByOrg[orgID]; ok {
+		return items, nil
+	}
+	return m.GetResourceUsers(resourceID, resourceType)
+}
+
+func (m *mockResourcePermRepo) CheckPermissionConsistencyByOrg(orgID int64) (*permission.PermissionConsistencyResult, error) {
+	m.lastConsistencyOrg = orgID
+	if result, ok := m.consistencyByOrg[orgID]; ok {
+		return result, nil
+	}
+	return m.CheckPermissionConsistency()
+}
+
+type permissionAuditSpy struct {
+	entries []permissionAuditSpyEntry
+}
+
+type permissionAuditSpyEntry struct {
+	operation  string
+	scope      PermissionMutationScope
+	targetType string
+	targetID   int64
+	permID     int64
+	resourceID int64
+	details    map[string]interface{}
+}
+
+func (s *permissionAuditSpy) RecordPermissionMutationAudit(operation string, scope PermissionMutationScope, targetType string, targetID, permID, resourceID int64, details map[string]interface{}) error {
+	s.entries = append(s.entries, permissionAuditSpyEntry{operation: operation, scope: scope, targetType: targetType, targetID: targetID, permID: permID, resourceID: resourceID, details: details})
+	return nil
+}
+
+type mockRoleScopeResolver struct {
+	role *role.SysRole
+	err  error
+}
+
+func (m *mockRoleScopeResolver) GetByID(roleID int64) (*role.SysRole, error) {
+	return m.role, m.err
+}
+
+type mockUserOrgScopeResolver struct {
+	inOrg bool
+	err   error
+}
+
+func (m *mockUserOrgScopeResolver) IsUserInOrg(userID, orgID int64) (bool, error) {
+	return m.inOrg, m.err
 }
 
 func resourceTypeKey(resourceType string, resourceID int64) string {
@@ -532,6 +613,110 @@ func TestResourcePermissionService_DelegateMethods(t *testing.T) {
 	}
 	if err = svc.RevokePermissionFromRole(3, 4); err != nil {
 		t.Fatalf("RevokePermissionFromRole failed: %v", err)
+	}
+}
+
+func TestResourcePermissionService_MutationAuditAndOrgScope(t *testing.T) {
+	t.Run("audits grant and revoke mutations", func(t *testing.T) {
+		mockRepo := newMockResourcePermRepo()
+		auditSpy := &permissionAuditSpy{}
+		roleOrgID := int64(7)
+		svc := NewResourcePermissionService(
+			mockRepo,
+			&mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}},
+			WithResourcePermissionAuditor(auditSpy),
+			WithResourcePermissionUserOrgResolver(&mockUserOrgScopeResolver{inOrg: true}),
+			WithResourcePermissionRoleResolver(&mockRoleScopeResolver{role: &role.SysRole{RoleID: 9, OrgID: &roleOrgID}}),
+		)
+
+		scope := PermissionMutationScope{ActorID: 88, OrgID: 7, Username: "tester"}
+		if err := svc.GrantPermissionToUser(5, 11, "tester", scope); err != nil {
+			t.Fatalf("GrantPermissionToUser failed: %v", err)
+		}
+		if err := svc.RevokePermissionFromRole(9, 11, scope); err != nil {
+			t.Fatalf("RevokePermissionFromRole failed: %v", err)
+		}
+		if len(auditSpy.entries) != 2 {
+			t.Fatalf("expected 2 audit entries, got %d", len(auditSpy.entries))
+		}
+		if auditSpy.entries[0].operation != "PERM_GRANT" || auditSpy.entries[0].targetType != "user" {
+			t.Fatalf("unexpected first audit entry: %+v", auditSpy.entries[0])
+		}
+		if auditSpy.entries[1].operation != "PERM_REVOKE" || auditSpy.entries[1].targetType != "role" {
+			t.Fatalf("unexpected second audit entry: %+v", auditSpy.entries[1])
+		}
+	})
+
+	t.Run("rejects cross org user grant", func(t *testing.T) {
+		svc := NewResourcePermissionService(
+			newMockResourcePermRepo(),
+			&mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}},
+			WithResourcePermissionUserOrgResolver(&mockUserOrgScopeResolver{inOrg: false}),
+		)
+		err := svc.GrantPermissionToUser(5, 11, "tester", PermissionMutationScope{ActorID: 2, OrgID: 7})
+		if err == nil || err.Error() != "user does not belong to current organization" {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("rejects cross org role grant", func(t *testing.T) {
+		roleOrgID := int64(8)
+		svc := NewResourcePermissionService(
+			newMockResourcePermRepo(),
+			&mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{}},
+			WithResourcePermissionRoleResolver(&mockRoleScopeResolver{role: &role.SysRole{RoleID: 9, OrgID: &roleOrgID}}),
+		)
+		err := svc.GrantPermissionToRole(9, 11, PermissionMutationScope{ActorID: 2, OrgID: 7})
+		if err == nil || err.Error() != "role does not belong to current organization" {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("admin bypass skips org guard", func(t *testing.T) {
+		svc := NewResourcePermissionService(
+			newMockResourcePermRepo(),
+			&mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{1: true}},
+		)
+		if err := svc.GrantPermissionToRole(9, 11, PermissionMutationScope{ActorID: 1, OrgID: 7}); err != nil {
+			t.Fatalf("expected admin bypass to succeed, got %v", err)
+		}
+	})
+}
+
+func TestResourcePermissionService_ScopedQueryAndConsistency(t *testing.T) {
+	mockRepo := newMockResourcePermRepo()
+	mockRepo.userResourcesByOrg[7] = []*permission.UserResourcePermVO{{PermKey: permission.PermKeyView, SourceType: "role"}}
+	mockRepo.resourceUsersByOrg[7] = []*permission.ResourceUserPermVO{{UserID: 9, SourceType: "direct"}}
+	mockRepo.consistencyByOrg[7] = &permission.PermissionConsistencyResult{Consistent: true, UserCount: 1, ResourceCount: 1}
+	svc := NewResourcePermissionService(mockRepo, &mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{99: true}})
+
+	items, err := svc.GetUserPerspective(5, permission.ResourceTypeDashboard, PermissionMutationScope{ActorID: 2, OrgID: 7})
+	if err != nil {
+		t.Fatalf("GetUserPerspective failed: %v", err)
+	}
+	if mockRepo.lastUserOrgID != 7 || len(items) != 1 {
+		t.Fatalf("expected org-scoped user perspective, org=%d items=%+v", mockRepo.lastUserOrgID, items)
+	}
+
+	resourceItems, err := svc.GetResourcePerspective(6, permission.ResourceTypeDashboard, PermissionMutationScope{ActorID: 2, OrgID: 7})
+	if err != nil {
+		t.Fatalf("GetResourcePerspective failed: %v", err)
+	}
+	if mockRepo.lastResourceOrgID != 7 || len(resourceItems) != 1 {
+		t.Fatalf("expected org-scoped resource perspective, org=%d items=%+v", mockRepo.lastResourceOrgID, resourceItems)
+	}
+
+	result, err := svc.CheckPermissionConsistency(PermissionMutationScope{ActorID: 2, OrgID: 7})
+	if err != nil {
+		t.Fatalf("CheckPermissionConsistency failed: %v", err)
+	}
+	if mockRepo.lastConsistencyOrg != 7 || result.UserCount != 1 {
+		t.Fatalf("expected org-scoped consistency result, org=%d result=%+v", mockRepo.lastConsistencyOrg, result)
+	}
+
+	_, err = svc.CheckPermissionConsistency(PermissionMutationScope{ActorID: 99, OrgID: 7})
+	if err != nil {
+		t.Fatalf("admin bypass consistency failed: %v", err)
 	}
 }
 
