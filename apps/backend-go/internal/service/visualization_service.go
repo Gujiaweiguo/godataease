@@ -556,52 +556,18 @@ func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy str
 	newDvID := int64(uuid.New().ID())
 	copyID := int64(uuid.New().ID()) / 100
 
-	if err := s.repo.CopyChartViews(req.ID, newDvID, copyID, "core"); err != nil {
-		return 0, fmt.Errorf("copy chart views (core): %w", err)
+	componentData, err := s.copyVisualizationChartViewsAndRemapComponentData(req.ID, newDvID, copyID, source.ComponentData)
+	if err != nil {
+		return 0, err
 	}
-	// Snapshot table copy is best-effort; the source may have no snapshot rows.
-	_ = s.repo.CopyChartViews(req.ID, newDvID, copyID, "snapshot")
+	s.copyVisualizationRelations(copyID)
 
-	componentData := source.ComponentData
-	viewMapping, err := s.repo.GetCopiedChartViewMapping(copyID)
-	if err == nil && len(viewMapping) > 0 && source.ComponentData != nil {
-		remapped := *source.ComponentData
-		for oldID, newID := range viewMapping {
-			remapped = strings.ReplaceAll(remapped, strconv.FormatInt(oldID, 10), strconv.FormatInt(newID, 10))
-		}
-		componentData = &remapped
-	}
-
-	_ = s.repo.CopyLinkages(copyID)
-	_ = s.repo.CopyLinkageFields(copyID)
-	_ = s.repo.CopyLinkJumps(copyID)
-	_ = s.repo.CopyLinkJumpInfos(copyID)
-	_ = s.repo.CopyLinkJumpTargetInfos(copyID)
-
-	nodeType := source.NodeType
-	if req.NodeType != nil && *req.NodeType != "" {
-		nodeType = req.NodeType
-	}
-	if nodeType != nil && *nodeType != visualizationNodeTypeFolder {
-		leaf := "leaf"
-		nodeType = &leaf
-	}
-
-	visualizationType := source.Type
-	if req.Type != nil && *req.Type != "" {
-		visualizationType = req.Type
-	}
-	mobileLayout := source.MobileLayout
-	if req.MobileLayout != nil {
-		mobileLayout = req.MobileLayout
-	}
+	nodeType := resolveCopiedVisualizationNodeType(source.NodeType, req.NodeType)
+	visualizationType := resolveCopiedVisualizationType(source.Type, req.Type)
+	mobileLayout := resolveCopiedVisualizationMobileLayout(source.MobileLayout, req.MobileLayout)
 
 	now := time.Now().UnixMilli()
-	status := source.Status
-	if nodeType != nil && *nodeType == visualizationNodeTypeFolder {
-		folderStatus := 1
-		status = &folderStatus
-	}
+	status := resolveCopiedVisualizationStatus(source.Status, nodeType)
 
 	newViz := &visualization.DataVisualizationInfo{
 		ID:              newDvID,
@@ -630,6 +596,68 @@ func (s *VisualizationService) Copy(req *visualization.CopyRequest, updateBy str
 	}
 
 	return newViz.ID, nil
+}
+
+func (s *VisualizationService) copyVisualizationChartViewsAndRemapComponentData(sourceID, newDvID, copyID int64, componentData *string) (*string, error) {
+	if err := s.repo.CopyChartViews(sourceID, newDvID, copyID, "core"); err != nil {
+		return nil, fmt.Errorf("copy chart views (core): %w", err)
+	}
+	// Snapshot table copy is best-effort; the source may have no snapshot rows.
+	_ = s.repo.CopyChartViews(sourceID, newDvID, copyID, "snapshot")
+
+	viewMapping, err := s.repo.GetCopiedChartViewMapping(copyID)
+	if err != nil || len(viewMapping) == 0 || componentData == nil {
+		return componentData, nil
+	}
+
+	remapped := *componentData
+	for oldID, newID := range viewMapping {
+		remapped = strings.ReplaceAll(remapped, strconv.FormatInt(oldID, 10), strconv.FormatInt(newID, 10))
+	}
+
+	return &remapped, nil
+}
+
+func (s *VisualizationService) copyVisualizationRelations(copyID int64) {
+	_ = s.repo.CopyLinkages(copyID)
+	_ = s.repo.CopyLinkageFields(copyID)
+	_ = s.repo.CopyLinkJumps(copyID)
+	_ = s.repo.CopyLinkJumpInfos(copyID)
+	_ = s.repo.CopyLinkJumpTargetInfos(copyID)
+}
+
+func resolveCopiedVisualizationNodeType(sourceNodeType, requestedNodeType *string) *string {
+	nodeType := sourceNodeType
+	if requestedNodeType != nil && *requestedNodeType != "" {
+		nodeType = requestedNodeType
+	}
+	if nodeType != nil && *nodeType != visualizationNodeTypeFolder {
+		leaf := "leaf"
+		return &leaf
+	}
+	return nodeType
+}
+
+func resolveCopiedVisualizationType(sourceType, requestedType *string) *string {
+	if requestedType != nil && *requestedType != "" {
+		return requestedType
+	}
+	return sourceType
+}
+
+func resolveCopiedVisualizationMobileLayout(sourceMobileLayout, requestedMobileLayout *bool) *bool {
+	if requestedMobileLayout != nil {
+		return requestedMobileLayout
+	}
+	return sourceMobileLayout
+}
+
+func resolveCopiedVisualizationStatus(sourceStatus *int, nodeType *string) *int {
+	if nodeType != nil && *nodeType == visualizationNodeTypeFolder {
+		folderStatus := 1
+		return &folderStatus
+	}
+	return sourceStatus
 }
 
 func (s *VisualizationService) Update(req *visualization.UpdateRequest, updateBy string) error {
@@ -1368,97 +1396,123 @@ func (s *VisualizationService) Decompression(req *visualization.DecompressionReq
 	}
 	newDvID := int64(uuid.New().ID())
 
-	var templateStyle, templateData, dynamicData, name, dvType, appDataStr, staticResourceStr string
-	var version int
-
-	switch req.NewFrom {
-	case newFromInnerTemplate:
-		if req.TemplateID == nil || *req.TemplateID <= 0 {
-			return nil, fmt.Errorf("templateId is required for new_inner_template")
-		}
-		if s.templateService == nil {
-			return nil, fmt.Errorf("template service is not initialized")
-		}
-		tmpl, err := s.templateService.GetTemplate(*req.TemplateID)
-		if err != nil {
-			return nil, fmt.Errorf("template not found: %w", err)
-		}
-		templateStyle = tmpl.TemplateStyle
-		templateData = tmpl.TemplateData
-		dynamicData = tmpl.DynamicData
-		name = tmpl.Name
-		dvType = tmpl.DvType
-		version = tmpl.Version
-		appDataStr = tmpl.AppData
-		_ = s.templateService.IncrementUseCount(tmpl.ID)
-
-	case newFromOuterTemplate:
-		templateStyle = req.CanvasStyleData
-		templateData = req.ComponentData
-		dynamicData = req.DynamicData
-		appDataStr = req.AppData
-		staticResourceStr = req.StaticResource
-		name = req.Name
-		dvType = req.Type
-		version = 3
-
-	case newFromLocalFile:
-		templateStyle = req.CanvasStyleData
-		templateData = req.ComponentData
-		dynamicData = req.DynamicData
-		appDataStr = req.AppData
-		staticResourceStr = req.StaticResource
-		name = req.Name
-		dvType = req.Type
-		version = req.Version
-		if version <= 0 {
-			version = 3
-		}
-
-	case newFromMarketTemplate:
-		tmpl, err := fetchMarketTemplate(req.TemplateURL)
-		if err != nil {
-			return nil, err
-		}
-		templateStyle = normalizeJSONPayload(tmpl.CanvasStyleData)
-		templateData = normalizeJSONPayload(tmpl.ComponentData)
-		dynamicData = normalizeJSONPayload(tmpl.DynamicData)
-		appDataStr = normalizeJSONPayload(tmpl.AppData)
-		staticResourceStr = normalizeJSONPayload(tmpl.StaticResource)
-		name = tmpl.Name
-		dvType = tmpl.DvType
-		version = tmpl.Version
-
-	default:
-		return nil, fmt.Errorf("unsupported newFrom: %s", req.NewFrom)
+	source, err := s.loadDecompressionTemplateSource(req)
+	if err != nil {
+		return nil, err
 	}
 
-	appDataStr = processAppData(appDataStr, newDvID)
+	appDataStr := processAppData(source.appData, newDvID)
 
 	hasAppData := strings.TrimSpace(appDataStr) != ""
-	canvasViewInfo, err := s.processDynamicData(dynamicData, newDvID, &templateData, &appDataStr, hasAppData)
+	canvasViewInfo, err := s.processDynamicData(source.dynamicData, newDvID, &source.templateData, &appDataStr, hasAppData)
 	if err != nil {
 		return nil, err
 	}
 
 	resp := &visualization.DecompressionResponse{
 		ID:              fmt.Sprintf("%d", newDvID),
-		Name:            name,
-		Type:            dvType,
-		Version:         version,
-		CanvasStyleData: templateStyle,
-		ComponentData:   templateData,
+		Name:            source.name,
+		Type:            source.dvType,
+		Version:         source.version,
+		CanvasStyleData: source.templateStyle,
+		ComponentData:   source.templateData,
 		AppData:         appDataStr,
 		CanvasViewInfo:  canvasViewInfo,
 	}
 
-	if s.staticService != nil && strings.TrimSpace(staticResourceStr) != "" {
-		if err := s.staticService.SaveFilesToServe(staticResourceStr); err != nil {
+	if s.staticService != nil && strings.TrimSpace(source.staticResource) != "" {
+		if err := s.staticService.SaveFilesToServe(source.staticResource); err != nil {
 			return nil, err
 		}
 	}
 
 	return resp, nil
+}
+
+type decompressionTemplateSource struct {
+	templateStyle  string
+	templateData   string
+	dynamicData    string
+	name           string
+	dvType         string
+	appData        string
+	staticResource string
+	version        int
+}
+
+func (s *VisualizationService) loadDecompressionTemplateSource(req *visualization.DecompressionRequest) (*decompressionTemplateSource, error) {
+	switch req.NewFrom {
+	case newFromInnerTemplate:
+		return s.loadInnerDecompressionTemplateSource(req)
+	case newFromOuterTemplate:
+		return buildDirectDecompressionTemplateSource(req, 3), nil
+	case newFromLocalFile:
+		version := req.Version
+		if version <= 0 {
+			version = 3
+		}
+		return buildDirectDecompressionTemplateSource(req, version), nil
+	case newFromMarketTemplate:
+		return loadMarketDecompressionTemplateSource(req)
+	default:
+		return nil, fmt.Errorf("unsupported newFrom: %s", req.NewFrom)
+	}
+}
+
+func (s *VisualizationService) loadInnerDecompressionTemplateSource(req *visualization.DecompressionRequest) (*decompressionTemplateSource, error) {
+	if req.TemplateID == nil || *req.TemplateID <= 0 {
+		return nil, fmt.Errorf("templateId is required for new_inner_template")
+	}
+	if s.templateService == nil {
+		return nil, fmt.Errorf("template service is not initialized")
+	}
+
+	tmpl, err := s.templateService.GetTemplate(*req.TemplateID)
+	if err != nil {
+		return nil, fmt.Errorf("template not found: %w", err)
+	}
+	_ = s.templateService.IncrementUseCount(tmpl.ID)
+
+	return &decompressionTemplateSource{
+		templateStyle: tmpl.TemplateStyle,
+		templateData:  tmpl.TemplateData,
+		dynamicData:   tmpl.DynamicData,
+		name:          tmpl.Name,
+		dvType:        tmpl.DvType,
+		appData:       tmpl.AppData,
+		version:       tmpl.Version,
+	}, nil
+}
+
+func buildDirectDecompressionTemplateSource(req *visualization.DecompressionRequest, version int) *decompressionTemplateSource {
+	return &decompressionTemplateSource{
+		templateStyle:  req.CanvasStyleData,
+		templateData:   req.ComponentData,
+		dynamicData:    req.DynamicData,
+		name:           req.Name,
+		dvType:         req.Type,
+		appData:        req.AppData,
+		staticResource: req.StaticResource,
+		version:        version,
+	}
+}
+
+func loadMarketDecompressionTemplateSource(req *visualization.DecompressionRequest) (*decompressionTemplateSource, error) {
+	tmpl, err := fetchMarketTemplate(req.TemplateURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return &decompressionTemplateSource{
+		templateStyle:  normalizeJSONPayload(tmpl.CanvasStyleData),
+		templateData:   normalizeJSONPayload(tmpl.ComponentData),
+		dynamicData:    normalizeJSONPayload(tmpl.DynamicData),
+		name:           tmpl.Name,
+		dvType:         tmpl.DvType,
+		appData:        normalizeJSONPayload(tmpl.AppData),
+		staticResource: normalizeJSONPayload(tmpl.StaticResource),
+		version:        tmpl.Version,
+	}, nil
 }
 
 func (s *VisualizationService) DecompressionLocalFile(fileContent []byte) (*visualization.DecompressionResponse, error) {
