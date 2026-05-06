@@ -1,30 +1,183 @@
 package service
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/repository"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type OrgService struct {
-	orgRepo  *repository.OrgRepository
-	auditSvc *AuditService
-	userRepo *repository.UserRepository
-	roleRepo *repository.RoleRepository
+	orgRepo             *repository.OrgRepository
+	auditSvc            *AuditService
+	userRepo            *repository.UserRepository
+	roleRepo            *repository.RoleRepository
+	userRoleRepo        *repository.UserRoleRepository
+	governancePolicySvc *GovernancePolicyService
 }
 
-func NewOrgService(orgRepo *repository.OrgRepository, auditSvc *AuditService, userRepo *repository.UserRepository, roleRepo *repository.RoleRepository) *OrgService {
+func NewOrgService(orgRepo *repository.OrgRepository, auditSvc *AuditService, userRepo *repository.UserRepository, roleRepo *repository.RoleRepository, userRoleRepo *repository.UserRoleRepository, governancePolicySvc *GovernancePolicyService) *OrgService {
 	return &OrgService{
-		orgRepo:  orgRepo,
-		auditSvc: auditSvc,
-		userRepo: userRepo,
-		roleRepo: roleRepo,
+		orgRepo:             orgRepo,
+		auditSvc:            auditSvc,
+		userRepo:            userRepo,
+		roleRepo:            roleRepo,
+		userRoleRepo:        userRoleRepo,
+		governancePolicySvc: governancePolicySvc,
+	}
+}
+
+// TransferUserOrg transfers a user from source org to target org atomically.
+func (s *OrgService) TransferUserOrg(sourceOrgID, targetOrgID, userID, actorID int64) error {
+	if sourceOrgID <= 0 || targetOrgID <= 0 || userID <= 0 {
+		return fmt.Errorf("source org, target org, and user id are required")
+	}
+	if sourceOrgID == targetOrgID {
+		return fmt.Errorf("source and target organizations must be different")
+	}
+	if s.orgRepo == nil || s.orgRepo.DB() == nil {
+		return fmt.Errorf("organization repository is not configured")
+	}
+	if s.roleRepo == nil {
+		return fmt.Errorf("role repository is not configured")
+	}
+	if s.userRoleRepo == nil {
+		return fmt.Errorf("user role repository is not configured")
+	}
+
+	sourceOrgInfo, err := s.orgRepo.GetByID(sourceOrgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("source organization not found")
+		}
+		return fmt.Errorf("failed to load source organization: %w", err)
+	}
+	targetOrgInfo, err := s.orgRepo.GetByID(targetOrgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("target organization not found")
+		}
+		return fmt.Errorf("failed to load target organization: %w", err)
+	}
+	if targetOrgInfo.Status != org.StatusEnabled {
+		return fmt.Errorf("target organization is disabled")
+	}
+
+	isMember, err := s.userRoleRepo.IsUserInOrg(userID, sourceOrgID)
+	if err != nil {
+		return fmt.Errorf("failed to validate source organization membership: %w", err)
+	}
+	if !isMember {
+		return fmt.Errorf("user is not a member of source organization")
+	}
+
+	sourceRoleCount, err := s.roleRepo.CountUserRolesByOrg(userID, sourceOrgID)
+	if err != nil {
+		return fmt.Errorf("failed to count source organization roles: %w", err)
+	}
+	policy := governance.DefaultLastRolePolicy
+	if sourceRoleCount <= 1 {
+		policy, err = s.getEffectiveLastRolePolicy(sourceOrgID)
+		if err != nil {
+			return fmt.Errorf("failed to resolve last-role policy: %w", err)
+		}
+		if policy == governance.LastRolePolicyBlock {
+			return fmt.Errorf("%w", ErrLastRoleRemovalBlocked)
+		}
+	}
+
+	var assignedRoleID int64
+	err = s.orgRepo.DB().Transaction(func(txDB *gorm.DB) error {
+		txOrgRepo := repository.NewOrgRepository(txDB)
+		txRoleRepo := repository.NewRoleRepository(txDB)
+		txUserRoleRepo := repository.NewUserRoleRepository(txDB)
+
+		if err := txDB.Where("user_id = ? AND org_id = ?", userID, sourceOrgID).Delete(&user.SysUserRole{}).Error; err != nil {
+			return fmt.Errorf("failed to remove source organization roles: %w", err)
+		}
+
+		if err := ensureUserOrgBaseline(txDB, txOrgRepo, txRoleRepo, txUserRoleRepo, userID, targetOrgID); err != nil {
+			return err
+		}
+
+		assignedRoleID, err = ensureDefaultOrgUserRole(txRoleRepo)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	s.recordTransferAudit(sourceOrgInfo, targetOrgInfo, userID, actorID, assignedRoleID, policy)
+	logger.Info("User transferred between organizations",
+		zap.Int64("userId", userID),
+		zap.Int64("sourceOrgId", sourceOrgID),
+		zap.Int64("targetOrgId", targetOrgID),
+		zap.Int64("assignedRoleId", assignedRoleID),
+	)
+	return nil
+}
+
+func (s *OrgService) getEffectiveLastRolePolicy(orgID int64) (governance.LastRolePolicy, error) {
+	if s.governancePolicySvc == nil {
+		return governance.DefaultLastRolePolicy, nil
+	}
+	return s.governancePolicySvc.GetLastRolePolicy(orgID)
+}
+
+func (s *OrgService) recordTransferAudit(sourceOrgInfo, targetOrgInfo *org.SysOrg, userID, actorID, assignedRoleID int64, policy governance.LastRolePolicy) {
+	if s.auditSvc == nil {
+		return
+	}
+
+	beforeValue, _ := json.Marshal(map[string]interface{}{
+		"sourceOrgId": sourceOrgInfo.OrgID,
+		"sourceOrg":   sourceOrgInfo.OrgName,
+		"userId":      userID,
+		"policy":      policy,
+	})
+	afterValue, _ := json.Marshal(map[string]interface{}{
+		"targetOrgId":      targetOrgInfo.OrgID,
+		"targetOrg":        targetOrgInfo.OrgName,
+		"userId":           userID,
+		"actorId":          actorID,
+		"assignedRoleId":   assignedRoleID,
+		"lastRolePolicy":   policy,
+		"transferOccurred": true,
+	})
+	resourceType := string(audit.ResourceTypeUser)
+	username := strconv.FormatInt(actorID, 10)
+	if actorID <= 0 {
+		username = systemActor
+	}
+
+	for _, visibilityOrgID := range []int64{sourceOrgInfo.OrgID, targetOrgInfo.OrgID} {
+		_, _ = s.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
+			UserID:         governanceInt64PtrIfPositive(actorID),
+			Username:       governanceStringPtrIfNotEmpty(username),
+			ActionType:     audit.ActionTypeSystemConfig,
+			ActionName:     "转移用户组织归属",
+			ResourceType:   &resourceType,
+			ResourceID:     &userID,
+			Operation:      audit.OperationUpdate,
+			Status:         ptrStatus(audit.StatusSuccess),
+			BeforeValue:    ptrStr(string(beforeValue)),
+			AfterValue:     ptrStr(string(afterValue)),
+			OrganizationID: &visibilityOrgID,
+		})
 	}
 }
 

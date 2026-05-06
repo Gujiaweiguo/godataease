@@ -3095,7 +3095,7 @@ func setupBridgeUserOrgHandlers(t *testing.T) (*UserHandler, *OrgHandler) {
 	userHandler := NewUserHandler(userSvc, service.NewUserImportService(userSvc))
 
 	orgRepo := repository.NewOrgRepository(db)
-	orgSvc := service.NewOrgService(orgRepo, nil, userRepo, nil)
+	orgSvc := service.NewOrgService(orgRepo, nil, userRepo, nil, userRoleRepo, nil)
 	orgHandler := NewOrgHandler(orgSvc)
 
 	return userHandler, orgHandler

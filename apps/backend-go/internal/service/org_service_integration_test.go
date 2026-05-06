@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -19,20 +21,41 @@ func newTestOrgService(t *testing.T) *OrgService {
 		&org.SysOrg{},
 		&user.SysUser{},
 		&user.SysUserRole{},
+		&role.SysRole{},
 		&audit.AuditLog{},
 		&audit.AuditLogDetail{},
+		&governance.SysGovernancePolicy{},
 	)
 
 	orgRepo := repository.NewOrgRepository(testDB)
 	userRepo := repository.NewUserRepository(testDB)
 	roleRepo := repository.NewRoleRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
 
 	auditLogRepo := repository.NewAuditLogRepository(testDB)
 	loginFailureRepo := repository.NewLoginFailureRepository(testDB)
 	auditLogDetailRepo := repository.NewAuditLogDetailRepository(testDB)
 	auditSvc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
+	governancePolicySvc := NewGovernancePolicyService(repository.NewGovernancePolicyRepository(testDB), auditSvc)
 
-	return NewOrgService(orgRepo, auditSvc, userRepo, roleRepo)
+	return NewOrgService(orgRepo, auditSvc, userRepo, roleRepo, userRoleRepo, governancePolicySvc)
+}
+
+func seedTransferFixture(t *testing.T) (*org.SysOrg, *org.SysOrg, *user.SysUser) {
+	t.Helper()
+	orgRepo := repository.NewOrgRepository(testDB)
+	userRepo := repository.NewUserRepository(testDB)
+	roleRepo := repository.NewRoleRepository(testDB)
+
+	source := &org.SysOrg{OrgName: "Source Org", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
+	target := &org.SysOrg{OrgName: "Target Org", ParentID: org.RootParentID, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}
+	require.NoError(t, orgRepo.Create(source))
+	require.NoError(t, orgRepo.Create(target))
+	require.NoError(t, roleRepo.Create(&role.SysRole{RoleName: "Transfer Source Role", RoleCode: "transfer-source-role", Status: role.StatusEnabled}))
+	usr := &user.SysUser{Username: "transfer.integration", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	require.NoError(t, userRepo.Create(usr))
+	require.NoError(t, testDB.Create(&user.SysUserRole{UserID: usr.UserID, RoleID: 1, OrgID: source.OrgID}).Error)
+	return source, target, usr
 }
 
 func TestOrgServiceIntegration_CreateRoot(t *testing.T) {
@@ -385,4 +408,67 @@ func TestOrgServiceIntegration_CheckOrgNameExists(t *testing.T) {
 	notExists, err := svc.CheckOrgNameExists("NotExisting")
 	assert.NoError(t, err)
 	assert.False(t, notExists)
+}
+
+func TestOrgServiceIntegration_TransferUserOrg_Success(t *testing.T) {
+	svc := newTestOrgService(t)
+	auditLogRepo := repository.NewAuditLogRepository(testDB)
+	source, target, usr := seedTransferFixture(t)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(testDB).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyWarnAllow, "tester"))
+	require.NoError(t, svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 55))
+
+	var sourceCount int64
+	require.NoError(t, testDB.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", usr.UserID, source.OrgID).Count(&sourceCount).Error)
+	assert.Equal(t, int64(0), sourceCount)
+
+	defaultRole, err := repository.NewRoleRepository(testDB).GetByRoleCode(role.BuiltInOrgUserRoleCode)
+	require.NoError(t, err)
+	var targetCount int64
+	require.NoError(t, testDB.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ? AND role_id = ?", usr.UserID, target.OrgID, defaultRole.RoleID).Count(&targetCount).Error)
+	assert.Equal(t, int64(1), targetCount)
+
+	sourceLogs, total, err := auditLogRepo.Query(&audit.AuditLogQuery{OrganizationID: &source.OrgID, Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, sourceLogs, 1)
+
+	targetLogs, total, err := auditLogRepo.Query(&audit.AuditLogQuery{OrganizationID: &target.OrgID, Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, targetLogs, 1)
+	assert.Contains(t, *targetLogs[0].AfterValue, "assignedRoleId")
+}
+
+func TestOrgServiceIntegration_TransferUserOrg_RejectsInactiveTarget(t *testing.T) {
+	svc := newTestOrgService(t)
+	orgRepo := repository.NewOrgRepository(testDB)
+	source, target, usr := seedTransferFixture(t)
+	target.Status = org.StatusDisabled
+	require.NoError(t, orgRepo.Update(target))
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 66)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "target organization is disabled")
+}
+
+func TestOrgServiceIntegration_TransferUserOrg_RejectsBlockedLastRolePolicy(t *testing.T) {
+	svc := newTestOrgService(t)
+	source, target, usr := seedTransferFixture(t)
+	require.NoError(t, repository.NewGovernancePolicyRepository(testDB).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyBlock, "tester"))
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 77)
+	require.ErrorIs(t, err, ErrLastRoleRemovalBlocked)
+}
+
+func TestOrgServiceIntegration_TransferUserOrg_CascadePolicyRemovesSourceMembership(t *testing.T) {
+	svc := newTestOrgService(t)
+	source, target, usr := seedTransferFixture(t)
+	require.NoError(t, repository.NewGovernancePolicyRepository(testDB).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyCascade, "tester"))
+
+	require.NoError(t, svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 88))
+
+	var sourceCount int64
+	require.NoError(t, testDB.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", usr.UserID, source.OrgID).Count(&sourceCount).Error)
+	assert.Equal(t, int64(0), sourceCount)
 }

@@ -195,7 +195,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	// Organization module initialization
 	userService.SetOrgRepository(orgRepo)
-	orgService := service.NewOrgService(orgRepo, auditService, userRepo, roleRepo)
+	orgService := service.NewOrgService(orgRepo, auditService, userRepo, roleRepo, userRoleRepo, governancePolicyService)
 	orgHandler := handler.NewOrgHandler(orgService)
 
 	// Permission module initialization
