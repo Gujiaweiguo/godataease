@@ -18,6 +18,13 @@ func NewResourcePermissionRepository(db *gorm.DB) *ResourcePermissionRepository 
 	return &ResourcePermissionRepository{db: db}
 }
 
+func (r *ResourcePermissionRepository) DB() *gorm.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 func (r *ResourcePermissionRepository) GetPermByID(permID int64) (*permission.SysPerm, error) {
 	var perm permission.SysPerm
 	err := r.db.Where("perm_id = ? AND del_flag = 0", permID).First(&perm).Error
@@ -109,8 +116,17 @@ func (r *ResourcePermissionRepository) CheckRolePermission(roleID, permID int64)
 }
 
 func (r *ResourcePermissionRepository) GrantPermToUser(userID, permID int64, createBy string) error {
+	return r.GrantPermToUserInOrg(userID, permID, createBy, 0)
+}
+
+func (r *ResourcePermissionRepository) GrantPermToUserInOrg(userID, permID int64, createBy string, orgID int64) error {
+	var orgPtr *int64
+	if orgID > 0 {
+		orgPtr = &orgID
+	}
 	perm := &permission.SysUserPerm{
 		UserID:   userID,
+		OrgID:    orgPtr,
 		PermID:   permID,
 		CreateBy: &createBy,
 		Status:   1,
@@ -120,9 +136,37 @@ func (r *ResourcePermissionRepository) GrantPermToUser(userID, permID int64, cre
 }
 
 func (r *ResourcePermissionRepository) RevokePermFromUser(userID, permID int64) error {
-	return r.db.Model(&permission.SysUserPerm{}).
-		Where("user_id = ? AND perm_id = ?", userID, permID).
-		Updates(map[string]interface{}{"status": 0, "del_flag": 1}).Error
+	return r.RevokePermFromUserInOrg(userID, permID, 0)
+}
+
+func (r *ResourcePermissionRepository) RevokePermFromUserInOrg(userID, permID, orgID int64) error {
+	query := r.db.Model(&permission.SysUserPerm{}).
+		Where("user_id = ? AND perm_id = ?", userID, permID)
+	if orgID > 0 {
+		query = query.Where("org_id = ?", orgID)
+	}
+	return query.Updates(map[string]interface{}{"status": 0, "del_flag": 1}).Error
+}
+
+func (r *ResourcePermissionRepository) GetUserResourcesByOrg(userID int64, resourceType string, orgID int64) ([]*permission.UserResourcePermVO, error) {
+	if orgID <= 0 {
+		return r.GetUserResources(userID, resourceType)
+	}
+	return r.getUserResources(userID, resourceType, orgID)
+}
+
+func (r *ResourcePermissionRepository) GetResourceUsersByOrg(resourceID int64, resourceType string, orgID int64) ([]*permission.ResourceUserPermVO, error) {
+	if orgID <= 0 {
+		return r.GetResourceUsers(resourceID, resourceType)
+	}
+	return r.getResourceUsers(resourceID, resourceType, orgID)
+}
+
+func (r *ResourcePermissionRepository) CheckPermissionConsistencyByOrg(orgID int64) (*permission.PermissionConsistencyResult, error) {
+	if orgID <= 0 {
+		return r.CheckPermissionConsistency()
+	}
+	return r.checkPermissionConsistency(orgID)
 }
 
 func (r *ResourcePermissionRepository) GrantPermToRole(roleID, permID int64) error {
@@ -142,6 +186,10 @@ func (r *ResourcePermissionRepository) RevokePermFromRole(roleID, permID int64) 
 
 // GetUserResources 获取用户可访问的资源列表（按用户视角）
 func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceType string) ([]*permission.UserResourcePermVO, error) {
+	return r.getUserResources(userID, resourceType, 0)
+}
+
+func (r *ResourcePermissionRepository) getUserResources(userID int64, resourceType string, orgID int64) ([]*permission.UserResourcePermVO, error) {
 	var results []*permission.UserResourcePermVO
 	permKeyPrefix := resourcePermKeyPrefix(resourceType)
 
@@ -151,11 +199,14 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 		PermKey  string `gorm:"column:perm_key"`
 		PermName string `gorm:"column:perm_name"`
 	}
-	err := r.db.Table("sys_user_perm sup").
+	query := r.db.Table("sys_user_perm sup").
 		Select("p.perm_id, p.perm_key, p.perm_name").
 		Joins("JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0").
-		Where("sup.user_id = ? AND sup.status = 1 AND sup.del_flag = 0", userID).
-		Find(&userPerms).Error
+		Where("sup.user_id = ? AND sup.status = 1 AND sup.del_flag = 0", userID)
+	if orgID > 0 {
+		query = query.Where("sup.org_id = ?", orgID)
+	}
+	err := query.Find(&userPerms).Error
 	if err != nil {
 		return nil, err
 	}
@@ -180,13 +231,16 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 		RoleID   int64  `gorm:"column:role_id"`
 		RoleName string `gorm:"column:role_name"`
 	}
-	err = r.db.Table("sys_user_role sur").
+	query = r.db.Table("sys_user_role sur").
 		Select("srp.perm_id, p.perm_key, p.perm_name, srp.role_id, r.role_name").
 		Joins("JOIN sys_role_perm srp ON srp.role_id = sur.role_id").
 		Joins("JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0").
 		Joins("JOIN sys_role r ON r.role_id = sur.role_id").
-		Where("sur.user_id = ?", userID).
-		Find(&rolePerms).Error
+		Where("sur.user_id = ?", userID)
+	if orgID > 0 {
+		query = query.Where("sur.org_id = ?", orgID)
+	}
+	err = query.Find(&rolePerms).Error
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +264,10 @@ func (r *ResourcePermissionRepository) GetUserResources(userID int64, resourceTy
 
 // GetResourceUsers 获取资源的授权用户列表（按资源视角）
 func (r *ResourcePermissionRepository) GetResourceUsers(resourceID int64, resourceType string) ([]*permission.ResourceUserPermVO, error) {
+	return r.getResourceUsers(resourceID, resourceType, 0)
+}
+
+func (r *ResourcePermissionRepository) getResourceUsers(resourceID int64, resourceType string, orgID int64) ([]*permission.ResourceUserPermVO, error) {
 	var results []*permission.ResourceUserPermVO
 	resourcePermIDs, exists, err := r.GetResourcePermissionIDs(resourceID, resourceType)
 	if err != nil {
@@ -220,28 +278,32 @@ func (r *ResourcePermissionRepository) GetResourceUsers(resourceID int64, resour
 			return results, nil
 		}
 		var directPerms []*permission.ResourceUserPermVO
-		err = r.db.Table("sys_user_perm sup").
+		query := r.db.Table("sys_user_perm sup").
 			Select("DISTINCT u.user_id, u.username, COALESCE(u.nick_name, u.username) AS nick_name, p.perm_key, p.perm_name, ? AS source_type, u.user_id AS source_id, u.username AS source_name", "direct").
 			Joins("JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0").
 			Joins("JOIN sys_user u ON u.user_id = sup.user_id AND u.del_flag = 0").
-			Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_id IN ?", resourcePermIDs).
-			Order("u.user_id ASC, p.perm_key ASC").
-			Find(&directPerms).Error
+			Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_id IN ?", resourcePermIDs)
+		if orgID > 0 {
+			query = query.Where("sup.org_id = ?", orgID)
+		}
+		err = query.Order("u.user_id ASC, p.perm_key ASC").Find(&directPerms).Error
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, directPerms...)
 
 		var rolePerms []*permission.ResourceUserPermVO
-		err = r.db.Table("sys_role_perm srp").
+		query = r.db.Table("sys_role_perm srp").
 			Select("DISTINCT u.user_id, u.username, COALESCE(u.nick_name, u.username) AS nick_name, p.perm_key, p.perm_name, ? AS source_type, r.role_id AS source_id, r.role_name AS source_name", "role").
 			Joins("JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0").
 			Joins("JOIN sys_user_role sur ON sur.role_id = srp.role_id").
 			Joins("JOIN sys_user u ON u.user_id = sur.user_id AND u.del_flag = 0").
 			Joins("JOIN sys_role r ON r.role_id = srp.role_id").
-			Where("p.perm_id IN ?", resourcePermIDs).
-			Order("u.user_id ASC, p.perm_key ASC, r.role_id ASC").
-			Find(&rolePerms).Error
+			Where("p.perm_id IN ?", resourcePermIDs)
+		if orgID > 0 {
+			query = query.Where("sur.org_id = ?", orgID)
+		}
+		err = query.Order("u.user_id ASC, p.perm_key ASC, r.role_id ASC").Find(&rolePerms).Error
 		if err != nil {
 			return nil, err
 		}
@@ -255,28 +317,32 @@ func (r *ResourcePermissionRepository) GetResourceUsers(resourceID int64, resour
 	}
 
 	var directPerms []*permission.ResourceUserPermVO
-	err = r.db.Table("sys_user_perm sup").
+	query := r.db.Table("sys_user_perm sup").
 		Select("DISTINCT u.user_id, u.username, COALESCE(u.nick_name, u.username) AS nick_name, p.perm_key, p.perm_name, ? AS source_type, u.user_id AS source_id, u.username AS source_name", "direct").
 		Joins("JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0").
 		Joins("JOIN sys_user u ON u.user_id = sup.user_id AND u.del_flag = 0").
-		Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_key LIKE ?", permKeyPrefix+"%").
-		Order("u.user_id ASC, p.perm_key ASC").
-		Find(&directPerms).Error
+		Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_key LIKE ?", permKeyPrefix+"%")
+	if orgID > 0 {
+		query = query.Where("sup.org_id = ?", orgID)
+	}
+	err = query.Order("u.user_id ASC, p.perm_key ASC").Find(&directPerms).Error
 	if err != nil {
 		return nil, err
 	}
 	results = append(results, directPerms...)
 
 	var rolePerms []*permission.ResourceUserPermVO
-	err = r.db.Table("sys_role_perm srp").
+	query = r.db.Table("sys_role_perm srp").
 		Select("DISTINCT u.user_id, u.username, COALESCE(u.nick_name, u.username) AS nick_name, p.perm_key, p.perm_name, ? AS source_type, r.role_id AS source_id, r.role_name AS source_name", "role").
 		Joins("JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0").
 		Joins("JOIN sys_user_role sur ON sur.role_id = srp.role_id").
 		Joins("JOIN sys_user u ON u.user_id = sur.user_id AND u.del_flag = 0").
 		Joins("JOIN sys_role r ON r.role_id = srp.role_id").
-		Where("p.perm_key LIKE ?", permKeyPrefix+"%").
-		Order("u.user_id ASC, p.perm_key ASC, r.role_id ASC").
-		Find(&rolePerms).Error
+		Where("p.perm_key LIKE ?", permKeyPrefix+"%")
+	if orgID > 0 {
+		query = query.Where("sur.org_id = ?", orgID)
+	}
+	err = query.Order("u.user_id ASC, p.perm_key ASC, r.role_id ASC").Find(&rolePerms).Error
 	if err != nil {
 		return nil, err
 	}
@@ -390,13 +456,21 @@ func (r *ResourcePermissionRepository) GetResourcePermissionIDs(resourceID int64
 
 // CheckPermissionConsistency 检查双视角权限一致性
 func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission.PermissionConsistencyResult, error) {
+	return r.checkPermissionConsistency(0)
+}
+
+func (r *ResourcePermissionRepository) checkPermissionConsistency(orgID int64) (*permission.PermissionConsistencyResult, error) {
 	result := &permission.PermissionConsistencyResult{
 		Consistent:      true,
 		Inconsistencies: []*permission.PermissionInconsistencyVO{},
 	}
 
 	var userCount int64
-	if err := r.db.Table("sys_user").Where("del_flag = 0").Count(&userCount).Error; err != nil {
+	userCountQuery := r.db.Table("sys_user u").Where("u.del_flag = 0")
+	if orgID > 0 {
+		userCountQuery = userCountQuery.Joins("JOIN sys_user_role sur ON sur.user_id = u.user_id").Where("sur.org_id = ?", orgID).Distinct("u.user_id")
+	}
+	if err := userCountQuery.Count(&userCount).Error; err != nil {
 		return nil, err
 	}
 	result.UserCount = int(userCount)
@@ -434,18 +508,25 @@ func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission
 			FROM sys_user_perm sup
 			JOIN sys_user u ON u.user_id = sup.user_id AND u.del_flag = 0
 			JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0
-			WHERE sup.status = 1 AND sup.del_flag = 0 AND (%s)
+			WHERE sup.status = 1 AND sup.del_flag = 0 AND (%s)%s
 			UNION
 			SELECT sur.user_id AS user_id, p.perm_key AS perm_key
 			FROM sys_user_role sur
 			JOIN sys_user u ON u.user_id = sur.user_id AND u.del_flag = 0
 			JOIN sys_role_perm srp ON srp.role_id = sur.role_id
 			JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0
-			WHERE %s
+			WHERE %s%s
 		) AS effective
 		GROUP BY effective.user_id, effective.perm_key
-	`, prefixFilter, prefixFilter)
-	unionArgs := append(append([]interface{}{}, prefixArgs...), prefixArgs...)
+	`, prefixFilter, orgScopedSQL(" AND sup.org_id = ?", orgID), prefixFilter, orgScopedSQL(" AND sur.org_id = ?", orgID))
+	unionArgs := append([]interface{}{}, prefixArgs...)
+	if orgID > 0 {
+		unionArgs = append(unionArgs, orgID)
+	}
+	unionArgs = append(unionArgs, prefixArgs...)
+	if orgID > 0 {
+		unionArgs = append(unionArgs, orgID)
+	}
 	var userViewRows []userPermRow
 	if err := r.db.Raw(userViewSQL, unionArgs...).Scan(&userViewRows).Error; err != nil {
 		return nil, err
@@ -463,11 +544,19 @@ func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission
 		ResourceID   int64  `gorm:"column:resource_id"`
 		ResourceType string `gorm:"column:resource_type"`
 	}
+	resourceQuery := r.db.Model(&permission.SysResource{}).
+		Select("DISTINCT sys_resource.resource_id, sys_resource.resource_type").
+		Where("sys_resource.resource_type IN ?", governedTypes)
+	if orgID > 0 {
+		resourceQuery = resourceQuery.
+			Joins("JOIN sys_resource_perm sr ON sr.resource_id = sys_resource.resource_id").
+			Joins("LEFT JOIN sys_user_perm sup ON sup.perm_id = sr.perm_id AND sup.status = 1 AND sup.del_flag = 0 AND sup.org_id = ?", orgID).
+			Joins("LEFT JOIN sys_role_perm srp ON srp.perm_id = sr.perm_id").
+			Joins("LEFT JOIN sys_user_role sur ON sur.role_id = srp.role_id AND sur.org_id = ?", orgID).
+			Where("sup.id IS NOT NULL OR sur.id IS NOT NULL")
+	}
 	var resources []resourceRow
-	if err := r.db.Model(&permission.SysResource{}).
-		Select("resource_id, resource_type").
-		Where("resource_type IN ?", governedTypes).
-		Find(&resources).Error; err != nil {
+	if err := resourceQuery.Find(&resources).Error; err != nil {
 		return nil, err
 	}
 	result.ResourceCount = len(resources)
@@ -486,12 +575,15 @@ func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission
 		}
 
 		var directRows []userPermRow
-		if err := r.db.Table("sys_user_perm sup").
+		query := r.db.Table("sys_user_perm sup").
 			Select("DISTINCT sup.user_id, p.perm_key").
 			Joins("JOIN sys_perm p ON p.perm_id = sup.perm_id AND p.del_flag = 0").
 			Joins("JOIN sys_user u ON u.user_id = sup.user_id AND u.del_flag = 0").
-			Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_id IN ?", permIDs).
-			Find(&directRows).Error; err != nil {
+			Where("sup.status = 1 AND sup.del_flag = 0 AND p.perm_id IN ?", permIDs)
+		if orgID > 0 {
+			query = query.Where("sup.org_id = ?", orgID)
+		}
+		if err := query.Find(&directRows).Error; err != nil {
 			return nil, err
 		}
 		for _, row := range directRows {
@@ -503,13 +595,16 @@ func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission
 		}
 
 		var roleRows []userPermRow
-		if err := r.db.Table("sys_role_perm srp").
+		query = r.db.Table("sys_role_perm srp").
 			Select("DISTINCT sur.user_id, p.perm_key").
 			Joins("JOIN sys_perm p ON p.perm_id = srp.perm_id AND p.del_flag = 0").
 			Joins("JOIN sys_user_role sur ON sur.role_id = srp.role_id").
 			Joins("JOIN sys_user u ON u.user_id = sur.user_id AND u.del_flag = 0").
-			Where("p.perm_id IN ?", permIDs).
-			Find(&roleRows).Error; err != nil {
+			Where("p.perm_id IN ?", permIDs)
+		if orgID > 0 {
+			query = query.Where("sur.org_id = ?", orgID)
+		}
+		if err := query.Find(&roleRows).Error; err != nil {
 			return nil, err
 		}
 		for _, row := range roleRows {
@@ -589,6 +684,13 @@ func (r *ResourcePermissionRepository) CheckPermissionConsistency() (*permission
 	result.Inconsistencies = inconsistencies
 	result.Consistent = len(inconsistencies) == 0
 	return result, nil
+}
+
+func orgScopedSQL(clause string, orgID int64) string {
+	if orgID <= 0 {
+		return ""
+	}
+	return clause
 }
 
 func resourcePermKeyPrefix(resourceType string) string {

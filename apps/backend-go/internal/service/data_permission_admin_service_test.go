@@ -127,6 +127,33 @@ func (f *fakeDatasetFieldProvider) ListByDQ(datasetGroupID int64, chartID int64)
 	return f.resp, nil
 }
 
+type fakeDatasetOrgScopeValidator struct {
+	allowed bool
+	err     error
+	last    struct {
+		datasetID int64
+		orgID     int64
+	}
+}
+
+func (f *fakeDatasetOrgScopeValidator) DatasetBelongsToOrg(datasetID, orgID int64) (bool, error) {
+	f.last.datasetID = datasetID
+	f.last.orgID = orgID
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.allowed, nil
+}
+
+type fakePermissionMutationAuditor struct {
+	entries []permissionAuditSpyEntry
+}
+
+func (f *fakePermissionMutationAuditor) RecordPermissionMutationAudit(operation string, scope PermissionMutationScope, targetType string, targetID, permID, resourceID int64, details map[string]interface{}) error {
+	f.entries = append(f.entries, permissionAuditSpyEntry{operation: operation, scope: scope, targetType: targetType, targetID: targetID, permID: permID, resourceID: resourceID, details: details})
+	return nil
+}
+
 func TestDataPermissionAdminService_SaveRowPermission(t *testing.T) {
 	rowStore := &fakeRowPermissionStore{}
 	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{
@@ -292,6 +319,48 @@ func TestDataPermissionAdminService_SaveColumnPermission(t *testing.T) {
 	if rule.BuiltInRule != permission.BuiltInRuleCustom || rule.M != 2 || rule.N != 3 {
 		t.Fatalf("unexpected mask rule: %#v", rule)
 	}
+}
+
+func TestDataPermissionAdminService_ScopedSaveAuditAndGuard(t *testing.T) {
+	fieldProvider := &fakeDatasetFieldProvider{resp: &chart.ChartFieldListResponse{DimensionList: []chart.ChartField{{ID: 11, OriginName: "region", Name: "region"}, {ID: 22, OriginName: "mobile", Type: "string"}}}}
+	auditSpy := &fakePermissionMutationAuditor{}
+	validator := &fakeDatasetOrgScopeValidator{allowed: true}
+	scope := PermissionMutationScope{ActorID: 7, OrgID: 9, Username: "auditor"}
+
+	t.Run("save row permission records audit", func(t *testing.T) {
+		rowStore := &fakeRowPermissionStore{}
+		svc := NewDataPermissionAdminService(rowStore, &fakeColumnPermissionStore{}, fieldProvider, nil, WithDataPermissionAuditor(auditSpy), WithDatasetOrgScopeValidator(validator))
+		err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, FilterType: permission.AuthTargetTypeRole, TargetID: 3, FilterField: "region", FilterValue: "east"}, scope)
+		require.NoError(t, err)
+		require.Len(t, auditSpy.entries, 1)
+		assert.Equal(t, "SAVE_ROW_PERM", auditSpy.entries[0].operation)
+		assert.Equal(t, int64(9), validator.last.datasetID)
+		assert.Equal(t, int64(9), auditSpy.entries[0].resourceID)
+	})
+
+	t.Run("save column permission records audit", func(t *testing.T) {
+		columnStore := &fakeColumnPermissionStore{}
+		auditSpy.entries = nil
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, columnStore, fieldProvider, nil, WithDataPermissionAuditor(auditSpy), WithDatasetOrgScopeValidator(validator))
+		err := svc.SaveColumnPermission(&ColumnPermissionForm{DatasetID: 9, FieldName: "mobile", RuleType: permission.PermTypeDisable}, scope)
+		require.NoError(t, err)
+		require.Len(t, auditSpy.entries, 1)
+		assert.Equal(t, "SAVE_COLUMN_PERM", auditSpy.entries[0].operation)
+		assert.Equal(t, int64(9), auditSpy.entries[0].resourceID)
+	})
+
+	t.Run("rejects cross org dataset mutation", func(t *testing.T) {
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider, nil, WithDatasetOrgScopeValidator(&fakeDatasetOrgScopeValidator{allowed: false}))
+		err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, FilterType: permission.AuthTargetTypeUser, TargetID: 1, FilterField: "region", FilterValue: "east"}, scope)
+		require.Error(t, err)
+		assert.Equal(t, "dataset does not belong to current organization", err.Error())
+	})
+
+	t.Run("admin bypass skips dataset scope validator", func(t *testing.T) {
+		svc := NewDataPermissionAdminService(&fakeRowPermissionStore{}, &fakeColumnPermissionStore{}, fieldProvider, nil, WithDataPermissionAdminChecker(&mockResourcePermAdminChecker{adminUserIDs: map[int64]bool{99: true}}))
+		err := svc.SaveRowPermission(&RowPermissionForm{DatasetID: 9, FilterType: permission.AuthTargetTypeUser, TargetID: 1, FilterField: "region", FilterValue: "east"}, PermissionMutationScope{ActorID: 99, OrgID: 7})
+		require.NoError(t, err)
+	})
 }
 
 func TestDataPermissionAdminService_SaveRowPermission_Validation(t *testing.T) {

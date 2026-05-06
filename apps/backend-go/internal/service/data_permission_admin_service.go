@@ -11,7 +11,12 @@ import (
 	"dataease/backend/internal/pkg/logger"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
+
+type datasetOrgScopeValidator interface {
+	DatasetBelongsToOrg(datasetID, orgID int64) (bool, error)
+}
 
 type RowPermissionStore interface {
 	PagerByDatasetID(datasetID int64, page, size int) ([]*permission.DataPermRow, int64, error)
@@ -35,11 +40,14 @@ type DatasetFieldProvider interface {
 }
 
 type DataPermissionAdminService struct {
-	rowStore        RowPermissionStore
-	columnStore     ColumnPermissionStore
-	fieldSource     DatasetFieldProvider
-	cache           *permission.PermissionCacheService
+	rowStore         RowPermissionStore
+	columnStore      ColumnPermissionStore
+	fieldSource      DatasetFieldProvider
+	cache            *permission.PermissionCacheService
 	deferredRegistry *permission.DeferredDimensionRegistry
+	auditor          permissionMutationAuditor
+	datasetOrgScope  datasetOrgScopeValidator
+	adminChecker     AdminChecker
 }
 
 const (
@@ -87,13 +95,47 @@ func NewDataPermissionAdminService(
 	columnStore ColumnPermissionStore,
 	fieldSource DatasetFieldProvider,
 	cache *permission.PermissionCacheService,
+	opts ...DataPermissionAdminServiceOption,
 ) *DataPermissionAdminService {
-	return &DataPermissionAdminService{
-		rowStore:        rowStore,
-		columnStore:     columnStore,
-		fieldSource:     fieldSource,
-		cache:           cache,
+	svc := &DataPermissionAdminService{
+		rowStore:         rowStore,
+		columnStore:      columnStore,
+		fieldSource:      fieldSource,
+		cache:            cache,
 		deferredRegistry: permission.NewDeferredDimensionRegistry(),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(svc)
+		}
+	}
+	if svc.auditor == nil {
+		if dbProvider, ok := rowStore.(interface{ DB() *gorm.DB }); ok {
+			svc.auditor = newPermAuditHelperFromDB(dbProvider.DB())
+		} else if dbProvider, ok := columnStore.(interface{ DB() *gorm.DB }); ok {
+			svc.auditor = newPermAuditHelperFromDB(dbProvider.DB())
+		}
+	}
+	return svc
+}
+
+type DataPermissionAdminServiceOption func(*DataPermissionAdminService)
+
+func WithDataPermissionAuditor(auditor permissionMutationAuditor) DataPermissionAdminServiceOption {
+	return func(s *DataPermissionAdminService) {
+		s.auditor = auditor
+	}
+}
+
+func WithDatasetOrgScopeValidator(validator datasetOrgScopeValidator) DataPermissionAdminServiceOption {
+	return func(s *DataPermissionAdminService) {
+		s.datasetOrgScope = validator
+	}
+}
+
+func WithDataPermissionAdminChecker(adminChecker AdminChecker) DataPermissionAdminServiceOption {
+	return func(s *DataPermissionAdminService) {
+		s.adminChecker = adminChecker
 	}
 }
 
@@ -151,7 +193,11 @@ func (s *DataPermissionAdminService) buildRowPermissionPage(datasetID int64, row
 	return &DataPermissionPage{List: items, Total: total, Current: normalizePage(page), Size: normalizeSize(size)}, nil
 }
 
-func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm) error {
+func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm, scopes ...PermissionMutationScope) error {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireDatasetScope(req.DatasetID, scope); err != nil {
+		return err
+	}
 	if req.DatasetID <= 0 {
 		return fmt.Errorf("datasetId is required")
 	}
@@ -194,17 +240,23 @@ func (s *DataPermissionAdminService) SaveRowPermission(req *RowPermissionForm) e
 		row.AuthTargetID = req.TargetID
 		row.ExpressionTree = expressionTree
 		row.Status = 1
-		return s.rowStore.Update(row)
+		if err := s.rowStore.Update(row); err != nil {
+			return err
+		}
+		return s.recordPermissionAudit("SAVE_ROW_PERM", scope, req.DatasetID, req.TargetID, map[string]interface{}{"filterType": req.FilterType, "filterField": req.FilterField, "mode": "update"})
 	}
 
-	return s.rowStore.Create(&permission.DataPermRow{
+	if err := s.rowStore.Create(&permission.DataPermRow{
 		DatasetID:      req.DatasetID,
 		DatasetGroupID: req.DatasetID,
 		AuthTargetType: req.FilterType,
 		AuthTargetID:   req.TargetID,
 		ExpressionTree: expressionTree,
 		Status:         1,
-	})
+	}); err != nil {
+		return err
+	}
+	return s.recordPermissionAudit("SAVE_ROW_PERM", scope, req.DatasetID, req.TargetID, map[string]interface{}{"filterType": req.FilterType, "filterField": req.FilterField, "mode": "create"})
 }
 
 func (s *DataPermissionAdminService) DeleteRowPermission(id int64) error {
@@ -254,7 +306,11 @@ func (s *DataPermissionAdminService) ColumnPermissionPage(datasetID int64, page,
 	return &DataPermissionPage{List: items, Total: total, Current: normalizePage(page), Size: normalizeSize(size)}, nil
 }
 
-func (s *DataPermissionAdminService) SaveColumnPermission(req *ColumnPermissionForm) error {
+func (s *DataPermissionAdminService) SaveColumnPermission(req *ColumnPermissionForm, scopes ...PermissionMutationScope) error {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireDatasetScope(req.DatasetID, scope); err != nil {
+		return err
+	}
 	if req.DatasetID <= 0 {
 		return fmt.Errorf("datasetId is required")
 	}
@@ -293,7 +349,7 @@ func (s *DataPermissionAdminService) SaveColumnPermission(req *ColumnPermissionF
 			return err
 		}
 		s.invalidateColumnPermissionCache(req.DatasetID)
-		return nil
+		return s.recordPermissionAudit("SAVE_COLUMN_PERM", scope, req.DatasetID, 0, map[string]interface{}{"fieldName": req.FieldName, "ruleType": req.RuleType, "mode": "update"})
 	}
 
 	if err := s.columnStore.Create(&permission.DataPermColumn{
@@ -307,7 +363,38 @@ func (s *DataPermissionAdminService) SaveColumnPermission(req *ColumnPermissionF
 		return err
 	}
 	s.invalidateColumnPermissionCache(req.DatasetID)
+	return s.recordPermissionAudit("SAVE_COLUMN_PERM", scope, req.DatasetID, 0, map[string]interface{}{"fieldName": req.FieldName, "ruleType": req.RuleType, "mode": "create"})
+}
+
+func (s *DataPermissionAdminService) requireDatasetScope(datasetID int64, scope PermissionMutationScope) error {
+	if datasetID <= 0 || scope.OrgID <= 0 || s.isAdminScope(scope) {
+		return nil
+	}
+	if err := requireOrgScope(scope); err != nil {
+		return err
+	}
+	if s.datasetOrgScope == nil {
+		return requireDatasetOrgValidator()
+	}
+	allowed, err := s.datasetOrgScope.DatasetBelongsToOrg(datasetID, scope.OrgID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return fmt.Errorf("dataset does not belong to current organization")
+	}
 	return nil
+}
+
+func (s *DataPermissionAdminService) isAdminScope(scope PermissionMutationScope) bool {
+	return scope.ActorID > 0 && s.adminChecker != nil && s.adminChecker.IsAdmin(scope.ActorID)
+}
+
+func (s *DataPermissionAdminService) recordPermissionAudit(operation string, scope PermissionMutationScope, datasetID, targetID int64, details map[string]interface{}) error {
+	if s.auditor == nil {
+		return nil
+	}
+	return s.auditor.RecordPermissionMutationAudit(operation, scope, "dataset", targetID, 0, datasetID, details)
 }
 
 func (s *DataPermissionAdminService) DeleteColumnPermission(id int64) error {
