@@ -49,6 +49,11 @@ type bridgeCodeResp struct {
 	Msg  string `json:"msg"`
 }
 
+type bridgeCompatRouteMappingsResp struct {
+	Code string               `json:"code"`
+	Data []CompatRouteMapping `json:"data"`
+}
+
 type bridgeFieldListResp struct {
 	Code string `json:"code"`
 	Data struct {
@@ -483,6 +488,52 @@ func (r *fakeBridgeChartRepo) DeleteDatasetFieldsByChart(chartID int64) error {
 		delete(r.chartFields, chartID)
 	}
 	return nil
+}
+
+func TestGetCompatRouteMappings(t *testing.T) {
+	expected := []CompatRouteMapping{
+		{LegacyPath: "/user/org/option", CanonicalPath: "/api/user/options", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/user/list", CanonicalPath: "/api/user/list", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/user/create", CanonicalPath: "/api/user/create", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/user/edit", CanonicalPath: "/api/user/update", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/user/delete/:id", CanonicalPath: "/api/user/delete/:id", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/user/options", CanonicalPath: "/api/user/options", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/user/resetPwd/:uid", CanonicalPath: "/api/user/resetPwd/:id", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/org/create", CanonicalPath: "/api/org/create", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/org/update", CanonicalPath: "/api/org/update", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/org/delete/:orgId", CanonicalPath: "/api/org/delete/:orgId", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+		{LegacyPath: "/org/list", CanonicalPath: "/api/org/list", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	}
+
+	assert.Equal(t, expected, GetCompatRouteMappings())
+
+	mappings := GetCompatRouteMappings()
+	for _, mapping := range mappings {
+		assert.NotEmpty(t, mapping.LegacyPath)
+		assert.NotEmpty(t, mapping.CanonicalPath)
+		assert.Equal(t, "FRONTEND_MIGRATION", mapping.Bucket)
+		assert.Equal(t, "pending", mapping.MigrationStatus)
+		assert.NotContains(t, mapping.LegacyPath, "/de2api/")
+		assert.NotContains(t, mapping.LegacyPath, "/xpackComponent/")
+		assert.NotContains(t, mapping.LegacyPath, "/api/login/localLogin")
+	}
+}
+
+func TestGetCompatRouteMappingsEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	api := r.Group("/api")
+	RegisterCompatibilityBridgeRoutes(api, &UserHandler{}, &OrgHandler{}, nil, nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/compat-route-mappings", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	resp := bridgeCompatRouteMappingsResp{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, GetCompatRouteMappings(), resp.Data)
 }
 
 func TestChartDataGetFieldDataInvalidID(t *testing.T) {
