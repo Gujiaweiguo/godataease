@@ -1,0 +1,53 @@
+- generic [ref=e71]:
+  - generic [ref=e72]:
+    - generic [ref=e73]:
+      - generic [ref=e74]: 新建 Data Filling 表单
+      - generic [ref=e75]: 新建表单，父目录 ID：0
+    - generic [ref=e76]:
+      - button "返回管理页" [ref=e77] [cursor=pointer]:
+        - img [ref=e80]
+        - generic [ref=e82]: 返回管理页
+      - button "保存" [ref=e83] [cursor=pointer]:
+        - generic [ref=e84]: 保存
+  - generic [ref=e85]:
+    - generic [ref=e86]:
+      - generic [ref=e87]:
+        - generic [ref=e88]: 基础配置
+        - generic [ref=e90]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: 表单名称*
+              - textbox "表单名称*" [ref=e97]:
+                - /placeholder: 请输入表单名称
+            - generic [ref=e98]:
+              - generic [ref=e99]: 数据源*
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - combobox "数据源*" [ref=e105]
+                  - generic [ref=e106]: 请选择数据源
+                - img [ref=e109] [cursor=pointer]
+          - generic [ref=e111]:
+            - generic [ref=e112]: 使用已有表
+            - generic [ref=e114]:
+              - switch "使用已有表"
+          - generic [ref=e118]:
+            - generic [ref=e119]: 新建表名*
+            - textbox "新建表名*" [ref=e123]:
+              - /placeholder: 请输入物理表名
+          - generic [ref=e124]:
+            - generic [ref=e125]: 创建索引
+            - generic [ref=e127]:
+              - switch "创建索引"
+      - generic [ref=e132]:
+        - generic [ref=e133]:
+          - generic [ref=e134]: 字段配置
+          - button "添加字段" [ref=e136] [cursor=pointer]:
+            - generic [ref=e137]: 添加字段
+        - generic [ref=e138]:
+          - img [ref=e140]
+          - paragraph [ref=e157]: 暂无字段，点击右上角添加字段
+    - generic [ref=e159]:
+      - generic [ref=e160]: 表单预览
+      - generic [ref=e163]:
+        - img [ref=e165]
+        - paragraph [ref=e182]: 暂无表单字段

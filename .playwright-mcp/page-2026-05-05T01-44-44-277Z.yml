@@ -1,0 +1,57 @@
+- generic [ref=e1]:
+  - generic [ref=e292]:
+    - generic [ref=e293]:
+      - generic [ref=e294]:
+        - generic [ref=e295]: 新建 Data Filling 表单
+        - generic [ref=e296]: 新建表单，父目录 ID：0
+      - generic [ref=e297]:
+        - button "返回管理页" [ref=e298] [cursor=pointer]:
+          - img [ref=e301]
+          - generic [ref=e303]: 返回管理页
+        - button "保存" [ref=e304] [cursor=pointer]:
+          - generic [ref=e305]: 保存
+    - generic [ref=e306]:
+      - generic [ref=e307]:
+        - generic [ref=e308]:
+          - generic [ref=e309]: 基础配置
+          - generic [ref=e311]:
+            - generic [ref=e312]:
+              - generic [ref=e313]:
+                - generic [ref=e314]: 表单名称*
+                - textbox "表单名称*" [ref=e318]:
+                  - /placeholder: 请输入表单名称
+                  - text: 测试表单
+              - generic [ref=e319]:
+                - generic [ref=e320]: 数据源*
+                - generic [ref=e323]:
+                  - generic [ref=e324]:
+                    - combobox "数据源*" [expanded] [active] [ref=e326]
+                    - generic [ref=e327]: 请选择数据源
+                  - img [ref=e330] [cursor=pointer]
+            - generic [ref=e332]:
+              - generic [ref=e333]: 使用已有表
+              - generic [ref=e335]:
+                - switch "使用已有表"
+            - generic [ref=e339]:
+              - generic [ref=e340]: 新建表名*
+              - textbox "新建表名*" [ref=e344]:
+                - /placeholder: 请输入物理表名
+            - generic [ref=e345]:
+              - generic [ref=e346]: 创建索引
+              - generic [ref=e348]:
+                - switch "创建索引"
+        - generic [ref=e353]:
+          - generic [ref=e354]:
+            - generic [ref=e355]: 字段配置
+            - button "添加字段" [ref=e357] [cursor=pointer]:
+              - generic [ref=e358]: 添加字段
+          - generic [ref=e359]:
+            - img [ref=e361]
+            - paragraph [ref=e378]: 暂无字段，点击右上角添加字段
+      - generic [ref=e380]:
+        - generic [ref=e381]: 表单预览
+        - generic [ref=e384]:
+          - img [ref=e386]
+          - paragraph [ref=e403]: 暂无表单字段
+  - tooltip "No data" [ref=e404]:
+    - generic [ref=e406]: No data

@@ -1,0 +1,42 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e188]:
+    - complementary [ref=e189]:
+      - generic [ref=e191]:
+        - generic [ref=e192]:
+          - generic [ref=e193]:
+            - generic [ref=e194]: Data Filling
+            - generic [ref=e195]:
+              - img [ref=e198] [cursor=pointer]
+              - img [ref=e204] [cursor=pointer]
+          - generic [ref=e209]:
+            - img [ref=e213]
+            - textbox "搜索目录或表单" [ref=e215]
+        - tree [ref=e219]:
+          - treeitem "测试文件夹" [ref=e220]:
+            - generic [ref=e222] [cursor=pointer]:
+              - img [ref=e225]
+              - generic "测试文件夹" [ref=e228]
+              - button [ref=e231]:
+                - img [ref=e233]
+          - treeitem "测试表单" [ref=e235]:
+            - generic [ref=e237] [cursor=pointer]:
+              - img [ref=e240]
+              - generic "测试表单" [ref=e244]
+              - button [ref=e247]:
+                - img [ref=e249]
+    - generic [ref=e251]:
+      - generic [ref=e252]:
+        - generic [ref=e253]: Data Filling 管理
+        - generic [ref=e254]:
+          - button "新建文件夹" [ref=e255] [cursor=pointer]:
+            - img [ref=e258]
+            - generic [ref=e260]: 新建文件夹
+          - button "新建表单" [ref=e261] [cursor=pointer]:
+            - img [ref=e264]
+            - generic [ref=e266]: 新建表单
+      - generic [ref=e267]:
+        - img [ref=e269]
+        - paragraph [ref=e271]: 请选择左侧一个叶子表单以查看摘要，文件夹仅用于组织与新建。
+  - alert [ref=e272]:
+    - img [ref=e274]
+    - paragraph [ref=e277]: 表单保存成功

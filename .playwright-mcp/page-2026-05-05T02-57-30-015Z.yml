@@ -1,0 +1,86 @@
+- generic [ref=e220]:
+  - generic [ref=e221]:
+    - generic [ref=e222]:
+      - generic [ref=e223]: 测试表单 · 数据管理
+      - generic [ref=e224]: 表单 ID：6 · 数据表：df_test_form
+    - generic [ref=e225]:
+      - generic [ref=e226]:
+        - generic [ref=e227]: 当前筛选
+        - generic [ref=e228]: "0"
+      - generic [ref=e229]:
+        - generic [ref=e230]: 已选数据
+        - generic [ref=e231]: "0"
+      - generic [ref=e232]:
+        - generic [ref=e233]: 数据总量
+        - generic [ref=e234]: "1"
+  - generic [ref=e237]:
+    - generic [ref=e238]:
+      - button "新增数据行" [ref=e239] [cursor=pointer]:
+        - generic [ref=e240]: 新增数据行
+      - button "批量删除" [disabled] [ref=e241]:
+        - generic [ref=e242]: 批量删除
+      - button "导出数据" [ref=e243] [cursor=pointer]:
+        - generic [ref=e244]: 导出数据
+      - button "下载模板" [ref=e245] [cursor=pointer]:
+        - generic [ref=e246]: 下载模板
+      - button "上传 Excel" [ref=e247] [cursor=pointer]:
+        - generic [ref=e248]: 上传 Excel
+    - generic [ref=e249]:
+      - button "清空数据" [ref=e250] [cursor=pointer]:
+        - generic [ref=e251]: 清空数据
+      - button "提交日志" [ref=e252] [cursor=pointer]:
+        - generic [ref=e253]: 提交日志
+  - generic [ref=e257]:
+    - generic [ref=e258]:
+      - generic [ref=e259]: 姓名
+      - textbox "姓名" [ref=e263]:
+        - /placeholder: 请输入姓名
+    - generic [ref=e265]:
+      - button "搜索" [ref=e266] [cursor=pointer]:
+        - generic [ref=e267]: 搜索
+      - button "清空" [ref=e268] [cursor=pointer]:
+        - generic [ref=e269]: 清空
+  - generic [ref=e272]:
+    - generic [ref=e274]:
+      - table [ref=e276]:
+        - rowgroup [ref=e281]:
+          - row "姓名 操作" [ref=e282]:
+            - columnheader [ref=e283]:
+              - generic [ref=e286] [cursor=pointer]:
+                - checkbox
+            - columnheader "姓名" [ref=e288]:
+              - generic [ref=e289]: 姓名
+            - columnheader "操作" [ref=e290]:
+              - generic [ref=e291]: 操作
+      - table [ref=e296]:
+        - rowgroup [ref=e301]:
+          - row "张三 编辑 删除" [ref=e302]:
+            - cell [ref=e303]:
+              - generic [ref=e306] [cursor=pointer]:
+                - checkbox
+            - cell "张三" [ref=e308]:
+              - generic [ref=e309]: 张三
+            - cell "编辑 删除" [ref=e310]:
+              - generic [ref=e312]:
+                - button "编辑" [ref=e313] [cursor=pointer]:
+                  - generic [ref=e314]: 编辑
+                - button "删除" [ref=e315] [cursor=pointer]:
+                  - generic [ref=e316]: 删除
+    - generic [ref=e319]:
+      - generic [ref=e320]: Total 1
+      - button "Go to previous page" [disabled] [ref=e321]:
+        - generic:
+          - img
+      - list [ref=e322]:
+        - listitem "page 1" [ref=e323]: "1"
+      - button "Go to next page" [disabled] [ref=e324]:
+        - generic:
+          - img
+      - generic [ref=e327] [cursor=pointer]:
+        - generic:
+          - combobox [ref=e329]
+          - generic [ref=e330]: 10/page
+        - img [ref=e333]
+      - generic [ref=e335]:
+        - generic [ref=e336]: Go to
+        - spinbutton "Page" [ref=e339]: "1"

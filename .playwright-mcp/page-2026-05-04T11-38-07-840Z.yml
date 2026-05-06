@@ -1,0 +1,9 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e3]:
+    - img [ref=e5]
+    - paragraph [ref=e8]: Request failed with status code 500
+    - img [ref=e10] [cursor=pointer]
+  - alert [ref=e12]:
+    - img [ref=e14]
+    - paragraph [ref=e17]: Request failed with status code 500
+    - img [ref=e19] [cursor=pointer]

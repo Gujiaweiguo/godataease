@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	tableChartView             = "core_chart_view"
-	tableSnapshotChartView     = "snapshot_core_chart_view"
-	tableLinkage               = "visualization_linkage"
-	tableSnapshotLinkage       = "snapshot_visualization_linkage"
-	tableLinkageField          = "visualization_linkage_field"
-	tableSnapshotLinkageField  = "snapshot_visualization_linkage_field"
+	tableChartView            = "core_chart_view"
+	tableSnapshotChartView    = "snapshot_core_chart_view"
+	tableLinkage              = "visualization_linkage"
+	tableSnapshotLinkage      = "snapshot_visualization_linkage"
+	tableLinkageField         = "visualization_linkage_field"
+	tableSnapshotLinkageField = "snapshot_visualization_linkage_field"
 )
 
 type LinkageGatherRow struct {
