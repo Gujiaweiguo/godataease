@@ -125,7 +125,10 @@ func TestCreateRequest_JSONRoundTrip(t *testing.T) {
 
 func assertCreateRequestFields(t *testing.T, decoded, req CreateRequest, enable, repeatSend, showField bool, rateType, msgType int) {
 	t.Helper()
-	checks := []struct{ name string; ok bool }{
+	checks := []struct {
+		name string
+		ok   bool
+	}{
 		{"ID", decoded.ID == req.ID},
 		{"Name", decoded.Name == req.Name},
 		{"Enable", decoded.Enable != nil && *decoded.Enable == enable},
