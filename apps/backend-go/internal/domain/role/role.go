@@ -18,7 +18,7 @@ const (
 const (
 	RoleTypeSystem       = "system"
 	RoleTypeCustom       = "custom"
-	RoleTypeOrganization = "organization"
+	RoleTypeOrganization = "org"
 )
 
 const (
@@ -30,6 +30,9 @@ type SysRole struct {
 	RoleID     int64      `gorm:"column:role_id;primaryKey;autoIncrement" json:"roleId"`
 	RoleName   string     `gorm:"column:role_name;size:100;not null" json:"roleName"`
 	RoleCode   string     `gorm:"column:role_code;size:100" json:"roleCode"`
+	OrgID      *int64     `gorm:"column:org_id" json:"orgId"`
+	IsBuiltin  *bool      `gorm:"column:is_builtin;default:0" json:"isBuiltin"`
+	Readonly   *bool      `gorm:"column:readonly;default:0" json:"readonly"`
 	RoleType   *string    `gorm:"column:role_type;size:50" json:"roleType"`
 	RoleDesc   *string    `gorm:"column:role_desc;size:255" json:"roleDesc"`
 	ParentID   *int64     `gorm:"column:parent_id" json:"parentId"`

@@ -93,6 +93,10 @@ func (h *RoleHandler) Create(c *gin.Context) {
 
 	createBy := h.getCreateBy(c)
 	callerOrgID := middleware.GetOrgID(c)
+	if callerOrgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 	id, err := h.service.CreateRole(&req, createBy, callerOrgID)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
@@ -112,6 +116,10 @@ func (h *RoleHandler) Edit(c *gin.Context) {
 
 	updateBy := h.getCreateBy(c)
 	callerOrgID := middleware.GetOrgID(c)
+	if callerOrgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 	if err := h.service.EditRole(&req, updateBy, callerOrgID); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -126,8 +134,13 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
+	callerOrgID := middleware.GetOrgID(c)
+	if callerOrgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 
-	if err := h.service.DeleteRole(id); err != nil {
+	if err := h.service.DeleteRole(id, callerOrgID); err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
 	}
@@ -242,6 +255,10 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 	if req.OrgId <= 0 {
 		req.OrgId = middleware.GetOrgID(c)
 	}
+	if req.OrgId <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
 
 	if err := h.service.UnmountUser(&req); err != nil {
 		if errors.Is(err, service.ErrLastRoleRemovalBlocked) {
@@ -266,6 +283,10 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 
 	if req.OrgId <= 0 {
 		req.OrgId = middleware.GetOrgID(c)
+	}
+	if req.OrgId <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
 	}
 
 	count, err := h.service.BeforeUnmountInfo(&req)

@@ -81,7 +81,7 @@ func TestOrgCreateOrg_SuccessRoot(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 
 	req := &org.OrgCreateRequest{OrgName: "Root Org"}
-	if err := svc.CreateOrg(req); err != nil {
+	if err := svc.CreateOrg(req, 1); err != nil {
 		t.Fatalf("CreateOrg failed: %v", err)
 	}
 
@@ -110,7 +110,7 @@ func TestOrgCreateOrg_SuccessChild(t *testing.T) {
 	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
 
 	req := &org.OrgCreateRequest{OrgName: "Child", ParentID: &parent.OrgID}
-	if err := svc.CreateOrg(req); err != nil {
+	if err := svc.CreateOrg(req, 1); err != nil {
 		t.Fatalf("CreateOrg child failed: %v", err)
 	}
 
@@ -130,7 +130,7 @@ func TestOrgCreateOrg_DuplicateName(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 	createSeedOrg(t, mockRepo, "Dup", org.RootParentID, 1)
 
-	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Dup"})
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Dup"}, 1)
 	if err == nil {
 		t.Fatal("expected duplicate name error, got nil")
 	}
@@ -143,7 +143,7 @@ func TestOrgCreateOrg_ParentNotFound(t *testing.T) {
 	svc, _ := setupOrgService(t)
 	notExistParent := int64(999)
 
-	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child", ParentID: &notExistParent})
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child", ParentID: &notExistParent}, 1)
 	if err == nil {
 		t.Fatal("expected parent not found error, got nil")
 	}
@@ -157,7 +157,7 @@ func TestOrgUpdateOrg_Success(t *testing.T) {
 	existing := createSeedOrg(t, mockRepo, "Old", org.RootParentID, 1)
 	desc := "new desc"
 
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "New", OrgDesc: &desc})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "New", OrgDesc: &desc}, 1)
 	if err != nil {
 		t.Fatalf("UpdateOrg failed: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestOrgUpdateOrg_Success(t *testing.T) {
 
 func TestOrgUpdateOrg_NotFound(t *testing.T) {
 	svc, _ := setupOrgService(t)
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: 1000, OrgName: "New"})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: 1000, OrgName: "New"}, 1)
 	if err == nil {
 		t.Fatal("expected organization not found error, got nil")
 	}
@@ -193,7 +193,7 @@ func TestOrgUpdateOrg_DuplicateName(t *testing.T) {
 	target := createSeedOrg(t, mockRepo, "Target", org.RootParentID, 1)
 	createSeedOrg(t, mockRepo, "Duplicated", org.RootParentID, 1)
 
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: target.OrgID, OrgName: "Duplicated"})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: target.OrgID, OrgName: "Duplicated"}, 1)
 	if err == nil {
 		t.Fatal("expected duplicate name error, got nil")
 	}
@@ -212,7 +212,7 @@ func TestOrgUpdateOrg_UnchangedNameSkipsDuplicateCheckAndNilDescKeepsExisting(t 
 	}
 	createSeedOrg(t, mockRepo, "OtherOrg", org.RootParentID, 1)
 
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "SameName", OrgDesc: nil})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "SameName", OrgDesc: nil}, 1)
 	if err != nil {
 		t.Fatalf("UpdateOrg failed: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestOrgUpdateOrg_MoveToNewParent(t *testing.T) {
 	child := createSeedOrg(t, mockRepo, "Child Org", org.RootParentID, 1)
 
 	newParentID := parent.OrgID
-	require.NoError(t, svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &newParentID}))
+	require.NoError(t, svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &newParentID}, 1))
 
 	updated, err := mockRepo.repo.GetByID(child.OrgID)
 	require.NoError(t, err)
@@ -252,7 +252,7 @@ func TestOrgUpdateOrg_MoveToRoot(t *testing.T) {
 	child := createSeedOrg(t, mockRepo, "Child Org", parent.OrgID, parent.Level+1)
 
 	rootID := int64(0)
-	require.NoError(t, svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &rootID}))
+	require.NoError(t, svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &rootID}, 1))
 
 	updated, err := mockRepo.repo.GetByID(child.OrgID)
 	require.NoError(t, err)
@@ -265,7 +265,7 @@ func TestOrgUpdateOrg_RejectSelfAsParent(t *testing.T) {
 	existing := createSeedOrg(t, mockRepo, "Self Parent", org.RootParentID, 1)
 
 	selfID := existing.OrgID
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, ParentID: &selfID})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, ParentID: &selfID}, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot be its own parent")
 }
@@ -277,7 +277,7 @@ func TestOrgUpdateOrg_RejectDescendantAsParent(t *testing.T) {
 	grandchild := createSeedOrg(t, mockRepo, "Grandchild", child.OrgID, child.Level+1)
 
 	descendantID := grandchild.OrgID
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: parent.OrgID, ParentID: &descendantID})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: parent.OrgID, ParentID: &descendantID}, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "own descendant")
 }
@@ -287,7 +287,7 @@ func TestOrgUpdateOrg_RejectNonexistentParent(t *testing.T) {
 	existing := createSeedOrg(t, mockRepo, "MoveToMissing", org.RootParentID, 1)
 
 	missingID := int64(9999)
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, ParentID: &missingID})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, ParentID: &missingID}, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parent organization not found")
 }
@@ -296,7 +296,7 @@ func TestOrgDeleteOrg_Success(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 	existing := createSeedOrg(t, mockRepo, "ToDelete", org.RootParentID, 1)
 
-	err := svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
+	err := svc.DeleteOrg(existing.OrgID, 1, 1, "test-user", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("DeleteOrg failed: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestOrgDeleteOrg_HasChildren(t *testing.T) {
 	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
 	createSeedOrg(t, mockRepo, "Child", parent.OrgID, 2)
 
-	err := svc.DeleteOrg(parent.OrgID, 1, "test-user", "127.0.0.1")
+	err := svc.DeleteOrg(parent.OrgID, 1, 1, "test-user", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected children exists error, got nil")
 	}
@@ -326,7 +326,7 @@ func TestOrgDeleteOrg_HasChildren_RecordsFailedAuditLog(t *testing.T) {
 	parent := createSeedOrg(t, mockRepo, "Parent", org.RootParentID, 1)
 	createSeedOrg(t, mockRepo, "Child", parent.OrgID, 2)
 
-	err := svc.DeleteOrg(parent.OrgID, 7, "operator", "127.0.0.1")
+	err := svc.DeleteOrg(parent.OrgID, 7, 7, "operator", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected children exists error, got nil")
 	}
@@ -495,7 +495,7 @@ func TestOrgUpdateOrgStatus(t *testing.T) {
 	svc, mockRepo := setupOrgService(t)
 	existing := createSeedOrg(t, mockRepo, "NeedDisable", org.RootParentID, 1)
 
-	err := svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled)
+	err := svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled, 1)
 	if err != nil {
 		t.Fatalf("UpdateOrgStatus failed: %v", err)
 	}
@@ -535,7 +535,7 @@ func TestOrgCheckOrgNameExists(t *testing.T) {
 
 func TestOrgDeleteOrg_NotFound(t *testing.T) {
 	svc, _ := setupOrgService(t)
-	err := svc.DeleteOrg(404, 1, "test-user", "127.0.0.1")
+	err := svc.DeleteOrg(404, 1, 1, "test-user", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected organization not found error")
 	}
@@ -556,7 +556,7 @@ func TestOrgDeleteOrg_Success_WithAffectedUsers_RecordsSuccessAuditLog(t *testin
 		t.Fatalf("seed user role failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(existing.OrgID, 9, "operator", "127.0.0.1")
+	err := svc.DeleteOrg(existing.OrgID, 9, 9, "operator", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("DeleteOrg failed: %v", err)
 	}
@@ -590,7 +590,7 @@ func TestOrgDeleteOrg_Success_UserCountLookupFailureStillDeletes(t *testing.T) {
 		t.Fatalf("drop user role table failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(existing.OrgID, 10, "operator", "127.0.0.1")
+	err := svc.DeleteOrg(existing.OrgID, 10, 10, "operator", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("DeleteOrg should ignore user count lookup error, got %v", err)
 	}
@@ -619,7 +619,7 @@ func TestOrgDeleteOrg_Success_AuditFailureDoesNotBlockDelete(t *testing.T) {
 		t.Fatalf("create audit trigger failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(existing.OrgID, 11, "operator", "127.0.0.1")
+	err := svc.DeleteOrg(existing.OrgID, 11, 11, "operator", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("DeleteOrg should ignore audit failure, got %v", err)
 	}
@@ -651,7 +651,7 @@ func TestOrgDeleteOrg_CountChildrenFailed(t *testing.T) {
 		t.Fatalf("drop table failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(1, 1, "test-user", "127.0.0.1")
+	err := svc.DeleteOrg(1, 1, 1, "test-user", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected database error, got nil")
 	}
@@ -678,7 +678,7 @@ func TestOrgCheckOrgNameExists_CheckFailed(t *testing.T) {
 
 func TestOrgUpdateOrgStatus_NotFound(t *testing.T) {
 	svc, _ := setupOrgService(t)
-	err := svc.UpdateOrgStatus(1234, org.StatusDisabled)
+	err := svc.UpdateOrgStatus(1234, org.StatusDisabled, 1)
 	if err == nil {
 		t.Fatal("expected organization not found error, got nil")
 	}
@@ -693,7 +693,7 @@ func TestOrgCreateOrg_CheckNameFailed(t *testing.T) {
 		t.Fatalf("drop table failed: %v", err)
 	}
 
-	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Any"})
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Any"}, 1)
 	if err == nil {
 		t.Fatal("expected check name error, got nil")
 	}
@@ -708,7 +708,7 @@ func TestOrgCreateOrg_CreateFailed(t *testing.T) {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
-	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Any"})
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Any"}, 1)
 	if err == nil {
 		t.Fatal("expected create organization error, got nil")
 	}
@@ -724,7 +724,7 @@ func TestOrgUpdateOrg_UpdateFailed(t *testing.T) {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
-	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgDesc: strPtr("desc")})
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgDesc: strPtr("desc")}, 1)
 	if err == nil {
 		t.Fatal("expected update organization error, got nil")
 	}
@@ -740,7 +740,7 @@ func TestOrgDeleteOrg_DeleteFailed(t *testing.T) {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
-	err := svc.DeleteOrg(existing.OrgID, 1, "test-user", "127.0.0.1")
+	err := svc.DeleteOrg(existing.OrgID, 1, 1, "test-user", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected delete organization error, got nil")
 	}
@@ -756,7 +756,7 @@ func TestOrgUpdateOrgStatus_UpdateFailed(t *testing.T) {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
-	err := svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled)
+	err := svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled, 1)
 	if err == nil {
 		t.Fatal("expected update organization status error, got nil")
 	}
@@ -772,4 +772,21 @@ func TestOrgPtrHelpers(t *testing.T) {
 	if got := ptrStatus(audit.StatusSuccess); got == nil || *got != audit.StatusSuccess {
 		t.Fatalf("expected ptrStatus to return pointer to status, got %#v", got)
 	}
+}
+
+func TestOrgService_RejectsInvalidOrgContext(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	existing := createSeedOrg(t, mockRepo, "Scoped", org.RootParentID, 1)
+
+	err := svc.CreateOrg(&org.OrgCreateRequest{OrgName: "Child"}, 0)
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: existing.OrgID, OrgName: "Rename"}, 0)
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.DeleteOrg(existing.OrgID, 0, 1, "tester", "127.0.0.1")
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled, 0)
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
 }

@@ -216,7 +216,7 @@ func TestRoleService_CreateRole_AllowsBuiltInRootParent(t *testing.T) {
 	seed := &role.SysRole{RoleName: "System Root", RoleCode: "system-root", RoleType: &roleType, Status: role.StatusEnabled, ParentID: &rootParent}
 	require.NoError(t, repo.Create(seed))
 
-	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Child Custom", ParentID: &seed.RoleID}, "tester", 0)
+	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Child Custom", ParentID: &seed.RoleID}, "tester", 1)
 	require.NoError(t, err)
 	created, err := repo.GetByID(createdID)
 	require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestRoleService_CreateRole_RejectsCustomParent(t *testing.T) {
 	seed := &role.SysRole{RoleName: "Custom Parent", RoleCode: "custom-parent", RoleType: &customType, Status: role.StatusEnabled, ParentID: &rootParent}
 	require.NoError(t, repo.Create(seed))
 
-	_, err := svc.CreateRole(&role.RoleCreator{Name: "Invalid Child", ParentID: &seed.RoleID}, "tester", 0)
+	_, err := svc.CreateRole(&role.RoleCreator{Name: "Invalid Child", ParentID: &seed.RoleID}, "tester", 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "custom role cannot be used as parent role")
 }
@@ -241,7 +241,7 @@ func TestRoleService_CreateRole_RejectsCustomParent(t *testing.T) {
 func TestRoleService_CreateRole_RequiresName(t *testing.T) {
 	svc, _ := setupRoleServiceTest(t)
 
-	createdID, err := svc.CreateRole(&role.RoleCreator{}, "tester", 0)
+	createdID, err := svc.CreateRole(&role.RoleCreator{}, "tester", 1)
 	require.Error(t, err)
 	assert.Zero(t, createdID)
 	assert.Contains(t, err.Error(), "role name is required")
@@ -252,7 +252,7 @@ func TestRoleService_CreateRole_UsesFallbackFieldsAndStatus(t *testing.T) {
 	desc := "desc from fallback"
 	customStatus := 2
 
-	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Fallback Name", Desc: &desc, RoleKey: "fallback-key", Status: &customStatus}, "tester", 0)
+	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Fallback Name", Desc: &desc, RoleKey: "fallback-key", Status: &customStatus}, "tester", 1)
 	require.NoError(t, err)
 
 	created, err := repo.GetByID(createdID)
@@ -271,7 +271,7 @@ func TestRoleService_CreateRole_UsesFallbackFieldsAndStatus(t *testing.T) {
 func TestRoleService_CreateRole_RepoError(t *testing.T) {
 	svc, _ := setupClosedRoleServiceTest(t)
 
-	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Broken Create"}, "tester", 0)
+	createdID, err := svc.CreateRole(&role.RoleCreator{Name: "Broken Create"}, "tester", 1)
 	require.Error(t, err)
 	assert.Zero(t, createdID)
 	assert.Contains(t, err.Error(), "failed to create role")
@@ -285,10 +285,10 @@ func TestRoleService_EditRole_RejectsNonRootParent(t *testing.T) {
 	require.NoError(t, repo.Create(builtInParent))
 	childOfBuiltIn := &role.SysRole{RoleName: "Custom Child", RoleCode: "custom-child", Status: role.StatusEnabled, ParentID: &builtInParent.RoleID}
 	require.NoError(t, repo.Create(childOfBuiltIn))
-	targetID, err := svc.CreateRole(&role.RoleCreator{Name: "Editable Role"}, "tester", 0)
+	targetID, err := svc.CreateRole(&role.RoleCreator{Name: "Editable Role"}, "tester", 1)
 	require.NoError(t, err)
 
-	err = svc.EditRole(&role.RoleEditor{ID: targetID, ParentID: &childOfBuiltIn.RoleID}, "editor", 0)
+	err = svc.EditRole(&role.RoleEditor{ID: targetID, ParentID: &childOfBuiltIn.RoleID}, "editor", 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parent role must be a built-in root role")
 }
@@ -296,7 +296,7 @@ func TestRoleService_EditRole_RejectsNonRootParent(t *testing.T) {
 func TestRoleService_EditRole_RequiresID(t *testing.T) {
 	svc, _ := setupRoleServiceTest(t)
 
-	err := svc.EditRole(&role.RoleEditor{}, "editor", 0)
+	err := svc.EditRole(&role.RoleEditor{}, "editor", 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "role id is required")
 }
@@ -314,7 +314,7 @@ func TestRoleService_EditRole_UsesRoleIDAndUpdatesFields(t *testing.T) {
 
 	newDesc := "new desc"
 	disabled := role.StatusDisabled
-	err := svc.EditRole(&role.RoleEditor{RoleID: target.RoleID, Name: "New Name", Desc: &newDesc, Status: &disabled, ParentID: &parent.RoleID}, "editor", 0)
+	err := svc.EditRole(&role.RoleEditor{RoleID: target.RoleID, Name: "New Name", Desc: &newDesc, Status: &disabled, ParentID: &parent.RoleID}, "editor", 1)
 	require.NoError(t, err)
 
 	updated, err := repo.GetByID(target.RoleID)
@@ -340,7 +340,7 @@ func TestRoleService_DeleteRole_Success(t *testing.T) {
 	require.Len(t, roles, 1)
 	roleID := roles[0].RoleID
 
-	err := svc.DeleteRole(roleID)
+	err := svc.DeleteRole(roleID, 1)
 	require.NoError(t, err)
 
 	_, err = repo.GetByID(roleID)
@@ -350,7 +350,7 @@ func TestRoleService_DeleteRole_Success(t *testing.T) {
 func TestRoleService_DeleteRole_NotFound(t *testing.T) {
 	svc, _ := setupRoleServiceTest(t)
 
-	err := svc.DeleteRole(99999)
+	err := svc.DeleteRole(99999, 1)
 	require.NoError(t, err)
 }
 
@@ -362,9 +362,36 @@ func TestRoleService_DeleteRole_BuiltInBlocked(t *testing.T) {
 	roles, _ := repo.Query("")
 	require.Len(t, roles, 1)
 
-	err := svc.DeleteRole(roles[0].RoleID)
+	err := svc.DeleteRole(roles[0].RoleID, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot delete built-in role")
+}
+
+func TestRoleService_RejectsInvalidOrgContext(t *testing.T) {
+	svc, repo, userRepo, _ := setupRoleServiceWithReposTest(t)
+	seedRole(t, repo, "ScopedRole", "scoped-role", nil, time.Now())
+	roles, err := repo.Query("")
+	require.NoError(t, err)
+	require.NotEmpty(t, roles)
+
+	_, err = svc.CreateRole(&role.RoleCreator{Name: "NoOrg"}, "tester", 0)
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.EditRole(&role.RoleEditor{RoleID: roles[0].RoleID, Name: "Rename"}, "tester", 0)
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.DeleteRole(roles[0].RoleID, 0)
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	u := seedUser(t, userRepo, "scoped-user", nil)
+	err = svc.MountUsers(&role.MountUserRequest{Rid: roles[0].RoleID, Uids: []int64{u.UserID}, OrgId: 0})
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.UnmountUser(&role.UnmountUserRequest{Rid: roles[0].RoleID, Uid: u.UserID, OrgId: 0})
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	_, err = svc.BeforeUnmountInfo(&role.UnmountUserRequest{Rid: roles[0].RoleID, Uid: u.UserID, OrgId: 0})
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
 }
 
 func TestRoleService_DeleteRole_CustomRoleAllowed(t *testing.T) {
@@ -376,7 +403,7 @@ func TestRoleService_DeleteRole_CustomRoleAllowed(t *testing.T) {
 	require.Len(t, roles, 1)
 	roleID := roles[0].RoleID
 
-	err := svc.DeleteRole(roleID)
+	err := svc.DeleteRole(roleID, 1)
 	require.NoError(t, err)
 
 	_, err = repo.GetByID(roleID)
@@ -386,7 +413,7 @@ func TestRoleService_DeleteRole_CustomRoleAllowed(t *testing.T) {
 func TestRoleService_DeleteRole_RepoError(t *testing.T) {
 	svc, _ := setupClosedRoleServiceTest(t)
 
-	err := svc.DeleteRole(1)
+	err := svc.DeleteRole(1, 1)
 	require.NoError(t, err) // GetByID fails on closed DB → treated as "not found"
 }
 
@@ -656,7 +683,7 @@ func TestRoleService_UnmountUser_RejectsLastRole(t *testing.T) {
 	require.NoError(t, repo.Create(roleA))
 	require.NoError(t, repo.BindUserRole(31, roleA.RoleID, 5))
 
-	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 31, Rid: roleA.RoleID})
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 31, Rid: roleA.RoleID, OrgId: 5})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrLastRoleRemovalBlocked)
 	assert.Equal(t, "cannot remove user's last role", err.Error())
@@ -671,7 +698,7 @@ func TestRoleService_UnmountUser_Success(t *testing.T) {
 	require.NoError(t, repo.BindUserRole(32, roleA.RoleID, 5))
 	require.NoError(t, repo.BindUserRole(32, roleB.RoleID, 5))
 
-	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: roleA.RoleID})
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: roleA.RoleID, OrgId: 5})
 	require.NoError(t, err)
 
 	roleIDs, err := repo.GetUserRoleIDs(32)
@@ -688,7 +715,7 @@ func TestRoleService_BeforeUnmountInfo_Success(t *testing.T) {
 	require.NoError(t, repo.BindUserRole(33, roleA.RoleID, 5))
 	require.NoError(t, repo.BindUserRole(33, roleB.RoleID, 5))
 
-	count, err := svc.BeforeUnmountInfo(&role.UnmountUserRequest{Uid: 33, Rid: roleA.RoleID})
+	count, err := svc.BeforeUnmountInfo(&role.UnmountUserRequest{Uid: 33, Rid: roleA.RoleID, OrgId: 5})
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
 }
@@ -696,7 +723,7 @@ func TestRoleService_BeforeUnmountInfo_Success(t *testing.T) {
 func TestRoleService_UnmountUser_CountUserRolesError(t *testing.T) {
 	svc, _, _, _ := setupClosedRoleServiceWithReposTest(t)
 
-	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: 1})
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: 1, OrgId: 5})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to check user role count")
 	assert.False(t, errors.Is(err, ErrLastRoleRemovalBlocked))
@@ -705,7 +732,7 @@ func TestRoleService_UnmountUser_CountUserRolesError(t *testing.T) {
 func TestRoleService_BeforeUnmountInfo_CountError(t *testing.T) {
 	svc, _, _, _ := setupClosedRoleServiceWithReposTest(t)
 
-	count, err := svc.BeforeUnmountInfo(&role.UnmountUserRequest{Uid: 33, Rid: 1})
+	count, err := svc.BeforeUnmountInfo(&role.UnmountUserRequest{Uid: 33, Rid: 1, OrgId: 5})
 	require.Error(t, err)
 	assert.Zero(t, count)
 	assert.Contains(t, err.Error(), "failed to count user roles")
@@ -847,7 +874,7 @@ func TestRoleService_UnmountUser_UnbindError(t *testing.T) {
 		END;
 	`).Error)
 
-	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 99, Rid: roleA.RoleID})
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 99, Rid: roleA.RoleID, OrgId: 5})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unbind user from role")
 	count, countErr := repo.CountUserRoles(99)
@@ -861,7 +888,7 @@ func TestRoleService_BeforeUnmountInfo_SingleRole(t *testing.T) {
 	require.NoError(t, repo.Create(roleA))
 	require.NoError(t, repo.BindUserRole(88, roleA.RoleID, 5))
 
-	count, err := svc.BeforeUnmountInfo(&role.UnmountUserRequest{Uid: 88, Rid: roleA.RoleID})
+	count, err := svc.BeforeUnmountInfo(&role.UnmountUserRequest{Uid: 88, Rid: roleA.RoleID, OrgId: 5})
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -932,7 +959,7 @@ func TestEditRole_BuiltInSystemRoleProtected(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, roles, 1)
 
-	err = svc.EditRole(&role.RoleEditor{RoleID: roles[0].RoleID, Name: "HackedName"}, "attacker", 0)
+	err = svc.EditRole(&role.RoleEditor{RoleID: roles[0].RoleID, Name: "HackedName"}, "attacker", 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot edit built-in system role")
 }

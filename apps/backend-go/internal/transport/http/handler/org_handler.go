@@ -26,8 +26,12 @@ func (h *OrgHandler) CreateOrg(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	callerOrgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
 
-	err := h.orgService.CreateOrg(&req)
+	err := h.orgService.CreateOrg(&req, callerOrgID)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -43,8 +47,12 @@ func (h *OrgHandler) UpdateOrg(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	callerOrgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
 
-	err := h.orgService.UpdateOrg(&req)
+	err := h.orgService.UpdateOrg(&req, callerOrgID)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -56,6 +64,10 @@ func (h *OrgHandler) UpdateOrg(c *gin.Context) {
 func (h *OrgHandler) DeleteOrg(c *gin.Context) {
 	defer recoverServicePanic(c)
 	orgID, ok := parseIDParamMsg(c, "orgId", "Invalid organization ID")
+	if !ok {
+		return
+	}
+	callerOrgID, ok := requireCurrentOrg(c)
 	if !ok {
 		return
 	}
@@ -89,7 +101,7 @@ func (h *OrgHandler) DeleteOrg(c *gin.Context) {
 	// 获取 IP 地址
 	ipAddress := c.ClientIP()
 
-	err := h.orgService.DeleteOrg(orgID, operatorID, operatorName, ipAddress)
+	err := h.orgService.DeleteOrg(orgID, callerOrgID, operatorID, operatorName, ipAddress)
 	if err != nil {
 		response.Error(c, "500000", err.Error())
 		return
@@ -160,8 +172,12 @@ func (h *OrgHandler) UpdateOrgStatus(c *gin.Context) {
 		response.Error(c, "500000", "Invalid request: "+err.Error())
 		return
 	}
+	callerOrgID, ok := requireCurrentOrg(c)
+	if !ok {
+		return
+	}
 
-	err := h.orgService.UpdateOrgStatus(req.OrgID, req.Status)
+	err := h.orgService.UpdateOrgStatus(req.OrgID, req.Status, callerOrgID)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return

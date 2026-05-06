@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1693,8 +1695,26 @@ func int64PtrIfPositive(value int64) *int64 {
 }
 
 func replaceIDs(value string, idMap map[int64]int64) string {
+	type idReplacement struct {
+		old string
+		new string
+	}
+
+	replacements := make([]idReplacement, 0, len(idMap))
 	for oldID, newID := range idMap {
-		value = strings.ReplaceAll(value, strconv.FormatInt(oldID, 10), strconv.FormatInt(newID, 10))
+		replacements = append(replacements, idReplacement{
+			old: strconv.FormatInt(oldID, 10),
+			new: strconv.FormatInt(newID, 10),
+		})
+	}
+
+	sort.Slice(replacements, func(i, j int) bool {
+		return len(replacements[i].old) > len(replacements[j].old)
+	})
+
+	for _, replacement := range replacements {
+		re := regexp.MustCompile(`(^|[^0-9])` + regexp.QuoteMeta(replacement.old) + `($|[^0-9])`)
+		value = re.ReplaceAllString(value, `${1}`+replacement.new+`${2}`)
 	}
 	return value
 }
