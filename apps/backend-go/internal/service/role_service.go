@@ -15,6 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// ErrLastRoleRemovalBlocked is returned when attempting to remove a user's last role.
+// This is an intentional policy deviation: the system blocks removal rather than cascading user deletion.
 var ErrLastRoleRemovalBlocked = errors.New("cannot remove user's last role")
 
 type RoleService struct {
@@ -33,6 +35,10 @@ func (s *RoleService) SetResourcePermissionRepository(repo *repository.ResourceP
 }
 
 func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string, callerOrgID int64) (int64, error) {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return 0, err
+	}
+
 	logger.Info("Role creation with org context", zap.Int64("orgId", callerOrgID), zap.String("createBy", createBy))
 	if req.ParentID != nil && *req.ParentID > 0 {
 		if err := s.validateInheritance(*req.ParentID); err != nil {
@@ -86,6 +92,10 @@ func (s *RoleService) CreateRole(req *role.RoleCreator, createBy string, callerO
 }
 
 func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string, callerOrgID int64) error {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return err
+	}
+
 	logger.Info("Role edit with org context", zap.Int64("orgId", callerOrgID), zap.String("updateBy", updateBy))
 
 	// Normalize: RoleID takes precedence over ID
@@ -148,7 +158,11 @@ func (s *RoleService) EditRole(req *role.RoleEditor, updateBy string, callerOrgI
 	return nil
 }
 
-func (s *RoleService) DeleteRole(roleID int64) error {
+func (s *RoleService) DeleteRole(roleID int64, callerOrgID int64) error {
+	if err := requireGovernedOrgContext(callerOrgID); err != nil {
+		return err
+	}
+
 	rle, err := s.repo.GetByID(roleID)
 	if err != nil {
 		return nil // role not found, nothing to delete
@@ -202,7 +216,7 @@ func (s *RoleService) QueryRoles(req *role.RoleQueryRequest) ([]*role.RoleVO, er
 			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
-			ReadOnly: false,
+			ReadOnly: rle.Readonly != nil && *rle.Readonly,
 			Root:     rle.ParentID == nil || *rle.ParentID == 0,
 		})
 	}
@@ -218,13 +232,13 @@ func (s *RoleService) QueryRolesPage(req *role.RolePageRequest) (*role.RolePageR
 	if req.RoleType != nil {
 		roleType = *req.RoleType
 	}
-	current := req.Current
-	if current < 1 {
-		current = 1
+	current := 1
+	if req.Current > 0 {
+		current = req.Current
 	}
-	size := req.Size
-	if size < 1 {
-		size = 10
+	size := 10
+	if req.Size > 0 {
+		size = req.Size
 	}
 
 	roles, total, err := s.repo.QueryWithPage(keyword, roleType, current, size)
@@ -241,7 +255,7 @@ func (s *RoleService) QueryRolesPage(req *role.RolePageRequest) (*role.RolePageR
 			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
-			ReadOnly: false,
+			ReadOnly: rle.Readonly != nil && *rle.Readonly,
 			Root:     rle.ParentID == nil || *rle.ParentID == 0,
 		})
 	}
@@ -262,6 +276,9 @@ func strPtr(s string) *string {
 func (s *RoleService) MountUsers(req *role.MountUserRequest) error {
 	if s.userRoleRepo == nil {
 		return fmt.Errorf("userRoleRepo not initialized")
+	}
+	if err := requireGovernedOrgContext(req.OrgId); err != nil {
+		return err
 	}
 
 	for _, uid := range req.Uids {
@@ -312,8 +329,17 @@ func (s *RoleService) MountExternalUser(req *role.MountExternalUserRequest, orgI
 }
 
 // UnmountUser 解绑用户与角色（含唯一角色安全约束）
-// 如果用户只有这一个角色，将拒绝移除并返回错误
+//
+// Intentional Deviation: The system REJECTS removal of a user's last role instead of
+// cascading to user deletion, even though some documentation implies cascade behavior.
+// This is a documented policy decision for C1; cascade delete is deferred to C2 work.
+//
+// 如果用户只有这一个角色，将拒绝移除并返回 ErrLastRoleRemovalBlocked
 func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
+	if err := requireGovernedOrgContext(req.OrgId); err != nil {
+		return err
+	}
+
 	var count int64
 	var err error
 	if req.OrgId > 0 {
@@ -343,6 +369,10 @@ func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
 
 // BeforeUnmountInfo 检查解绑前用户的角色数量（用于安全提示）
 func (s *RoleService) BeforeUnmountInfo(req *role.UnmountUserRequest) (int, error) {
+	if err := requireGovernedOrgContext(req.OrgId); err != nil {
+		return 0, err
+	}
+
 	var count int64
 	var err error
 	if req.OrgId > 0 {
@@ -412,7 +442,7 @@ func (s *RoleService) QueryRolesByOrgID(orgID int64, keyword string) ([]*role.Ro
 			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
-			ReadOnly: false,
+			ReadOnly: rle.Readonly != nil && *rle.Readonly,
 			Root:     rle.ParentID == nil || *rle.ParentID == 0,
 		})
 	}
@@ -448,7 +478,7 @@ func (s *RoleService) SelectedForUser(req *role.RoleRequest) ([]*role.RoleVO, er
 			RoleType: rle.RoleType,
 			Desc:     rle.RoleDesc,
 			Status:   rle.Status,
-			ReadOnly: false,
+			ReadOnly: rle.Readonly != nil && *rle.Readonly,
 			Root:     rle.ParentID == nil || *rle.ParentID == 0,
 		})
 	}

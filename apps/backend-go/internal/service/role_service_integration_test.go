@@ -36,7 +36,7 @@ func TestRoleServiceIntegration_Create(t *testing.T) {
 		Desc: &desc,
 	}
 
-	id, err := svc.CreateRole(req, "tester", 0)
+	id, err := svc.CreateRole(req, "tester", 1)
 	assert.NoError(t, err)
 	assert.Greater(t, id, int64(0))
 
@@ -57,7 +57,7 @@ func TestRoleServiceIntegration_Edit(t *testing.T) {
 
 	// Create role
 	initialDesc := "Initial description"
-	id, _ := svc.CreateRole(&role.RoleCreator{Name: "ToEdit", Desc: &initialDesc}, "creator", 0)
+	id, _ := svc.CreateRole(&role.RoleCreator{Name: "ToEdit", Desc: &initialDesc}, "creator", 1)
 
 	// Edit
 	newDesc := "Updated description"
@@ -65,7 +65,7 @@ func TestRoleServiceIntegration_Edit(t *testing.T) {
 		ID:   id,
 		Name: "EditedRole",
 		Desc: &newDesc,
-	}, "editor", 0)
+	}, "editor", 1)
 	assert.NoError(t, err)
 
 	// Verify
@@ -83,7 +83,7 @@ func TestRoleServiceIntegration_Edit(t *testing.T) {
 func TestRoleServiceIntegration_EditNotFound(t *testing.T) {
 	svc := newTestRoleService(t)
 
-	err := svc.EditRole(&role.RoleEditor{ID: 9999, Name: "NotFound"}, "editor", 0)
+	err := svc.EditRole(&role.RoleEditor{ID: 9999, Name: "NotFound"}, "editor", 1)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "role not found")
 }
@@ -92,10 +92,10 @@ func TestRoleServiceIntegration_CreateRole_WithParent(t *testing.T) {
 	svc := newTestRoleService(t)
 	repo := repository.NewRoleRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "RootParentRole"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "RootParentRole"}, "tester", 1)
 	require.NoError(t, err)
 
-	childID, err := svc.CreateRole(&role.RoleCreator{Name: "ChildCustomRole", ParentID: &parentID}, "tester", 0)
+	childID, err := svc.CreateRole(&role.RoleCreator{Name: "ChildCustomRole", ParentID: &parentID}, "tester", 1)
 	require.NoError(t, err)
 
 	child, err := repo.GetByID(childID)
@@ -111,12 +111,12 @@ func TestRoleServiceIntegration_EditRole_WithParent(t *testing.T) {
 	svc := newTestRoleService(t)
 	repo := repository.NewRoleRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "EditParentRole"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "EditParentRole"}, "tester", 1)
 	require.NoError(t, err)
-	childID, err := svc.CreateRole(&role.RoleCreator{Name: "EditChildRole"}, "tester", 0)
+	childID, err := svc.CreateRole(&role.RoleCreator{Name: "EditChildRole"}, "tester", 1)
 	require.NoError(t, err)
 
-	err = svc.EditRole(&role.RoleEditor{ID: childID, Name: "EditChildRole", ParentID: &parentID}, "tester", 0)
+	err = svc.EditRole(&role.RoleEditor{ID: childID, Name: "EditChildRole", ParentID: &parentID}, "tester", 1)
 	require.NoError(t, err)
 
 	child, err := repo.GetByID(childID)
@@ -132,13 +132,13 @@ func TestRoleServiceIntegration_EditRole_ClearParent(t *testing.T) {
 	svc := newTestRoleService(t)
 	repo := repository.NewRoleRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "ClearParentRoot"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "ClearParentRoot"}, "tester", 1)
 	require.NoError(t, err)
-	childID, err := svc.CreateRole(&role.RoleCreator{Name: "ClearParentChild", ParentID: &parentID}, "tester", 0)
+	childID, err := svc.CreateRole(&role.RoleCreator{Name: "ClearParentChild", ParentID: &parentID}, "tester", 1)
 	require.NoError(t, err)
 
 	zeroParent := int64(0)
-	err = svc.EditRole(&role.RoleEditor{ID: childID, Name: "ClearParentChild", ParentID: &zeroParent}, "tester", 0)
+	err = svc.EditRole(&role.RoleEditor{ID: childID, Name: "ClearParentChild", ParentID: &zeroParent}, "tester", 1)
 	require.NoError(t, err)
 
 	child, err := repo.GetByID(childID)
@@ -151,10 +151,10 @@ func TestRoleServiceIntegration_Delete(t *testing.T) {
 	svc := newTestRoleService(t)
 
 	// Create role
-	id, _ := svc.CreateRole(&role.RoleCreator{Name: "ToDelete"}, "tester", 0)
+	id, _ := svc.CreateRole(&role.RoleCreator{Name: "ToDelete"}, "tester", 1)
 
 	// Delete
-	err := svc.DeleteRole(id)
+	err := svc.DeleteRole(id, 1)
 	assert.NoError(t, err)
 
 	// Verify deleted
@@ -170,7 +170,7 @@ func TestRoleServiceIntegration_GetRoleByID(t *testing.T) {
 	id, _ := svc.CreateRole(&role.RoleCreator{
 		Name: "DetailRole",
 		Desc: pStr("Detailed role"),
-	}, "tester", 0)
+	}, "tester", 1)
 
 	// Get by ID
 	vo, err := svc.GetRoleByID(id)
@@ -248,6 +248,25 @@ func TestRoleServiceIntegration_QueryRolesPage(t *testing.T) {
 	}
 }
 
+func TestRoleServiceIntegration_RejectsInvalidOrgContext(t *testing.T) {
+	svc := newTestRoleService(t)
+	repo := repository.NewRoleRepository(testDB)
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "ScopedRole", RoleCode: "scoped-role", Status: role.StatusEnabled}))
+
+	roles, err := repo.Query("")
+	require.NoError(t, err)
+	require.NotEmpty(t, roles)
+
+	_, err = svc.CreateRole(&role.RoleCreator{Name: "NoOrgRole"}, "tester", 0)
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.EditRole(&role.RoleEditor{ID: roles[0].RoleID, Name: "Rename"}, "tester", 0)
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
+
+	err = svc.DeleteRole(roles[0].RoleID, 0)
+	assert.ErrorIs(t, err, ErrInvalidOrgContext)
+}
+
 func pStr(v string) *string {
 	return &v
 }
@@ -269,7 +288,7 @@ func TestRoleServiceIntegration_MountUsers(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create a test role
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MountTestRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MountTestRole"}, "tester", 1)
 	assert.NoError(t, err)
 
 	// Mount users
@@ -294,7 +313,7 @@ func TestRoleServiceIntegration_MountUsers_Idempotent(t *testing.T) {
 
 	testUser := &user.SysUser{Username: "mount_idempotent_user", NickName: "Mount Idempotent User", Status: 1}
 	require.NoError(t, userRepo.Create(testUser))
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MountIdempotentRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MountIdempotentRole"}, "tester", 1)
 	require.NoError(t, err)
 
 	req := &role.MountUserRequest{Rid: roleID, OrgId: 7, Uids: []int64{testUser.UserID}}
@@ -324,7 +343,7 @@ func TestRoleServiceIntegration_MountExternalUser(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create a test role
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "ExternalMountRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "ExternalMountRole"}, "tester", 1)
 	assert.NoError(t, err)
 
 	// Mount external user
@@ -348,7 +367,7 @@ func TestRoleServiceIntegration_MountExternalUser_RejectsUserAlreadyInTargetOrg(
 
 	testUser := &user.SysUser{Username: "external_existing_org_user", NickName: "External Existing Org User", Status: 1}
 	require.NoError(t, userRepo.Create(testUser))
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "ExistingOrgRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "ExistingOrgRole"}, "tester", 1)
 	require.NoError(t, err)
 	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: testUser.UserID, RoleID: roleID, OrgID: 2}))
 
@@ -363,7 +382,7 @@ func TestRoleServiceIntegration_MountExternalUser_RequiresOrgID(t *testing.T) {
 
 	testUser := &user.SysUser{Username: "external_missing_org_user", NickName: "External Missing Org User", Status: 1}
 	require.NoError(t, userRepo.Create(testUser))
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MissingOrgRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "MissingOrgRole"}, "tester", 1)
 	require.NoError(t, err)
 
 	err = svc.MountExternalUser(&role.MountExternalUserRequest{Rid: roleID, Uid: testUser.UserID}, 0)
@@ -388,9 +407,9 @@ func TestRoleServiceIntegration_UnmountUser(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create two roles so user can be unmounted from one
-	roleID1, err := svc.CreateRole(&role.RoleCreator{Name: "UnmountRole1"}, "tester", 0)
+	roleID1, err := svc.CreateRole(&role.RoleCreator{Name: "UnmountRole1"}, "tester", 1)
 	assert.NoError(t, err)
-	roleID2, err := svc.CreateRole(&role.RoleCreator{Name: "UnmountRole2"}, "tester", 0)
+	roleID2, err := svc.CreateRole(&role.RoleCreator{Name: "UnmountRole2"}, "tester", 1)
 	assert.NoError(t, err)
 
 	// Mount user to both roles
@@ -399,8 +418,9 @@ func TestRoleServiceIntegration_UnmountUser(t *testing.T) {
 
 	// Unmount from one role
 	req := &role.UnmountUserRequest{
-		Rid: roleID1,
-		Uid: testUser.UserID,
+		Rid:   roleID1,
+		Uid:   testUser.UserID,
+		OrgId: 1,
 	}
 	err = svc.UnmountUser(req)
 	assert.NoError(t, err)
@@ -428,7 +448,7 @@ func TestRoleServiceIntegration_UnmountUserLastRole(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create one role
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "OnlyRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "OnlyRole"}, "tester", 1)
 	assert.NoError(t, err)
 
 	// Mount user to only role
@@ -436,8 +456,9 @@ func TestRoleServiceIntegration_UnmountUserLastRole(t *testing.T) {
 
 	// Try to unmount (should fail)
 	req := &role.UnmountUserRequest{
-		Rid: roleID,
-		Uid: testUser.UserID,
+		Rid:   roleID,
+		Uid:   testUser.UserID,
+		OrgId: 1,
 	}
 	err = svc.UnmountUser(req)
 	assert.Error(t, err)
@@ -460,8 +481,8 @@ func TestRoleServiceIntegration_BeforeUnmountInfo(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create two roles
-	roleID1, _ := svc.CreateRole(&role.RoleCreator{Name: "BeforeRole1"}, "tester", 0)
-	roleID2, _ := svc.CreateRole(&role.RoleCreator{Name: "BeforeRole2"}, "tester", 0)
+	roleID1, _ := svc.CreateRole(&role.RoleCreator{Name: "BeforeRole1"}, "tester", 1)
+	roleID2, _ := svc.CreateRole(&role.RoleCreator{Name: "BeforeRole2"}, "tester", 1)
 
 	// Mount user to both roles
 	svc.MountUsers(&role.MountUserRequest{Rid: roleID1, OrgId: 1, Uids: []int64{testUser.UserID}})
@@ -469,8 +490,9 @@ func TestRoleServiceIntegration_BeforeUnmountInfo(t *testing.T) {
 
 	// Check before unmount info
 	req := &role.UnmountUserRequest{
-		Rid: roleID1,
-		Uid: testUser.UserID,
+		Rid:   roleID1,
+		Uid:   testUser.UserID,
+		OrgId: 1,
 	}
 	count, err := svc.BeforeUnmountInfo(req)
 	assert.NoError(t, err)
@@ -487,7 +509,7 @@ func TestRoleServiceIntegration_SearchExternalUser_UsesExactKeyword(t *testing.T
 	outsideUser := &user.SysUser{Username: "outside-user", NickName: "Outside User", Email: pStr("outside@example.com"), Status: 1}
 	require.NoError(t, userRepo.Create(insideUser))
 	require.NoError(t, userRepo.Create(outsideUser))
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "SearchRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "SearchRole"}, "tester", 1)
 	require.NoError(t, err)
 	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: insideUser.UserID, RoleID: roleID, OrgID: 4}))
 	require.NoError(t, roleRepo.Delete(roleID))
@@ -551,9 +573,9 @@ func TestRoleServiceIntegration_OptionForUser(t *testing.T) {
 	userRepo := repository.NewUserRepository(testDB)
 
 	// Create some roles
-	roleID1, err := svc.CreateRole(&role.RoleCreator{Name: "OptionRole1"}, "tester", 0)
+	roleID1, err := svc.CreateRole(&role.RoleCreator{Name: "OptionRole1"}, "tester", 1)
 	require.NoError(t, err)
-	_, err = svc.CreateRole(&role.RoleCreator{Name: "OptionRole2"}, "tester", 0)
+	_, err = svc.CreateRole(&role.RoleCreator{Name: "OptionRole2"}, "tester", 1)
 	require.NoError(t, err)
 
 	testUser := &user.SysUser{
@@ -589,7 +611,7 @@ func TestRoleServiceIntegration_SelectedForUser(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create a role
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "SelectedRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "SelectedRole"}, "tester", 1)
 	assert.NoError(t, err)
 
 	// Mount user to role
@@ -652,7 +674,7 @@ func TestRoleServiceIntegration_CreateRoleWithInheritance(t *testing.T) {
 	svc := newTestRoleService(t)
 	repo := repository.NewRoleRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "ParentRole"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "ParentRole"}, "tester", 1)
 	require.NoError(t, err)
 
 	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildRole"}, &parentID, "tester")
@@ -686,7 +708,7 @@ func TestRoleServiceIntegration_ValidatePermissionInheritance_WithParent(t *test
 	svc := newTestRoleService(t)
 	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParent"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParent"}, "tester", 1)
 	require.NoError(t, err)
 
 	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "InheritanceChild"}, &parentID, "tester")
@@ -702,7 +724,7 @@ func TestRoleServiceIntegration_ValidatePermissionInheritance_RejectsExtraPermis
 	svc := newTestRoleService(t)
 	resourcePermRepo := repository.NewResourcePermissionRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParentLimited"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "InheritanceParentLimited"}, "tester", 1)
 	require.NoError(t, err)
 	childID, err := svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "InheritanceChildLimited"}, &parentID, "tester")
 	require.NoError(t, err)
@@ -734,7 +756,7 @@ func TestRoleServiceIntegration_CreateRoleWithInheritance_ParentDisabled(t *test
 	svc := newTestRoleService(t)
 	repo := repository.NewRoleRepository(testDB)
 
-	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "DisabledParent"}, "tester", 0)
+	parentID, err := svc.CreateRole(&role.RoleCreator{Name: "DisabledParent"}, "tester", 1)
 	require.NoError(t, err)
 	parent, err := repo.GetByID(parentID)
 	require.NoError(t, err)
@@ -749,9 +771,9 @@ func TestRoleServiceIntegration_CreateRoleWithInheritance_ParentDisabled(t *test
 func TestRoleServiceIntegration_CreateRoleWithInheritance_CustomParentRejected(t *testing.T) {
 	svc := newTestRoleService(t)
 
-	rootParentID, err := svc.CreateRole(&role.RoleCreator{Name: "RootParentForCustom"}, "tester", 0)
+	rootParentID, err := svc.CreateRole(&role.RoleCreator{Name: "RootParentForCustom"}, "tester", 1)
 	require.NoError(t, err)
-	customParentID, err := svc.CreateRole(&role.RoleCreator{Name: "CustomParent", ParentID: &rootParentID}, "tester", 0)
+	customParentID, err := svc.CreateRole(&role.RoleCreator{Name: "CustomParent", ParentID: &rootParentID}, "tester", 1)
 	require.NoError(t, err)
 
 	_, err = svc.CreateRoleWithInheritance(&role.RoleCreator{Name: "ChildFromCustomParent"}, &customParentID, "tester")
@@ -771,7 +793,7 @@ func TestRoleServiceIntegration_EditRole_SystemRoleProtected(t *testing.T) {
 	require.Len(t, roles, 1)
 	systemRoleID := roles[0].RoleID
 
-	err = svc.EditRole(&role.RoleEditor{RoleID: systemRoleID, Name: "Hacked Admin"}, "attacker", 0)
+	err = svc.EditRole(&role.RoleEditor{RoleID: systemRoleID, Name: "Hacked Admin"}, "attacker", 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot edit built-in system role")
 }
@@ -779,7 +801,7 @@ func TestRoleServiceIntegration_EditRole_SystemRoleProtected(t *testing.T) {
 func TestRoleServiceIntegration_ValidatePermissionInheritance_NoParent(t *testing.T) {
 	svc := newTestRoleService(t)
 
-	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "NoParentRole"}, "tester", 0)
+	roleID, err := svc.CreateRole(&role.RoleCreator{Name: "NoParentRole"}, "tester", 1)
 	require.NoError(t, err)
 
 	require.NoError(t, svc.ValidatePermissionInheritance(roleID, []int64{1}))
