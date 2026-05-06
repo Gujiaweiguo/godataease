@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
@@ -21,10 +22,11 @@ func setupRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRepositor
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	repo := repository.NewRoleRepository(db)
-	svc := NewRoleService(repo, nil, nil, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(repo, nil, nil, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, repo
 }
@@ -34,12 +36,13 @@ func setupRoleServiceWithReposTest(t *testing.T) (*RoleService, *repository.Role
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo
 }
@@ -49,12 +52,13 @@ func setupRoleServiceWithReposAndDBTest(t *testing.T) (*RoleService, *repository
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo, db
 }
@@ -64,12 +68,13 @@ func setupRoleServiceWithoutUserRoleTableTest(t *testing.T) (*RoleService, *repo
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo
 }
@@ -79,12 +84,13 @@ func setupRoleServiceWithoutRoleTableTest(t *testing.T) (*RoleService, *reposito
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	return svc, roleRepo, userRepo, userRoleRepo
 }
@@ -94,9 +100,10 @@ func setupClosedRoleServiceTest(t *testing.T) (*RoleService, *repository.RoleRep
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 	repo := repository.NewRoleRepository(db)
-	svc := NewRoleService(repo, nil, nil, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(repo, nil, nil, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
@@ -109,11 +116,12 @@ func setupClosedRoleServiceWithReposTest(t *testing.T) (*RoleService, *repositor
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, repository.NewOrgRepository(db), nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
@@ -145,6 +153,13 @@ func seedUser(t *testing.T, repo *repository.UserRepository, username string, em
 	}
 	require.NoError(t, repo.Create(u))
 	return u
+}
+
+func seedRoleServiceTestOrgs(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	for _, orgID := range []int64{1, 2, 3, 5, 7, 9} {
+		require.NoError(t, db.Create(&org.SysOrg{OrgID: orgID, OrgName: "Org", ParentID: 0, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}).Error)
+	}
 }
 
 func TestRoleService_QueryRolesPage_DefaultPaging(t *testing.T) {
@@ -527,43 +542,51 @@ func TestRoleService_MountExternalUser_InvalidOrgID(t *testing.T) {
 }
 
 func TestRoleService_MountUsers_Success(t *testing.T) {
-	svc, _, _, userRoleRepo := setupRoleServiceWithReposTest(t)
+	svc, roleRepo, userRepo, userRoleRepo := setupRoleServiceWithReposTest(t)
+	first := seedUser(t, userRepo, "mount-success-11", nil)
+	second := seedUser(t, userRepo, "mount-success-12", nil)
+	targetRole := &role.SysRole{RoleName: "Mount Success Role", RoleCode: "mount-success-role", Status: role.StatusEnabled}
+	require.NoError(t, roleRepo.Create(targetRole))
 
-	err := svc.MountUsers(&role.MountUserRequest{Rid: 9, Uids: []int64{11, 12}, OrgId: 3})
+	err := svc.MountUsers(&role.MountUserRequest{Rid: targetRole.RoleID, Uids: []int64{first.UserID, second.UserID}, OrgId: 3})
 	require.NoError(t, err)
 
-	roles11, err := userRoleRepo.GetByUserID(11)
+	roles11, err := userRoleRepo.GetByUserID(first.UserID)
 	require.NoError(t, err)
-	require.Len(t, roles11, 1)
-	assert.Equal(t, int64(9), roles11[0].RoleID)
-	assert.Equal(t, int64(3), roles11[0].OrgID)
+	require.Len(t, roles11, 2)
+	assert.Contains(t, []int64{roles11[0].RoleID, roles11[1].RoleID}, targetRole.RoleID)
 
-	roles12, err := userRoleRepo.GetByUserID(12)
+	roles12, err := userRoleRepo.GetByUserID(second.UserID)
 	require.NoError(t, err)
-	require.Len(t, roles12, 1)
-	assert.Equal(t, int64(9), roles12[0].RoleID)
-	assert.Equal(t, int64(3), roles12[0].OrgID)
+	require.Len(t, roles12, 2)
+	assert.Contains(t, []int64{roles12[0].RoleID, roles12[1].RoleID}, targetRole.RoleID)
 }
 
 func TestRoleService_MountUsers_DeduplicatesExistingBinding(t *testing.T) {
-	svc, _, _, userRoleRepo := setupRoleServiceWithReposTest(t)
+	svc, roleRepo, userRepo, userRoleRepo := setupRoleServiceWithReposTest(t)
+	member := seedUser(t, userRepo, "mount-dedupe", nil)
+	targetRole := &role.SysRole{RoleName: "Mount Dedupe Role", RoleCode: "mount-dedupe-role", Status: role.StatusEnabled}
+	require.NoError(t, roleRepo.Create(targetRole))
 
-	err := svc.MountUsers(&role.MountUserRequest{Rid: 9, Uids: []int64{11}, OrgId: 3})
+	err := svc.MountUsers(&role.MountUserRequest{Rid: targetRole.RoleID, Uids: []int64{member.UserID}, OrgId: 3})
 	require.NoError(t, err)
-	err = svc.MountUsers(&role.MountUserRequest{Rid: 9, Uids: []int64{11}, OrgId: 3})
+	err = svc.MountUsers(&role.MountUserRequest{Rid: targetRole.RoleID, Uids: []int64{member.UserID}, OrgId: 3})
 	require.NoError(t, err)
 
-	roles11, err := userRoleRepo.GetByUserID(11)
+	roles11, err := userRoleRepo.GetByUserID(member.UserID)
 	require.NoError(t, err)
-	require.Len(t, roles11, 1)
+	require.Len(t, roles11, 2)
 }
 
 func TestRoleService_MountUsers_CreateIfMissingError(t *testing.T) {
-	svc, _, _, _ := setupRoleServiceWithoutUserRoleTableTest(t)
+	svc, roleRepo, userRepo, _ := setupRoleServiceWithoutUserRoleTableTest(t)
+	member := seedUser(t, userRepo, "mount-error", nil)
+	targetRole := &role.SysRole{RoleName: "Mount Error Role", RoleCode: "mount-error-role", Status: role.StatusEnabled}
+	require.NoError(t, roleRepo.Create(targetRole))
 
-	err := svc.MountUsers(&role.MountUserRequest{Rid: 9, Uids: []int64{11}, OrgId: 3})
+	err := svc.MountUsers(&role.MountUserRequest{Rid: targetRole.RoleID, Uids: []int64{member.UserID}, OrgId: 3})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to bind user 11 to role")
+	assert.Contains(t, err.Error(), "failed to bind user")
 }
 
 func TestRoleService_MountExternalUser_UserAlreadyInOrg(t *testing.T) {
@@ -677,6 +700,85 @@ func TestRoleService_OptionForUser_FiltersByKeywordAndAssignedRole(t *testing.T)
 	assert.Equal(t, "Assigned Analyst", result[0].Name)
 }
 
+func TestRoleService_OptionForUser_FiltersScopedRolesByOrg(t *testing.T) {
+	svc, repo := setupRoleServiceTest(t)
+	orgType := role.RoleTypeOrganization
+	orgSeven := int64(7)
+	orgNine := int64(9)
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "Org 7 Admin", RoleCode: "org-7-admin", RoleType: &orgType, OrgID: &orgSeven, Status: role.StatusEnabled}))
+	require.NoError(t, repo.Create(&role.SysRole{RoleName: "Org 9 Admin", RoleCode: "org-9-admin", RoleType: &orgType, OrgID: &orgNine, Status: role.StatusEnabled}))
+
+	result, err := svc.OptionForUser(&role.RoleRequest{}, 7)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, "Org 7 Admin", result[0].Name)
+}
+
+func TestRoleService_AssignRolesToUser_IdempotentAndCreatesBaseline(t *testing.T) {
+	svc, repo, userRepo, userRoleRepo := setupRoleServiceWithReposTest(t)
+	member := seedUser(t, userRepo, "assign-idempotent", nil)
+	orgType := role.RoleTypeOrganization
+	orgID := int64(7)
+	targetRole := &role.SysRole{RoleName: "Scoped Analyst", RoleCode: "scoped-analyst", RoleType: &orgType, OrgID: &orgID, Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(targetRole))
+
+	require.NoError(t, svc.AssignRolesToUser(orgID, member.UserID, []int64{targetRole.RoleID}))
+	require.NoError(t, svc.AssignRolesToUser(orgID, member.UserID, []int64{targetRole.RoleID}))
+
+	bindings, err := userRoleRepo.GetByUserID(member.UserID)
+	require.NoError(t, err)
+	require.Len(t, bindings, 2)
+
+	roleIDs := make([]int64, 0, len(bindings))
+	for _, binding := range bindings {
+		assert.Equal(t, orgID, binding.OrgID)
+		roleIDs = append(roleIDs, binding.RoleID)
+	}
+	assert.Contains(t, roleIDs, targetRole.RoleID)
+
+	defaultRole, err := repo.GetByRoleCode(role.BuiltInOrgUserRoleCode)
+	require.NoError(t, err)
+	assert.Contains(t, roleIDs, defaultRole.RoleID)
+}
+
+func TestRoleService_AssignRolesToUser_RejectsCrossOrgRole(t *testing.T) {
+	svc, repo, userRepo, userRoleRepo := setupRoleServiceWithReposTest(t)
+	member := seedUser(t, userRepo, "assign-cross-org", nil)
+	orgType := role.RoleTypeOrganization
+	roleOrgID := int64(9)
+	targetRole := &role.SysRole{RoleName: "Org 9 Analyst", RoleCode: "org-9-analyst", RoleType: &orgType, OrgID: &roleOrgID, Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(targetRole))
+
+	err := svc.AssignRolesToUser(7, member.UserID, []int64{targetRole.RoleID})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "current organization")
+
+	bindings, err := userRoleRepo.GetByUserID(member.UserID)
+	require.NoError(t, err)
+	assert.Empty(t, bindings)
+}
+
+func TestRoleService_AssignRolesToUser_RejectsInvalidOrgContext(t *testing.T) {
+	svc, _, userRepo, _ := setupRoleServiceWithReposTest(t)
+	member := seedUser(t, userRepo, "assign-invalid-org", nil)
+
+	err := svc.AssignRolesToUser(0, member.UserID, []int64{1})
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+}
+
+func TestRoleService_MountUsers_RejectsRoleOrgMismatch(t *testing.T) {
+	svc, repo, userRepo, _ := setupRoleServiceWithReposTest(t)
+	member := seedUser(t, userRepo, "mount-mismatch", nil)
+	orgType := role.RoleTypeOrganization
+	roleOrgID := int64(9)
+	targetRole := &role.SysRole{RoleName: "Org 9 Admin", RoleCode: "org-9-admin", RoleType: &orgType, OrgID: &roleOrgID, Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(targetRole))
+
+	err := svc.MountUsers(&role.MountUserRequest{Rid: targetRole.RoleID, Uids: []int64{member.UserID}, OrgId: 7})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "current organization")
+}
+
 func TestRoleService_UnmountUser_RejectsLastRole(t *testing.T) {
 	svc, repo, _, _ := setupRoleServiceWithReposTest(t)
 	roleA := &role.SysRole{RoleName: "Role A", RoleCode: "role-a", Status: role.StatusEnabled}
@@ -725,7 +827,7 @@ func TestRoleService_UnmountUser_CountUserRolesError(t *testing.T) {
 
 	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: 1, OrgId: 5})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to check user role count")
+	assert.Contains(t, err.Error(), "failed to validate user role association")
 	assert.False(t, errors.Is(err, ErrLastRoleRemovalBlocked))
 }
 
@@ -762,6 +864,28 @@ func TestRoleService_SelectedForUser_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 	assert.ElementsMatch(t, []string{"Role A", "Role B"}, []string{result[0].Name, result[1].Name})
+}
+
+func TestRoleService_SelectedForUser_FiltersCrossOrgScopedRoles(t *testing.T) {
+	svc, repo, _, userRoleRepo := setupRoleServiceWithReposTest(t)
+	orgType := role.RoleTypeOrganization
+	orgFive := int64(5)
+	orgNine := int64(9)
+	matching := &role.SysRole{RoleName: "Org 5 Role", RoleCode: "org-5-role", RoleType: &orgType, OrgID: &orgFive, Status: role.StatusEnabled}
+	mismatched := &role.SysRole{RoleName: "Org 9 Role", RoleCode: "org-9-role", RoleType: &orgType, OrgID: &orgNine, Status: role.StatusEnabled}
+	global := &role.SysRole{RoleName: "Global Role", RoleCode: "global-role", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(matching))
+	require.NoError(t, repo.Create(mismatched))
+	require.NoError(t, repo.Create(global))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: 52, RoleID: matching.RoleID, OrgID: 5}))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: 52, RoleID: mismatched.RoleID, OrgID: 5}))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: 52, RoleID: global.RoleID, OrgID: 5}))
+	uid := int64(52)
+
+	result, err := svc.SelectedForUser(&role.RoleRequest{Uid: &uid})
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	assert.ElementsMatch(t, []string{"Org 5 Role", "Global Role"}, []string{result[0].Name, result[1].Name})
 }
 
 func TestRoleService_SelectedForUser_GetUserRoleIDsError(t *testing.T) {
@@ -880,6 +1004,18 @@ func TestRoleService_UnmountUser_UnbindError(t *testing.T) {
 	count, countErr := repo.CountUserRoles(99)
 	require.NoError(t, countErr)
 	assert.Equal(t, int64(2), count)
+}
+
+func TestRoleService_UnmountUser_RejectsOrgMismatchAssociation(t *testing.T) {
+	svc, repo, _, userRoleRepo := setupRoleServiceWithReposTest(t)
+	orgType := role.RoleTypeOrganization
+	orgNine := int64(9)
+	targetRole := &role.SysRole{RoleName: "Org 9 Role", RoleCode: "org-9-role", RoleType: &orgType, OrgID: &orgNine, Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(targetRole))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: 77, RoleID: targetRole.RoleID, OrgID: 9}))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 77, Rid: targetRole.RoleID, OrgId: 7})
+	require.ErrorIs(t, err, ErrUserNotInCurrentOrg)
 }
 
 func TestRoleService_BeforeUnmountInfo_SingleRole(t *testing.T) {

@@ -3,8 +3,10 @@
 package service
 
 import (
+	"sync"
 	"testing"
 
+	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
@@ -15,15 +17,24 @@ import (
 
 // Helper function to create RoleService with all dependencies
 func newTestRoleService(t *testing.T) *RoleService {
-	cleanupTables(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}, &permission.SysRolePerm{})
+	cleanupTables(&role.SysRole{}, &org.SysOrg{}, &user.SysUser{}, &user.SysUserRole{}, &permission.SysRolePerm{})
 
 	repo := repository.NewRoleRepository(testDB)
+	orgRepo := repository.NewOrgRepository(testDB)
 	userRepo := repository.NewUserRepository(testDB)
 	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	seedRoleServiceIntegrationOrgs(t, orgRepo)
 
-	svc := NewRoleService(repo, userRepo, userRoleRepo, nil)
+	svc := NewRoleService(repo, userRepo, userRoleRepo, orgRepo, nil)
 	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(testDB))
 	return svc
+}
+
+func seedRoleServiceIntegrationOrgs(t *testing.T, orgRepo *repository.OrgRepository) {
+	t.Helper()
+	for _, orgID := range []int64{1, 2, 3, 5, 7, 9} {
+		require.NoError(t, orgRepo.Create(&org.SysOrg{OrgID: orgID, OrgName: "Org", ParentID: 0, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
+	}
 }
 
 func TestRoleServiceIntegration_Create(t *testing.T) {
@@ -326,6 +337,54 @@ func TestRoleServiceIntegration_MountUsers_Idempotent(t *testing.T) {
 	assert.Equal(t, int64(7), bindings[0].OrgID)
 }
 
+func TestRoleServiceIntegration_AssignRolesToUser_Concurrent(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	orgType := role.RoleTypeOrganization
+	orgID := int64(7)
+
+	member := &user.SysUser{Username: "concurrent_assign_user", NickName: "Concurrent Assign User", Status: 1}
+	require.NoError(t, userRepo.Create(member))
+	targetRole := &role.SysRole{RoleName: "Concurrent Scoped Role", RoleCode: "concurrent-scoped-role", RoleType: &orgType, OrgID: &orgID, Status: role.StatusEnabled}
+	require.NoError(t, repository.NewRoleRepository(testDB).Create(targetRole))
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- svc.AssignRolesToUser(orgID, member.UserID, []int64{targetRole.RoleID})
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	bindings, err := userRoleRepo.GetByUserID(member.UserID)
+	require.NoError(t, err)
+	require.Len(t, bindings, 2)
+}
+
+func TestRoleServiceIntegration_MountUsers_RejectsCrossOrgRole(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	orgType := role.RoleTypeOrganization
+	roleOrgID := int64(9)
+
+	member := &user.SysUser{Username: "mount_cross_org_user", NickName: "Mount Cross Org User", Status: 1}
+	require.NoError(t, userRepo.Create(member))
+	targetRole := &role.SysRole{RoleName: "Org 9 Mount Role", RoleCode: "org-9-mount-role", RoleType: &orgType, OrgID: &roleOrgID, Status: role.StatusEnabled}
+	require.NoError(t, repository.NewRoleRepository(testDB).Create(targetRole))
+
+	err := svc.MountUsers(&role.MountUserRequest{Rid: targetRole.RoleID, OrgId: 7, Uids: []int64{member.UserID}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "current organization")
+}
+
 // Test MountExternalUser
 func TestRoleServiceIntegration_MountExternalUser(t *testing.T) {
 	svc := newTestRoleService(t)
@@ -463,6 +522,24 @@ func TestRoleServiceIntegration_UnmountUserLastRole(t *testing.T) {
 	err = svc.UnmountUser(req)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot remove user's last role")
+}
+
+func TestRoleServiceIntegration_UnmountUser_RejectsCrossOrgAssociation(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	roleRepo := repository.NewRoleRepository(testDB)
+	orgType := role.RoleTypeOrganization
+	roleOrgID := int64(9)
+
+	member := &user.SysUser{Username: "unmount_cross_org_user", NickName: "Unmount Cross Org User", Status: 1}
+	require.NoError(t, userRepo.Create(member))
+	targetRole := &role.SysRole{RoleName: "Org 9 Unmount Role", RoleCode: "org-9-unmount-role", RoleType: &orgType, OrgID: &roleOrgID, Status: role.StatusEnabled}
+	require.NoError(t, roleRepo.Create(targetRole))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: member.UserID, RoleID: targetRole.RoleID, OrgID: 9}))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Rid: targetRole.RoleID, Uid: member.UserID, OrgId: 7})
+	require.ErrorIs(t, err, ErrUserNotInCurrentOrg)
 }
 
 // Test BeforeUnmountInfo
@@ -634,6 +711,30 @@ func TestRoleServiceIntegration_SelectedForUser(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "Created role should be in selected roles")
+}
+
+func TestRoleServiceIntegration_SelectedForUser_FiltersScopedMismatch(t *testing.T) {
+	svc := newTestRoleService(t)
+	userRepo := repository.NewUserRepository(testDB)
+	userRoleRepo := repository.NewUserRoleRepository(testDB)
+	roleRepo := repository.NewRoleRepository(testDB)
+	orgType := role.RoleTypeOrganization
+	orgFive := int64(5)
+	orgNine := int64(9)
+
+	member := &user.SysUser{Username: "selected_scope_user", NickName: "Selected Scope User", Status: 1}
+	require.NoError(t, userRepo.Create(member))
+	matching := &role.SysRole{RoleName: "Org 5 Visible", RoleCode: "org-5-visible", RoleType: &orgType, OrgID: &orgFive, Status: role.StatusEnabled}
+	mismatched := &role.SysRole{RoleName: "Org 9 Hidden", RoleCode: "org-9-hidden", RoleType: &orgType, OrgID: &orgNine, Status: role.StatusEnabled}
+	require.NoError(t, roleRepo.Create(matching))
+	require.NoError(t, roleRepo.Create(mismatched))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: member.UserID, RoleID: matching.RoleID, OrgID: 5}))
+	require.NoError(t, userRoleRepo.Create(&user.SysUserRole{UserID: member.UserID, RoleID: mismatched.RoleID, OrgID: 5}))
+
+	result, err := svc.SelectedForUser(&role.RoleRequest{Uid: &member.UserID})
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, matching.RoleID, result[0].ID)
 }
 
 // Test SelectedForUser without uid (should fail)

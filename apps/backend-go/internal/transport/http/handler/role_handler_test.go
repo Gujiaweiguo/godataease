@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dataease/backend/internal/domain/governance"
+	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
@@ -38,19 +39,23 @@ func setupRoleHandlerTestRouterWithOrg(t *testing.T, orgID uint64) *gin.Engine {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}, &governance.SysGovernancePolicy{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &org.SysOrg{}, &user.SysUser{}, &user.SysUserRole{}, &governance.SysGovernancePolicy{}))
 
 	repo := repository.NewRoleRepository(db)
+	orgRepo := repository.NewOrgRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
+	require.NoError(t, orgRepo.Create(&org.SysOrg{OrgID: 1, OrgName: "Org 1", ParentID: 0, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
+	require.NoError(t, orgRepo.Create(&org.SysOrg{OrgID: 3, OrgName: "Org 3", ParentID: 0, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
 	systemType := "system"
 	now := time.Unix(300, 0)
 	adminRole := &role.SysRole{RoleName: "Admin", RoleCode: "admin", RoleType: &systemType, Status: role.StatusEnabled, CreateTime: &now}
 	require.NoError(t, repo.Create(adminRole))
+	require.NoError(t, userRepo.Create(&user.SysUser{UserID: 99, Username: "mount-user", NickName: "Mount User", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
 	require.NoError(t, db.Create(&user.SysUserRole{UserID: 1, RoleID: adminRole.RoleID, OrgID: 1}).Error)
 
 	policySvc := service.NewGovernancePolicyService(repository.NewGovernancePolicyRepository(db), nil)
-	svc := service.NewRoleService(repo, userRepo, userRoleRepo, policySvc)
+	svc := service.NewRoleService(repo, userRepo, userRoleRepo, orgRepo, policySvc)
 	r := gin.New()
 	if orgID > 0 {
 		r.Use(func(c *gin.Context) {

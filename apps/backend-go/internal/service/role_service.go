@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"dataease/backend/internal/domain/audit"
 	"dataease/backend/internal/domain/governance"
+	domainorg "dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/pkg/logger"
@@ -23,16 +25,19 @@ import (
 // This is an intentional policy deviation: the system blocks removal rather than cascading user deletion.
 var ErrLastRoleRemovalBlocked = errors.New("cannot remove user's last role")
 
+var roleAssignmentLocks sync.Map
+
 type RoleService struct {
 	repo                *repository.RoleRepository
 	userRepo            *repository.UserRepository
 	userRoleRepo        *repository.UserRoleRepository
+	orgRepo             *repository.OrgRepository
 	resourcePermRepo    *repository.ResourcePermissionRepository
 	governancePolicySvc *GovernancePolicyService
 }
 
-func NewRoleService(repo *repository.RoleRepository, userRepo *repository.UserRepository, userRoleRepo *repository.UserRoleRepository, governancePolicySvc *GovernancePolicyService) *RoleService {
-	return &RoleService{repo: repo, userRepo: userRepo, userRoleRepo: userRoleRepo, governancePolicySvc: governancePolicySvc}
+func NewRoleService(repo *repository.RoleRepository, userRepo *repository.UserRepository, userRoleRepo *repository.UserRoleRepository, orgRepo *repository.OrgRepository, governancePolicySvc *GovernancePolicyService) *RoleService {
+	return &RoleService{repo: repo, userRepo: userRepo, userRoleRepo: userRoleRepo, orgRepo: orgRepo, governancePolicySvc: governancePolicySvc}
 }
 
 func (s *RoleService) SetResourcePermissionRepository(repo *repository.ResourcePermissionRepository) {
@@ -286,13 +291,16 @@ func (s *RoleService) MountUsers(req *role.MountUserRequest) error {
 		return err
 	}
 
+	targetRole, err := s.repo.GetByID(req.Rid)
+	if err != nil {
+		return fmt.Errorf("role not found: %w", err)
+	}
+	if err := validateRoleOrgScope(targetRole, req.OrgId); err != nil {
+		return err
+	}
+
 	for _, uid := range req.Uids {
-		userRole := &user.SysUserRole{
-			UserID: uid,
-			RoleID: req.Rid,
-			OrgID:  req.OrgId,
-		}
-		if _, err := s.userRoleRepo.CreateIfMissing(userRole); err != nil {
+		if err := s.AssignRolesToUser(req.OrgId, uid, []int64{req.Rid}); err != nil {
 			logger.Error("Failed to bind user to role", zap.Int64("uid", uid), zap.Int64("rid", req.Rid), zap.Error(err))
 			return fmt.Errorf("failed to bind user %d to role: %w", uid, err)
 		}
@@ -300,6 +308,79 @@ func (s *RoleService) MountUsers(req *role.MountUserRequest) error {
 
 	logger.Info("Users mounted to role", zap.Int64("rid", req.Rid), zap.Int64s("uids", req.Uids))
 	return nil
+}
+
+// AssignRolesToUser assigns the given roles to a user within an explicit org scope.
+// The operation is transactional and idempotent: duplicate bindings are no-ops.
+func (s *RoleService) AssignRolesToUser(orgID int64, userID int64, roleIDs []int64) error {
+	if err := requireGovernedOrgContext(orgID); err != nil {
+		return err
+	}
+	if s.repo == nil || s.repo.DB() == nil {
+		return fmt.Errorf("role repository is not configured")
+	}
+	if s.userRepo == nil {
+		return fmt.Errorf("userRepo not initialized")
+	}
+	if s.userRoleRepo == nil {
+		return fmt.Errorf("userRoleRepo not initialized")
+	}
+	if s.orgRepo == nil {
+		return fmt.Errorf("org repository is not configured")
+	}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+
+	if _, err := s.userRepo.GetByID(userID); err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+
+	lockKey := fmt.Sprintf("%d:%d", orgID, userID)
+	assignLock := getRoleAssignmentLock(lockKey)
+	assignLock.Lock()
+	defer assignLock.Unlock()
+
+	return s.repo.DB().Transaction(func(txDB *gorm.DB) error {
+		roleRepo := repository.NewRoleRepository(txDB)
+		userRoleRepo := repository.NewUserRoleRepository(txDB)
+		orgRepo := repository.NewOrgRepository(txDB)
+
+		inOrg, err := userRoleRepo.IsUserInOrg(userID, orgID)
+		if err != nil {
+			return fmt.Errorf("failed to validate user organization: %w", err)
+		}
+		if !inOrg {
+			if err := ensureUserOrgBaseline(txDB, orgRepo, roleRepo, userRoleRepo, userID, orgID); err != nil {
+				return err
+			}
+		}
+
+		for _, roleID := range roleIDs {
+			targetRole, err := roleRepo.GetByID(roleID)
+			if err != nil {
+				return fmt.Errorf("role not found: %w", err)
+			}
+			if err := validateRoleOrgScope(targetRole, orgID); err != nil {
+				return err
+			}
+
+			created, err := userRoleRepo.CreateIfMissing(&user.SysUserRole{UserID: userID, RoleID: roleID, OrgID: orgID})
+			if err != nil {
+				return fmt.Errorf("failed to assign role %d to user %d: %w", roleID, userID, err)
+			}
+			if created {
+				s.recordRoleAssignmentAudit(orgID, userID, roleID, audit.StatusSuccess, "assigned role to user")
+			}
+		}
+
+		return nil
+	})
+}
+
+func getRoleAssignmentLock(key string) *sync.Mutex {
+	lock, _ := roleAssignmentLocks.LoadOrStore(key, &sync.Mutex{})
+	return lock.(*sync.Mutex)
 }
 
 // MountExternalUser 绑定组织外用户到角色
@@ -344,9 +425,19 @@ func (s *RoleService) UnmountUser(req *role.UnmountUserRequest) error {
 	if err := requireGovernedOrgContext(req.OrgId); err != nil {
 		return err
 	}
+	if s.userRoleRepo == nil {
+		return fmt.Errorf("userRoleRepo not initialized")
+	}
+
+	exists, err := s.userRoleRepo.Exists(req.Uid, req.Rid, req.OrgId)
+	if err != nil {
+		return fmt.Errorf("failed to validate user role association: %w", err)
+	}
+	if !exists {
+		return ErrUserNotInCurrentOrg
+	}
 
 	var count int64
-	var err error
 	if req.OrgId > 0 {
 		count, err = s.repo.CountUserRolesByOrg(req.Uid, req.OrgId)
 	} else {
@@ -462,6 +553,36 @@ func (s *RoleService) recordLastRoleAudit(req *role.UnmountUserRequest, policy g
 	})
 }
 
+func (s *RoleService) recordRoleAssignmentAudit(orgID, userID, roleID int64, status audit.Status, detail string) {
+	if s.governancePolicySvc == nil || s.governancePolicySvc.auditSvc == nil {
+		return
+	}
+	beforeValue, _ := json.Marshal(map[string]interface{}{
+		"uid":   userID,
+		"rid":   roleID,
+		"orgId": orgID,
+	})
+	afterValue, _ := json.Marshal(map[string]interface{}{
+		"detail": detail,
+	})
+	resourceType := string(audit.ResourceTypeUser)
+	username := systemActor
+	_, _ = s.governancePolicySvc.auditSvc.CreateAuditLog(&audit.AuditLogCreateRequest{
+		UserID:         &userID,
+		Username:       &username,
+		ActionType:     audit.ActionTypeUserAction,
+		ActionName:     "分配用户角色",
+		ResourceType:   &resourceType,
+		ResourceID:     &userID,
+		OrganizationID: &orgID,
+		Operation:      audit.OperationCreate,
+		Status:         &status,
+		FailureReason:  stringPtrIfNotEmpty(detail),
+		BeforeValue:    stringPtrIfNotEmpty(string(beforeValue)),
+		AfterValue:     stringPtrIfNotEmpty(string(afterValue)),
+	})
+}
+
 // BeforeUnmountInfo 检查解绑前用户的角色数量（用于安全提示）
 func (s *RoleService) BeforeUnmountInfo(req *role.UnmountUserRequest) (int, error) {
 	if err := requireGovernedOrgContext(req.OrgId); err != nil {
@@ -550,13 +671,22 @@ func (s *RoleService) SelectedForUser(req *role.RoleRequest) ([]*role.RoleVO, er
 		return nil, fmt.Errorf("uid is required")
 	}
 
-	roleIDs, err := s.repo.GetUserRoleIDs(*req.Uid)
+	if s.userRoleRepo == nil {
+		return nil, fmt.Errorf("userRoleRepo not initialized")
+	}
+
+	bindings, err := s.userRoleRepo.GetByUserID(*req.Uid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user role IDs: %w", err)
 	}
 
-	if len(roleIDs) == 0 {
+	if len(bindings) == 0 {
 		return []*role.RoleVO{}, nil
+	}
+
+	roleIDs := make([]int64, 0, len(bindings))
+	for _, binding := range bindings {
+		roleIDs = append(roleIDs, binding.RoleID)
 	}
 
 	roles, err := s.repo.GetRolesByIDs(roleIDs)
@@ -564,8 +694,16 @@ func (s *RoleService) SelectedForUser(req *role.RoleRequest) ([]*role.RoleVO, er
 		return nil, fmt.Errorf("failed to get roles by IDs: %w", err)
 	}
 
+	bindingByRoleID := make(map[int64][]int64, len(bindings))
+	for _, binding := range bindings {
+		bindingByRoleID[binding.RoleID] = append(bindingByRoleID[binding.RoleID], binding.OrgID)
+	}
+
 	result := make([]*role.RoleVO, 0, len(roles))
 	for _, rle := range roles {
+		if !roleMatchesAnyBindingOrg(rle, bindingByRoleID[rle.RoleID]) {
+			continue
+		}
 		result = append(result, &role.RoleVO{
 			ID:       rle.RoleID,
 			Name:     rle.RoleName,
@@ -693,4 +831,88 @@ func (s *RoleService) ValidatePermissionInheritance(roleID int64, permIDs []int6
 		zap.Int64s("validatedPermIDs", slices.Clone(permIDs)))
 
 	return nil
+}
+
+func validateRoleOrgScope(rle *role.SysRole, orgID int64) error {
+	if rle == nil {
+		return fmt.Errorf("role not found")
+	}
+	if rle.OrgID == nil || *rle.OrgID == 0 {
+		return nil
+	}
+	if *rle.OrgID != orgID {
+		return fmt.Errorf("role does not belong to current organization")
+	}
+	return nil
+}
+
+func ensureUserOrgBaseline(_ *gorm.DB, orgRepo *repository.OrgRepository, roleRepo *repository.RoleRepository, userRoleRepo *repository.UserRoleRepository, userID int64, orgID int64) error {
+	orgEntity, err := orgRepo.GetByID(orgID)
+	if err != nil {
+		return fmt.Errorf("organization not found: %w", err)
+	}
+	if orgEntity.Status != domainorg.StatusEnabled {
+		return fmt.Errorf("organization is disabled")
+	}
+
+	defaultRoleID, err := ensureDefaultOrgUserRole(roleRepo)
+	if err != nil {
+		return err
+	}
+
+	created, err := userRoleRepo.CreateIfMissing(&user.SysUserRole{UserID: userID, RoleID: defaultRoleID, OrgID: orgID})
+	if err != nil {
+		return fmt.Errorf("failed to persist organization membership baseline: %w", err)
+	}
+	_ = created
+	return nil
+}
+
+func ensureDefaultOrgUserRole(roleRepo *repository.RoleRepository) (int64, error) {
+	existing, err := roleRepo.GetByRoleCode(role.BuiltInOrgUserRoleCode)
+	if err == nil {
+		if existing.Status != role.StatusEnabled {
+			existing.Status = role.StatusEnabled
+			if updateErr := roleRepo.Update(existing); updateErr != nil {
+				return 0, fmt.Errorf("failed to enable default organization role: %w", updateErr)
+			}
+		}
+		return existing.RoleID, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to load default organization role: %w", err)
+	}
+
+	roleType := role.RoleTypeOrganization
+	dataScope := role.DataScopeSelf
+	createBy := systemActor
+	defaultRole := &role.SysRole{
+		RoleName:  role.BuiltInOrgUserRoleName,
+		RoleCode:  role.BuiltInOrgUserRoleCode,
+		RoleType:  &roleType,
+		DataScope: &dataScope,
+		Status:    role.StatusEnabled,
+		CreateBy:  &createBy,
+	}
+
+	if err := roleRepo.Create(defaultRole); err != nil {
+		return 0, fmt.Errorf("failed to create default organization role: %w", err)
+	}
+
+	return defaultRole.RoleID, nil
+}
+
+func roleMatchesAnyBindingOrg(rle *role.SysRole, orgIDs []int64) bool {
+	if rle == nil {
+		return false
+	}
+	if rle.OrgID == nil || *rle.OrgID == 0 {
+		return true
+	}
+	for _, orgID := range orgIDs {
+		if *rle.OrgID == orgID {
+			return true
+		}
+	}
+	return false
 }

@@ -35,7 +35,7 @@ func setupGovernancePolicyServiceTest(t *testing.T) (*GovernancePolicyService, *
 	roleRepo := repository.NewRoleRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
-	roleSvc := NewRoleService(roleRepo, userRepo, userRoleRepo, policySvc)
+	roleSvc := NewRoleService(roleRepo, userRepo, userRoleRepo, nil, policySvc)
 	return policySvc, roleSvc, roleRepo, userRepo, db
 }
 

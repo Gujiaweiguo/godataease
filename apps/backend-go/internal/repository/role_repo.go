@@ -129,7 +129,7 @@ func (r *RoleRepository) QueryByOrgID(orgID int64, keyword string) ([]*role.SysR
 	assignedRoles := r.db.Table("sys_user_role").Select("role_id").Where("org_id = ?", orgID)
 	db := r.db.Model(&role.SysRole{}).
 		Where("status = ?", role.StatusEnabled).
-		Where("role_type = ? OR role_id IN (?)", role.RoleTypeOrganization, assignedRoles)
+		Where("((role_type = ? AND (org_id = ? OR org_id IS NULL OR org_id = 0)) OR role_id IN (?))", role.RoleTypeOrganization, orgID, assignedRoles)
 	if keyword != "" {
 		db = db.Where("role_name LIKE ?", "%"+keyword+"%")
 	}
