@@ -412,7 +412,7 @@ func ensureTeaSalesFields(db *gorm.DB, datasourceID, datasetGroupID, datasetTabl
 	return fieldIDs, nil
 }
 
-func ensureDemoChartViews(db *gorm.DB, dashboardID, datasetGroupID, datasetTableID int64, fieldIDs map[string]int64, now int64) ([]int64, error) {
+func ensureDemoChartViews(db *gorm.DB, dashboardID, _ int64, datasetTableID int64, fieldIDs map[string]int64, now int64) ([]int64, error) {
 	chartConfigs := []demoChartViewConfig{
 		{
 			Title:       "Sales by Category",
@@ -610,7 +610,7 @@ type demoDashboardBackgroundRadius struct {
 type demoDashboardEvents struct {
 	Checked bool                   `json:"checked"`
 	Type    string                 `json:"type"`
-	Jump    demoDashboardEventJump `json:"jump,omitempty"`
+	Jump    demoDashboardEventJump `json:"jump"`
 }
 
 type demoDashboardEventJump struct {
@@ -776,6 +776,9 @@ func ensureAdminRole(db *gorm.DB, out *role.SysRole) error {
 			DataScope: ptrString("all"),
 			Status:    role.StatusEnabled,
 			CreateBy:  ptrString("system"),
+			RoleType:  ptrString(role.RoleTypeSystem),
+			IsBuiltin: ptrBool(true),
+			Readonly:  ptrBool(true),
 		}
 		if err := db.Create(out).Error; err != nil {
 			return fmt.Errorf("failed to create admin role: %w", err)
@@ -797,6 +800,9 @@ func ensureUserRole(db *gorm.DB, out *role.SysRole) error {
 			DataScope: ptrString("self"),
 			Status:    role.StatusEnabled,
 			CreateBy:  ptrString("system"),
+			RoleType:  ptrString(role.RoleTypeOrganization),
+			IsBuiltin: ptrBool(true),
+			Readonly:  ptrBool(false),
 		}
 		if err := db.Create(out).Error; err != nil {
 			return fmt.Errorf("failed to create user role: %w", err)
