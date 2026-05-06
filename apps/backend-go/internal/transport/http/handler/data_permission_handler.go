@@ -20,12 +20,17 @@ func NewDataPermissionHandler(service *service.DataPermissionAdminService) *Data
 
 func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
 	defer recoverServicePanic(c)
+	scope, err := buildPermissionScope(c)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
 	if !ok {
 		return
 	}
 
-	result, err := h.service.RowPermissionPage(datasetID, page, size)
+	result, err := h.service.RowPermissionPage(datasetID, page, size, scope)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -35,6 +40,11 @@ func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
 
 func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
 	defer recoverServicePanic(c)
+	scope, err := buildPermissionScope(c)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
 	if !ok {
 		return
@@ -46,7 +56,7 @@ func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.RowPermissionPageByTarget(datasetID, targetType, targetID, page, size)
+	result, err := h.service.RowPermissionPageByTarget(datasetID, targetType, targetID, page, size, scope)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return
@@ -86,12 +96,17 @@ func (h *DataPermissionHandler) DeleteRowPermission(c *gin.Context) {
 
 func (h *DataPermissionHandler) ColumnPermissionPager(c *gin.Context) {
 	defer recoverServicePanic(c)
+	scope, err := buildPermissionScope(c)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
 	if !ok {
 		return
 	}
 
-	result, err := h.service.ColumnPermissionPage(datasetID, page, size)
+	result, err := h.service.ColumnPermissionPage(datasetID, page, size, scope)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return

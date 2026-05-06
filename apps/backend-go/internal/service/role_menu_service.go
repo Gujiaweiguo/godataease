@@ -48,15 +48,24 @@ type SaveRoleMenuRequest struct {
 	MenuIDs []int64 `json:"menuIds"`
 }
 
-func (s *RoleMenuService) GetRoleMenuAuth(roleID int64) (*RoleMenuAuthVO, error) {
+func (s *RoleMenuService) GetRoleMenuAuth(roleID int64, scopes ...PermissionMutationScope) (*RoleMenuAuthVO, error) {
 	if roleID <= 0 {
 		return nil, ErrInvalidRoleID
 	}
 
-	_, err := s.roleRepo.GetByID(roleID)
+	rle, err := s.roleRepo.GetByID(roleID)
 	if err != nil {
 		logger.Error("Role not found", zap.Int64("roleId", roleID), zap.Error(err))
 		return nil, ErrRoleNotFound
+	}
+	scope := resolvePermissionScope(scopes)
+	if scope.OrgID > 0 {
+		if err := requireOrgScope(scope); err != nil {
+			return nil, err
+		}
+		if err := validateRoleOrgScope(rle, scope.OrgID); err != nil {
+			return nil, err
+		}
 	}
 
 	menuIDs, err := s.roleMenuRepo.GetMenuIDsByRoleID(roleID)

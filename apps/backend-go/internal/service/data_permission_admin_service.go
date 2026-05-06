@@ -139,7 +139,11 @@ func WithDataPermissionAdminChecker(adminChecker AdminChecker) DataPermissionAdm
 	}
 }
 
-func (s *DataPermissionAdminService) RowPermissionPage(datasetID int64, page, size int) (*DataPermissionPage, error) {
+func (s *DataPermissionAdminService) RowPermissionPage(datasetID int64, page, size int, scopes ...PermissionMutationScope) (*DataPermissionPage, error) {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireDatasetScope(datasetID, scope); err != nil {
+		return nil, err
+	}
 	rows, total, err := s.rowStore.PagerByDatasetID(datasetID, page, size)
 	if err != nil {
 		return nil, err
@@ -147,7 +151,11 @@ func (s *DataPermissionAdminService) RowPermissionPage(datasetID int64, page, si
 	return s.buildRowPermissionPage(datasetID, rows, total, page, size)
 }
 
-func (s *DataPermissionAdminService) RowPermissionPageByTarget(datasetID int64, targetType string, targetID int64, page, size int) (*DataPermissionPage, error) {
+func (s *DataPermissionAdminService) RowPermissionPageByTarget(datasetID int64, targetType string, targetID int64, page, size int, scopes ...PermissionMutationScope) (*DataPermissionPage, error) {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireDatasetScope(datasetID, scope); err != nil {
+		return nil, err
+	}
 	if !isSupportedRowPermissionTargetType(targetType) {
 		return nil, s.unsupportedRowPermissionTargetTypeError("targetType", targetType)
 	}
@@ -277,7 +285,11 @@ func (s *DataPermissionAdminService) unsupportedRowPermissionTargetTypeError(fie
 	return fmt.Errorf("%s %s is not supported", fieldName, targetType)
 }
 
-func (s *DataPermissionAdminService) ColumnPermissionPage(datasetID int64, page, size int) (*DataPermissionPage, error) {
+func (s *DataPermissionAdminService) ColumnPermissionPage(datasetID int64, page, size int, scopes ...PermissionMutationScope) (*DataPermissionPage, error) {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireDatasetScope(datasetID, scope); err != nil {
+		return nil, err
+	}
 	columns, total, err := s.columnStore.PagerByDatasetID(datasetID, page, size)
 	if err != nil {
 		return nil, err

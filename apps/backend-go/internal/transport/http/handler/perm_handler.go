@@ -21,13 +21,18 @@ func NewPermHandler(permService *service.PermService) *PermHandler {
 
 func (h *PermHandler) ListPerms(c *gin.Context) {
 	defer recoverServicePanic(c)
+	scope, err := buildPermissionScope(c)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
 	var req permission.PermQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		req.Current = 1
 		req.Size = 10
 	}
 
-	result, err := h.permService.ListPerms(&req)
+	result, err := h.permService.ListPerms(&req, scope)
 	if err != nil {
 		response.Error(c, "500000", "Failed: "+err.Error())
 		return

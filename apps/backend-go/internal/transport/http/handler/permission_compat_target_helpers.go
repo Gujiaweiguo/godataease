@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/service"
 )
 
 type targetPermissionTarget struct {
@@ -58,8 +59,8 @@ func extractTargetPermIDs(target targetPermissionTarget) []int64 {
 	return permIDs
 }
 
-func (h *PermissionCompatHandler) collectDirectResourcePermIDs(resourceID int64, resourceType string) ([]int64, error) {
-	items, err := h.resourcePermService.GetResourcePerspective(resourceID, resourceType)
+func (h *PermissionCompatHandler) collectDirectResourcePermIDs(resourceID int64, resourceType string, scope service.PermissionMutationScope) ([]int64, error) {
+	items, err := h.resourcePermService.GetResourcePerspective(resourceID, resourceType, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +99,7 @@ func uniqueInt64(values []int64) []int64 {
 	return result
 }
 
-func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []int64) error {
+func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []int64, scope service.PermissionMutationScope) error {
 	target := make(map[int64]struct{}, len(targetPermIDs))
 	for _, id := range targetPermIDs {
 		if id > 0 {
@@ -106,7 +107,7 @@ func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []in
 		}
 	}
 
-	currentPermIDs, err := h.resourcePermService.GetRolePermissionIDs(roleID)
+	currentPermIDs, err := h.resourcePermService.GetRolePermissionIDs(roleID, scope)
 	if err != nil {
 		return err
 	}
@@ -118,7 +119,7 @@ func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []in
 
 	for id := range target {
 		if _, exists := current[id]; !exists {
-			if grantErr := h.resourcePermService.GrantPermissionToRole(roleID, id); grantErr != nil {
+			if grantErr := h.resourcePermService.GrantPermissionToRole(roleID, id, scope); grantErr != nil {
 				return grantErr
 			}
 		}
@@ -126,7 +127,7 @@ func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []in
 
 	for id := range current {
 		if _, keep := target[id]; !keep {
-			if revokeErr := h.resourcePermService.RevokePermissionFromRole(roleID, id); revokeErr != nil {
+			if revokeErr := h.resourcePermService.RevokePermissionFromRole(roleID, id, scope); revokeErr != nil {
 				return revokeErr
 			}
 		}
@@ -135,7 +136,7 @@ func (h *PermissionCompatHandler) saveRolePerms(roleID int64, targetPermIDs []in
 	return nil
 }
 
-func (h *PermissionCompatHandler) saveRolePermsForResourceType(roleID int64, targetPermIDs []int64, resourceType string) error {
+func (h *PermissionCompatHandler) saveRolePermsForResourceType(roleID int64, targetPermIDs []int64, resourceType string, scope service.PermissionMutationScope) error {
 	target := make(map[int64]struct{}, len(targetPermIDs))
 	for _, id := range targetPermIDs {
 		if id <= 0 {
@@ -151,7 +152,7 @@ func (h *PermissionCompatHandler) saveRolePermsForResourceType(roleID int64, tar
 		target[id] = struct{}{}
 	}
 
-	currentPermIDs, err := h.resourcePermService.GetRolePermissionIDs(roleID)
+	currentPermIDs, err := h.resourcePermService.GetRolePermissionIDs(roleID, scope)
 	if err != nil {
 		return err
 	}
@@ -169,7 +170,7 @@ func (h *PermissionCompatHandler) saveRolePermsForResourceType(roleID int64, tar
 
 	for id := range target {
 		if _, exists := current[id]; !exists {
-			if grantErr := h.resourcePermService.GrantPermissionToRole(roleID, id); grantErr != nil {
+			if grantErr := h.resourcePermService.GrantPermissionToRole(roleID, id, scope); grantErr != nil {
 				return grantErr
 			}
 		}
@@ -177,7 +178,7 @@ func (h *PermissionCompatHandler) saveRolePermsForResourceType(roleID int64, tar
 
 	for id := range current {
 		if _, keep := target[id]; !keep {
-			if revokeErr := h.resourcePermService.RevokePermissionFromRole(roleID, id); revokeErr != nil {
+			if revokeErr := h.resourcePermService.RevokePermissionFromRole(roleID, id, scope); revokeErr != nil {
 				return revokeErr
 			}
 		}

@@ -113,7 +113,7 @@ func (s *PermService) GetPermByID(permID int64) (*permission.SysPerm, error) {
 	return s.permRepo.GetByID(permID)
 }
 
-func (s *PermService) ListPerms(req *permission.PermQueryRequest) (*permission.PermListResponse, error) {
+func (s *PermService) ListPerms(req *permission.PermQueryRequest, _ ...PermissionMutationScope) (*permission.PermListResponse, error) {
 	perms, err := s.permRepo.List()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list permissions: %w", err)

@@ -185,7 +185,11 @@ func (s *ResourcePermissionService) GetUserPermissionIDs(userID int64) ([]int64,
 	return s.repo.GetUserPerms(userID)
 }
 
-func (s *ResourcePermissionService) GetRolePermissionIDs(roleID int64) ([]int64, error) {
+func (s *ResourcePermissionService) GetRolePermissionIDs(roleID int64, scopes ...PermissionMutationScope) ([]int64, error) {
+	scope := resolvePermissionScope(scopes)
+	if err := s.requireRoleMutationScope(roleID, scope); err != nil {
+		return nil, err
+	}
 	return s.repo.GetRolePerms(roleID)
 }
 
