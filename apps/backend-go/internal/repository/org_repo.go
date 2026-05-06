@@ -14,6 +14,10 @@ func NewOrgRepository(db *gorm.DB) *OrgRepository {
 	return &OrgRepository{db: db}
 }
 
+func (r *OrgRepository) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *OrgRepository) Create(o *org.SysOrg) error {
 	return r.db.Create(o).Error
 }

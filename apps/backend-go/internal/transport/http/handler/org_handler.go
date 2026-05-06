@@ -4,10 +4,17 @@ import (
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
+
+type transferUserRequest struct {
+	SourceOrgID int64 `json:"sourceOrgId" binding:"required"`
+	TargetOrgID int64 `json:"targetOrgId" binding:"required"`
+	UserID      int64 `json:"userId" binding:"required"`
+}
 
 type OrgHandler struct {
 	orgService *service.OrgService
@@ -186,6 +193,23 @@ func (h *OrgHandler) UpdateOrgStatus(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func (h *OrgHandler) TransferUser(c *gin.Context) {
+	defer recoverServicePanic(c)
+	var req transferUserRequest
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+
+	actorID := int64(middleware.GetUserID(c))
+	if err := h.orgService.TransferUserOrg(req.SourceOrgID, req.TargetOrgID, req.UserID, actorID); err != nil {
+		response.Error(c, "500000", err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func (h *OrgHandler) GetChildOrgs(c *gin.Context) {
 	defer recoverServicePanic(c)
 	parentID, ok := parseIDParamMsg(c, "parentId", "Invalid parent ID")
@@ -213,8 +237,10 @@ func RegisterOrgRoutes(r *gin.RouterGroup, h *OrgHandler) {
 		orgGroup.GET("/tree", h.GetOrgTree)
 		orgGroup.GET("/checkName", h.CheckOrgName)
 		orgGroup.POST("/updateStatus", h.UpdateOrgStatus)
+		orgGroup.POST("/transfer-user", h.TransferUser)
 		orgGroup.GET("/children/:parentId", h.GetChildOrgs)
 	}
 
 	r.POST("/org/mounted", h.ListOrgs)
+	r.POST("/organization/transfer-user", h.TransferUser)
 }

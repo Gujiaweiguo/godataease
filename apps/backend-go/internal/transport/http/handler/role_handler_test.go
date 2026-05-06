@@ -10,10 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/governance"
+	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -36,26 +39,35 @@ func setupRoleHandlerTestRouterWithOrg(t *testing.T, orgID uint64) *gin.Engine {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}))
+	require.NoError(t, db.AutoMigrate(&role.SysRole{}, &org.SysOrg{}, &user.SysUser{}, &user.SysUserRole{}, &governance.SysGovernancePolicy{}))
 
 	repo := repository.NewRoleRepository(db)
+	orgRepo := repository.NewOrgRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
+	require.NoError(t, orgRepo.Create(&org.SysOrg{OrgID: 1, OrgName: "Org 1", ParentID: 0, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
+	require.NoError(t, orgRepo.Create(&org.SysOrg{OrgID: 3, OrgName: "Org 3", ParentID: 0, Level: 1, Status: org.StatusEnabled, DelFlag: org.DelFlagNormal}))
 	systemType := "system"
 	now := time.Unix(300, 0)
 	adminRole := &role.SysRole{RoleName: "Admin", RoleCode: "admin", RoleType: &systemType, Status: role.StatusEnabled, CreateTime: &now}
 	require.NoError(t, repo.Create(adminRole))
+	require.NoError(t, userRepo.Create(&user.SysUser{UserID: 99, Username: "mount-user", NickName: "Mount User", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}))
 	require.NoError(t, db.Create(&user.SysUserRole{UserID: 1, RoleID: adminRole.RoleID, OrgID: 1}).Error)
 
-	svc := service.NewRoleService(repo, userRepo, userRoleRepo)
+	policySvc := service.NewGovernancePolicyService(repository.NewGovernancePolicyRepository(db), nil)
+	svc := service.NewRoleService(repo, userRepo, userRoleRepo, orgRepo, policySvc)
 	r := gin.New()
 	if orgID > 0 {
 		r.Use(func(c *gin.Context) {
 			c.Set("org_id", orgID)
+			c.Set("user_id", uint64(1))
 			c.Next()
 		})
 	}
-	RegisterRoleRoutes(r.Group("/api"), NewRoleHandler(svc))
+	h := NewRoleHandler(svc)
+	h.SetGovernancePolicyService(policySvc)
+	h.SetAdminChecker(middleware.NewDefaultAdminChecker([]int64{1}))
+	RegisterRoleRoutes(r.Group("/api"), h)
 	return r
 }
 
@@ -187,6 +199,44 @@ func TestRoleHandler_UnmountUser_LastRoleReturnsDeterministicErrorEnvelope(t *te
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "500000", resp["code"])
 	assert.Equal(t, service.ErrLastRoleRemovalBlocked.Error(), resp["msg"])
+}
+
+func TestRoleHandler_GetLastRolePolicy_DefaultBlock(t *testing.T) {
+	r := setupRoleHandlerTestRouter(t)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/governance/last-role-policy?orgId=1", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string `json:"code"`
+		Data struct {
+			Policy string `json:"policy"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, string(governance.DefaultLastRolePolicy), resp.Data.Policy)
+}
+
+func TestRoleHandler_UpdateLastRolePolicy_Success(t *testing.T) {
+	r := setupRoleHandlerTestRouter(t)
+	body := []byte(`{"orgId":1,"policy":"WARN_ALLOW"}`)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PUT", "/api/governance/last-role-policy", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Code string `json:"code"`
+		Data struct {
+			Policy string `json:"policy"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "000000", resp.Code)
+	assert.Equal(t, string(governance.LastRolePolicyWarnAllow), resp.Data.Policy)
 }
 
 func TestRoleHandler_Create_RejectsMissingOrgContext(t *testing.T) {

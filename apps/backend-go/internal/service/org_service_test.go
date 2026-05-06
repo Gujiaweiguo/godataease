@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/org"
+	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/user"
 	"dataease/backend/internal/repository"
 
@@ -28,13 +30,16 @@ func setupOrgService(t *testing.T) (*OrgService, *mockOrgRepository) {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
 
-	if err := db.AutoMigrate(&org.SysOrg{}); err != nil {
+	if err := db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}, &governance.SysGovernancePolicy{}); err != nil {
 		t.Fatalf("migrate sys_org failed: %v", err)
 	}
 
 	orgRepo := repository.NewOrgRepository(db)
-	// Pass nil for auditSvc, userRepo, roleRepo as they are optional for most tests
-	return NewOrgService(orgRepo, nil, nil, nil), &mockOrgRepository{repo: orgRepo, db: db}
+	userRepo := repository.NewUserRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
+	userRoleRepo := repository.NewUserRoleRepository(db)
+	governancePolicySvc := NewGovernancePolicyService(repository.NewGovernancePolicyRepository(db), nil)
+	return NewOrgService(orgRepo, nil, userRepo, roleRepo, userRoleRepo, governancePolicySvc), &mockOrgRepository{repo: orgRepo, db: db}
 }
 
 func setupOrgServiceWithAudit(t *testing.T) (*OrgService, *mockOrgRepository, *repository.AuditLogRepository, *repository.UserRepository, *repository.UserRoleRepository) {
@@ -45,7 +50,7 @@ func setupOrgServiceWithAudit(t *testing.T) (*OrgService, *mockOrgRepository, *r
 		t.Fatalf("open sqlite failed: %v", err)
 	}
 
-	if err := db.AutoMigrate(&org.SysOrg{}, &audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{}, &user.SysUser{}, &user.SysUserRole{}); err != nil {
+	if err := db.AutoMigrate(&org.SysOrg{}, &audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{}, &user.SysUser{}, &user.SysUserRole{}, &role.SysRole{}, &governance.SysGovernancePolicy{}); err != nil {
 		t.Fatalf("migrate audit-aware org fixtures failed: %v", err)
 	}
 
@@ -56,8 +61,10 @@ func setupOrgServiceWithAudit(t *testing.T) (*OrgService, *mockOrgRepository, *r
 	auditSvc := NewAuditService(auditLogRepo, loginFailureRepo, auditLogDetailRepo)
 	userRepo := repository.NewUserRepository(db)
 	userRoleRepo := repository.NewUserRoleRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
+	governancePolicySvc := NewGovernancePolicyService(repository.NewGovernancePolicyRepository(db), auditSvc)
 
-	return NewOrgService(orgRepo, auditSvc, userRepo, nil), &mockOrgRepository{repo: orgRepo, db: db}, auditLogRepo, userRepo, userRoleRepo
+	return NewOrgService(orgRepo, auditSvc, userRepo, roleRepo, userRoleRepo, governancePolicySvc), &mockOrgRepository{repo: orgRepo, db: db}, auditLogRepo, userRepo, userRoleRepo
 }
 
 func createSeedOrg(t *testing.T, mockRepo *mockOrgRepository, name string, parentID int64, level int) *org.SysOrg {
@@ -789,4 +796,68 @@ func TestOrgService_RejectsInvalidOrgContext(t *testing.T) {
 
 	err = svc.UpdateOrgStatus(existing.OrgID, org.StatusDisabled, 0)
 	require.ErrorIs(t, err, ErrInvalidOrgContext)
+}
+
+func TestOrgTransferUserOrg_Success(t *testing.T) {
+	svc, mockRepo, auditLogRepo, userRepo, _ := setupOrgServiceWithAudit(t)
+	source := createSeedOrg(t, mockRepo, "Source", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "Target", org.RootParentID, 1)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(mockRepo.db).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyWarnAllow, "tester"))
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Source Role", RoleCode: "source-role", Status: role.StatusEnabled}).Error)
+	usr := &user.SysUser{Username: "transfer-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	require.NoError(t, userRepo.Create(usr))
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: usr.UserID, RoleID: 1, OrgID: source.OrgID}).Error)
+
+	require.NoError(t, svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 88))
+
+	var sourceCount int64
+	require.NoError(t, mockRepo.db.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", usr.UserID, source.OrgID).Count(&sourceCount).Error)
+	assert.Equal(t, int64(0), sourceCount)
+
+	var targetBindings []user.SysUserRole
+	require.NoError(t, mockRepo.db.Where("user_id = ? AND org_id = ?", usr.UserID, target.OrgID).Find(&targetBindings).Error)
+	require.Len(t, targetBindings, 1)
+	defaultRole, err := repository.NewRoleRepository(mockRepo.db).GetByRoleCode(role.BuiltInOrgUserRoleCode)
+	require.NoError(t, err)
+	assert.Equal(t, defaultRole.RoleID, targetBindings[0].RoleID)
+
+	logs, total, err := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	require.Len(t, logs, 2)
+}
+
+func TestOrgTransferUserOrg_RejectsDisabledTarget(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	source := createSeedOrg(t, mockRepo, "Source", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "Target", org.RootParentID, 1)
+	target.Status = org.StatusDisabled
+	require.NoError(t, mockRepo.repo.Update(target))
+
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Source Role", RoleCode: "source-role-disabled", Status: role.StatusEnabled}).Error)
+	require.NoError(t, mockRepo.db.Create(&user.SysUser{UserID: 9, Username: "u9", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: 9, RoleID: 1, OrgID: source.OrgID}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, 9, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "target organization is disabled")
+}
+
+func TestOrgTransferUserOrg_RejectsBlockedLastRolePolicy(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	source := createSeedOrg(t, mockRepo, "Source", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "Target", org.RootParentID, 1)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(mockRepo.db).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyBlock, "tester"))
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Only Role", RoleCode: "only-role", Status: role.StatusEnabled}).Error)
+	require.NoError(t, mockRepo.db.Create(&user.SysUser{UserID: 10, Username: "u10", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: 10, RoleID: 1, OrgID: source.OrgID}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, 10, 2)
+	require.ErrorIs(t, err, ErrLastRoleRemovalBlocked)
+
+	var count int64
+	require.NoError(t, mockRepo.db.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", 10, source.OrgID).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
 }

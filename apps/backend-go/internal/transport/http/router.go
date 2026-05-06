@@ -185,14 +185,17 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	userHandler := handler.NewUserHandler(userService, userImportService)
 	// Role module initialization (must be before OrgService as it depends on roleRepo)
 	roleRepo := repository.NewRoleRepository(db)
+	orgRepo := repository.NewOrgRepository(db)
+	governancePolicyRepo := repository.NewGovernancePolicyRepository(db)
+	governancePolicyService := service.NewGovernancePolicyService(governancePolicyRepo, auditService)
 	userService.SetRoleRepository(roleRepo)
-	roleService := service.NewRoleService(roleRepo, userRepo, userRoleRepo)
+	roleService := service.NewRoleService(roleRepo, userRepo, userRoleRepo, orgRepo, governancePolicyService)
 	roleHandler := handler.NewRoleHandler(roleService)
+	roleHandler.SetGovernancePolicyService(governancePolicyService)
 
 	// Organization module initialization
-	orgRepo := repository.NewOrgRepository(db)
 	userService.SetOrgRepository(orgRepo)
-	orgService := service.NewOrgService(orgRepo, auditService, userRepo, roleRepo)
+	orgService := service.NewOrgService(orgRepo, auditService, userRepo, roleRepo, userRoleRepo, governancePolicyService)
 	orgHandler := handler.NewOrgHandler(orgService)
 
 	// Permission module initialization
@@ -249,6 +252,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	syncService := service.NewSyncService(syncRepo, datasourceRepo, datasourceService)
 	syncHandler := handler.NewSyncHandler(syncService)
 	adminChecker := middleware.NewDefaultAdminChecker([]int64{1})
+	roleHandler.SetAdminChecker(adminChecker)
 	var permissionCacheService *permission.PermissionCacheService
 	if pkgcache.GetClient() != nil {
 		permissionCacheService = permission.NewPermissionCacheService(pkgcache.NewRedisCacheBackend(), 0)

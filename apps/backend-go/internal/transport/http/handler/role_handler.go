@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
@@ -14,11 +15,30 @@ import (
 )
 
 type RoleHandler struct {
-	service *service.RoleService
+	service             *service.RoleService
+	governancePolicySvc *service.GovernancePolicyService
+	adminChecker        roleGovernanceAdminChecker
+}
+
+type roleGovernanceAdminChecker interface {
+	IsAdmin(userID int64) bool
+}
+
+type updateLastRolePolicyRequest struct {
+	OrgID  int64  `json:"orgId"`
+	Policy string `json:"policy" binding:"required"`
 }
 
 func NewRoleHandler(service *service.RoleService) *RoleHandler {
 	return &RoleHandler{service: service}
+}
+
+func (h *RoleHandler) SetGovernancePolicyService(svc *service.GovernancePolicyService) {
+	h.governancePolicySvc = svc
+}
+
+func (h *RoleHandler) SetAdminChecker(checker roleGovernanceAdminChecker) {
+	h.adminChecker = checker
 }
 
 func (h *RoleHandler) Query(c *gin.Context) {
@@ -298,6 +318,69 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 	response.Success(c, count)
 }
 
+func (h *RoleHandler) GetLastRolePolicy(c *gin.Context) {
+	defer recoverServicePanic(c)
+	if h.governancePolicySvc == nil {
+		response.Error(c, "500000", "Failed: governance policy service is unavailable")
+		return
+	}
+
+	orgID, err := strconv.ParseInt(c.Query("orgId"), 10, 64)
+	if err != nil || orgID <= 0 {
+		orgID = middleware.GetOrgID(c)
+	}
+	if orgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
+
+	policy, err := h.governancePolicySvc.GetLastRolePolicy(orgID)
+	if err != nil {
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{"orgId": orgID, "policy": policy})
+}
+
+func (h *RoleHandler) UpdateLastRolePolicy(c *gin.Context) {
+	defer recoverServicePanic(c)
+	if h.governancePolicySvc == nil {
+		response.Error(c, "500000", "Failed: governance policy service is unavailable")
+		return
+	}
+	userID := int64(middleware.GetUserID(c))
+	if h.adminChecker != nil && !h.adminChecker.IsAdmin(userID) {
+		response.Forbidden(c, "insufficient permissions")
+		return
+	}
+
+	var req updateLastRolePolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "500000", "Invalid request: "+err.Error())
+		return
+	}
+	if req.OrgID <= 0 {
+		req.OrgID = middleware.GetOrgID(c)
+	}
+	if req.OrgID <= 0 {
+		response.Error(c, "500000", "Invalid org context")
+		return
+	}
+
+	policy := governance.LastRolePolicy(req.Policy)
+	if err := h.governancePolicySvc.SetLastRolePolicy(req.OrgID, policy, userID); err != nil {
+		if errors.Is(err, service.ErrInvalidLastRolePolicy) {
+			response.Error(c, "500000", "Invalid request: "+err.Error())
+			return
+		}
+		response.Error(c, "500000", "Failed: "+err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{"orgId": req.OrgID, "policy": policy})
+}
+
 // SearchExternalUser 搜索组织外用户
 func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
 	defer recoverServicePanic(c)
@@ -375,6 +458,12 @@ func RegisterRoleRoutes(r *gin.RouterGroup, h *RoleHandler) {
 		roleGroup.GET("/searchExternalUser/:keyword", h.SearchExternalUser)
 		roleGroup.POST("/user/option", h.OptionForUser)
 		roleGroup.POST("/user/selected", h.SelectedForUser)
+	}
+
+	governanceGroup := r.Group("/governance")
+	{
+		governanceGroup.GET("/last-role-policy", h.GetLastRolePolicy)
+		governanceGroup.PUT("/last-role-policy", h.UpdateLastRolePolicy)
 	}
 
 	// System role routes - frontend compatibility aliases

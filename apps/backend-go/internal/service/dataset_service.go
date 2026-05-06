@@ -26,19 +26,19 @@ import (
 )
 
 type DatasetService struct {
-	repo                   *repository.DatasetRepository
-	datasourceRepo         *repository.DatasourceRepository
-	exportRepo             repository.ExportRepositoryInterface
-	rowPermissionService   *RowPermissionService
+	repo                    *repository.DatasetRepository
+	datasourceRepo          *repository.DatasourceRepository
+	exportRepo              repository.ExportRepositoryInterface
+	rowPermissionService    *RowPermissionService
 	columnPermissionService *ColumnPermissionService
-	resourcePermService    *ResourcePermissionService
-	calciteAddress         string
-	calciteTimeout         time.Duration
-	calciteRetries         int
-	calciteClient          *calciteintegration.Client
-	calciteMu              sync.Mutex
-	userRepo               *repository.UserRepository
-	previewExecutorFactory PreviewExecutorFactory
+	resourcePermService     *ResourcePermissionService
+	calciteAddress          string
+	calciteTimeout          time.Duration
+	calciteRetries          int
+	calciteClient           *calciteintegration.Client
+	calciteMu               sync.Mutex
+	userRepo                *repository.UserRepository
+	previewExecutorFactory  PreviewExecutorFactory
 }
 
 var (

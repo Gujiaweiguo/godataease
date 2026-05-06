@@ -2,10 +2,44 @@ package handler
 
 import (
 	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )
+
+// CompatRouteMapping records the canonical path for a legacy compat route.
+type CompatRouteMapping struct {
+	LegacyPath      string `json:"legacyPath"`
+	CanonicalPath   string `json:"canonicalPath"`
+	Bucket          string `json:"bucket"`
+	MigrationStatus string `json:"migrationStatus"`
+}
+
+// compatRouteMappings is the registry of compat routes tracked for frontend migration.
+var compatRouteMappings = []CompatRouteMapping{
+	{LegacyPath: "/user/org/option", CanonicalPath: "/api/user/options", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/list", CanonicalPath: "/api/user/list", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/create", CanonicalPath: "/api/user/create", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/edit", CanonicalPath: "/api/user/update", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/delete/:id", CanonicalPath: "/api/user/delete/:id", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/options", CanonicalPath: "/api/user/options", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/resetPwd/:uid", CanonicalPath: "/api/user/resetPwd/:id", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/org/create", CanonicalPath: "/api/org/create", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/org/update", CanonicalPath: "/api/org/update", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/org/delete/:orgId", CanonicalPath: "/api/org/delete/:orgId", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/org/list", CanonicalPath: "/api/org/list", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+}
+
+type CompatibilityBridgeHandler struct{}
+
+func GetCompatRouteMappings() []CompatRouteMapping {
+	return append([]CompatRouteMapping(nil), compatRouteMappings...)
+}
+
+func (h *CompatibilityBridgeHandler) GetCompatRouteMappings(c *gin.Context) {
+	response.Success(c, GetCompatRouteMappings())
+}
 
 // RegisterCompatibilityBridgeRoutes registers Java-era API compatibility routes.
 //
@@ -38,6 +72,14 @@ import (
 //	  /chart/*              — chart CRUD compatibility (C3 migrate to canonical)
 //	  /datasetField/*       — dataset field compatibility (C3 migrate to canonical)
 func RegisterCompatibilityBridgeRoutes(r gin.IRouter, user *UserHandler, org *OrgHandler, datasourceHandler *DatasourceHandler, datasetHandler *DatasetHandler, chartHandler *ChartHandler, permMiddleware *middleware.PermissionMiddleware, menuAuthMiddlewares ...*middleware.MenuAuthMiddleware) {
+	compatibilityBridgeHandler := &CompatibilityBridgeHandler{}
+	if user != nil && org != nil {
+		if basePathProvider, ok := r.(interface{ BasePath() string }); ok && basePathProvider.BasePath() == "/api" {
+			adminGroup := r.Group("/admin")
+			adminGroup.GET("/compat-route-mappings", compatibilityBridgeHandler.GetCompatRouteMappings)
+		}
+	}
+
 	var menuAuthMiddleware *middleware.MenuAuthMiddleware
 	if len(menuAuthMiddlewares) > 0 {
 		menuAuthMiddleware = menuAuthMiddlewares[0]

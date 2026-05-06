@@ -19,33 +19,33 @@ func (m *mockResourcePermAdminChecker) IsAdmin(userID int64) bool {
 }
 
 type mockResourcePermRepo struct {
-	permByID         map[int64]*permission.SysPerm
-	permByIDErr      error
-	userPerms        map[int64][]int64
-	userPermsErr     error
-	rolePerms        map[int64][]int64
-	rolePermsErr     error
-	userRoles        map[int64][]int64
-	userRoleErr      error
-	permKeys         map[string]*permission.SysPerm
-	userPermOk       map[int64]map[int64]bool
-	rolePermOk       map[int64]map[int64]bool
-	rolePermCheckErr error
-	resourcePerms    map[string][]int64
-	userResources    []*permission.UserResourcePermVO
-	resourceUsers    []*permission.ResourceUserPermVO
-	applyGroupErr    error
-	resourcePermErr  error
-	registerErr      error
-	replaceErr       error
-	userResourcesErr error
-	resourceUsersErr error
-	consistencyErr   error
+	permByID          map[int64]*permission.SysPerm
+	permByIDErr       error
+	userPerms         map[int64][]int64
+	userPermsErr      error
+	rolePerms         map[int64][]int64
+	rolePermsErr      error
+	userRoles         map[int64][]int64
+	userRoleErr       error
+	permKeys          map[string]*permission.SysPerm
+	userPermOk        map[int64]map[int64]bool
+	rolePermOk        map[int64]map[int64]bool
+	rolePermCheckErr  error
+	resourcePerms     map[string][]int64
+	userResources     []*permission.UserResourcePermVO
+	resourceUsers     []*permission.ResourceUserPermVO
+	applyGroupErr     error
+	resourcePermErr   error
+	registerErr       error
+	replaceErr        error
+	userResourcesErr  error
+	resourceUsersErr  error
+	consistencyErr    error
 	consistencyResult *permission.PermissionConsistencyResult
-	applyGroupCalls  int
-	registerCalls    int
-	replaceCalls     int
-	lastParentID     *int64
+	applyGroupCalls   int
+	registerCalls     int
+	replaceCalls      int
+	lastParentID      *int64
 }
 
 func newMockResourcePermRepo() *mockResourcePermRepo {

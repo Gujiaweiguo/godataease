@@ -20,6 +20,7 @@ import (
 	"dataease/backend/internal/domain/embedded"
 	"dataease/backend/internal/domain/engine"
 	"dataease/backend/internal/domain/geo"
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/menu"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
@@ -77,6 +78,7 @@ func TestMain(m *testing.M) {
 		&share.Share{}, &share.ShareTicket{},
 		&template.Template{},
 		&audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{},
+		&governance.SysGovernancePolicy{},
 		&visualization.DataVisualizationInfo{},
 		&visualization.Watermark{},
 		&datasource.CoreDatasource{}, &auto.CoreDatasourceTaskLog{},
