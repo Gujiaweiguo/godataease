@@ -425,7 +425,7 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	visualService.SetAuditService(auditService)
 	visualService.SetThresholdService(thresholdService)
 
-	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID)
+	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID, linkageHandler, linkJumpHandler)
 
 	relationHandler := handler.NewRelationHandler()
 	jobScheduler := scheduler.NewScheduler()

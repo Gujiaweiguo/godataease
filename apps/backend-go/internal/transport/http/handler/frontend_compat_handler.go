@@ -22,6 +22,8 @@ type FrontendCompatHandler struct {
 	datasetService         *service.DatasetService
 	datasourceService      *service.DatasourceService
 	visualizationService   *service.VisualizationService
+	linkageHandler         *LinkageHandler
+	linkJumpHandler        *LinkJumpHandler
 	loadUserByID           userByIDLoader
 	loadRoleIDsByUserID    func(userID int64) ([]int64, error)
 	queryMenuTree          func() ([]*menu.MenuVO, error)
@@ -68,12 +70,16 @@ func NewFrontendCompatHandler(
 	visualizationService *service.VisualizationService,
 	userService *service.UserService,
 	loadRoleIDsByUserID func(userID int64) ([]int64, error),
+	linkageHandler *LinkageHandler,
+	linkJumpHandler *LinkJumpHandler,
 ) *FrontendCompatHandler {
 	h := &FrontendCompatHandler{
 		menuService:          menuService,
 		datasetService:       datasetService,
 		datasourceService:    datasourceService,
 		visualizationService: visualizationService,
+		linkageHandler:       linkageHandler,
+		linkJumpHandler:      linkJumpHandler,
 		loadUserByID:         nil,
 		loadRoleIDsByUserID:  loadRoleIDsByUserID,
 	}
@@ -336,8 +342,8 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	// Note: Root-level /linkage/... and /linkJump/... are already registered by
 	// RegisterLinkageRoutes and RegisterLinkJumpRoutes in registerRootRoutes().
 	// Only /api/ prefixed aliases are needed here for frontend compat.
-	protected.GET("/api/linkage/getVisualizationAllLinkageInfo/:dvId/:resourceTable", h.StubEmptyData)
-	protected.GET("/api/linkJump/queryVisualizationJumpInfo/:dvId/:resourceTable", h.StubEmptyData)
+	protected.GET("/api/linkage/getVisualizationAllLinkageInfo/:dvId/:resourceTable", h.linkageHandler.GetVisualizationAllLinkageInfo)
+	protected.GET("/api/linkJump/queryVisualizationJumpInfo/:dvId/:resourceTable", h.linkJumpHandler.QueryVisualizationJumpInfo)
 }
 
 func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
