@@ -85,13 +85,6 @@ func round5bOpenDB(t *testing.T, name string, models ...interface{}) *gorm.DB {
 	return db
 }
 
-func round5bCloseDB(t *testing.T, db *gorm.DB) {
-	t.Helper()
-	sqlDB, err := db.DB()
-	require.NoError(t, err)
-	require.NoError(t, sqlDB.Close())
-}
-
 func writeTestFile(dir, name string, content []byte) error {
 	return os.WriteFile(filepath.Join(dir, name), content, 0o644)
 }
