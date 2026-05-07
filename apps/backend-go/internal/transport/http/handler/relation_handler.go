@@ -2,54 +2,73 @@ package handler
 
 import (
 	"dataease/backend/internal/pkg/response"
+	"dataease/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-type RelationHandler struct{}
+type RelationHandler struct {
+	relationService *service.RelationService
+}
 
-func NewRelationHandler() *RelationHandler {
-	return &RelationHandler{}
+func NewRelationHandler(svc *service.RelationService) *RelationHandler {
+	return &RelationHandler{relationService: svc}
 }
 
 func (h *RelationHandler) GetDatasourceRelationship(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id := c.Param("id")
-	response.Success(c, map[string]any{
-		"id":           id,
-		"busiFlag":     "datasource",
-		"relationList": []any{},
-	})
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
+		return
+	}
+	result, err := h.relationService.GetDatasourceRelationship(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, "500000", "Failed to get datasource relationship: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *RelationHandler) GetDatasetRelationship(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id := c.Param("id")
-	response.Success(c, map[string]any{
-		"id":           id,
-		"busiFlag":     "dataset",
-		"relationList": []any{},
-	})
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
+		return
+	}
+	result, err := h.relationService.GetDatasetRelationship(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, "500000", "Failed to get dataset relationship: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *RelationHandler) GetPanelRelationship(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id := c.Param("id")
-	response.Success(c, map[string]any{
-		"id":           id,
-		"busiFlag":     "dashboard",
-		"relationList": []any{},
-	})
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
+		return
+	}
+	result, err := h.relationService.GetPanelRelationship(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, "500000", "Failed to get panel relationship: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *RelationHandler) CheckPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id := c.Param("id")
-	response.Success(c, map[string]any{
-		"id":        id,
-		"editable":  true,
-		"creatable": true,
-	})
+	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	if !ok {
+		return
+	}
+	result, err := h.relationService.CheckPermission(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, "500000", "Failed to check permission: "+err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func RegisterRelationRoutes(r *gin.RouterGroup, h *RelationHandler) {

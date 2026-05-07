@@ -30,3 +30,6 @@ linters:
         linters:
           - dupl
           - goconst
+      - path: internal/service/relation_service\.go
+        linters:
+          - dupl

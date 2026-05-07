@@ -300,6 +300,10 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 	linkageService := service.NewLinkageService(linkageRepo)
 	linkageHandler := handler.NewLinkageHandler(linkageService)
 
+	relationRepo := repository.NewRelationRepository(db)
+	relationService := service.NewRelationService(relationRepo)
+	relationHandler := handler.NewRelationHandler(relationService)
+
 	linkJumpRepo := repository.NewLinkJumpRepository(db)
 	linkJumpService := service.NewLinkJumpService(linkJumpRepo)
 	linkJumpHandler := handler.NewLinkJumpHandler(linkJumpService)
@@ -427,7 +431,6 @@ func NewRouter(application *app.Application, db *gorm.DB) *Router {
 
 	frontendCompatHandler := handler.NewFrontendCompatHandler(menuService, datasetService, datasourceService, visualService, userService, userRoleRepo.GetRoleIDsByUserID, linkageHandler, linkJumpHandler)
 
-	relationHandler := handler.NewRelationHandler()
 	jobScheduler := scheduler.NewScheduler()
 	schedulerCfg := app.SchedulerConfig{}
 	if application != nil && application.Config != nil {
