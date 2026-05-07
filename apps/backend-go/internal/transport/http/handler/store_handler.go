@@ -6,6 +6,7 @@ import (
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/repository"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -123,7 +124,7 @@ func RegisterStoreRoutes(r gin.IRouter, h *StoreHandler, skipQuery bool) {
 }
 
 func getUserID(c *gin.Context) int64 {
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			return id
 		}

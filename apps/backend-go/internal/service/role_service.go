@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -228,7 +229,7 @@ func (s *RoleService) DeleteRole(roleID int64, callerOrgID int64) error {
 func (s *RoleService) GetRoleByID(roleID int64) (*role.RoleDetailVO, error) {
 	rle, err := s.repo.GetByID(roleID)
 	if err != nil {
-		return nil, fmt.Errorf("role not found: %w", err)
+		return nil, fmt.Errorf(errno.ErrRoleNotFound, err)
 	}
 
 	return &role.RoleDetailVO{
@@ -330,7 +331,7 @@ func (s *RoleService) MountUsers(req *role.MountUserRequest) error {
 
 	targetRole, err := s.repo.GetByID(req.Rid)
 	if err != nil {
-		return fmt.Errorf("role not found: %w", err)
+		return fmt.Errorf(errno.ErrRoleNotFound, err)
 	}
 	if err := validateRoleOrgScope(targetRole, req.OrgId); err != nil {
 		return err
@@ -369,7 +370,7 @@ func (s *RoleService) validateAssignmentPrerequisites(orgID, userID int64, roleI
 		return err
 	}
 	if s.repo == nil || s.repo.DB() == nil {
-		return fmt.Errorf("role repository is not configured")
+		return fmt.Errorf(errno.ErrRoleRepoNotConfigured)
 	}
 	if s.userRepo == nil {
 		return fmt.Errorf("userRepo not initialized")
@@ -378,14 +379,14 @@ func (s *RoleService) validateAssignmentPrerequisites(orgID, userID int64, roleI
 		return fmt.Errorf("userRoleRepo not initialized")
 	}
 	if s.orgRepo == nil {
-		return fmt.Errorf("org repository is not configured")
+		return fmt.Errorf(errno.ErrOrgRepoNotConfigured)
 	}
 	if len(roleIDs) == 0 {
 		return nil
 	}
 
 	if _, err := s.userRepo.GetByID(userID); err != nil {
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf(errno.ErrUserNotFound, err)
 	}
 	return nil
 }
@@ -408,7 +409,7 @@ func (s *RoleService) resolveRoleAssignments(txDB *gorm.DB, orgID, userID int64,
 	for _, roleID := range roleIDs {
 		targetRole, err := roleRepo.GetByID(roleID)
 		if err != nil {
-			return fmt.Errorf("role not found: %w", err)
+			return fmt.Errorf(errno.ErrRoleNotFound, err)
 		}
 		if err := validateRoleOrgScope(targetRole, orgID); err != nil {
 			return err
@@ -437,7 +438,7 @@ func (s *RoleService) MountExternalUser(req *role.MountExternalUserRequest, orgI
 		return fmt.Errorf("userRoleRepo not initialized")
 	}
 	if orgID <= 0 {
-		return fmt.Errorf("org id is required")
+		return fmt.Errorf(errno.ErrOrgIDRequired)
 	}
 
 	inOrg, err := s.userRoleRepo.IsUserInOrg(req.Uid, orgID)
@@ -555,7 +556,7 @@ func (s *RoleService) unmountLastRoleWithCascade(req *role.UnmountUserRequest) e
 		return fmt.Errorf("userRepo not initialized")
 	}
 	if s.repo == nil || s.repo.DB() == nil {
-		return fmt.Errorf("role repository is not configured")
+		return fmt.Errorf(errno.ErrRoleRepoNotConfigured)
 	}
 
 	return s.repo.DB().Transaction(func(txDB *gorm.DB) error {
@@ -575,7 +576,7 @@ func disableUserAfterRoleUnbind(txDB *gorm.DB, req *role.UnmountUserRequest) err
 	userRepo := repository.NewUserRepository(txDB)
 	existing, err := userRepo.GetByID(req.Uid)
 	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf(errno.ErrUserNotFound, err)
 	}
 	now := time.Now()
 	existing.Status = user.StatusDisabled
@@ -681,7 +682,7 @@ func (s *RoleService) SearchExternalUser(keyword string, excludeOrgID int64) ([]
 		return []*role.ExternalUserVO{}, nil
 	}
 	if excludeOrgID <= 0 {
-		return nil, fmt.Errorf("org id is required")
+		return nil, fmt.Errorf(errno.ErrOrgIDRequired)
 	}
 	if s.userRepo == nil {
 		return nil, fmt.Errorf("userRepo not initialized")
@@ -865,7 +866,7 @@ func (s *RoleService) validateInheritance(parentRoleID int64) error {
 func (s *RoleService) ValidatePermissionInheritance(roleID int64, permIDs []int64) error {
 	rle, err := s.repo.GetByID(roleID)
 	if err != nil {
-		return fmt.Errorf("role not found: %w", err)
+		return fmt.Errorf(errno.ErrRoleNotFound, err)
 	}
 
 	// 如果没有父角色，则无继承约束
@@ -921,7 +922,7 @@ func validateRoleOrgScope(rle *role.SysRole, orgID int64) error {
 func ensureUserOrgBaseline(_ *gorm.DB, orgRepo *repository.OrgRepository, roleRepo *repository.RoleRepository, userRoleRepo *repository.UserRoleRepository, userID int64, orgID int64) error {
 	orgEntity, err := orgRepo.GetByID(orgID)
 	if err != nil {
-		return fmt.Errorf("organization not found: %w", err)
+		return fmt.Errorf(errno.ErrOrganizationNotFound, err)
 	}
 	if orgEntity.Status != domainorg.StatusEnabled {
 		return fmt.Errorf("organization is disabled")

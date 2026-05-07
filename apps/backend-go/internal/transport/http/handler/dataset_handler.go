@@ -29,13 +29,13 @@ func (h *DatasetHandler) Tree(c *gin.Context) {
 
 	var req dataset.TreeRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Tree(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -47,13 +47,13 @@ func (h *DatasetHandler) Fields(c *gin.Context) {
 
 	var req dataset.FieldsRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Fields(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -65,13 +65,13 @@ func (h *DatasetHandler) Preview(c *gin.Context) {
 
 	var req dataset.PreviewRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Preview(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -83,13 +83,13 @@ func (h *DatasetHandler) PreviewWithPermission(c *gin.Context) {
 
 	var req dataset.PreviewRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	userID := int64(middleware.GetUserID(c))
 	if userID == 0 {
-		response.Unauthorized(c, "authentication required")
+		response.Unauthorized(c, response.MsgAuthenticationRequired)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *DatasetHandler) PreviewWithPermission(c *gin.Context) {
 			response.Forbidden(c, err.Error())
 			return
 		}
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *DatasetHandler) Save(c *gin.Context) {
 	}
 	result, err := h.service.Save(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -128,7 +128,7 @@ func (h *DatasetHandler) Create(c *gin.Context) {
 	}
 	result, err := h.service.Create(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -141,12 +141,12 @@ func (h *DatasetHandler) Rename(c *gin.Context) {
 		return
 	}
 	if req.ID <= 0 {
-		response.Error(c, "500000", "Invalid dataset ID")
+		response.Error(c, response.CodeInternalError, errInvalidDatasetID)
 		return
 	}
 	result, err := h.service.Rename(req.ID, req.Name)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -159,7 +159,7 @@ func (h *DatasetHandler) Move(c *gin.Context) {
 		return
 	}
 	if req.ID <= 0 {
-		response.Error(c, "500000", "Invalid dataset ID")
+		response.Error(c, response.CodeInternalError, errInvalidDatasetID)
 		return
 	}
 	pid := int64(0)
@@ -168,7 +168,7 @@ func (h *DatasetHandler) Move(c *gin.Context) {
 	}
 	result, err := h.service.Move(req.ID, pid)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -176,13 +176,13 @@ func (h *DatasetHandler) Move(c *gin.Context) {
 
 func (h *DatasetHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
 	var err error
 	if err = h.service.Delete(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -190,14 +190,14 @@ func (h *DatasetHandler) Delete(c *gin.Context) {
 
 func (h *DatasetHandler) PerDelete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
 	var err error
 	result, err := h.service.PerDelete(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -205,14 +205,14 @@ func (h *DatasetHandler) PerDelete(c *gin.Context) {
 
 func (h *DatasetHandler) GetDetail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
 	var err error
 	result, err := buildDatasetDetail(h, id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -220,14 +220,14 @@ func (h *DatasetHandler) GetDetail(c *gin.Context) {
 
 func (h *DatasetHandler) Details(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
 	var err error
 	result, err := buildDatasetDetail(h, id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -258,7 +258,7 @@ func (h *DatasetHandler) GetSQLParams(c *gin.Context) {
 	}
 	result, err := h.service.GetSQLParams(ids)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -266,14 +266,14 @@ func (h *DatasetHandler) GetSQLParams(c *gin.Context) {
 
 func (h *DatasetHandler) BarInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
 	var err error
 	group, err := h.service.GetGroupByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get dataset: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get dataset: "+err.Error())
 		return
 	}
 	barInfo := &dataset.BarInfo{
@@ -293,7 +293,7 @@ func (h *DatasetHandler) GetDatasetTotal(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var body map[string]interface{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	id, ok := parseInt64Value(body["id"])
@@ -313,12 +313,12 @@ func (h *DatasetHandler) PreviewSQL(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req dataset.SQLPreviewRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.PreviewSQLWithUser(&req, int64(middleware.GetUserID(c)))
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -332,7 +332,7 @@ func (h *DatasetHandler) EnumValueObj(c *gin.Context) {
 	}
 	result, err := h.service.GetFieldEnumObj(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -346,7 +346,7 @@ func (h *DatasetHandler) EnumValueDs(c *gin.Context) {
 	}
 	result, err := h.service.GetFieldEnumDs(fieldID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -360,7 +360,7 @@ func (h *DatasetHandler) EnumValue(c *gin.Context) {
 	}
 	result, err := h.service.GetFieldEnum(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -368,7 +368,7 @@ func (h *DatasetHandler) EnumValue(c *gin.Context) {
 
 func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 	defer recoverServicePanic(c)
-	datasetID, ok := parseIDParamMsg(c, "datasetId", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "datasetId", errInvalidDatasetID)
 	if !ok {
 		return
 	}
@@ -385,7 +385,7 @@ func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 		result, err = h.chartService.ListByDQ(datasetID, 0)
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, flattenChartFieldList(result))
@@ -393,7 +393,7 @@ func (h *DatasetHandler) ListByDatasetGroup(c *gin.Context) {
 
 func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
 	defer recoverServicePanic(c)
-	datasetID, ok := parseIDParamMsg(c, "datasetId", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "datasetId", errInvalidDatasetID)
 	if !ok {
 		return
 	}
@@ -410,7 +410,7 @@ func (h *DatasetHandler) ListWithPermissions(c *gin.Context) {
 		result, err = h.chartService.ListByDQ(datasetID, 0)
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, flattenChartFieldList(result))
@@ -420,16 +420,16 @@ func (h *DatasetHandler) SaveField(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var field dataset.CoreDatasetTableField
 	if err := c.ShouldBindBodyWith(&field, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, "500000", "dataset service unavailable")
+		response.Error(c, response.CodeInternalError, "dataset service unavailable")
 		return
 	}
 	result, err := h.service.SaveField(&field)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -457,7 +457,7 @@ func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
 	}
 	result, err := h.service.GetFieldEnum(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -465,18 +465,18 @@ func (h *DatasetHandler) MultFieldValuesForPermissions(c *gin.Context) {
 
 func (h *DatasetHandler) CopilotFields(c *gin.Context) {
 	defer recoverServicePanic(c)
-	datasetID, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
 	var err error
 	userID := int64(middleware.GetUserID(c))
 	if userID <= 0 {
-		response.Unauthorized(c, "authentication required")
+		response.Unauthorized(c, response.MsgAuthenticationRequired)
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, "500000", "dataset service unavailable")
+		response.Error(c, response.CodeInternalError, "dataset service unavailable")
 		return
 	}
 	result, err := h.service.CopilotFields(datasetID, userID)
@@ -486,10 +486,10 @@ func (h *DatasetHandler) CopilotFields(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, service.ErrDatasetViewPermissionDenied) {
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			return
 		}
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -501,7 +501,7 @@ func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
 		DsIds []int64 `json:"dsIds"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if h == nil || h.service == nil {
@@ -510,7 +510,7 @@ func (h *DatasetHandler) ListFieldsByDsIds(c *gin.Context) {
 	}
 	result, err := h.service.ListFieldsByDsIds(req.DsIds)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -546,7 +546,7 @@ func (h *DatasetHandler) ExportDataset(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req dataset.ExportDatasetRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -557,22 +557,22 @@ func (h *DatasetHandler) ExportDataset(c *gin.Context) {
 			Details:  req.Details,
 		})
 		if err != nil {
-			response.Error(c, "500000", "Failed to export: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed to export: "+err.Error())
 			return
 		}
 
 		filename := service.GenerateExcelFilename(req.ViewName)
 		c.Header("Content-Description", "File Transfer")
-		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		c.Header("Content-Type", mimeExcelOpenXML)
 		c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 		c.Header("Content-Transfer-Encoding", "binary")
-		c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+		c.Data(200, mimeExcelOpenXML, buf.Bytes())
 		return
 	}
 
 	result, err := h.service.ExportDataset(&req, int64(middleware.GetUserID(c)))
 	if err != nil {
-		response.Error(c, "500000", "Failed to export: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to export: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -587,7 +587,7 @@ func (h *DatasetHandler) GetFieldTree(c *gin.Context) {
 	}
 	result, err := h.service.GetFieldTree(req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -596,7 +596,7 @@ func (h *DatasetHandler) GetFieldTree(c *gin.Context) {
 // DeleteDatasetField handles POST /datasetField/delete/:id
 func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid field ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidFieldID)
 	if !ok {
 		return
 	}
@@ -606,11 +606,11 @@ func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
 	} else if h.chartService != nil {
 		err = h.chartService.DeleteField(id)
 	} else {
-		response.Error(c, "500000", "service unavailable")
+		response.Error(c, response.CodeInternalError, "service unavailable")
 		return
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -619,7 +619,7 @@ func (h *DatasetHandler) DeleteDatasetField(c *gin.Context) {
 // DeleteDatasetFieldByChart handles POST /datasetField/deleteByChartId/:id
 func (h *DatasetHandler) DeleteDatasetFieldByChart(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid chart ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidChartID)
 	if !ok {
 		return
 	}
@@ -629,11 +629,11 @@ func (h *DatasetHandler) DeleteDatasetFieldByChart(c *gin.Context) {
 	} else if h.chartService != nil {
 		err = h.chartService.DeleteFieldByChart(id)
 	} else {
-		response.Error(c, "500000", "service unavailable")
+		response.Error(c, response.CodeInternalError, "service unavailable")
 		return
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)

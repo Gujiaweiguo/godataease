@@ -50,7 +50,7 @@ func (h *StaticHandler) ListResources(c *gin.Context) {
 
 	result, err := h.service.ListResources()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -62,7 +62,7 @@ func (h *StaticHandler) GetResource(c *gin.Context) {
 	id := c.Param("id")
 	result, err := h.service.GetResource(id)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -73,7 +73,7 @@ func (h *StaticHandler) ListStores(c *gin.Context) {
 
 	result, err := h.service.ListStores()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -84,7 +84,7 @@ func (h *StaticHandler) ListTypefaces(c *gin.Context) {
 
 	result, err := h.service.ListTypefaces()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -96,7 +96,7 @@ func (h *StaticHandler) ListFont(c *gin.Context) {
 
 	result, err := h.service.ListTypefaces()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -108,7 +108,7 @@ func (h *StaticHandler) DefaultFont(c *gin.Context) {
 
 	result, err := h.service.ListTypefaces()
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	// Return first font as default, or empty object if none
@@ -129,13 +129,13 @@ func (h *StaticHandler) Upload(c *gin.Context) {
 	defer recoverServicePanic(c)
 	fileID := c.Param("fileId")
 	if fileID == "" {
-		response.Error(c, "500000", "fileId is required")
+		response.Error(c, response.CodeInternalError, "fileId is required")
 		return
 	}
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		response.Error(c, "500000", "Failed to read upload file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to read upload file: "+err.Error())
 		return
 	}
 	defer func() { _ = file.Close() }()
@@ -143,13 +143,13 @@ func (h *StaticHandler) Upload(c *gin.Context) {
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	allowedExts := map[string]bool{".gif": true, ".svg": true, ".png": true, ".jpeg": true, ".jpg": true}
 	if !allowedExts[ext] {
-		response.Error(c, "500000", "File type not allowed. Only gif, svg, png, jpeg, jpg are supported")
+		response.Error(c, response.CodeInternalError, "File type not allowed. Only gif, svg, png, jpeg, jpg are supported")
 		return
 	}
 
 	content, err := io.ReadAll(io.LimitReader(file, 10<<20))
 	if err != nil {
-		response.Error(c, "500000", "Failed to read file content: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to read file content: "+err.Error())
 		return
 	}
 
@@ -157,7 +157,7 @@ func (h *StaticHandler) Upload(c *gin.Context) {
 		svgStr := string(content)
 		if strings.Contains(strings.ToUpper(svgStr), "<!DOCTYPE") ||
 			strings.Contains(strings.ToUpper(svgStr), "<!ENTITY") {
-			response.Error(c, "500000", "SVG with DOCTYPE/ENTITY is not allowed for security reasons")
+			response.Error(c, response.CodeInternalError, "SVG with DOCTYPE/ENTITY is not allowed for security reasons")
 			return
 		}
 	}
@@ -167,17 +167,17 @@ func (h *StaticHandler) Upload(c *gin.Context) {
 		staticDir = "/opt/dataease2.0/data/static-resource"
 	}
 	if err := os.MkdirAll(staticDir, 0755); err != nil {
-		response.Error(c, "500000", "Failed to create static directory: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to create static directory: "+err.Error())
 		return
 	}
 
 	destPath, ok := resolveSafeStaticUploadPath(staticDir, fileID, ext)
 	if !ok {
-		response.Error(c, "500000", "Invalid fileId")
+		response.Error(c, response.CodeInternalError, "Invalid fileId")
 		return
 	}
 	if err := os.WriteFile(destPath, content, 0644); err != nil {
-		response.Error(c, "500000", "Failed to save file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to save file: "+err.Error())
 		return
 	}
 
@@ -190,11 +190,11 @@ func (h *StaticHandler) FindResourceAsBase64(c *gin.Context) {
 		ResourcePathList []string `json:"resourcePathList"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if len(req.ResourcePathList) > maxStaticResourcePathCount {
-		response.Error(c, "500000", fmt.Sprintf("too many files requested (max %d)", maxStaticResourcePathCount))
+		response.Error(c, response.CodeInternalError, fmt.Sprintf("too many files requested (max %d)", maxStaticResourcePathCount))
 		return
 	}
 

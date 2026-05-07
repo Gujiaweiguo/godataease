@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -576,7 +577,7 @@ func toTaskLog(row auto.CoreDatasourceTaskLog) syncmodule.TaskLog {
 func parseStringID(raw string) (int64, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return 0, fmt.Errorf("id is required")
+		return 0, fmt.Errorf(errno.ErrIDRequired)
 	}
 	id, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil || id <= 0 {

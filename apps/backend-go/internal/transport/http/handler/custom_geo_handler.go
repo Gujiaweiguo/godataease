@@ -22,7 +22,7 @@ func (h *CustomGeoHandler) ListGeoAreas(c *gin.Context) {
 	defer recoverServicePanic(c)
 	areas, err := h.repo.ListGeoAreas()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, areas)
@@ -33,7 +33,7 @@ func (h *CustomGeoHandler) GetGeoArea(c *gin.Context) {
 	id := c.Param("id")
 	subAreas, err := h.repo.GetGeoArea(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, subAreas)
@@ -43,7 +43,7 @@ func (h *CustomGeoHandler) DeleteGeoArea(c *gin.Context) {
 	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if err := h.repo.DeleteGeoArea(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -56,14 +56,14 @@ func (h *CustomGeoHandler) SaveGeoArea(c *gin.Context) {
 		Name string `json:"name"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	// Check for duplicate name
 	exists, err := h.repo.CheckGeoAreaName(req.Name, req.ID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	if exists {
@@ -76,7 +76,7 @@ func (h *CustomGeoHandler) SaveGeoArea(c *gin.Context) {
 		Name: req.Name,
 	}
 	if err := h.repo.SaveGeoArea(area); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -89,7 +89,7 @@ func (h *CustomGeoHandler) DeleteGeoSubArea(c *gin.Context) {
 		return
 	}
 	if err := h.repo.DeleteGeoSubArea(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -104,14 +104,14 @@ func (h *CustomGeoHandler) SaveGeoSubArea(c *gin.Context) {
 		GeoAreaID string `json:"geoAreaId"`
 	}
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	// Check for duplicate name in same geo area
 	exists, err := h.repo.CheckGeoSubAreaName(req.Name, req.GeoAreaID, req.ID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	if exists {
@@ -126,7 +126,7 @@ func (h *CustomGeoHandler) SaveGeoSubArea(c *gin.Context) {
 		GeoAreaID: req.GeoAreaID,
 	}
 	if err := h.repo.SaveGeoSubArea(subArea); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -136,7 +136,7 @@ func (h *CustomGeoHandler) ListSubAreaOptions(c *gin.Context) {
 	defer recoverServicePanic(c)
 	areas, err := h.repo.ListAreaOptions()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	// Convert to AreaNode format

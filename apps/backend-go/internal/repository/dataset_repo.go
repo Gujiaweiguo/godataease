@@ -9,6 +9,7 @@ import (
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/dataset"
 	"dataease/backend/internal/domain/permission"
+	"dataease/backend/internal/pkg/errno"
 
 	"gorm.io/gorm"
 )
@@ -25,7 +26,7 @@ func NewDatasetRepository(db *gorm.DB) *DatasetRepository {
 
 func (r *DatasetRepository) ListGroups(keyword *string) ([]*dataset.CoreDatasetGroup, error) {
 	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("dataset repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasetRepoUnavailable)
 	}
 
 	var groups []*dataset.CoreDatasetGroup
@@ -40,7 +41,7 @@ func (r *DatasetRepository) ListGroups(keyword *string) ([]*dataset.CoreDatasetG
 
 func (r *DatasetRepository) ListGroupsBatch(keyword *string, afterID int64, limit int) ([]*dataset.CoreDatasetGroup, error) {
 	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("dataset repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasetRepoUnavailable)
 	}
 
 	var groups []*dataset.CoreDatasetGroup
@@ -223,7 +224,7 @@ func (r *DatasetRepository) DeleteFieldByIDAndChartID(id int64, chartID int64) (
 
 func (r *DatasetRepository) DeleteFieldsByChartID(chartID int64) (int64, error) {
 	if chartID <= 0 {
-		return 0, fmt.Errorf("chart id is required")
+		return 0, fmt.Errorf(errno.ErrChartIDRequired)
 	}
 	result := r.db.Where("chart_id = ?", chartID).Delete(&dataset.CoreDatasetTableField{})
 	if result.Error != nil {
@@ -363,7 +364,7 @@ func (r *DatasetRepository) FindPrimaryTableName(datasetGroupID int64) (string, 
 
 func (r *DatasetRepository) PreviewRows(tableName string, limit int) ([]map[string]interface{}, error) {
 	if !tableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if limit < 1 {
 		limit = 100
@@ -382,7 +383,7 @@ func (r *DatasetRepository) PreviewRows(tableName string, limit int) ([]map[stri
 
 func (r *DatasetRepository) PreviewRowsWithFilter(tableName string, selectColumns string, whereClause string, whereArgs []interface{}, limit int) ([]map[string]interface{}, error) {
 	if !tableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if limit < 1 {
 		limit = 100
@@ -415,7 +416,7 @@ func (r *DatasetRepository) PreviewRowsWithFilter(tableName string, selectColumn
 
 func (r *DatasetRepository) QueryDistinctValues(tableName string, columnName string, filters []dataset.EnumFilterClause, limit int) ([]string, error) {
 	if !tableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 
 	quotedTable, err := quoteIdentifier(tableName)
@@ -483,7 +484,7 @@ func (r *DatasetRepository) QueryDistinctValues(tableName string, columnName str
 
 func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, searchColumn string, searchText string, sortColumn string, sortDirection string, limit int) ([]map[string]interface{}, error) { //nolint:gocyclo // complex query builder with multiple conditions
 	if !tableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if len(columns) == 0 {
 		return []map[string]interface{}{}, nil
@@ -571,7 +572,7 @@ func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns 
 
 func (r *DatasetRepository) QueryFieldTreeValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, limit int) ([]map[string]interface{}, error) {
 	if !tableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if len(columns) == 0 {
 		return []map[string]interface{}{}, nil
@@ -657,7 +658,7 @@ func buildFilterWhereParts(filters []dataset.EnumFilterClause, args *[]interface
 
 func (r *DatasetRepository) CountRows(tableName string) (int64, error) {
 	if !tableNamePattern.MatchString(tableName) {
-		return 0, fmt.Errorf("invalid table name")
+		return 0, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	var result struct {
 		C int64 `gorm:"column:c"`

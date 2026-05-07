@@ -22,7 +22,7 @@ func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
@@ -32,7 +32,7 @@ func (h *DataPermissionHandler) RowPermissionPager(c *gin.Context) {
 
 	result, err := h.service.RowPermissionPage(datasetID, page, size, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -42,7 +42,7 @@ func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
@@ -58,7 +58,7 @@ func (h *DataPermissionHandler) RowPermissionPagerByTarget(c *gin.Context) {
 
 	result, err := h.service.RowPermissionPageByTarget(datasetID, targetType, targetID, page, size, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -68,12 +68,12 @@ func (h *DataPermissionHandler) SaveRowPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.RowPermissionForm
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.service.SaveRowPermission(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -83,12 +83,12 @@ func (h *DataPermissionHandler) DeleteRowPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.DeletePermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.service.DeleteRowPermission(req.ID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -98,7 +98,7 @@ func (h *DataPermissionHandler) ColumnPermissionPager(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	datasetID, page, size, ok := parseDatasetPagerParams(c)
@@ -108,7 +108,7 @@ func (h *DataPermissionHandler) ColumnPermissionPager(c *gin.Context) {
 
 	result, err := h.service.ColumnPermissionPage(datasetID, page, size, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -118,12 +118,12 @@ func (h *DataPermissionHandler) SaveColumnPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.ColumnPermissionForm
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.service.SaveColumnPermission(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -133,12 +133,12 @@ func (h *DataPermissionHandler) DeleteColumnPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.DeletePermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.service.DeleteColumnPermission(req.ID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -162,20 +162,20 @@ func RegisterDataPermissionRoutes(r *gin.RouterGroup, h *DataPermissionHandler) 
 }
 
 func parseDatasetPagerParams(c *gin.Context) (int64, int, int, bool) {
-	datasetID, ok := parseIDParamMsg(c, "datasetId", "Invalid dataset ID")
+	datasetID, ok := parseIDParamMsg(c, "datasetId", errInvalidDatasetID)
 	if !ok {
 		return 0, 0, 0, false
 	}
 
 	page, err := strconv.Atoi(c.Param("page"))
 	if err != nil {
-		response.Error(c, "500000", "Invalid page")
+		response.Error(c, response.CodeInternalError, errInvalidPage)
 		return 0, 0, 0, false
 	}
 
 	size, err := strconv.Atoi(c.Param("limit"))
 	if err != nil {
-		response.Error(c, "500000", "Invalid limit")
+		response.Error(c, response.CodeInternalError, "Invalid limit")
 		return 0, 0, 0, false
 	}
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"fmt"
 	"strings"
 
@@ -254,7 +255,7 @@ func (s *ResourcePermissionService) RevokePermissionFromRole(roleID, permID int6
 // GetUserPerspective 获取用户视角的权限列表
 func (s *ResourcePermissionService) GetUserPerspective(userID int64, resourceType string, scopes ...PermissionMutationScope) ([]*permission.UserResourcePermVO, error) {
 	if s.repo == nil {
-		return nil, fmt.Errorf("repository not initialized")
+		return nil, fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 	scope := resolvePermissionScope(scopes)
 
@@ -279,7 +280,7 @@ func (s *ResourcePermissionService) GetUserPerspective(userID int64, resourceTyp
 // GetResourcePerspective 获取资源视角的授权列表
 func (s *ResourcePermissionService) GetResourcePerspective(resourceID int64, resourceType string, scopes ...PermissionMutationScope) ([]*permission.ResourceUserPermVO, error) {
 	if s.repo == nil {
-		return nil, fmt.Errorf("repository not initialized")
+		return nil, fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 	scope := resolvePermissionScope(scopes)
 	if scope.OrgID > 0 && !s.isAdminActor(scope) {
@@ -297,7 +298,7 @@ func (s *ResourcePermissionService) GetResourcePerspective(resourceID int64, res
 // ApplyGroupPermissionsToResource 将分组权限应用到新资源
 func (s *ResourcePermissionService) ApplyGroupPermissionsToResource(groupID, resourceID int64, resourceType string) error {
 	if s.repo == nil {
-		return fmt.Errorf("repository not initialized")
+		return fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 
 	return s.repo.ApplyGroupPermissions(groupID, resourceID, resourceType)
@@ -305,7 +306,7 @@ func (s *ResourcePermissionService) ApplyGroupPermissionsToResource(groupID, res
 
 func (s *ResourcePermissionService) RegisterResource(resourceID int64, resourceName, resourceType string, parentID *int64) error {
 	if s.repo == nil {
-		return fmt.Errorf("repository not initialized")
+		return fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 
 	return s.repo.RegisterResource(resourceID, resourceName, resourceType, parentID)
@@ -318,7 +319,7 @@ func (s *ResourcePermissionService) InheritParentResourcePermissions(parentID, r
 
 func (s *ResourcePermissionService) TryInheritParentResourcePermissions(parentID, resourceID int64, resourceName, resourceType string) (bool, error) {
 	if s.repo == nil {
-		return false, fmt.Errorf("repository not initialized")
+		return false, fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 	if parentID <= 0 || resourceID <= 0 || strings.TrimSpace(resourceType) == "" {
 		return false, nil
@@ -341,7 +342,7 @@ func (s *ResourcePermissionService) TryInheritParentResourcePermissions(parentID
 
 func (s *ResourcePermissionService) ReplaceResourcePermissions(resourceID int64, resourceType string, permIDs []int64) error {
 	if s.repo == nil {
-		return fmt.Errorf("repository not initialized")
+		return fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 
 	return s.repo.ReplaceResourcePermissions(resourceID, resourceType, permIDs)
@@ -354,7 +355,7 @@ func (s *ResourcePermissionService) ResolvePermission(resourceType, permKey stri
 // CheckPermissionConsistency 校验双视角权限一致性
 func (s *ResourcePermissionService) CheckPermissionConsistency(scopes ...PermissionMutationScope) (*permission.PermissionConsistencyResult, error) {
 	if s.repo == nil {
-		return nil, fmt.Errorf("repository not initialized")
+		return nil, fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 	scope := resolvePermissionScope(scopes)
 	if scope.OrgID > 0 && !s.isAdminActor(scope) {
@@ -425,7 +426,7 @@ func (s *ResourcePermissionService) recordMutationAudit(operation string, scope 
 
 func (s *ResourcePermissionService) lookupPermission(resourceType, permKey string) (*permission.SysPerm, error) {
 	if s.repo == nil {
-		return nil, fmt.Errorf("repository not initialized")
+		return nil, fmt.Errorf(errno.ErrRepositoryNotInitialized)
 	}
 
 	lookupKeys := make([]string, 0, 2)

@@ -30,13 +30,13 @@ func (h *ChartHandler) Query(c *gin.Context) {
 
 	var req chart.ChartQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Query(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -46,12 +46,12 @@ func (h *ChartHandler) ViewOption(c *gin.Context) {
 	defer recoverServicePanic(c)
 	resourceId, err := strconv.ParseInt(c.Param("resourceId"), 10, 64)
 	if err != nil {
-		response.Error(c, "500000", "Invalid resource ID")
+		response.Error(c, response.CodeInternalError, errInvalidResourceID)
 		return
 	}
 	result, err := h.service.ViewOption(resourceId)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -61,13 +61,13 @@ func (h *ChartHandler) ChartBaseInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, "500000", "Invalid chart ID")
+		response.Error(c, response.CodeInternalError, errInvalidChartID)
 		return
 	}
 	resourceTable := c.Param("resourceTable")
 	result, err := h.service.ChartBaseInfo(id, resourceTable)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -78,13 +78,13 @@ func (h *ChartHandler) Data(c *gin.Context) {
 
 	var reqMap map[string]interface{}
 	if err := c.ShouldBindBodyWith(&reqMap, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	id, ok := chartDataIDFromMap(reqMap)
 	if !ok || id <= 0 {
-		response.Error(c, "500000", "Invalid request: chart id is required")
+		response.Error(c, response.CodeInternalError, "Invalid request: chart id is required")
 		return
 	}
 	req := &chart.ChartDataRequest{ID: id, Payload: reqMap}
@@ -104,7 +104,7 @@ func (h *ChartHandler) Data(c *gin.Context) {
 		result, err = h.service.QueryData(req)
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -230,12 +230,12 @@ func (h *ChartHandler) CheckSameDataSet(c *gin.Context) {
 
 	source, err := h.service.Query(&chart.ChartQueryRequest{ID: sourceID})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	target, err := h.service.Query(&chart.ChartQueryRequest{ID: targetID})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -249,12 +249,12 @@ func (h *ChartHandler) SaveFromMap(c *gin.Context) {
 
 	var body map[string]interface{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.SaveFromMap(body)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -264,11 +264,11 @@ func (h *ChartHandler) SaveFromMap(c *gin.Context) {
 func (h *ChartHandler) ListByDQ(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	datasetGroupID, ok := parseIDParamMsg(c, "id", "Invalid dataset ID")
+	datasetGroupID, ok := parseIDParamMsg(c, "id", errInvalidDatasetID)
 	if !ok {
 		return
 	}
-	chartID, ok := parseIDParamMsg(c, "chartId", "Invalid chart ID")
+	chartID, ok := parseIDParamMsg(c, "chartId", errInvalidChartID)
 	if !ok {
 		return
 	}
@@ -282,7 +282,7 @@ func (h *ChartHandler) ListByDQ(c *gin.Context) {
 		result, err = h.service.ListByDQ(datasetGroupID, chartID)
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -292,17 +292,17 @@ func (h *ChartHandler) ListByDQ(c *gin.Context) {
 func (h *ChartHandler) CopyField(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	id, ok := parseIDParamMsg(c, "id", "Invalid field ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidFieldID)
 	if !ok {
 		return
 	}
-	chartID, ok := parseIDParamMsg(c, "chartId", "Invalid chart ID")
+	chartID, ok := parseIDParamMsg(c, "chartId", errInvalidChartID)
 	if !ok {
 		return
 	}
 	var err error
 	if err = h.service.CopyField(id, chartID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -312,13 +312,13 @@ func (h *ChartHandler) CopyField(c *gin.Context) {
 func (h *ChartHandler) DeleteField(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	id, ok := parseIDParamMsg(c, "id", "Invalid field ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidFieldID)
 	if !ok {
 		return
 	}
 	var err error
 	if err = h.service.DeleteField(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -327,12 +327,12 @@ func (h *ChartHandler) DeleteField(c *gin.Context) {
 // DeleteFieldByChart handles POST /chart/deleteFieldByChart/:chartId
 func (h *ChartHandler) DeleteFieldByChart(c *gin.Context) {
 	defer recoverServicePanic(c)
-	chartID, ok := parseIDParamMsg(c, "chartId", "Invalid chart ID")
+	chartID, ok := parseIDParamMsg(c, "chartId", errInvalidChartID)
 	if !ok {
 		return
 	}
 	if err := h.service.DeleteFieldByChart(chartID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -340,14 +340,14 @@ func (h *ChartHandler) DeleteFieldByChart(c *gin.Context) {
 
 func (h *ChartHandler) GetChart(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid chart ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidChartID)
 	if !ok {
 		return
 	}
 	var err error
 	result, err := h.service.Query(&chart.ChartQueryRequest{ID: id})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -355,14 +355,14 @@ func (h *ChartHandler) GetChart(c *gin.Context) {
 
 func (h *ChartHandler) GetDetail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid chart ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidChartID)
 	if !ok {
 		return
 	}
 	var err error
 	result, err := h.service.Query(&chart.ChartQueryRequest{ID: id})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -372,7 +372,7 @@ func (h *ChartHandler) GetDetail(c *gin.Context) {
 func (h *ChartHandler) GetFieldData(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	fieldID, ok := parseIDParamMsg(c, "fieldId", "Invalid field ID")
+	fieldID, ok := parseIDParamMsg(c, "fieldId", errInvalidFieldID)
 	if !ok {
 		return
 	}
@@ -383,7 +383,7 @@ func (h *ChartHandler) GetFieldData(c *gin.Context) {
 	}
 	result, err := h.datasetService.GetFieldEnum(&dataset.MultFieldValuesRequest{FieldIDs: []int64{fieldID}, ResultMode: 1})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -393,7 +393,7 @@ func (h *ChartHandler) GetFieldData(c *gin.Context) {
 func (h *ChartHandler) GetDrillFieldData(c *gin.Context) {
 	defer recoverServicePanic(c)
 
-	fieldID, ok := parseIDParamMsg(c, "fieldId", "Invalid field ID")
+	fieldID, ok := parseIDParamMsg(c, "fieldId", errInvalidFieldID)
 	if !ok {
 		return
 	}
@@ -404,7 +404,7 @@ func (h *ChartHandler) GetDrillFieldData(c *gin.Context) {
 	}
 	result, err := h.datasetService.GetFieldEnumDs(fieldID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -416,22 +416,22 @@ func (h *ChartHandler) InnerExportDetails(c *gin.Context) {
 
 	var req service.ExportChartRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	buf, err := h.exportService.InnerExportDetails(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to export: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to export: "+err.Error())
 		return
 	}
 
 	filename := service.GenerateExcelFilename(req.ViewName)
 	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Type", mimeExcelOpenXML)
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 	c.Header("Content-Transfer-Encoding", "binary")
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+	c.Data(200, mimeExcelOpenXML, buf.Bytes())
 }
 
 // InnerExportDataSetDetails handles POST /chartData/innerExportDataSetDetails

@@ -21,7 +21,7 @@ func (h *GeoHandler) ListAreas(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.ListAreas()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -32,7 +32,7 @@ func (h *GeoHandler) GetArea(c *gin.Context) {
 	id := c.Param("id")
 	result, err := h.service.GetArea(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -46,24 +46,24 @@ func (h *GeoHandler) Save(c *gin.Context) {
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		response.Error(c, "500000", "geometry file is required")
+		response.Error(c, response.CodeInternalError, "geometry file is required")
 		return
 	}
 	defer func() { _ = file.Close() }()
 
 	if !strings.HasSuffix(strings.ToLower(header.Filename), ".json") {
-		response.Error(c, "500000", "only json format files are supported")
+		response.Error(c, response.CodeInternalError, "only json format files are supported")
 		return
 	}
 
 	fileContent := make([]byte, header.Size)
 	if _, err := file.Read(fileContent); err != nil {
-		response.Error(c, "500000", "failed to read file")
+		response.Error(c, response.CodeInternalError, "failed to read file")
 		return
 	}
 
 	if err := h.service.SaveMapGeo(code, name, pid, fileContent, header.Filename); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -73,7 +73,7 @@ func (h *GeoHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
 	id := c.Param("id")
 	if err := h.service.DeleteGeo(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)

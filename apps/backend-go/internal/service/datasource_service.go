@@ -17,6 +17,7 @@ import (
 	"dataease/backend/internal/domain/datasource"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/integration/seatunnel"
+	"dataease/backend/internal/pkg/errno"
 	"dataease/backend/internal/repository"
 
 	"gorm.io/gorm"
@@ -33,6 +34,8 @@ var repeatCheckSchemaTypes = map[string]struct{}{
 }
 
 const apiDefinitionTypeTable = "table"
+
+const errDatasourceConfigEmpty = "datasource configuration is empty"
 
 type DatasourceService struct {
 	repo                *repository.DatasourceRepository
@@ -416,7 +419,7 @@ func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.Core
 	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, fmt.Errorf("datasource name is required")
+		return nil, fmt.Errorf(errno.ErrDatasourceNameRequired)
 	}
 
 	pid := normalizedPID(req.PID)
@@ -439,7 +442,7 @@ func (s *DatasourceService) Save(req *datasource.WriteRequest) (*datasource.Core
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("datasource name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasourceNameExists)
 	}
 
 	now := time.Now().UnixMilli()
@@ -472,13 +475,13 @@ func (s *DatasourceService) Update(req *datasource.WriteRequest) (*datasource.Co
 		return nil, fmt.Errorf("repository is unavailable")
 	}
 	if req.ID <= 0 {
-		return nil, fmt.Errorf("datasource id is required")
+		return nil, fmt.Errorf(errno.ErrDatasourceIDRequired)
 	}
 
 	existing, err := s.repo.GetByID(req.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("datasource not found")
+			return nil, fmt.Errorf(errno.ErrDatasourceNotFound)
 		}
 		return nil, err
 	}
@@ -538,7 +541,7 @@ func (s *DatasourceService) validateNoDuplicateName(name string, pid int64, excl
 		return err
 	}
 	if count > 0 {
-		return fmt.Errorf("datasource name already exists")
+		return fmt.Errorf(errno.ErrDatasourceNameExists)
 	}
 	return nil
 }
@@ -568,7 +571,7 @@ func (s *DatasourceService) BackfillGovernedResourcesWithOptions(options *Govern
 		return nil, fmt.Errorf("datasource repository not initialized")
 	}
 	if s.resourcePermService == nil {
-		return nil, fmt.Errorf("resource permission service not initialized")
+		return nil, fmt.Errorf(errno.ErrResourcePermNotInitialized)
 	}
 	return runGovernanceBackfillWithOptions(options, permission.ResourceTypeDatasource, func(normalized GovernanceBackfillOptions) ([]*datasource.CoreDatasource, error) {
 		return s.repo.ListBatch(nil, normalized.AfterID, normalized.Limit)
@@ -583,13 +586,13 @@ func (s *DatasourceService) Rename(id int64, name string) (*datasource.CoreDatas
 	existing, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("datasource not found")
+			return nil, fmt.Errorf(errno.ErrDatasourceNotFound)
 		}
 		return nil, err
 	}
 	newName := strings.TrimSpace(name)
 	if newName == "" {
-		return nil, fmt.Errorf("datasource name is required")
+		return nil, fmt.Errorf(errno.ErrDatasourceNameRequired)
 	}
 	pid := int64(0)
 	if existing.PID != nil {
@@ -600,7 +603,7 @@ func (s *DatasourceService) Rename(id int64, name string) (*datasource.CoreDatas
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("datasource name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasourceNameExists)
 	}
 
 	existing.Name = newName
@@ -614,7 +617,7 @@ func (s *DatasourceService) Rename(id int64, name string) (*datasource.CoreDatas
 
 func (s *DatasourceService) Move(id int64, pid int64) (*datasource.CoreDatasource, error) {
 	if id <= 0 {
-		return nil, fmt.Errorf("datasource id is required")
+		return nil, fmt.Errorf(errno.ErrDatasourceIDRequired)
 	}
 	if id == pid {
 		return nil, fmt.Errorf("destination folder cannot be itself")
@@ -622,7 +625,7 @@ func (s *DatasourceService) Move(id int64, pid int64) (*datasource.CoreDatasourc
 	existing, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("datasource not found")
+			return nil, fmt.Errorf(errno.ErrDatasourceNotFound)
 		}
 		return nil, err
 	}
@@ -642,7 +645,7 @@ func (s *DatasourceService) Move(id int64, pid int64) (*datasource.CoreDatasourc
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("datasource name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasourceNameExists)
 	}
 
 	existing.PID = &pid
@@ -659,14 +662,14 @@ func (s *DatasourceService) Delete(id int64) error {
 		return fmt.Errorf("repository is unavailable")
 	}
 	if id <= 0 {
-		return fmt.Errorf("datasource id is required")
+		return fmt.Errorf(errno.ErrDatasourceIDRequired)
 	}
 	return s.deleteRecursive(id)
 }
 
 func (s *DatasourceService) PerDelete(id int64) (bool, error) {
 	if id <= 0 {
-		return false, fmt.Errorf("datasource id is required")
+		return false, fmt.Errorf(errno.ErrDatasourceIDRequired)
 	}
 	count, err := s.repo.CountDatasourceRelations(id)
 	if err != nil {
@@ -796,10 +799,10 @@ func (s *DatasourceService) resolveConfig(req *datasource.ValidateRequest) (stri
 	if req.DatasourceID != nil {
 		ds, err := s.repo.GetByID(*req.DatasourceID)
 		if err != nil {
-			return "", "", fmt.Errorf("datasource not found")
+			return "", "", fmt.Errorf(errno.ErrDatasourceNotFound)
 		}
 		if ds.Configuration == nil {
-			return ds.Type, "", fmt.Errorf("datasource configuration is empty")
+			return ds.Type, "", errors.New(errDatasourceConfigEmpty)
 		}
 		return ds.Type, *ds.Configuration, nil
 	}
@@ -927,10 +930,10 @@ func (s *DatasourceService) SyncAPIDs(req map[string]string) (map[string]interfa
 
 func (s *DatasourceService) ListSyncRecord(dsID int64, page int, limit int) (*datasource.SyncRecordPage, error) {
 	if dsID <= 0 {
-		return nil, fmt.Errorf("invalid datasource id")
+		return nil, fmt.Errorf(errno.ErrInvalidDatasourceID)
 	}
 	if s.repo == nil {
-		return nil, fmt.Errorf("datasource repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 
 	records, total, err := s.repo.ListSyncTaskLogs(dsID, page, limit)
@@ -1069,14 +1072,14 @@ func parseDatasourceID(req map[string]string) (int64, error) {
 		}
 		id, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("invalid datasource id")
+			return 0, fmt.Errorf(errno.ErrInvalidDatasourceID)
 		}
 		if id <= 0 {
-			return 0, fmt.Errorf("invalid datasource id")
+			return 0, fmt.Errorf(errno.ErrInvalidDatasourceID)
 		}
 		return id, nil
 	}
-	return 0, fmt.Errorf("datasource id is required")
+	return 0, fmt.Errorf(errno.ErrDatasourceIDRequired)
 }
 
 func parseTaskID(raw string) int64 {

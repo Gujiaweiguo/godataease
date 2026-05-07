@@ -26,12 +26,12 @@ func (h *SyncHandler) SourceDatasourcePager(c *gin.Context) {
 	}
 	var req datasource.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.SourcePager(page, size, &req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -45,12 +45,12 @@ func (h *SyncHandler) TargetDatasourcePager(c *gin.Context) {
 	}
 	var req datasource.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.TargetPager(page, size, &req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -66,7 +66,7 @@ func (h *SyncHandler) LatestUse(c *gin.Context) {
 	}
 	result, err := h.service.LatestUse(c.Param("sourceType"), creator)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -76,12 +76,12 @@ func (h *SyncHandler) ValidateDatasource(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req datasource.ValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.ValidateDatasource(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -95,7 +95,7 @@ func (h *SyncHandler) ValidateDatasourceByID(c *gin.Context) {
 	}
 	result, err := h.service.ValidateDatasourceByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -105,7 +105,7 @@ func (h *SyncHandler) GetSchemas(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.GetSchemas()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -115,12 +115,12 @@ func (h *SyncHandler) SaveDatasource(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req datasource.WriteRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.SaveDatasource(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -134,7 +134,7 @@ func (h *SyncHandler) GetDatasource(c *gin.Context) {
 	}
 	result, err := h.service.GetDatasource(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -144,12 +144,12 @@ func (h *SyncHandler) UpdateDatasource(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req datasource.WriteRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.UpdateDatasource(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -162,7 +162,7 @@ func (h *SyncHandler) DeleteDatasource(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteDatasource(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -172,16 +172,16 @@ func (h *SyncHandler) BatchDeleteDatasource(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var ids []string
 	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	parsedIDs, err := parseIDList(ids)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	if err = h.service.BatchDeleteDatasource(parsedIDs); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -191,12 +191,12 @@ func (h *SyncHandler) GetDatasourceFields(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req syncmodule.SyncDatasourceFieldRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.GetDatasourceFields(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -206,7 +206,7 @@ func (h *SyncHandler) ListDatasourceByType(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.ListDatasourceByType(c.Param("type"))
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -220,7 +220,7 @@ func (h *SyncHandler) ListDatasourceTables(c *gin.Context) {
 	}
 	result, err := h.service.ListDatasourceTables(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -234,12 +234,12 @@ func (h *SyncHandler) TaskPager(c *gin.Context) {
 	}
 	var req syncmodule.TaskGridRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.TaskPager(page, size, &req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -253,7 +253,7 @@ func (h *SyncHandler) GetTask(c *gin.Context) {
 	}
 	result, err := h.service.GetTask(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -263,11 +263,11 @@ func (h *SyncHandler) AddTask(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req syncmodule.TaskInfo
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.AddTask(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -277,11 +277,11 @@ func (h *SyncHandler) UpdateTask(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req syncmodule.TaskInfo
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.UpdateTask(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -294,7 +294,7 @@ func (h *SyncHandler) RemoveTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.RemoveTask(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -304,16 +304,16 @@ func (h *SyncHandler) BatchDeleteTasks(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var ids []string
 	if err := c.ShouldBindBodyWith(&ids, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	parsedIDs, err := parseIDList(ids)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	if err = h.service.BatchDeleteTasks(parsedIDs); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -327,7 +327,7 @@ func (h *SyncHandler) ExecuteTask(c *gin.Context) {
 	}
 	result, err := h.service.ExecuteTask(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -340,7 +340,7 @@ func (h *SyncHandler) StartTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.StartTask(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -353,7 +353,7 @@ func (h *SyncHandler) StopTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.StopTask(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -367,12 +367,12 @@ func (h *SyncHandler) TaskLogPager(c *gin.Context) {
 	}
 	var req syncmodule.TaskLogGridRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.TaskLogPager(page, size, &req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -390,7 +390,7 @@ func (h *SyncHandler) TaskLogDetail(c *gin.Context) {
 	}
 	result, err := h.service.TaskLogDetail(id, int(fromLineNum))
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -403,7 +403,7 @@ func (h *SyncHandler) DeleteTaskLog(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteTaskLog(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -413,11 +413,11 @@ func (h *SyncHandler) ClearTaskLog(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req syncmodule.TaskLog
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil && !isEOFBindError(err) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.ClearTaskLog(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -430,7 +430,7 @@ func (h *SyncHandler) TerminateTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.TerminateTaskByLogID(id); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -440,7 +440,7 @@ func (h *SyncHandler) ResourceCount(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.ResourceCount()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -450,7 +450,7 @@ func (h *SyncHandler) LogChartData(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.LogChartData()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)

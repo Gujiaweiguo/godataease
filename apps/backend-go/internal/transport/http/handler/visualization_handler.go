@@ -33,7 +33,7 @@ func (h *VisualizationHandler) FindByID(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.DetailRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *VisualizationHandler) FindByID(c *gin.Context) {
 			response.NotFound(c, "Visualization not found")
 			return
 		}
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -154,13 +154,13 @@ func (h *VisualizationHandler) List(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.ListRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.List(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -170,14 +170,14 @@ func (h *VisualizationHandler) FindRecent(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.WorkbranchQueryRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	req.QueryFrom = "recent"
 	uid := int64(middleware.GetUserID(c))
 	result, err := h.service.FindRecent(&req, uid)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -209,13 +209,13 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req treeRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	types, err := resolveBusiTypes(req.BusiFlag)
 	if err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	all := make([]*visualization.DataVisualizationInfo, 0)
@@ -223,7 +223,7 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 		t := typ
 		list, err := h.service.List(&visualization.ListRequest{Type: &t, Current: 1, Size: 2000})
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			return
 		}
 		all = append(all, list.List...)
@@ -231,7 +231,7 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 
 	nodes, err := buildVisualizationTree(all, req.Leaf)
 	if err != nil {
-		response.Error(c, "500000", "Invalid tree payload: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid tree payload: "+err.Error())
 		return
 	}
 	root := treeNode{
@@ -246,7 +246,7 @@ func (h *VisualizationHandler) Tree(c *gin.Context) {
 	}
 
 	if err := validateTreeNodes([]treeNode{root}); err != nil {
-		response.Error(c, "500000", "Invalid tree payload: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid tree payload: "+err.Error())
 		return
 	}
 
@@ -375,14 +375,14 @@ func (h *VisualizationHandler) SaveCanvas(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.SaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	updateBy := h.getUpdateBy(c)
 	id, err := h.service.Save(&req, updateBy)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, strconv.FormatInt(id, 10))
@@ -397,7 +397,7 @@ func (h *VisualizationHandler) FindDvType(c *gin.Context) {
 	var err error
 	result, err := h.service.FindDvType(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -412,7 +412,7 @@ func (h *VisualizationHandler) UpdateCheckVersion(c *gin.Context) {
 	var err error
 	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(id)})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	if result == nil || result.CheckVersion == nil {
@@ -426,13 +426,13 @@ func (h *VisualizationHandler) Copy(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.CopyRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	updateBy := h.getUpdateBy(c)
 	id, err := h.service.Copy(&req, updateBy)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, id)
@@ -442,12 +442,12 @@ func (h *VisualizationHandler) CheckCanvasChange(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.CanvasChangeRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.CheckCanvasChange(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -457,13 +457,13 @@ func (h *VisualizationHandler) UpdateCanvas(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.Update(&req, updateBy); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -473,12 +473,12 @@ func (h *VisualizationHandler) UpdateBase(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.UpdateBase(&req, updateBy); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -488,12 +488,12 @@ func (h *VisualizationHandler) Move(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.MoveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.Move(&req, updateBy); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -503,13 +503,13 @@ func (h *VisualizationHandler) UpdatePublishStatus(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.UpdateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	updateBy := h.getUpdateBy(c)
 	result, err := h.service.UpdatePublishStatus(&req, updateBy)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -519,13 +519,13 @@ func (h *VisualizationHandler) RecoverToPublished(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.DetailRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	updateBy := h.getUpdateBy(c)
 	result, err := h.service.RecoverToPublished(req.ID.Int64(), updateBy)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -540,7 +540,7 @@ func (h *VisualizationHandler) DeleteLogic(c *gin.Context) {
 
 	updateBy := h.getUpdateBy(c)
 	if err := h.service.DeleteLogic(id, updateBy); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -550,19 +550,19 @@ func (h *VisualizationHandler) NameCheck(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.NameCheckRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.NameCheck(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
 }
 
 func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
-	if userID, exists := c.Get("userId"); exists {
+	if userID, exists := c.Get(middleware.ContextUserID); exists {
 		switch v := userID.(type) {
 		case int64:
 			return strconv.FormatInt(v, 10)
@@ -577,13 +577,13 @@ func (h *VisualizationHandler) getUpdateBy(c *gin.Context) string {
 
 func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", errInvalidDvID)
 	if !ok {
 		return
 	}
 	result, err := h.service.Detail(&visualization.DetailRequest{ID: visualization.FlexInt(dvID)})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	if result != nil && result.PID != nil && *result.PID == -1 {
@@ -595,13 +595,13 @@ func (h *VisualizationHandler) FindCopyResource(c *gin.Context) {
 
 func (h *VisualizationHandler) ViewDetailList(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", errInvalidDvID)
 	if !ok {
 		return
 	}
 	result, err := h.service.ViewDetailList(dvID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -611,12 +611,12 @@ func (h *VisualizationHandler) AppCanvasNameCheck(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.AppCanvasNameCheckRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.AppCanvasNameCheck(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -631,12 +631,12 @@ func (h *VisualizationHandler) Export2AppCheck(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.Export2AppCheckRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.Export2AppCheck(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -665,11 +665,11 @@ func (h *VisualizationHandler) ExportLogImg(c *gin.Context) {
 func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 	var req visualization.ExportLogRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	var userID *int64
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		switch v := uid.(type) {
 		case int64:
 			userID = &v
@@ -679,7 +679,7 @@ func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 		}
 	}
 	var username *string
-	if raw, exists := c.Get("userName"); exists {
+	if raw, exists := c.Get(middleware.ContextUserName); exists {
 		if name, ok := raw.(string); ok && strings.TrimSpace(name) != "" {
 			username = &name
 		}
@@ -687,7 +687,7 @@ func (h *VisualizationHandler) recordExportLog(c *gin.Context, logType string) {
 	ipAddress := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
 	if err := h.service.RecordExportLog(&req, userID, username, &ipAddress, &userAgent, logType); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -697,13 +697,13 @@ func (h *VisualizationHandler) Decompression(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req visualization.DecompressionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.Decompression(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -714,30 +714,30 @@ func (h *VisualizationHandler) DecompressionLocalFile(c *gin.Context) {
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		response.Error(c, "500000", "Failed to read upload file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to read upload file: "+err.Error())
 		return
 	}
 
 	opened, err := file.Open()
 	if err != nil {
-		response.Error(c, "500000", "Failed to open upload file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to open upload file: "+err.Error())
 		return
 	}
 	defer func() { _ = opened.Close() }()
 
 	content, err := io.ReadAll(io.LimitReader(opened, maxVisualizationTemplateUploadBytes+1))
 	if err != nil {
-		response.Error(c, "500000", "Failed to read file content: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to read file content: "+err.Error())
 		return
 	}
 	if len(content) > maxVisualizationTemplateUploadBytes {
-		response.Error(c, "500000", fmt.Sprintf("Template file exceeds %d bytes", maxVisualizationTemplateUploadBytes))
+		response.Error(c, response.CodeInternalError, fmt.Sprintf("Template file exceeds %d bytes", maxVisualizationTemplateUploadBytes))
 		return
 	}
 
 	result, err := h.service.DecompressionLocalFile(content)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)

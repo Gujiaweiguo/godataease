@@ -135,7 +135,7 @@ func (s *AuditService) RecordLoginFailure(req *audit.LoginFailureRequest) (*audi
 		return nil, fmt.Errorf("failed to record login failure: %w", err)
 	}
 
-	logger.Info("Login failure recorded", zap.String("username", req.Username))
+	logger.Info("Login failure recorded", zap.String(zapKeyUsername, req.Username))
 	return failure, nil
 }
 

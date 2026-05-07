@@ -59,8 +59,8 @@ const (
 	interactiveMenuPathScreen     = "/screen"
 	interactiveMenuPathDataset    = "/data/dataset"
 	interactiveMenuPathDatasource = "/data/datasource"
-	interactivePanelAlias         = "panel"
-	interactiveScreenAlias        = "screen"
+	interactivePanelAlias         = visualization.ResourceAliasPanel
+	interactiveScreenAlias        = visualization.ResourceAliasScreen
 )
 
 func NewFrontendCompatHandler(
@@ -111,7 +111,7 @@ func (h *FrontendCompatHandler) GetRoleRouters(c *gin.Context) {
 	locale := requestLocale(c, h.loadUserByID)
 	menus, err := h.loadRuntimeMenus(c)
 	if err != nil {
-		response.Error(c, "500000", "failed to load role routers")
+		response.Error(c, response.CodeInternalError, "failed to load role routers")
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *FrontendCompatHandler) GetMenuResource(c *gin.Context) {
 	locale := requestLocale(c, h.loadUserByID)
 	menus, err := h.loadRuntimeMenus(c)
 	if err != nil {
-		response.Error(c, "500000", "failed to load menu resource")
+		response.Error(c, response.CodeInternalError, "failed to load menu resource")
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *FrontendCompatHandler) InteractiveTree(c *gin.Context) {
 	result := make(map[string]interface{})
 	menus, err := h.loadRuntimeMenus(c)
 	if err != nil {
-		response.Error(c, "500000", "failed to load interactive tree")
+		response.Error(c, response.CodeInternalError, "failed to load interactive tree")
 		return
 	}
 	authorized := collectAuthorizedBusiFlags(menus)

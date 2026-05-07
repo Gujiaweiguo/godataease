@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"dataease/backend/internal/domain/role"
 	"dataease/backend/internal/domain/template"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 	"net/http"
 	"strconv"
 
@@ -18,6 +20,8 @@ type TemplateHandler struct {
 func NewTemplateHandler(service *service.TemplateService) *TemplateHandler {
 	return &TemplateHandler{service: service}
 }
+
+const queryParamCategories = "categories"
 
 func (h *TemplateHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
@@ -59,13 +63,13 @@ func (h *TemplateHandler) Save(c *gin.Context) {
 
 func templateCreateBy(c *gin.Context) string {
 	userID := int64(0)
-	if uid, exists := c.Get("userId"); exists {
+	if uid, exists := c.Get(middleware.ContextUserID); exists {
 		if id, ok := uid.(int64); ok {
 			userID = id
 		}
 	}
 
-	if uid, exists := c.Get("userName"); exists {
+	if uid, exists := c.Get(middleware.ContextUserName); exists {
 		if name, ok := uid.(string); ok && name != "" {
 			return name
 		}
@@ -76,7 +80,7 @@ func templateCreateBy(c *gin.Context) string {
 
 func (h *TemplateHandler) Get(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid template ID")
+	id, ok := parseIDParamMsgBadRequest(c, "id", errInvalidTemplateID)
 	if !ok {
 		return
 	}
@@ -126,7 +130,7 @@ func (h *TemplateHandler) Update(c *gin.Context) {
 
 func (h *TemplateHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid template ID")
+	id, ok := parseIDParamMsgBadRequest(c, "id", errInvalidTemplateID)
 	if !ok {
 		return
 	}
@@ -175,7 +179,7 @@ func (h *TemplateHandler) ListCategories(c *gin.Context) {
 // DeleteWithCategory handles delete scoped to a category when categoryId is present (Java compatibility)
 func (h *TemplateHandler) DeleteWithCategory(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsgBadRequest(c, "id", "Invalid template ID")
+	id, ok := parseIDParamMsgBadRequest(c, "id", errInvalidTemplateID)
 	if !ok {
 		return
 	}
@@ -210,9 +214,9 @@ func (h *TemplateHandler) SearchTemplateMarket(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, map[string]interface{}{
-			"baseUrl":    "",
-			"contents":   []interface{}{},
-			"categories": []interface{}{},
+			"baseUrl":            "",
+			"contents":           []interface{}{},
+			queryParamCategories: []interface{}{},
 		})
 		return
 	}
@@ -224,9 +228,9 @@ func (h *TemplateHandler) SearchTemplateMarketRecommend(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, map[string]interface{}{
-			"baseUrl":    "",
-			"contents":   []interface{}{},
-			"categories": []interface{}{},
+			"baseUrl":            "",
+			"contents":           []interface{}{},
+			queryParamCategories: []interface{}{},
 		})
 		return
 	}
@@ -238,9 +242,9 @@ func (h *TemplateHandler) SearchTemplateMarketPreview(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.service == nil {
 		response.Success(c, map[string]interface{}{
-			"baseUrl":    "",
-			"contents":   []interface{}{},
-			"categories": []interface{}{},
+			"baseUrl":            "",
+			"contents":           []interface{}{},
+			queryParamCategories: []interface{}{},
 		})
 		return
 	}
@@ -412,12 +416,12 @@ func RegisterTemplateRoutes(r gin.IRouter, h *TemplateHandler) {
 }
 
 func (h *TemplateHandler) buildTemplateMarketResponse(groupByCategory bool) map[string]interface{} {
-	categories, err := h.service.ListCategories("0", "self")
+	categories, err := h.service.ListCategories("0", role.DataScopeSelf)
 	if err != nil || len(categories) == 0 {
 		return map[string]interface{}{
-			"baseUrl":    "",
-			"contents":   []interface{}{},
-			"categories": []interface{}{},
+			"baseUrl":            "",
+			"contents":           []interface{}{},
+			queryParamCategories: []interface{}{},
 		}
 	}
 
@@ -482,9 +486,9 @@ func (h *TemplateHandler) buildTemplateMarketResponse(groupByCategory bool) map[
 	}
 
 	return map[string]interface{}{
-		"baseUrl":    "",
-		"contents":   contents,
-		"categories": categoryResult,
+		"baseUrl":            "",
+		"contents":           contents,
+		queryParamCategories: categoryResult,
 	}
 }
 

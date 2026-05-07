@@ -45,13 +45,13 @@ func (h *RoleHandler) Query(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RoleQueryRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.QueryRoles(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -62,13 +62,13 @@ func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RoleQueryRequest
 	if err := shouldBindOptionalJSON(c, &req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	orgID := middleware.GetOrgID(c)
 	if orgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h *RoleHandler) QueryByCurrentOrg(c *gin.Context) {
 
 	result, err := h.service.QueryRolesByOrgID(orgID, keyword)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -90,13 +90,13 @@ func (h *RoleHandler) Page(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RolePageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.QueryRolesPage(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -107,19 +107,19 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RoleCreator
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	createBy := h.getCreateBy(c)
 	callerOrgID := middleware.GetOrgID(c)
 	if callerOrgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 	id, err := h.service.CreateRole(&req, createBy, callerOrgID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -130,18 +130,18 @@ func (h *RoleHandler) Edit(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RoleEditor
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	updateBy := h.getCreateBy(c)
 	callerOrgID := middleware.GetOrgID(c)
 	if callerOrgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 	if err := h.service.EditRole(&req, updateBy, callerOrgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -150,18 +150,18 @@ func (h *RoleHandler) Edit(c *gin.Context) {
 
 func (h *RoleHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid role ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidRoleID)
 	if !ok {
 		return
 	}
 	callerOrgID := middleware.GetOrgID(c)
 	if callerOrgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	if err := h.service.DeleteRole(id, callerOrgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -170,7 +170,7 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 
 func (h *RoleHandler) Detail(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid role ID")
+	id, ok := parseIDParamMsg(c, "id", errInvalidRoleID)
 	if !ok {
 		return
 	}
@@ -178,7 +178,7 @@ func (h *RoleHandler) Detail(c *gin.Context) {
 
 	result, err := h.service.GetRoleByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -196,7 +196,7 @@ func (h *RoleHandler) QueryWithOrgID(c *gin.Context) {
 	keyword := c.Query("keyword")
 	result, err := h.service.QueryRolesByOrgID(oid, keyword)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -204,7 +204,7 @@ func (h *RoleHandler) QueryWithOrgID(c *gin.Context) {
 }
 
 func (h *RoleHandler) getCreateBy(c *gin.Context) string {
-	if userId, exists := c.Get("userId"); exists {
+	if userId, exists := c.Get(middleware.ContextUserID); exists {
 		switch v := userId.(type) {
 		case string:
 			return v
@@ -222,19 +222,19 @@ func (h *RoleHandler) MountUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.MountUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if req.OrgId <= 0 {
 		req.OrgId = middleware.GetOrgID(c)
 	}
 	if req.OrgId <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	if err := h.service.MountUsers(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -246,17 +246,17 @@ func (h *RoleHandler) MountExternalUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.MountExternalUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	orgID := middleware.GetOrgID(c)
 	if orgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 	if err := h.service.MountExternalUser(&req, orgID); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -268,7 +268,7 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.UnmountUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -276,16 +276,16 @@ func (h *RoleHandler) UnmountUser(c *gin.Context) {
 		req.OrgId = middleware.GetOrgID(c)
 	}
 	if req.OrgId <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	if err := h.service.UnmountUser(&req); err != nil {
 		if errors.Is(err, service.ErrLastRoleRemovalBlocked) {
-			response.Error(c, "500000", service.ErrLastRoleRemovalBlocked.Error())
+			response.Error(c, response.CodeInternalError, service.ErrLastRoleRemovalBlocked.Error())
 			return
 		}
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -297,7 +297,7 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.UnmountUserRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -305,13 +305,13 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 		req.OrgId = middleware.GetOrgID(c)
 	}
 	if req.OrgId <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	count, err := h.service.BeforeUnmountInfo(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -321,22 +321,22 @@ func (h *RoleHandler) BeforeUnmountInfo(c *gin.Context) {
 func (h *RoleHandler) GetLastRolePolicy(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.governancePolicySvc == nil {
-		response.Error(c, "500000", "Failed: governance policy service is unavailable")
+		response.Error(c, response.CodeInternalError, "Failed: governance policy service is unavailable")
 		return
 	}
 
-	orgID, err := strconv.ParseInt(c.Query("orgId"), 10, 64)
+	orgID, err := strconv.ParseInt(c.Query(middleware.ContextOrgID), 10, 64)
 	if err != nil || orgID <= 0 {
 		orgID = middleware.GetOrgID(c)
 	}
 	if orgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	policy, err := h.governancePolicySvc.GetLastRolePolicy(orgID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -346,35 +346,35 @@ func (h *RoleHandler) GetLastRolePolicy(c *gin.Context) {
 func (h *RoleHandler) UpdateLastRolePolicy(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.governancePolicySvc == nil {
-		response.Error(c, "500000", "Failed: governance policy service is unavailable")
+		response.Error(c, response.CodeInternalError, "Failed: governance policy service is unavailable")
 		return
 	}
 	userID := int64(middleware.GetUserID(c))
 	if h.adminChecker != nil && !h.adminChecker.IsAdmin(userID) {
-		response.Forbidden(c, "insufficient permissions")
+		response.Forbidden(c, response.MsgInsufficientPermission)
 		return
 	}
 
 	var req updateLastRolePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if req.OrgID <= 0 {
 		req.OrgID = middleware.GetOrgID(c)
 	}
 	if req.OrgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	policy := governance.LastRolePolicy(req.Policy)
 	if err := h.governancePolicySvc.SetLastRolePolicy(req.OrgID, policy, userID); err != nil {
 		if errors.Is(err, service.ErrInvalidLastRolePolicy) {
-			response.Error(c, "500000", "Invalid request: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 			return
 		}
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -387,13 +387,13 @@ func (h *RoleHandler) SearchExternalUser(c *gin.Context) {
 	keyword := c.Param("keyword")
 	excludeOrgID := middleware.GetOrgID(c)
 	if excludeOrgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 
 	result, err := h.service.SearchExternalUser(keyword, excludeOrgID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -405,18 +405,18 @@ func (h *RoleHandler) OptionForUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RoleRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	orgID := middleware.GetOrgID(c)
 	if orgID <= 0 {
-		response.Error(c, "500000", "Invalid org context")
+		response.Error(c, response.CodeInternalError, errInvalidOrgContext)
 		return
 	}
 	result, err := h.service.OptionForUser(&req, orgID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -428,13 +428,13 @@ func (h *RoleHandler) SelectedForUser(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req role.RoleRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	result, err := h.service.SelectedForUser(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

@@ -53,7 +53,7 @@ func (h *AuthHandler) LocalLogin(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto auth.PwdLoginDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *AuthHandler) LocalLogin(c *gin.Context) {
 
 	tokenVO, err := h.authService.LocalLogin(&dto, c.GetHeader("Accept-Language"))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.authService == nil {
-		response.Error(c, "500000", "auth service is not configured")
+		response.Error(c, response.CodeInternalError, "auth service is not configured")
 		return
 	}
 

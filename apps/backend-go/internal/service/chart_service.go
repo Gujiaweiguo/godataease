@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/md5"
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -567,7 +568,7 @@ func intLikeToFloat(v interface{}) (float64, bool) {
 func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) { //nolint:gocyclo // chart view construction with multiple field types
 	id, ok := int64FromAny(body["id"])
 	if !ok || id <= 0 {
-		return nil, fmt.Errorf("chart id is required")
+		return nil, fmt.Errorf(errno.ErrChartIDRequired)
 	}
 
 	view, err := s.repo.GetByID(id)
@@ -836,7 +837,7 @@ func (s *ChartService) DeleteField(id int64) error {
 
 func (s *ChartService) DeleteFieldByChart(chartID int64) error {
 	if chartID <= 0 {
-		return fmt.Errorf("chart id is required")
+		return fmt.Errorf(errno.ErrChartIDRequired)
 	}
 	return s.repo.DeleteDatasetFieldsByChart(chartID)
 }

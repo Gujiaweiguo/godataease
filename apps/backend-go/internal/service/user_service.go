@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"errors"
 	"fmt"
 	"os"
@@ -72,7 +73,7 @@ func (s *UserService) isBuiltInAdminUser(userID int64) bool {
 
 func (s *UserService) EnsureUserInOrg(userID int64, orgID int64) error {
 	if orgID <= 0 {
-		return fmt.Errorf("org id is required")
+		return fmt.Errorf(errno.ErrOrgIDRequired)
 	}
 	if s.userRoleRepo == nil {
 		return fmt.Errorf("user-role repository is not configured")
@@ -103,7 +104,7 @@ func (s *UserService) CreateUser(req *user.UserCreateRequest) (int64, error) {
 	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), DefaultBcryptCost)
 	if err != nil {
-		return 0, fmt.Errorf("failed to hash password: %w", err)
+		return 0, fmt.Errorf(errno.ErrFailedHashPassword, err)
 	}
 
 	u := &user.SysUser{
@@ -133,7 +134,7 @@ func (s *UserService) CreateUser(req *user.UserCreateRequest) (int64, error) {
 		}
 	}
 
-	logger.Info("User created", zap.Int64("userId", u.UserID), zap.String("username", u.Username))
+	logger.Info("User created", zap.Int64(zapKeyUserID, u.UserID), zap.String(zapKeyUsername, u.Username))
 	return u.UserID, nil
 }
 
@@ -141,7 +142,7 @@ func (s *UserService) CreateUser(req *user.UserCreateRequest) (int64, error) {
 func (s *UserService) UpdateUser(req *user.UserUpdateRequest) error {
 	existing, err := s.userRepo.GetByID(req.ID)
 	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf(errno.ErrUserNotFound, err)
 	}
 
 	if req.Username != "" {
@@ -159,7 +160,7 @@ func (s *UserService) UpdateUser(req *user.UserUpdateRequest) error {
 	if req.Password != nil && *req.Password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*req.Password), DefaultBcryptCost)
 		if err != nil {
-			return fmt.Errorf("failed to hash password: %w", err)
+			return fmt.Errorf(errno.ErrFailedHashPassword, err)
 		}
 		existing.Password = string(hashedPassword)
 	}
@@ -178,12 +179,12 @@ func (s *UserService) UpdateUser(req *user.UserUpdateRequest) error {
 	newOrgID := resolveOrgID(req.OrgID, req.OrganizationID)
 	if newOrgID != nil && *newOrgID > 0 {
 		if err := s.switchUserOrg(req.ID, *newOrgID); err != nil {
-			logger.Error("Failed to switch user org", zap.Int64("userId", req.ID), zap.Error(err))
+			logger.Error("Failed to switch user org", zap.Int64(zapKeyUserID, req.ID), zap.Error(err))
 			return fmt.Errorf("failed to update user organization: %w", err)
 		}
 	}
 
-	logger.Info("User updated", zap.Int64("userId", req.ID))
+	logger.Info("User updated", zap.Int64(zapKeyUserID, req.ID))
 	return nil
 }
 
@@ -202,7 +203,7 @@ func (s *UserService) DeleteUser(userID int64) error {
 	_ = s.userRoleRepo.DeleteByUserID(userID)
 	_ = s.userPermRepo.DeleteByUserID(userID)
 
-	logger.Info("User deleted", zap.Int64("userId", userID))
+	logger.Info("User deleted", zap.Int64(zapKeyUserID, userID))
 	return nil
 }
 
@@ -254,13 +255,13 @@ func (s *UserService) ResetPasswordWithAudit(userID int64, newPassword string, o
 	existing, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		s.recordPasswordResetAudit(nil, userID, operatorID, operatorName, ipAddress, audit.StatusFailed, "user not found")
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf(errno.ErrUserNotFound, err)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), DefaultBcryptCost)
 	if err != nil {
 		s.recordPasswordResetAudit(existing, userID, operatorID, operatorName, ipAddress, audit.StatusFailed, "failed to hash password")
-		return fmt.Errorf("failed to hash password: %w", err)
+		return fmt.Errorf(errno.ErrFailedHashPassword, err)
 	}
 
 	existing.Password = string(hashedPassword)
@@ -273,7 +274,7 @@ func (s *UserService) ResetPasswordWithAudit(userID int64, newPassword string, o
 		return fmt.Errorf("failed to reset password: %w", err)
 	}
 
-	logger.Info("Password reset", zap.Int64("userId", userID))
+	logger.Info("Password reset", zap.Int64(zapKeyUserID, userID))
 	s.recordPasswordResetAudit(existing, userID, operatorID, operatorName, ipAddress, audit.StatusSuccess, "")
 	return nil
 }
@@ -337,7 +338,7 @@ func (s *UserService) UpdateUserStatus(userID int64, status int) error {
 
 	existing, err := s.userRepo.GetByID(userID)
 	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf(errno.ErrUserNotFound, err)
 	}
 
 	existing.Status = status
@@ -349,14 +350,14 @@ func (s *UserService) UpdateUserStatus(userID int64, status int) error {
 		return fmt.Errorf("failed to update user status: %w", err)
 	}
 
-	logger.Info("User status updated", zap.Int64("userId", userID), zap.Int("status", status))
+	logger.Info("User status updated", zap.Int64(zapKeyUserID, userID), zap.Int("status", status))
 	return nil
 }
 
 func (s *UserService) SwitchLanguage(userID int64, lang string) error {
 	existing, err := s.userRepo.GetByID(userID)
 	if err != nil {
-		return fmt.Errorf("user not found: %w", err)
+		return fmt.Errorf(errno.ErrUserNotFound, err)
 	}
 
 	normalized := normalizeLanguage(lang)
@@ -369,7 +370,7 @@ func (s *UserService) SwitchLanguage(userID int64, lang string) error {
 		return fmt.Errorf("failed to switch user language: %w", err)
 	}
 
-	logger.Info("User language updated", zap.Int64("userId", userID), zap.String("language", normalized))
+	logger.Info("User language updated", zap.Int64(zapKeyUserID, userID), zap.String("language", normalized))
 	return nil
 }
 
@@ -401,7 +402,7 @@ func requestedOrgID(orgID *int64, organizationID *int64) (int64, bool) {
 // role workflows (MountUsers, UnmountUser, etc.) must reuse through the same org context.
 func (s *UserService) bindUserToOrgBaseline(userID int64, orgID int64) error {
 	if s.orgRepo == nil {
-		return fmt.Errorf("org repository is not configured")
+		return fmt.Errorf(errno.ErrOrgRepoNotConfigured)
 	}
 	if s.userRoleRepo == nil {
 		return fmt.Errorf("user-role repository is not configured")
@@ -409,7 +410,7 @@ func (s *UserService) bindUserToOrgBaseline(userID int64, orgID int64) error {
 
 	orgEntity, err := s.orgRepo.GetByID(orgID)
 	if err != nil {
-		return fmt.Errorf("organization not found: %w", err)
+		return fmt.Errorf(errno.ErrOrganizationNotFound, err)
 	}
 	if orgEntity.Status != domainorg.StatusEnabled {
 		return fmt.Errorf("organization is disabled")
@@ -429,7 +430,7 @@ func (s *UserService) bindUserToOrgBaseline(userID int64, orgID int64) error {
 
 func (s *UserService) ensureDefaultOrgUserRole() (int64, error) {
 	if s.roleRepo == nil {
-		return 0, fmt.Errorf("role repository is not configured")
+		return 0, fmt.Errorf(errno.ErrRoleRepoNotConfigured)
 	}
 
 	existing, err := s.roleRepo.GetByRoleCode(domainrole.BuiltInOrgUserRoleCode)
@@ -477,7 +478,7 @@ func resolveOrgID(orgID *int64, organizationID *int64) *int64 {
 
 func (s *UserService) switchUserOrg(userID int64, newOrgID int64) error {
 	if s.orgRepo == nil {
-		return fmt.Errorf("org repository is not configured")
+		return fmt.Errorf(errno.ErrOrgRepoNotConfigured)
 	}
 	orgEntity, err := s.orgRepo.GetByID(newOrgID)
 	if err != nil {

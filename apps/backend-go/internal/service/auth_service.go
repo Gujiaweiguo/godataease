@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"fmt"
 	"sort"
 	"strings"
@@ -64,7 +65,7 @@ func (s *AuthService) LocalLogin(dto *domainauth.PwdLoginDTO, requestLanguage st
 	}
 
 	if s.jwt == nil {
-		return nil, fmt.Errorf("token generator is not configured")
+		return nil, fmt.Errorf(errno.ErrTokenGeneratorNotConfigured)
 	}
 
 	bootstrap, err := s.BuildIdentityBootstrap(u.UserID, requestLanguage)
@@ -77,7 +78,7 @@ func (s *AuthService) LocalLogin(dto *domainauth.PwdLoginDTO, requestLanguage st
 		return nil, err
 	}
 
-	logger.Info("User logged in", zap.String("username", dto.Name), zap.Int64("userId", u.UserID))
+	logger.Info("User logged in", zap.String(zapKeyUsername, dto.Name), zap.Int64(zapKeyUserID, u.UserID))
 	return &domainauth.TokenVO{
 		Token:         token,
 		Exp:           s.jwt.ExpirationUnixMilli(),
@@ -96,7 +97,7 @@ func (s *AuthService) Logout() {
 
 func (s *AuthService) ParseToken(token string) (*domainauth.TokenClaims, error) {
 	if s.jwt == nil {
-		return nil, fmt.Errorf("token generator is not configured")
+		return nil, fmt.Errorf(errno.ErrTokenGeneratorNotConfigured)
 	}
 
 	claims, err := s.jwt.ParseToken(token)
@@ -109,7 +110,7 @@ func (s *AuthService) ParseToken(token string) (*domainauth.TokenClaims, error) 
 
 func (s *AuthService) RefreshToken(token string) (string, int64, error) {
 	if s.jwt == nil {
-		return "", 0, fmt.Errorf("token generator is not configured")
+		return "", 0, fmt.Errorf(errno.ErrTokenGeneratorNotConfigured)
 	}
 
 	refreshedToken, err := s.jwt.RefreshToken(token)

@@ -42,30 +42,30 @@ func parseInt64Value(v interface{}) (int64, bool) {
 func parsePageParams(c *gin.Context) (int, int, bool) {
 	page, err := strconv.Atoi(strings.TrimSpace(firstNonEmptyParam(c.Param("page"), c.Param("current"))))
 	if err != nil || page < 1 {
-		response.Error(c, "500000", "Invalid page")
+		response.Error(c, response.CodeInternalError, errInvalidPage)
 		return 0, 0, false
 	}
 	size, err := strconv.Atoi(strings.TrimSpace(firstNonEmptyParam(c.Param("limit"), c.Param("size"))))
 	if err != nil || size < 1 {
-		response.Error(c, "500000", "Invalid size")
+		response.Error(c, response.CodeInternalError, "Invalid size")
 		return 0, 0, false
 	}
 	return page, size, true
 }
 
 func parseIDParam(c *gin.Context, key string) (int64, bool) {
-	return parseIDParamMsg(c, key, "Invalid id")
+	return parseIDParamMsg(c, key, errInvalidID)
 }
 
 func parseIDParamBadRequest(c *gin.Context, key string) (int64, bool) {
-	return parseIDParamMsgBadRequest(c, key, "Invalid id")
+	return parseIDParamMsgBadRequest(c, key, errInvalidID)
 }
 
 func parseIDParamMsg(c *gin.Context, key, errMsg string) (int64, bool) {
 	value := strings.TrimSpace(c.Param(key))
 	id, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || id <= 0 {
-		response.Error(c, "500000", errMsg)
+		response.Error(c, response.CodeInternalError, errMsg)
 		return 0, false
 	}
 	return id, true

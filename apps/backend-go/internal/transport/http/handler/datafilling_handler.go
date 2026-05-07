@@ -74,7 +74,7 @@ func (h *DataFillingHandler) Save(c *gin.Context) {
 	}
 	result, err := h.service.Save(c.Request.Context(), &req, int64(transportmiddleware.GetUserID(c)))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -88,7 +88,7 @@ func (h *DataFillingHandler) Get(c *gin.Context) {
 	}
 	result, err := h.service.Get(c.Request.Context(), id)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -103,7 +103,7 @@ func (h *DataFillingHandler) Update(c *gin.Context) {
 	}
 	result, err := h.service.Update(c.Request.Context(), &req, int64(transportmiddleware.GetUserID(c)))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -116,7 +116,7 @@ func (h *DataFillingHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.service.Delete(c.Request.Context(), id); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -135,7 +135,7 @@ func (h *DataFillingHandler) TableData(c *gin.Context) {
 	}
 	result, err := h.service.SearchTableData(c.Request.Context(), id, &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -154,7 +154,7 @@ func (h *DataFillingHandler) SaveRowData(c *gin.Context) {
 	}
 	result, err := h.service.SaveRowData(c.Request.Context(), formID, req, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -168,7 +168,7 @@ func (h *DataFillingHandler) DeleteRowData(c *gin.Context) {
 	}
 	rowID := c.Param("id")
 	if err := h.service.DeleteRowData(c.Request.Context(), formID, rowID, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c)); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -186,7 +186,7 @@ func (h *DataFillingHandler) BatchDeleteRowData(c *gin.Context) {
 		return
 	}
 	if err := h.service.BatchDeleteRowData(c.Request.Context(), formID, req.IDs, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c)); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -199,7 +199,7 @@ func (h *DataFillingHandler) TruncateTableData(c *gin.Context) {
 		return
 	}
 	if err := h.service.TruncateTableData(c.Request.Context(), formID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -218,7 +218,7 @@ func (h *DataFillingHandler) ListColumnData(c *gin.Context) {
 	}
 	result, err := h.service.ListColumnData(c.Request.Context(), formID, req.ColumnName)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -232,15 +232,15 @@ func (h *DataFillingHandler) ExcelTemplate(c *gin.Context) {
 	}
 	buf := bytes.NewBuffer(nil)
 	if err := h.service.ExcelTemplateDownload(c.Request.Context(), formID, buf); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	filename := "template.xlsx"
 	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Type", mimeExcelOpenXML)
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 	c.Header("Content-Transfer-Encoding", "binary")
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+	c.Data(200, mimeExcelOpenXML, buf.Bytes())
 }
 
 func (h *DataFillingHandler) ExcelUpload(c *gin.Context) {
@@ -251,12 +251,12 @@ func (h *DataFillingHandler) ExcelUpload(c *gin.Context) {
 	}
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
-		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get uploaded file: "+err.Error())
 		return
 	}
 	result, err := h.service.ExcelUpload(c.Request.Context(), formID, fileHeader)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -276,7 +276,7 @@ func (h *DataFillingHandler) ConfirmUpload(c *gin.Context) {
 		return
 	}
 	if err := h.service.ConfirmUpload(c.Request.Context(), formID, req.ID, int64(transportmiddleware.GetUserID(c)), transportmiddleware.GetUsername(c)); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -291,7 +291,7 @@ func (h *DataFillingHandler) ExtraDetails(c *gin.Context) {
 	}
 	result, err := h.service.ExtraDetails(c.Request.Context(), &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -310,7 +310,7 @@ func (h *DataFillingHandler) ListDatasourceOptions(c *gin.Context) {
 	}
 	result, err := h.service.ListDatasourceOptions(c.Request.Context(), datasourceID, &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -324,7 +324,7 @@ func (h *DataFillingHandler) GetTemplateByUserTaskItem(c *gin.Context) {
 	}
 	result, err := h.service.GetTemplateByUserTaskItem(c.Request.Context(), itemID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -338,15 +338,15 @@ func (h *DataFillingHandler) ExportFormData(c *gin.Context) {
 	}
 	buf := bytes.NewBuffer(nil)
 	if err := h.service.ExportFormData(c.Request.Context(), formID, buf); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	filename := "form-data.xlsx"
 	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Type", mimeExcelOpenXML)
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(filename))
 	c.Header("Content-Transfer-Encoding", "binary")
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+	c.Data(200, mimeExcelOpenXML, buf.Bytes())
 }
 
 func (h *DataFillingHandler) LogPage(c *gin.Context) {
@@ -362,7 +362,7 @@ func (h *DataFillingHandler) LogPage(c *gin.Context) {
 	}
 	rows, total, err := h.service.ListCommitLogs(c.Request.Context(), req.FormID, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"records": rows, "total": total, "current": goPage, "size": pageSize})
@@ -376,7 +376,7 @@ func (h *DataFillingHandler) LogClear(c *gin.Context) {
 		return
 	}
 	if err := h.service.ClearCommitLogs(c.Request.Context(), req.FormID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -390,7 +390,7 @@ func (h *DataFillingHandler) GetTaskInfo(c *gin.Context) {
 	}
 	result, err := h.service.GetTaskInfo(c.Request.Context(), taskID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -405,7 +405,7 @@ func (h *DataFillingHandler) SaveTask(c *gin.Context) {
 	}
 	result, err := h.service.SaveTask(c.Request.Context(), &req, int64(transportmiddleware.GetUserID(c)))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -419,7 +419,7 @@ func (h *DataFillingHandler) ExecuteNowTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.ExecuteNowTask(c.Request.Context(), req.TaskID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -437,7 +437,7 @@ func (h *DataFillingHandler) TaskPageList(c *gin.Context) {
 	}
 	result, err := h.service.TaskPageList(c.Request.Context(), formID, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -454,7 +454,7 @@ func (h *DataFillingHandler) StartTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.StartTask(c.Request.Context(), formID, taskID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -471,7 +471,7 @@ func (h *DataFillingHandler) StopTask(c *gin.Context) {
 		return
 	}
 	if err := h.service.StopTask(c.Request.Context(), formID, taskID); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -489,7 +489,7 @@ func (h *DataFillingHandler) DeleteTasks(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteTasks(c.Request.Context(), formID, req.IDs); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -508,7 +508,7 @@ func (h *DataFillingHandler) SubTaskPageList(c *gin.Context) {
 	}
 	result, err := h.service.SubTaskPageList(c.Request.Context(), req.TaskID, goPage, pageSize)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -526,7 +526,7 @@ func (h *DataFillingHandler) DeleteSubTasks(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteSubTasks(c.Request.Context(), formID, req.IDs); err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -540,7 +540,7 @@ func (h *DataFillingHandler) SubTaskUsersList(c *gin.Context) {
 	}
 	result, err := h.service.SubTaskUsersList(c.Request.Context(), subTaskID, c.Param("type"))
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -555,7 +555,7 @@ func (h *DataFillingHandler) Rename(c *gin.Context) {
 	}
 	result, err := h.service.Rename(c.Request.Context(), req.ID, req.Name)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -570,7 +570,7 @@ func (h *DataFillingHandler) Move(c *gin.Context) {
 	}
 	result, err := h.service.Move(c.Request.Context(), req.ID, req.PID)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -585,7 +585,7 @@ func (h *DataFillingHandler) Tree(c *gin.Context) {
 	}
 	result, err := h.service.Tree(c.Request.Context(), &req)
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -595,7 +595,7 @@ func (h *DataFillingHandler) ListDatasourceList(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.ListDatasourceList(c.Request.Context())
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -605,7 +605,7 @@ func (h *DataFillingHandler) ListDatasourceListAll(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.ListDatasourceListAll(c.Request.Context())
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -615,7 +615,7 @@ func (h *DataFillingHandler) GetBuiltInTables(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.GetBuiltInTables(c.Request.Context())
 	if err != nil {
-		response.Error(c, "500000", err.Error())
+		response.Error(c, response.CodeInternalError, err.Error())
 		return
 	}
 	response.Success(c, result)

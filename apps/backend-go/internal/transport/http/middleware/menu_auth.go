@@ -62,7 +62,7 @@ func (m *MenuAuthMiddleware) CheckMenuAccess() gin.HandlerFunc {
 
 		menuID, err := strconv.ParseInt(menuIDStr, 10, 64)
 		if err != nil {
-			response.Error(c, "500000", "Invalid menu ID")
+			response.Error(c, response.CodeInternalError, "Invalid menu ID")
 			c.Abort()
 			return
 		}
@@ -70,7 +70,7 @@ func (m *MenuAuthMiddleware) CheckMenuAccess() gin.HandlerFunc {
 		// 检查角色是否有该菜单的授权
 		authorized, err := m.roleMenuService.IsMenuAuthorized(roleIDSlice, menuID)
 		if err != nil {
-			response.Error(c, "500000", "Failed to check menu authorization")
+			response.Error(c, response.CodeInternalError, "Failed to check menu authorization")
 			c.Abort()
 			return
 		}
@@ -124,14 +124,14 @@ func (m *MenuAuthMiddleware) RequireMenuAuth(menuPath string) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			response.Error(c, "500000", "Failed to resolve menu path")
+			response.Error(c, response.CodeInternalError, "Failed to resolve menu path")
 			c.Abort()
 			return
 		}
 
 		authorized, err := m.roleMenuService.IsMenuAuthorized(roleIDSlice, menuItem.ID)
 		if err != nil {
-			response.Error(c, "500000", "Failed to check menu authorization")
+			response.Error(c, response.CodeInternalError, "Failed to check menu authorization")
 			c.Abort()
 			return
 		}

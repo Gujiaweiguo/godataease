@@ -18,6 +18,8 @@ var (
 	ErrNotFound     = errors.New("导出任务不存在")
 )
 
+const exportStatusPending = "PENDING"
+
 type ExportService struct {
 	repo repository.ExportRepositoryInterface
 }
@@ -89,7 +91,7 @@ func (s *ExportService) CheckAccess(task *export.ExportTask, userID int64, isAdm
 }
 
 func (s *ExportService) Retry(id string) error {
-	return s.repo.UpdateStatus(id, "PENDING")
+	return s.repo.UpdateStatus(id, exportStatusPending)
 }
 
 func (s *ExportService) ExportLimit() *export.ExportLimitResponse {

@@ -73,7 +73,7 @@ func (h *FontHandler) List(c *gin.Context) {
 	defer recoverServicePanic(c)
 	fonts, err := h.repo.ListFonts()
 	if err != nil {
-		response.Error(c, "500000", "Failed to list fonts: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to list fonts: "+err.Error())
 		return
 	}
 	dtos := make([]FontDTO, 0, len(fonts))
@@ -87,12 +87,12 @@ func (h *FontHandler) Create(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto FontDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	existing, err := h.repo.FindFontByName(dto.Name)
 	if err == nil && existing != nil {
-		response.Error(c, "500000", "存在重名字库")
+		response.Error(c, response.CodeInternalError, "存在重名字库")
 		return
 	}
 	font := &auto.CoreFont{
@@ -107,7 +107,7 @@ func (h *FontHandler) Create(c *gin.Context) {
 		UpdateTime:    time.Now().UnixMilli(),
 	}
 	if err := h.repo.CreateFont(font); err != nil {
-		response.Error(c, "500000", "Failed to create font: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to create font: "+err.Error())
 		return
 	}
 	response.Success(c, fontToDTO(font))
@@ -117,7 +117,7 @@ func (h *FontHandler) Edit(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto FontDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if dto.ID == 0 {
@@ -126,7 +126,7 @@ func (h *FontHandler) Edit(c *gin.Context) {
 	}
 	font, err := h.repo.GetFontByID(dto.ID)
 	if err != nil {
-		response.Error(c, "500000", "Font not found")
+		response.Error(c, response.CodeInternalError, "Font not found")
 		return
 	}
 	font.Name = dto.Name
@@ -141,7 +141,7 @@ func (h *FontHandler) Edit(c *gin.Context) {
 		_ = h.repo.ClearDefaultFonts(dto.ID)
 	}
 	if err := h.repo.UpdateFont(font); err != nil {
-		response.Error(c, "500000", "Failed to update font: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to update font: "+err.Error())
 		return
 	}
 	response.Success(c, fontToDTO(font))
@@ -149,13 +149,13 @@ func (h *FontHandler) Edit(c *gin.Context) {
 
 func (h *FontHandler) Delete(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	id, ok := parseIDParamMsg(c, "id", errInvalidID)
 	if !ok {
 		return
 	}
 	font, err := h.repo.GetFontByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Font not found")
+		response.Error(c, response.CodeInternalError, "Font not found")
 		return
 	}
 	if font.FileTransName != "" {
@@ -168,7 +168,7 @@ func (h *FontHandler) Delete(c *gin.Context) {
 		}
 	}
 	if err := h.repo.DeleteFont(id); err != nil {
-		response.Error(c, "500000", "Failed to delete font: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to delete font: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -178,20 +178,20 @@ func (h *FontHandler) UploadFile(c *gin.Context) {
 	defer recoverServicePanic(c)
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		response.Error(c, "500000", "Failed to read upload file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to read upload file: "+err.Error())
 		return
 	}
 	defer func() { _ = file.Close() }()
 
 	filename := header.Filename
 	if filename == "" || !strings.HasSuffix(strings.ToLower(filename), ".ttf") {
-		response.Error(c, "500000", "非法格式的文件！Only .ttf files are supported")
+		response.Error(c, response.CodeInternalError, "非法格式的文件！Only .ttf files are supported")
 		return
 	}
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		response.Error(c, "500000", "Failed to read file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to read file: "+err.Error())
 		return
 	}
 
@@ -200,7 +200,7 @@ func (h *FontHandler) UploadFile(c *gin.Context) {
 		fontDir = defaultFontDir
 	}
 	if err := os.MkdirAll(fontDir, 0755); err != nil {
-		response.Error(c, "500000", "Failed to create font directory: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to create font directory: "+err.Error())
 		return
 	}
 
@@ -209,7 +209,7 @@ func (h *FontHandler) UploadFile(c *gin.Context) {
 	fileTransName := fileUUID + ext
 	destPath := filepath.Join(fontDir, fileTransName)
 	if err := os.WriteFile(destPath, content, 0644); err != nil {
-		response.Error(c, "500000", "Failed to save font file: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to save font file: "+err.Error())
 		return
 	}
 
@@ -246,7 +246,7 @@ func (h *FontHandler) DefaultFont(c *gin.Context) {
 	defer recoverServicePanic(c)
 	fonts, err := h.repo.ListDefaultFonts()
 	if err != nil {
-		response.Error(c, "500000", "Failed to list default fonts: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to list default fonts: "+err.Error())
 		return
 	}
 	dtos := make([]FontDTO, 0, len(fonts))
@@ -260,12 +260,12 @@ func (h *FontHandler) Download(c *gin.Context) {
 	defer recoverServicePanic(c)
 	fileName := c.Param("file")
 	if fileName == "" {
-		response.Error(c, "500000", "Invalid file name")
+		response.Error(c, response.CodeInternalError, errInvalidFileName)
 		return
 	}
 	cleanName := filepath.Clean(fileName)
 	if cleanName != fileName || strings.Contains(cleanName, "..") {
-		response.Error(c, "500000", "Invalid file name")
+		response.Error(c, response.CodeInternalError, errInvalidFileName)
 		return
 	}
 	fontDir := os.Getenv("FONT_DIR")
@@ -275,15 +275,15 @@ func (h *FontHandler) Download(c *gin.Context) {
 	fontDir = filepath.Clean(fontDir)
 	filePath := filepath.Join(fontDir, cleanName)
 	if !strings.HasPrefix(filePath, fontDir+string(os.PathSeparator)) && filePath != fontDir {
-		response.Error(c, "500000", "Invalid file name")
+		response.Error(c, response.CodeInternalError, errInvalidFileName)
 		return
 	}
 	if !isAllowedFontDownloadExtension(cleanName) {
-		response.Error(c, "500000", "Invalid file name")
+		response.Error(c, response.CodeInternalError, errInvalidFileName)
 		return
 	}
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		response.Error(c, "500000", "Font file not found")
+		response.Error(c, response.CodeInternalError, "Font file not found")
 		return
 	}
 	c.Header("Content-Disposition", "attachment; filename="+cleanName)

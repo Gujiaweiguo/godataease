@@ -137,7 +137,7 @@ func sanitizeDatasourceResponse(ds *datasource.CoreDatasource, dsService *servic
 func parseTableRequest(c *gin.Context) (*datasource.TableRequest, bool) {
 	var body map[string]interface{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil && !errors.Is(err, io.EOF) {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return nil, false
 	}
 
@@ -159,14 +159,14 @@ func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.
 	body := make(map[string]interface{})
 	raw, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return nil, false
 	}
 	if len(bytes.TrimSpace(raw)) > 0 {
 		decoder := json.NewDecoder(bytes.NewReader(raw))
 		decoder.UseNumber()
 		if err := decoder.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-			response.Error(c, "500000", "Invalid request: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 			return nil, false
 		}
 	}
@@ -211,7 +211,7 @@ func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.
 	} else if cfg, ok := body["configuration"].(map[string]interface{}); ok {
 		b, err := json.Marshal(cfg)
 		if err != nil {
-			response.Error(c, "500000", "Invalid configuration")
+			response.Error(c, response.CodeInternalError, "Invalid configuration")
 			return nil, false
 		}
 		tmp := string(b)
@@ -219,7 +219,7 @@ func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.
 	} else if cfg, ok := body["configuration"].([]interface{}); ok {
 		b, err := json.Marshal(cfg)
 		if err != nil {
-			response.Error(c, "500000", "Invalid configuration")
+			response.Error(c, response.CodeInternalError, "Invalid configuration")
 			return nil, false
 		}
 		tmp := string(b)
@@ -231,7 +231,7 @@ func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.
 	}
 
 	if requireName && strings.TrimSpace(req.Name) == "" {
-		response.Error(c, "500000", "datasource name is required")
+		response.Error(c, response.CodeInternalError, "datasource name is required")
 		return nil, false
 	}
 

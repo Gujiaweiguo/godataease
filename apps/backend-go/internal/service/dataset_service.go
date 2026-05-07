@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -613,10 +614,10 @@ func (s *DatasetService) resolvePreviewExecutor(req *dataset.SQLPreviewRequest, 
 	}
 	ds, err := s.datasourceRepo.GetByID(req.DatasourceID)
 	if err != nil {
-		return nil, fmt.Errorf("datasource not found")
+		return nil, fmt.Errorf(errno.ErrDatasourceNotFound)
 	}
 	if ds.Configuration == nil || strings.TrimSpace(*ds.Configuration) == "" {
-		return nil, fmt.Errorf("datasource configuration is empty")
+		return nil, errors.New(errDatasourceConfigEmpty)
 	}
 	cfg, err := decodeConfig(*ds.Configuration)
 	if err != nil {
@@ -953,7 +954,7 @@ func (s *DatasetService) GetFieldEnumDs(fieldID int64) ([]string, error) {
 
 func (s *DatasetService) PerDelete(id int64) (bool, error) {
 	if id <= 0 {
-		return false, fmt.Errorf("dataset id is required")
+		return false, fmt.Errorf(errno.ErrDatasetIDRequired)
 	}
 	count, err := s.repo.CountChartRelations(id)
 	if err != nil {
@@ -996,7 +997,7 @@ func (s *DatasetService) DeleteField(id int64) error {
 
 func (s *DatasetService) DeleteFieldByChart(chartID int64) error {
 	if chartID <= 0 {
-		return fmt.Errorf("chart id is required")
+		return fmt.Errorf(errno.ErrChartIDRequired)
 	}
 	fields, err := s.repo.ListFieldsByChartID(chartID)
 	if err != nil {
@@ -1182,7 +1183,7 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 		return nil, fmt.Errorf("export request is required")
 	}
 	if req.ID <= 0 {
-		return nil, fmt.Errorf("dataset id is required")
+		return nil, fmt.Errorf(errno.ErrDatasetIDRequired)
 	}
 	if s.repo == nil {
 		return nil, fmt.Errorf("dataset repository not initialized")
@@ -1194,7 +1195,7 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 	group, err := s.GetGroupByID(req.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("dataset not found")
+			return nil, fmt.Errorf(errno.ErrDatasetNotFound)
 		}
 		return nil, err
 	}
@@ -1216,7 +1217,7 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 		FileSize:       0,
 		FileSizeUnit:   "B",
 		ExportFrom:     resolvedDatasetID,
-		ExportStatus:   "PENDING",
+		ExportStatus:   exportStatusPending,
 		ExportFromType: permission.ResourceTypeDataset,
 		ExportTime:     time.Now().UnixMilli(),
 		ExportProgress: "0",
@@ -1228,7 +1229,7 @@ func (s *DatasetService) ExportDataset(req *dataset.ExportDatasetRequest, userID
 
 	return &dataset.ExportDatasetResponse{
 		TaskID:         taskID,
-		Status:         "PENDING",
+		Status:         exportStatusPending,
 		ExportFrom:     resolvedDatasetID,
 		ExportFromType: permission.ResourceTypeDataset,
 		ExportFromName: viewName,
@@ -1446,7 +1447,7 @@ func (s *DatasetService) Save(req *dataset.WriteRequest) (*dataset.CoreDatasetGr
 	existing, err := s.repo.GetGroupByID(req.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("dataset not found")
+			return nil, fmt.Errorf(errno.ErrDatasetNotFound)
 		}
 		return nil, err
 	}
@@ -1465,7 +1466,7 @@ func (s *DatasetService) Save(req *dataset.WriteRequest) (*dataset.CoreDatasetGr
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("dataset name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasetNameExists)
 	}
 
 	existing.Name = name
@@ -1496,7 +1497,7 @@ func (s *DatasetService) Create(req *dataset.WriteRequest) (*dataset.CoreDataset
 
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, fmt.Errorf("dataset name is required")
+		return nil, fmt.Errorf(errno.ErrDatasetNameRequired)
 	}
 
 	pid := normalizedDatasetPID(req.PID)
@@ -1521,7 +1522,7 @@ func (s *DatasetService) Create(req *dataset.WriteRequest) (*dataset.CoreDataset
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("dataset name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasetNameExists)
 	}
 
 	nodeType := normalizedDatasetNodeType(req.NodeType)
@@ -1565,7 +1566,7 @@ func (s *DatasetService) BackfillGovernedResourcesWithOptions(options *Governanc
 		return nil, fmt.Errorf("dataset repository not initialized")
 	}
 	if s.resourcePermService == nil {
-		return nil, fmt.Errorf("resource permission service not initialized")
+		return nil, fmt.Errorf(errno.ErrResourcePermNotInitialized)
 	}
 	return runGovernanceBackfillWithOptions(options, permission.ResourceTypeDataset, func(normalized GovernanceBackfillOptions) ([]*dataset.CoreDatasetGroup, error) {
 		return s.repo.ListGroupsBatch(nil, normalized.AfterID, normalized.Limit)
@@ -1578,20 +1579,20 @@ func (s *DatasetService) BackfillGovernedResourcesWithOptions(options *Governanc
 
 func (s *DatasetService) Rename(id int64, name string) (*dataset.CoreDatasetGroup, error) {
 	if id <= 0 {
-		return nil, fmt.Errorf("dataset id is required")
+		return nil, fmt.Errorf(errno.ErrDatasetIDRequired)
 	}
 
 	existing, err := s.repo.GetGroupByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("dataset not found")
+			return nil, fmt.Errorf(errno.ErrDatasetNotFound)
 		}
 		return nil, err
 	}
 
 	newName := strings.TrimSpace(name)
 	if newName == "" {
-		return nil, fmt.Errorf("dataset name is required")
+		return nil, fmt.Errorf(errno.ErrDatasetNameRequired)
 	}
 
 	pid := int64(0)
@@ -1603,7 +1604,7 @@ func (s *DatasetService) Rename(id int64, name string) (*dataset.CoreDatasetGrou
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("dataset name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasetNameExists)
 	}
 
 	existing.Name = newName
@@ -1615,7 +1616,7 @@ func (s *DatasetService) Rename(id int64, name string) (*dataset.CoreDatasetGrou
 
 func (s *DatasetService) Move(id int64, pid int64) (*dataset.CoreDatasetGroup, error) {
 	if id <= 0 {
-		return nil, fmt.Errorf("dataset id is required")
+		return nil, fmt.Errorf(errno.ErrDatasetIDRequired)
 	}
 	if id == pid {
 		return nil, fmt.Errorf("destination folder cannot be itself")
@@ -1624,7 +1625,7 @@ func (s *DatasetService) Move(id int64, pid int64) (*dataset.CoreDatasetGroup, e
 	existing, err := s.repo.GetGroupByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("dataset not found")
+			return nil, fmt.Errorf(errno.ErrDatasetNotFound)
 		}
 		return nil, err
 	}
@@ -1650,7 +1651,7 @@ func (s *DatasetService) Move(id int64, pid int64) (*dataset.CoreDatasetGroup, e
 		return nil, err
 	}
 	if count > 0 {
-		return nil, fmt.Errorf("dataset name already exists")
+		return nil, fmt.Errorf(errno.ErrDatasetNameExists)
 	}
 
 	existing.PID = &pid
@@ -1662,7 +1663,7 @@ func (s *DatasetService) Move(id int64, pid int64) (*dataset.CoreDatasetGroup, e
 
 func (s *DatasetService) Delete(id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("dataset id is required")
+		return fmt.Errorf(errno.ErrDatasetIDRequired)
 	}
 	return s.deleteRecursive(id)
 }
@@ -1764,7 +1765,7 @@ func validatePreviewSQL(rawSQL string) error {
 	text := strings.TrimSpace(strings.TrimSuffix(rawSQL, ";"))
 	lower := strings.ToLower(text)
 	if text == "" {
-		return fmt.Errorf("sql is required")
+		return fmt.Errorf(errno.ErrSQLRequired)
 	}
 	if !strings.HasPrefix(lower, "select") && !strings.HasPrefix(lower, "with") {
 		return fmt.Errorf("only select query is supported")

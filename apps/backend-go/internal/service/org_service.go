@@ -1,6 +1,7 @@
 package service
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,7 +62,7 @@ func (s *OrgService) TransferUserOrg(sourceOrgID, targetOrgID, userID, actorID i
 
 	s.recordTransferAudit(sourceOrgInfo, targetOrgInfo, userID, actorID, assignedRoleID, policy)
 	logger.Info("User transferred between organizations",
-		zap.Int64("userId", userID),
+		zap.Int64(zapKeyUserID, userID),
 		zap.Int64("sourceOrgId", sourceOrgID),
 		zap.Int64("targetOrgId", targetOrgID),
 		zap.Int64("assignedRoleId", assignedRoleID),
@@ -101,7 +102,7 @@ func (s *OrgService) validateTransferInput(sourceOrgID, targetOrgID, userID int6
 		return fmt.Errorf("organization repository is not configured")
 	}
 	if s.roleRepo == nil {
-		return fmt.Errorf("role repository is not configured")
+		return fmt.Errorf(errno.ErrRoleRepoNotConfigured)
 	}
 	if s.userRoleRepo == nil {
 		return fmt.Errorf("user role repository is not configured")
@@ -184,13 +185,13 @@ func (s *OrgService) recordTransferAudit(sourceOrgInfo, targetOrgInfo *org.SysOr
 	beforeValue, _ := json.Marshal(map[string]interface{}{
 		"sourceOrgId": sourceOrgInfo.OrgID,
 		"sourceOrg":   sourceOrgInfo.OrgName,
-		"userId":      userID,
+		zapKeyUserID:  userID,
 		"policy":      policy,
 	})
 	afterValue, _ := json.Marshal(map[string]interface{}{
 		"targetOrgId":      targetOrgInfo.OrgID,
 		"targetOrg":        targetOrgInfo.OrgName,
-		"userId":           userID,
+		zapKeyUserID:       userID,
 		"actorId":          actorID,
 		"assignedRoleId":   assignedRoleID,
 		"lastRolePolicy":   policy,
@@ -269,7 +270,7 @@ func (s *OrgService) UpdateOrg(req *org.OrgUpdateRequest, callerOrgID int64) err
 
 	existing, err := s.orgRepo.GetByID(req.OrgID)
 	if err != nil {
-		return fmt.Errorf("organization not found: %w", err)
+		return fmt.Errorf(errno.ErrOrganizationNotFound, err)
 	}
 
 	if req.OrgName != "" && req.OrgName != existing.OrgName {
@@ -350,7 +351,7 @@ func (s *OrgService) DeleteOrg(orgID int64, callerOrgID int64, operatorID int64,
 	// 1. 获取组织信息
 	orgInfo, err := s.orgRepo.GetByID(orgID)
 	if err != nil {
-		return fmt.Errorf("organization not found: %w", err)
+		return fmt.Errorf(errno.ErrOrganizationNotFound, err)
 	}
 
 	// 2. 检查子组织
@@ -478,7 +479,7 @@ func (s *OrgService) UpdateOrgStatus(orgID int64, status int, callerOrgID int64)
 
 	existing, err := s.orgRepo.GetByID(orgID)
 	if err != nil {
-		return fmt.Errorf("organization not found: %w", err)
+		return fmt.Errorf(errno.ErrOrganizationNotFound, err)
 	}
 
 	existing.Status = status

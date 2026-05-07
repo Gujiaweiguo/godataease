@@ -3,6 +3,7 @@ package handler
 import (
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -20,14 +21,14 @@ func NewOuterParamsHandler(service *service.OuterParamsService) *OuterParamsHand
 // QueryWithVisualizationId returns the full outer params config for a dashboard.
 func (h *OuterParamsHandler) QueryWithVisualizationId(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID := c.Param("dvId")
+	dvID := c.Param(middleware.ContextDvID)
 	if dvID == "" {
-		response.Error(c, "500000", "Invalid dvId")
+		response.Error(c, response.CodeInternalError, errInvalidDvID)
 		return
 	}
 	result, err := h.service.QueryWithVisualizationId(dvID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to query outer params: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to query outer params: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -38,11 +39,11 @@ func (h *OuterParamsHandler) UpdateOuterParamsSet(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var dto service.OuterParamsDTO
 	if err := c.ShouldBindBodyWith(&dto, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.UpdateOuterParamsSet(&dto); err != nil {
-		response.Error(c, "500000", "Failed to update outer params: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to update outer params: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -51,14 +52,14 @@ func (h *OuterParamsHandler) UpdateOuterParamsSet(c *gin.Context) {
 // GetOuterParamsInfo returns runtime outer params info for dashboard rendering.
 func (h *OuterParamsHandler) GetOuterParamsInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID := c.Param("dvId")
+	dvID := c.Param(middleware.ContextDvID)
 	if dvID == "" {
-		response.Error(c, "500000", "Invalid dvId")
+		response.Error(c, response.CodeInternalError, errInvalidDvID)
 		return
 	}
 	result, err := h.service.GetOuterParamsInfo(dvID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get outer params info: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get outer params info: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -67,14 +68,14 @@ func (h *OuterParamsHandler) GetOuterParamsInfo(c *gin.Context) {
 // QueryDsWithVisualizationId returns dataset groups with fields and chart views.
 func (h *OuterParamsHandler) QueryDsWithVisualizationId(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID := c.Param("dvId")
+	dvID := c.Param(middleware.ContextDvID)
 	if dvID == "" {
-		response.Error(c, "500000", "Invalid dvId")
+		response.Error(c, response.CodeInternalError, errInvalidDvID)
 		return
 	}
 	result, err := h.service.QueryDsWithVisualizationId(dvID)
 	if err != nil {
-		response.Error(c, "500000", "Failed to query datasets: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to query datasets: "+err.Error())
 		return
 	}
 	response.Success(c, result)

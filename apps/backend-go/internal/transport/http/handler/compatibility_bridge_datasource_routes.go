@@ -102,12 +102,12 @@ func (h *DatasourceHandler) getSimpleDsCompat(c *gin.Context) {
 func (h *DatasourceHandler) moveCompat(c *gin.Context) {
 	var body map[string]interface{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	id, ok := parseInt64Value(body["id"])
 	if !ok || id <= 0 {
-		response.Error(c, "500000", "Invalid datasource ID")
+		response.Error(c, response.CodeInternalError, errInvalidDatasourceID)
 		return
 	}
 	pid, ok := parseInt64Value(body["pid"])
@@ -116,7 +116,7 @@ func (h *DatasourceHandler) moveCompat(c *gin.Context) {
 	}
 	result, err := h.service.Move(id, pid)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -125,18 +125,18 @@ func (h *DatasourceHandler) moveCompat(c *gin.Context) {
 func (h *DatasourceHandler) renameCompat(c *gin.Context) {
 	var body map[string]interface{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	id, ok := parseInt64Value(body["id"])
 	if !ok || id <= 0 {
-		response.Error(c, "500000", "Invalid datasource ID")
+		response.Error(c, response.CodeInternalError, errInvalidDatasourceID)
 		return
 	}
 	name, _ := body["name"].(string)
 	result, err := h.service.Rename(id, name)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -145,7 +145,7 @@ func (h *DatasourceHandler) renameCompat(c *gin.Context) {
 func (h *DatasourceHandler) createFolderCompat(c *gin.Context) {
 	var body map[string]interface{}
 	if err := c.ShouldBindBodyWith(&body, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	name, _ := body["name"].(string)
@@ -155,7 +155,7 @@ func (h *DatasourceHandler) createFolderCompat(c *gin.Context) {
 	}
 	result, err := h.service.CreateFolder(name, pid)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -168,7 +168,7 @@ func (h *DatasourceHandler) getDatasourceByIDCompat(c *gin.Context) (*datasource
 	}
 	result, err := h.service.GetByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return nil, false
 	}
 	return result, true
@@ -179,5 +179,5 @@ func parseDatasourceIDParam(c *gin.Context) (int64, bool) {
 }
 
 func parseDatasourceIDFromParam(c *gin.Context, param string) (int64, bool) {
-	return parseIDParamMsg(c, param, "Invalid datasource ID")
+	return parseIDParamMsg(c, param, errInvalidDatasourceID)
 }

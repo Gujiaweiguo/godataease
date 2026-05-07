@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"dataease/backend/internal/pkg/errno"
 	"dataease/backend/internal/pkg/response"
 	"errors"
 	"fmt"
@@ -15,12 +16,12 @@ func Permission(requiredRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role := GetRole(c)
 		if role == "" {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			return
 		}
 
 		if role != "admin" && role != requiredRole {
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			return
 		}
 
@@ -55,7 +56,7 @@ func RowPermissionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -82,7 +83,7 @@ func RowPermissionMiddleware() gin.HandlerFunc {
 			for _, datasetID := range datasetIDs {
 				if rowPermissionDatasetOrgVerifier == nil {
 					zap.L().Warn("Skipping dataset org validation: validator unavailable",
-						zap.Int64("dataset_id", datasetID),
+						zap.Int64(DatasetIDKey, datasetID),
 						zap.Int64("org_id", orgID),
 					)
 					continue
@@ -90,7 +91,7 @@ func RowPermissionMiddleware() gin.HandlerFunc {
 				allowed, validateErr := rowPermissionDatasetOrgVerifier.DatasetBelongsToOrg(datasetID, orgID)
 				if validateErr != nil {
 					zap.L().Warn("Dataset org validation failed; allowing request due to unsupported dataset org boundary",
-						zap.Int64("dataset_id", datasetID),
+						zap.Int64(DatasetIDKey, datasetID),
 						zap.Int64("org_id", orgID),
 						zap.Error(validateErr),
 					)
@@ -131,7 +132,7 @@ func extractRowPermissionDatasetIDs(c *gin.Context) ([]int64, error) {
 
 	ids = uniquePositiveIDs(ids)
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("dataset id is required")
+		return nil, fmt.Errorf(errno.ErrDatasetIDRequired)
 	}
 
 	return ids, nil
@@ -146,7 +147,7 @@ func parseDatasetIDsFromBody(c *gin.Context) ([]int64, error) {
 			if value, ok := payload[key]; ok {
 				id, parseErr := parseResourceIDFromAny(value)
 				if parseErr != nil {
-					return nil, fmt.Errorf("invalid dataset id")
+					return nil, fmt.Errorf(errno.ErrInvalidDatasetID)
 				}
 				ids = append(ids, id)
 			}
@@ -156,7 +157,7 @@ func parseDatasetIDsFromBody(c *gin.Context) ([]int64, error) {
 			for _, value := range values {
 				id, parseErr := parseResourceIDFromAny(value)
 				if parseErr != nil {
-					return nil, fmt.Errorf("invalid dataset id")
+					return nil, fmt.Errorf(errno.ErrInvalidDatasetID)
 				}
 				ids = append(ids, id)
 			}
@@ -174,7 +175,7 @@ func parseDatasetIDsFromBody(c *gin.Context) ([]int64, error) {
 		for _, value := range payloadList {
 			id, parseErr := parseResourceIDFromAny(value)
 			if parseErr != nil {
-				return nil, fmt.Errorf("invalid dataset id")
+				return nil, fmt.Errorf(errno.ErrInvalidDatasetID)
 			}
 			ids = append(ids, id)
 		}

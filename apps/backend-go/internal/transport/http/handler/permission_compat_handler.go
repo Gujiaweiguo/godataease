@@ -7,6 +7,7 @@ import (
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/service"
+	"dataease/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -85,7 +86,7 @@ func parseRoleIDQuery(c *gin.Context) (int64, error) {
 	if req.RoleID > 0 {
 		return req.RoleID, nil
 	}
-	if roleIDStr := c.Query("roleId"); roleIDStr != "" {
+	if roleIDStr := c.Query(middleware.ContextRoleID); roleIDStr != "" {
 		if roleID, err := strconv.ParseInt(roleIDStr, 10, 64); err == nil {
 			return roleID, nil
 		}
@@ -97,18 +98,18 @@ func (h *PermissionCompatHandler) MenuPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	menus, err := h.menuService.Query()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	roleID, err := parseRoleIDQuery(c)
 	if err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -130,7 +131,7 @@ func (h *PermissionCompatHandler) SaveMenuPer(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req menuSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -138,7 +139,7 @@ func (h *PermissionCompatHandler) SaveMenuPer(c *gin.Context) {
 		RoleID:  req.RoleID,
 		MenuIDs: req.MenuIDs,
 	}); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -149,18 +150,18 @@ func (h *PermissionCompatHandler) BusiPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	roleID, err := parseRoleIDQuery(c)
 	if err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	list, err := h.permService.ListPerms(&permission.PermQueryRequest{Current: 1, Size: 1000}, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -168,7 +169,7 @@ func (h *PermissionCompatHandler) BusiPermission(c *gin.Context) {
 	if roleID > 0 {
 		permIDs, err = h.resourcePermService.GetRolePermissionIDs(roleID, scope)
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			return
 		}
 	}
@@ -183,23 +184,23 @@ func (h *PermissionCompatHandler) SaveBusiPer(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	var req permissionSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if h.roleService != nil {
 		if err := h.roleService.ValidatePermissionInheritance(req.RoleID, req.PermIDs); err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			return
 		}
 	}
 
 	if err := h.saveRolePerms(req.RoleID, req.PermIDs, scope); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -215,20 +216,20 @@ func (h *PermissionCompatHandler) BusiResource(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	flag := strings.TrimSpace(c.Param("flag"))
 	list, err := h.permService.ListPerms(&permission.PermQueryRequest{Current: 1, Size: 1000}, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
 	if flag != "" && flag != "1" && !strings.EqualFold(flag, "all") {
 		perms, ok := list.List.([]*permission.SysPerm)
 		if !ok {
-			response.Error(c, "500000", "Failed: unexpected permission payload")
+			response.Error(c, response.CodeInternalError, "Failed: unexpected permission payload")
 			return
 		}
 
@@ -254,31 +255,31 @@ func (h *PermissionCompatHandler) MenuTargetPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	var req targetPermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if req.RoleID <= 0 {
-		response.Error(c, "500000", "Invalid request: roleId is required")
+		response.Error(c, response.CodeInternalError, "Invalid request: roleId is required")
 		return
 	}
 	if h.menuService == nil || h.roleMenuService == nil {
-		response.Error(c, "500000", "menu target permission compatibility is not configured")
+		response.Error(c, response.CodeInternalError, "menu target permission compatibility is not configured")
 		return
 	}
 
 	menus, err := h.menuService.Query()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	auth, err := h.roleMenuService.GetRoleMenuAuth(req.RoleID, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -292,12 +293,12 @@ func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	var req businessTargetPermissionRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -306,13 +307,13 @@ func (h *PermissionCompatHandler) BusiTargetPermission(c *gin.Context) {
 		resourceID = req.RoleID
 	}
 	if resourceID <= 0 || req.Flag == "" {
-		response.Error(c, "500000", "Invalid request: id and flag are required")
+		response.Error(c, response.CodeInternalError, "Invalid request: id and flag are required")
 		return
 	}
 
 	targetPermissions, err := h.resourcePermService.GetResourcePerspective(resourceID, req.Flag, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -323,12 +324,12 @@ func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, scopeErr := buildPermissionScope(c)
 	if scopeErr != nil {
-		response.Error(c, "500000", "Failed: "+scopeErr.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+scopeErr.Error())
 		return
 	}
 	var req userPerspectiveCompatRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -339,7 +340,7 @@ func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
 	if req.ResourceID > 0 {
 		resourcePermissions, resourceErr := h.resourcePermService.GetResourcePerspective(req.ResourceID, req.ResourceType, scope)
 		if resourceErr != nil {
-			response.Error(c, "500000", "Failed: "+resourceErr.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+resourceErr.Error())
 			return
 		}
 		userPermissions = make([]*permission.UserResourcePermVO, 0)
@@ -361,7 +362,7 @@ func (h *PermissionCompatHandler) UserPerspective(c *gin.Context) {
 		userPermissions, err = h.resourcePermService.GetUserPerspective(req.UserID, req.ResourceType, scope)
 	}
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -372,11 +373,11 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req targetPermissionSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if h.roleMenuService == nil {
-		response.Error(c, "500000", "save menu target permission compatibility is not configured")
+		response.Error(c, response.CodeInternalError, "save menu target permission compatibility is not configured")
 		return
 	}
 
@@ -385,7 +386,7 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 	for _, target := range req.TargetPerms {
 		targetType := normalizeTargetType(target.TargetType, target.SourceType)
 		if targetType != permission.AuthTargetTypeRole {
-			response.Error(c, "500000", "Invalid request: only role targets are supported")
+			response.Error(c, response.CodeInternalError, "Invalid request: only role targets are supported")
 			return
 		}
 		if roleID == 0 {
@@ -394,12 +395,12 @@ func (h *PermissionCompatHandler) SaveMenuTargetPer(c *gin.Context) {
 		menuIDs = append(menuIDs, extractTargetPermIDs(target)...)
 	}
 	if roleID <= 0 {
-		response.Error(c, "500000", "Invalid request: roleId is required")
+		response.Error(c, response.CodeInternalError, "Invalid request: roleId is required")
 		return
 	}
 
 	if err := h.roleMenuService.SaveRoleMenuAuth(&service.SaveRoleMenuRequest{RoleID: roleID, MenuIDs: uniqueInt64(menuIDs)}); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -410,12 +411,12 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 	defer recoverServicePanic(c)
 	scope, err := buildPermissionScope(c)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	var req targetPermissionSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -424,33 +425,33 @@ func (h *PermissionCompatHandler) SaveBusiTargetPer(c *gin.Context) {
 		resourceID = req.RoleID
 	}
 	if resourceID <= 0 || req.Flag == "" {
-		response.Error(c, "500000", "Invalid request: id and flag are required")
+		response.Error(c, response.CodeInternalError, "Invalid request: id and flag are required")
 		return
 	}
 
 	resourcePermIDs := make([]int64, 0)
 	preservedDirectPermIDs, err := h.collectDirectResourcePermIDs(resourceID, req.Flag, scope)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	resourcePermIDs = append(resourcePermIDs, preservedDirectPermIDs...)
 	for _, target := range req.TargetPerms {
 		matchedPermIDs, err := h.collectMatchedTargetPermIDs(target, req.Flag)
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			return
 		}
 		resourcePermIDs = append(resourcePermIDs, matchedPermIDs...)
 
 		if err := h.saveRolePermsForResourceType(normalizeTargetID(target.TargetID, target.SourceID), extractTargetPermIDs(target), req.Flag, scope); err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			return
 		}
 	}
 
 	if err := h.resourcePermService.ReplaceResourcePermissions(resourceID, req.Flag, uniqueInt64(resourcePermIDs)); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

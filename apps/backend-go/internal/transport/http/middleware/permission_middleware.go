@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"fmt"
 	"strconv"
 
@@ -117,7 +118,7 @@ func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey str
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -148,7 +149,7 @@ func (m *PermissionMiddleware) CheckResourcePermission(resourceType, permKey str
 				zap.String("perm_key", permKey),
 				zap.String("reason", result.Reason),
 			)
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			c.Abort()
 			return
 		}
@@ -168,7 +169,7 @@ func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -186,19 +187,19 @@ func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
 		}
 
 		if m.chartDatasetResolver == nil {
-			response.Error(c, "500000", "Failed: chart dataset resolver is unavailable")
+			response.Error(c, response.CodeInternalError, "Failed: chart dataset resolver is unavailable")
 			c.Abort()
 			return
 		}
 
 		datasetID, err := m.chartDatasetResolver.GetDatasetGroupIDByChartID(chartID)
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			c.Abort()
 			return
 		}
 		if datasetID <= 0 {
-			response.Error(c, "500000", "Failed: resolved dataset group id is invalid")
+			response.Error(c, response.CodeInternalError, "Failed: resolved dataset group id is invalid")
 			c.Abort()
 			return
 		}
@@ -215,7 +216,7 @@ func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
 			return
 		}
 		if m.resourcePermSvc == nil {
-			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			response.Error(c, response.CodeInternalError, "Failed: resource permission service is unavailable")
 			c.Abort()
 			return
 		}
@@ -225,11 +226,11 @@ func (m *PermissionMiddleware) CheckChartDataView() gin.HandlerFunc {
 			logger.Warn("Chart permission denied",
 				zap.Uint64("user_id", userID),
 				zap.Int64("chart_id", chartID),
-				zap.Int64("dataset_id", datasetID),
+				zap.Int64(DatasetIDKey, datasetID),
 				zap.String("perm_key", permission.PermKeyView),
 				zap.String("reason", result.Reason),
 			)
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			c.Abort()
 			return
 		}
@@ -257,7 +258,7 @@ func extractChartID(c *gin.Context) (int64, error) {
 		return payload.ID, nil
 	}
 
-	return 0, fmt.Errorf("chart id is required")
+	return 0, fmt.Errorf(errno.ErrChartIDRequired)
 }
 
 func (m *PermissionMiddleware) CheckDatasetBatchView() gin.HandlerFunc {
@@ -292,7 +293,7 @@ func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -304,7 +305,7 @@ func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
 
 		resourceType, resourceID, err := m.resolveVisualizationParentResource(c)
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			c.Abort()
 			return
 		}
@@ -318,7 +319,7 @@ func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
 			return
 		}
 		if m.resourcePermSvc == nil {
-			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			response.Error(c, response.CodeInternalError, "Failed: resource permission service is unavailable")
 			c.Abort()
 			return
 		}
@@ -332,7 +333,7 @@ func (m *PermissionMiddleware) CheckVisualizationParentEdit() gin.HandlerFunc {
 				zap.String("perm_key", permission.PermKeyEdit),
 				zap.String("reason", result.Reason),
 			)
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			c.Abort()
 			return
 		}
@@ -345,7 +346,7 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -357,7 +358,7 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 
 		sourceType, sourceID, destinationType, destinationID, err := m.resolveVisualizationCopyResources(c)
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			c.Abort()
 			return
 		}
@@ -371,7 +372,7 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 			return
 		}
 		if m.resourcePermSvc == nil {
-			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			response.Error(c, response.CodeInternalError, "Failed: resource permission service is unavailable")
 			c.Abort()
 			return
 		}
@@ -385,7 +386,7 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 				zap.String("perm_key", permission.PermKeyView),
 				zap.String("reason", sourceResult.Reason),
 			)
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			c.Abort()
 			return
 		}
@@ -399,7 +400,7 @@ func (m *PermissionMiddleware) CheckVisualizationCopy() gin.HandlerFunc {
 				zap.String("perm_key", permission.PermKeyEdit),
 				zap.String("reason", destinationResult.Reason),
 			)
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			c.Abort()
 			return
 		}
@@ -436,7 +437,7 @@ func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -448,7 +449,7 @@ func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.
 
 		resourceType, resourceID, err := m.resolveVisualizationResource(c)
 		if err != nil {
-			response.Error(c, "500000", "Failed: "+err.Error())
+			response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 			c.Abort()
 			return
 		}
@@ -462,7 +463,7 @@ func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.
 			return
 		}
 		if m.resourcePermSvc == nil {
-			response.Error(c, "500000", "Failed: resource permission service is unavailable")
+			response.Error(c, response.CodeInternalError, "Failed: resource permission service is unavailable")
 			c.Abort()
 			return
 		}
@@ -476,7 +477,7 @@ func (m *PermissionMiddleware) checkVisualizationPermission(permKey string) gin.
 				zap.String("perm_key", permKey),
 				zap.String("reason", result.Reason),
 			)
-			response.Forbidden(c, "insufficient permissions")
+			response.Forbidden(c, response.MsgInsufficientPermission)
 			c.Abort()
 			return
 		}
@@ -588,7 +589,7 @@ func (m *PermissionMiddleware) CheckBatchResourcePermission(resourceType, permKe
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -620,7 +621,7 @@ func (m *PermissionMiddleware) CheckBatchResourcePermission(resourceType, permKe
 					zap.String("perm_key", permKey),
 					zap.String("reason", result.Reason),
 				)
-				response.Forbidden(c, "insufficient permissions")
+				response.Forbidden(c, response.MsgInsufficientPermission)
 				c.Abort()
 				return
 			}
@@ -638,7 +639,7 @@ func (m *PermissionMiddleware) CheckExportPermission(resourceType string) gin.Ha
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -717,7 +718,7 @@ func extractResourceIDs(c *gin.Context) ([]int64, error) {
 }
 
 func extractResourceIDsFromRequestLine(c *gin.Context) ([]int64, bool, error) {
-	for _, rawID := range []string{c.Param("id"), c.Query("resourceId"), c.Query("id")} {
+	for _, rawID := range []string{c.Param("id"), c.Query(ContextResourceID), c.Query("id")} {
 		if rawID == "" {
 			continue
 		}
@@ -756,7 +757,7 @@ func extractResourceIDsFromBody(c *gin.Context) ([]int64, error) {
 
 func collectResourceIDsFromObject(payload map[string]interface{}) ([]int64, error) {
 	resourceIDs := make([]int64, 0, 4)
-	for _, key := range []string{"id", "resourceId", "datasetGroupId", "datasetId"} {
+	for _, key := range []string{"id", ContextResourceID, "datasetGroupId", ContextDatasetID} {
 		if value, ok := payload[key]; ok {
 			resourceID, err := parseResourceIDFromAny(value)
 			if err != nil {
@@ -833,7 +834,7 @@ func (m *PermissionMiddleware) CheckBatchExportPermission(resourceType string) g
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -872,7 +873,7 @@ func (m *PermissionMiddleware) CheckDatasetDataPermission() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {
-			response.Unauthorized(c, "authentication required")
+			response.Unauthorized(c, response.MsgAuthenticationRequired)
 			c.Abort()
 			return
 		}
@@ -881,9 +882,9 @@ func (m *PermissionMiddleware) CheckDatasetDataPermission() gin.HandlerFunc {
 			return
 		}
 
-		datasetIDStr := c.Param("datasetId")
+		datasetIDStr := c.Param(ContextDatasetID)
 		if datasetIDStr == "" {
-			datasetIDStr = c.Query("datasetId")
+			datasetIDStr = c.Query(ContextDatasetID)
 		}
 		if datasetIDStr == "" {
 			var req struct {

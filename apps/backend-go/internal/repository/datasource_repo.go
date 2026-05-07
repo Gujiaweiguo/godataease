@@ -9,6 +9,7 @@ import (
 
 	"dataease/backend/internal/domain/auto"
 	"dataease/backend/internal/domain/datasource"
+	"dataease/backend/internal/pkg/errno"
 
 	"gorm.io/gorm"
 )
@@ -37,7 +38,7 @@ func NewDatasourceRepository(db *gorm.DB) *DatasourceRepository {
 
 func (r *DatasourceRepository) Query(req *datasource.ListRequest) ([]*datasource.CoreDatasource, int64, error) {
 	if r == nil || r.db == nil {
-		return nil, 0, fmt.Errorf("datasource repository is unavailable")
+		return nil, 0, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 
 	var list []*datasource.CoreDatasource
@@ -76,7 +77,7 @@ func (r *DatasourceRepository) Query(req *datasource.ListRequest) ([]*datasource
 
 func (r *DatasourceRepository) GetByID(id int64) (*datasource.CoreDatasource, error) {
 	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("datasource repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	var ds datasource.CoreDatasource
 	if err := r.db.Where("id = ? AND COALESCE(del_flag, 0) = 0", id).First(&ds).Error; err != nil {
@@ -87,7 +88,7 @@ func (r *DatasourceRepository) GetByID(id int64) (*datasource.CoreDatasource, er
 
 func (r *DatasourceRepository) FindNearestIDInWindow(id int64, window int64) (*int64, error) {
 	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("datasource repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	if window <= 0 {
 		window = 100
@@ -124,21 +125,21 @@ func (r *DatasourceRepository) FindNearestIDInWindow(id int64, window int64) (*i
 
 func (r *DatasourceRepository) Create(ds *datasource.CoreDatasource) error {
 	if r == nil || r.db == nil {
-		return fmt.Errorf("datasource repository is unavailable")
+		return fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	return r.db.Create(ds).Error
 }
 
 func (r *DatasourceRepository) Update(ds *datasource.CoreDatasource) error {
 	if r == nil || r.db == nil {
-		return fmt.Errorf("datasource repository is unavailable")
+		return fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	return r.db.Save(ds).Error
 }
 
 func (r *DatasourceRepository) SoftDelete(id int64) error {
 	if r == nil || r.db == nil {
-		return fmt.Errorf("datasource repository is unavailable")
+		return fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	return r.db.Model(&datasource.CoreDatasource{}).
 		Where("id = ? AND COALESCE(del_flag, 0) = 0", id).
@@ -147,7 +148,7 @@ func (r *DatasourceRepository) SoftDelete(id int64) error {
 
 func (r *DatasourceRepository) ListChildren(parentID int64) ([]*datasource.CoreDatasource, error) {
 	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("datasource repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	var list []*datasource.CoreDatasource
 	err := r.db.Model(&datasource.CoreDatasource{}).
@@ -159,7 +160,7 @@ func (r *DatasourceRepository) ListChildren(parentID int64) ([]*datasource.CoreD
 
 func (r *DatasourceRepository) CountByNameAndPID(name string, pid int64, excludeID *int64) (int64, error) {
 	if r == nil || r.db == nil {
-		return 0, fmt.Errorf("datasource repository is unavailable")
+		return 0, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	var count int64
 	query := r.db.Model(&datasource.CoreDatasource{}).
@@ -173,7 +174,7 @@ func (r *DatasourceRepository) CountByNameAndPID(name string, pid int64, exclude
 
 func (r *DatasourceRepository) ListAll(keyword *string) ([]*datasource.CoreDatasource, error) {
 	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("datasource repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasourceRepoUnavailable)
 	}
 	var list []*datasource.CoreDatasource
 	query := r.db.Model(&datasource.CoreDatasource{}).Where("COALESCE(del_flag, 0) = 0")
@@ -274,7 +275,7 @@ func (r *DatasourceRepository) ListSchemas() ([]string, error) {
 
 func (r *DatasourceRepository) ListTableFields(tableName string) ([]datasource.TableField, error) {
 	if !datasourceTableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 
 	type columnRow struct {
@@ -301,7 +302,7 @@ func (r *DatasourceRepository) ListTableFields(tableName string) ([]datasource.T
 
 func (r *DatasourceRepository) PreviewRows(tableName string, limit int) ([]map[string]interface{}, error) {
 	if !datasourceTableNamePattern.MatchString(tableName) {
-		return nil, fmt.Errorf("invalid table name")
+		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if limit <= 0 {
 		limit = 100
@@ -320,7 +321,7 @@ func (r *DatasourceRepository) PreviewRows(tableName string, limit int) ([]map[s
 
 func (r *DatasourceRepository) CountRows(tableName string) (int64, error) {
 	if !datasourceTableNamePattern.MatchString(tableName) {
-		return 0, fmt.Errorf("invalid table name")
+		return 0, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	var result struct {
 		C int64 `gorm:"column:c"`

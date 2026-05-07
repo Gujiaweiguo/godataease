@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"dataease/backend/internal/pkg/errno"
 	"fmt"
 	"strings"
 
@@ -26,7 +27,7 @@ type localPreviewExecutor struct {
 
 func (e *localPreviewExecutor) PreviewSQL(ctx context.Context, rawSQL string, limit int) ([]map[string]interface{}, error) {
 	if e == nil || e.repo == nil {
-		return nil, fmt.Errorf("dataset repository is unavailable")
+		return nil, fmt.Errorf(errno.ErrDatasetRepoUnavailable)
 	}
 	select {
 	case <-ctx.Done():

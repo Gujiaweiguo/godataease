@@ -38,18 +38,18 @@ type resourceGovernanceBackfillRequest struct {
 func (h *ResourceGovernanceHandler) BackfillResources(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if h.service == nil {
-		response.Error(c, "500000", "Failed: resource governance service is unavailable")
+		response.Error(c, response.CodeInternalError, "Failed: resource governance service is unavailable")
 		return
 	}
 	userID := int64(transportmiddleware.GetUserID(c))
 	if h.adminChecker != nil && !h.adminChecker.IsAdmin(userID) {
-		response.Forbidden(c, "insufficient permissions")
+		response.Forbidden(c, response.MsgInsufficientPermission)
 		return
 	}
 
 	var req resourceGovernanceBackfillRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
@@ -60,7 +60,7 @@ func (h *ResourceGovernanceHandler) BackfillResources(c *gin.Context) {
 		OrgID:        req.OrgID,
 	})
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

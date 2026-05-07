@@ -21,7 +21,7 @@ func (h *EngineHandler) GetEngine(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.GetEngine()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -31,12 +31,12 @@ func (h *EngineHandler) Validate(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req engine.ValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.Validate(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -44,13 +44,13 @@ func (h *EngineHandler) Validate(c *gin.Context) {
 
 func (h *EngineHandler) ValidateByID(c *gin.Context) {
 	defer recoverServicePanic(c)
-	id, ok := parseIDParamMsg(c, "id", "Invalid id")
+	id, ok := parseIDParamMsg(c, "id", errInvalidID)
 	if !ok {
 		return
 	}
 	result, err := h.service.ValidateByID(id)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -60,7 +60,7 @@ func (h *EngineHandler) SupportSetKey(c *gin.Context) {
 	defer recoverServicePanic(c)
 	result, err := h.service.SupportSetKey()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)

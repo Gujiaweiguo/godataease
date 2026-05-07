@@ -18,7 +18,7 @@ func NewRoleMenuHandler(roleMenuService *service.RoleMenuService) *RoleMenuHandl
 
 func (h *RoleMenuHandler) GetRoleMenuAuth(c *gin.Context) {
 	defer recoverServicePanic(c)
-	roleID, ok := parseIDParamMsg(c, "roleId", "Invalid role ID")
+	roleID, ok := parseIDParamMsg(c, "roleId", errInvalidRoleID)
 	if !ok {
 		return
 	}
@@ -26,7 +26,7 @@ func (h *RoleMenuHandler) GetRoleMenuAuth(c *gin.Context) {
 
 	result, err := h.roleMenuService.GetRoleMenuAuth(roleID)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 
@@ -37,12 +37,12 @@ func (h *RoleMenuHandler) SaveRoleMenuAuth(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.SaveRoleMenuRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 
 	if err := h.roleMenuService.SaveRoleMenuAuth(&req); err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 

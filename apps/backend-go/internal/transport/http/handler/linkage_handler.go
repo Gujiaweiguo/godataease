@@ -20,12 +20,12 @@ func (h *LinkageHandler) GetViewLinkageGather(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.GetViewLinkageGather(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get linkage gather: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get linkage gather: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -35,12 +35,12 @@ func (h *LinkageHandler) GetViewLinkageGatherArray(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.GetViewLinkageGatherArray(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get linkage gather: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get linkage gather: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -50,11 +50,11 @@ func (h *LinkageHandler) SaveLinkage(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.SaveLinkage(&req); err != nil {
-		response.Error(c, "500000", "Failed to save linkage: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to save linkage: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -62,14 +62,14 @@ func (h *LinkageHandler) SaveLinkage(c *gin.Context) {
 
 func (h *LinkageHandler) GetVisualizationAllLinkageInfo(c *gin.Context) {
 	defer recoverServicePanic(c)
-	dvID, ok := parseIDParamMsg(c, "dvId", "Invalid dvId")
+	dvID, ok := parseIDParamMsg(c, "dvId", errInvalidDvID)
 	if !ok {
 		return
 	}
 	resourceTable := c.Param("resourceTable")
 	result, err := h.service.GetVisualizationAllLinkageInfo(dvID, resourceTable)
 	if err != nil {
-		response.Error(c, "500000", "Failed to get linkage info: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to get linkage info: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -79,12 +79,12 @@ func (h *LinkageHandler) UpdateLinkageActive(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	result, err := h.service.UpdateLinkageActive(&req)
 	if err != nil {
-		response.Error(c, "500000", "Failed to update linkage active: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to update linkage active: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -94,11 +94,11 @@ func (h *LinkageHandler) RemoveLinkage(c *gin.Context) {
 	defer recoverServicePanic(c)
 	var req service.LinkageRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	if err := h.service.RemoveLinkage(&req); err != nil {
-		response.Error(c, "500000", "Failed to remove linkage: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed to remove linkage: "+err.Error())
 		return
 	}
 	response.Success(c, nil)

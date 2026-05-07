@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	datafillingdomain "dataease/backend/internal/domain/datafilling"
+	"dataease/backend/internal/pkg/errno"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -47,7 +48,7 @@ func (p *MySQLDDLProvider) CreateTable(ctx context.Context, db *gorm.DB, tableNa
 
 func (p *MySQLDDLProvider) DropTable(ctx context.Context, db *gorm.DB, tableName string) error {
 	if !isValidDDLIdentifier(tableName) {
-		return fmt.Errorf("invalid table name")
+		return fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	return db.WithContext(ctx).Exec("DROP TABLE IF EXISTS `" + tableName + "`").Error
 }
@@ -102,7 +103,7 @@ func (p *MySQLDDLProvider) CountRows(ctx context.Context, db *gorm.DB, tableName
 
 func (p *MySQLDDLProvider) TruncateTable(ctx context.Context, db *gorm.DB, tableName string) error {
 	if !isValidDDLIdentifier(tableName) {
-		return fmt.Errorf("invalid table name")
+		return fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	return db.WithContext(ctx).Exec("TRUNCATE TABLE `" + tableName + "`").Error
 }
@@ -137,7 +138,7 @@ func (p *MySQLDDLProvider) DropTableColumns(ctx context.Context, db *gorm.DB, ta
 
 func (p *MySQLDDLProvider) buildCreateTableSQL(tableName string, fields []datafillingdomain.ExtTableField) (string, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", fmt.Errorf("invalid table name")
+		return "", fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	columns := []string{"`id` VARCHAR(64) PRIMARY KEY"}
 	for _, field := range fields {
@@ -146,7 +147,7 @@ func (p *MySQLDDLProvider) buildCreateTableSQL(tableName string, fields []datafi
 		}
 		mapping := field.Settings.Mapping
 		if !isValidDDLIdentifier(mapping.ColumnName) {
-			return "", fmt.Errorf("invalid column name")
+			return "", fmt.Errorf(errno.ErrInvalidColumnName)
 		}
 		columnType, err := mysqlColumnType(mapping)
 		if err != nil {
@@ -166,7 +167,7 @@ func (p *MySQLDDLProvider) buildCreateTableSQL(tableName string, fields []datafi
 
 func (p *MySQLDDLProvider) buildInsertRowSQL(tableName string, rowData map[string]interface{}) (string, []interface{}, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", nil, fmt.Errorf("invalid table name")
+		return "", nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	prepared := copyRowData(rowData)
 	if id, ok := prepared["id"]; !ok || strings.TrimSpace(fmt.Sprint(id)) == "" {
@@ -190,7 +191,7 @@ func (p *MySQLDDLProvider) buildInsertRowSQL(tableName string, rowData map[strin
 
 func (p *MySQLDDLProvider) buildUpdateRowSQL(tableName string, id string, rowData map[string]interface{}) (string, []interface{}, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", nil, fmt.Errorf("invalid table name")
+		return "", nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if strings.TrimSpace(id) == "" {
 		return "", nil, fmt.Errorf("invalid row id")
@@ -214,7 +215,7 @@ func (p *MySQLDDLProvider) buildUpdateRowSQL(tableName string, id string, rowDat
 
 func (p *MySQLDDLProvider) buildDeleteRowsSQL(tableName string, ids []string) (string, []interface{}, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", nil, fmt.Errorf("invalid table name")
+		return "", nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	cleaned := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -235,7 +236,7 @@ func (p *MySQLDDLProvider) buildDeleteRowsSQL(tableName string, ids []string) (s
 
 func (p *MySQLDDLProvider) buildSearchRowsSQL(tableName string, whereClause string, args []interface{}, limit, offset int64) (string, []interface{}, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", nil, fmt.Errorf("invalid table name")
+		return "", nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	queryArgs := append([]interface{}{}, args...)
 	sql := fmt.Sprintf("SELECT * FROM `%s`", tableName)
@@ -249,7 +250,7 @@ func (p *MySQLDDLProvider) buildSearchRowsSQL(tableName string, whereClause stri
 
 func (p *MySQLDDLProvider) buildCountRowsSQL(tableName string, whereClause string, args []interface{}) (string, []interface{}, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", nil, fmt.Errorf("invalid table name")
+		return "", nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	sql := fmt.Sprintf("SELECT COUNT(*) FROM `%s`", tableName)
 	if strings.TrimSpace(whereClause) != "" {
@@ -260,17 +261,17 @@ func (p *MySQLDDLProvider) buildCountRowsSQL(tableName string, whereClause strin
 
 func (p *MySQLDDLProvider) buildListColumnDataSQL(tableName string, columnName string) (string, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", fmt.Errorf("invalid table name")
+		return "", fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	if !isValidDDLIdentifier(columnName) {
-		return "", fmt.Errorf("invalid column name")
+		return "", fmt.Errorf(errno.ErrInvalidColumnName)
 	}
 	return fmt.Sprintf("SELECT DISTINCT `%s` FROM `%s` ORDER BY `%s` ASC", columnName, tableName, columnName), nil
 }
 
 func (p *MySQLDDLProvider) buildAddTableColumnsSQL(tableName string, fields []datafillingdomain.ExtTableField) (string, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", fmt.Errorf("invalid table name")
+		return "", fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	clauses := make([]string, 0)
 	for _, field := range fields {
@@ -291,12 +292,12 @@ func (p *MySQLDDLProvider) buildAddTableColumnsSQL(tableName string, fields []da
 
 func (p *MySQLDDLProvider) buildDropTableColumnsSQL(tableName string, columnNames []string) (string, error) {
 	if !isValidDDLIdentifier(tableName) {
-		return "", fmt.Errorf("invalid table name")
+		return "", fmt.Errorf(errno.ErrInvalidTableName)
 	}
 	clauses := make([]string, 0, len(columnNames))
 	for _, name := range columnNames {
 		if !isValidDDLIdentifier(name) {
-			return "", fmt.Errorf("invalid column name")
+			return "", fmt.Errorf(errno.ErrInvalidColumnName)
 		}
 		if name == "id" {
 			return "", fmt.Errorf("cannot drop primary key column")
@@ -341,7 +342,7 @@ func mysqlColumnType(mapping datafillingdomain.ExtTableFieldMapping) (string, er
 func buildColumnDefinition(field datafillingdomain.ExtTableField) (string, error) {
 	mapping := field.Settings.Mapping
 	if !isValidDDLIdentifier(mapping.ColumnName) {
-		return "", fmt.Errorf("invalid column name")
+		return "", fmt.Errorf(errno.ErrInvalidColumnName)
 	}
 	columnType, err := mysqlColumnType(mapping)
 	if err != nil {
@@ -422,7 +423,7 @@ func sortedRowColumns(rowData map[string]interface{}) ([]string, []interface{}, 
 	columns := make([]string, 0, len(rowData))
 	for column := range rowData {
 		if !isValidDDLIdentifier(column) {
-			return nil, nil, fmt.Errorf("invalid column name")
+			return nil, nil, fmt.Errorf(errno.ErrInvalidColumnName)
 		}
 		columns = append(columns, column)
 	}

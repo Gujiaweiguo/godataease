@@ -16,19 +16,24 @@ type CompatRouteMapping struct {
 	MigrationStatus string `json:"migrationStatus"`
 }
 
+const (
+	bucketFrontendMigration = "FRONTEND_MIGRATION"
+	statusPending           = "pending"
+)
+
 // compatRouteMappings is the registry of compat routes tracked for frontend migration.
 var compatRouteMappings = []CompatRouteMapping{
-	{LegacyPath: "/user/org/option", CanonicalPath: "/api/user/options", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/user/list", CanonicalPath: "/api/user/list", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/user/create", CanonicalPath: "/api/user/create", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/user/edit", CanonicalPath: "/api/user/update", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/user/delete/:id", CanonicalPath: "/api/user/delete/:id", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/user/options", CanonicalPath: "/api/user/options", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/user/resetPwd/:uid", CanonicalPath: "/api/user/resetPwd/:id", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/org/create", CanonicalPath: "/api/org/create", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/org/update", CanonicalPath: "/api/org/update", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/org/delete/:orgId", CanonicalPath: "/api/org/delete/:orgId", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
-	{LegacyPath: "/org/list", CanonicalPath: "/api/org/list", Bucket: "FRONTEND_MIGRATION", MigrationStatus: "pending"},
+	{LegacyPath: "/user/org/option", CanonicalPath: "/api/user/options", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/user/list", CanonicalPath: "/api/user/list", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/user/create", CanonicalPath: "/api/user/create", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/user/edit", CanonicalPath: "/api/user/update", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/user/delete/:id", CanonicalPath: "/api/user/delete/:id", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/user/options", CanonicalPath: "/api/user/options", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/user/resetPwd/:uid", CanonicalPath: "/api/user/resetPwd/:id", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/org/create", CanonicalPath: "/api/org/create", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/org/update", CanonicalPath: "/api/org/update", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/org/delete/:orgId", CanonicalPath: "/api/org/delete/:orgId", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
+	{LegacyPath: "/org/list", CanonicalPath: "/api/org/list", Bucket: bucketFrontendMigration, MigrationStatus: statusPending},
 }
 
 type CompatibilityBridgeHandler struct{}

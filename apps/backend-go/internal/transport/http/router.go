@@ -17,6 +17,7 @@ import (
 	pkgcache "dataease/backend/internal/pkg/cache"
 	"dataease/backend/internal/pkg/logger"
 	"dataease/backend/internal/pkg/metrics"
+	"dataease/backend/internal/pkg/response"
 	"dataease/backend/internal/repository"
 	"dataease/backend/internal/service"
 	"dataease/backend/internal/transport/http/handler"
@@ -790,9 +791,9 @@ func (r *Router) registerAPIRoutes() {
 
 		copilot := api.Group("/copilot")
 		{
-			copilot.POST("/chat", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
-			copilot.POST("/getList", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": []any{}, "msg": ""}) })
-			copilot.POST("/clearAll", func(c *gin.Context) { c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""}) })
+			copilot.POST("/chat", func(c *gin.Context) { c.JSON(200, gin.H{"code": response.CodeSuccess, "data": nil, "msg": ""}) })
+			copilot.POST("/getList", func(c *gin.Context) { c.JSON(200, gin.H{"code": response.CodeSuccess, "data": []any{}, "msg": ""}) })
+			copilot.POST("/clearAll", func(c *gin.Context) { c.JSON(200, gin.H{"code": response.CodeSuccess, "data": nil, "msg": ""}) })
 		}
 
 		api.GET("/DEXPack.umd.js", func(c *gin.Context) {
@@ -800,11 +801,11 @@ func (r *Router) registerAPIRoutes() {
 		})
 
 		api.POST("/login/platformLogin/:origin", func(c *gin.Context) {
-			c.JSON(200, gin.H{"code": "500000", "data": nil, "msg": "Platform login not supported"})
+			c.JSON(200, gin.H{"code": response.CodeInternalError, "data": nil, "msg": "Platform login not supported"})
 		})
 
 		api.GET("/sqlbot/dataset/:dvInfo", func(c *gin.Context) {
-			c.JSON(200, gin.H{"code": "000000", "data": nil, "msg": ""})
+			c.JSON(200, gin.H{"code": response.CodeSuccess, "data": nil, "msg": ""})
 		})
 	}
 }

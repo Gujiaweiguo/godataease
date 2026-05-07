@@ -23,13 +23,13 @@ func NewWatermarkHandler(service *service.WatermarkService) *WatermarkHandler {
 func (h *WatermarkHandler) Find(c *gin.Context) {
 	defer recoverServicePanic(c)
 	if getAuthenticatedUserID(c) == 0 {
-		response.Unauthorized(c, "authentication required")
+		response.Unauthorized(c, response.MsgAuthenticationRequired)
 		return
 	}
 
 	result, err := h.service.Find()
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -39,19 +39,19 @@ func (h *WatermarkHandler) Save(c *gin.Context) {
 	defer recoverServicePanic(c)
 	userID := getAuthenticatedUserID(c)
 	if userID == 0 {
-		response.Unauthorized(c, "authentication required")
+		response.Unauthorized(c, response.MsgAuthenticationRequired)
 		return
 	}
 
 	var req visualization.WatermarkSaveRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.Error(c, "500000", "Invalid request: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 		return
 	}
 	updateBy := strconv.FormatUint(userID, 10)
 	result, err := h.service.Save(&req, updateBy)
 	if err != nil {
-		response.Error(c, "500000", "Failed: "+err.Error())
+		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -70,7 +70,7 @@ func getAuthenticatedUserID(c *gin.Context) uint64 {
 		return userID
 	}
 
-	if userID, exists := c.Get("userId"); exists {
+	if userID, exists := c.Get(middleware.ContextUserID); exists {
 		switch v := userID.(type) {
 		case uint64:
 			return v
