@@ -23,7 +23,7 @@ func setupAuditRepositoryTest(t *testing.T) (*AuditLogRepository, *LoginFailureR
 	return NewAuditLogRepository(db), NewLoginFailureRepository(db), NewAuditLogDetailRepository(db)
 }
 
-func auditInt64Ptr(v int64) *int64 { return &v }
+func auditInt64Ptr(v int64) *int64    { return &v }
 func auditStringPtr(v string) *string { return &v }
 
 func TestAuditLogRepository_CRUDBatchQueryAndDelete(t *testing.T) {

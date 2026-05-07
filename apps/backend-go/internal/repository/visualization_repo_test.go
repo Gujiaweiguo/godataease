@@ -159,7 +159,6 @@ func setupVisualizationRepositoryTest(t *testing.T) (*VisualizationRepository, *
 }
 
 func strPtrVisualizationRepo(v string) *string { return &v }
-func intPtrVisualizationRepo(v int) *int       { return &v }
 func int64PtrVisualizationRepo(v int64) *int64 { return &v }
 func boolPtrVisualizationRepo(v bool) *bool    { return &v }
 

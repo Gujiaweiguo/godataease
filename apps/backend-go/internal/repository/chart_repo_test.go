@@ -63,7 +63,6 @@ func setupChartRepositoryTest(t *testing.T) (*ChartRepository, *gorm.DB) {
 func strPtrChartRepo(v string) *string { return &v }
 func int64PtrChartRepo(v int64) *int64 { return &v }
 func boolPtrChartRepo(v bool) *bool    { return &v }
-func intPtrChartRepo(v int) *int       { return &v }
 
 func createChartField(t *testing.T, db *gorm.DB, field *dataset.CoreDatasetTableField) {
 	t.Helper()
@@ -160,22 +159,22 @@ func TestChartRepository_QueryChartBaseInfo(t *testing.T) {
 	invalidJSON := `[{`
 	nullJSON := "null"
 	createChartView(t, db, &chart.CoreChartView{
-		ID:                10,
-		Title:             &title,
-		SceneID:           &sceneID,
-		TableID:           &tableID,
-		Type:              &chartType,
-		XAxis:             &xAxis,
-		XAxisExt:          &invalidJSON,
-		YAxis:             &yAxis,
-		YAxisExt:          &nullJSON,
-		ExtStack:          strPtrChartRepo(""),
-		ExtBubble:         strPtrChartRepo(`[{"id":"bubble"}]`),
-		FlowMapStartName:  strPtrChartRepo(`[{"id":"start"}]`),
-		FlowMapEndName:    strPtrChartRepo(`[{"id":"end"}]`),
-		ExtColor:          strPtrChartRepo(`[{"id":"color"}]`),
-		ExtLabel:          strPtrChartRepo(`[{"id":"label"}]`),
-		ExtTooltip:        strPtrChartRepo(`[{"id":"tooltip"}]`),
+		ID:               10,
+		Title:            &title,
+		SceneID:          &sceneID,
+		TableID:          &tableID,
+		Type:             &chartType,
+		XAxis:            &xAxis,
+		XAxisExt:         &invalidJSON,
+		YAxis:            &yAxis,
+		YAxisExt:         &nullJSON,
+		ExtStack:         strPtrChartRepo(""),
+		ExtBubble:        strPtrChartRepo(`[{"id":"bubble"}]`),
+		FlowMapStartName: strPtrChartRepo(`[{"id":"start"}]`),
+		FlowMapEndName:   strPtrChartRepo(`[{"id":"end"}]`),
+		ExtColor:         strPtrChartRepo(`[{"id":"color"}]`),
+		ExtLabel:         strPtrChartRepo(`[{"id":"label"}]`),
+		ExtTooltip:       strPtrChartRepo(`[{"id":"tooltip"}]`),
 	})
 	require.NoError(t, db.Exec(`
 		INSERT INTO snapshot_core_chart_view

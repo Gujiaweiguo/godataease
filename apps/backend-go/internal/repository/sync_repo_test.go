@@ -25,27 +25,27 @@ func setupSyncRepositoryTest(t *testing.T) *SyncRepository {
 	t.Helper()
 
 	registerSyncSQLiteDriverOnce.Do(func() {
-			sql.Register("sqlite3_sync_repo", &sqlite3.SQLiteDriver{
-				ConnectHook: func(conn *sqlite3.SQLiteConn) error {
-					return conn.RegisterFunc("FROM_UNIXTIME", func(value any) string {
-						var unixSeconds int64
-						switch v := value.(type) {
-						case int64:
-							unixSeconds = v
-						case float64:
-							unixSeconds = int64(v)
-						case []byte:
-							parsed, _ := strconv.ParseFloat(string(v), 64)
-							unixSeconds = int64(parsed)
-						case string:
-							parsed, _ := strconv.ParseFloat(v, 64)
-							unixSeconds = int64(parsed)
-						}
-						return time.Unix(unixSeconds, 0).UTC().Format("2006-01-02 15:04:05")
-					}, true)
-				},
-			})
+		sql.Register("sqlite3_sync_repo", &sqlite3.SQLiteDriver{
+			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+				return conn.RegisterFunc("FROM_UNIXTIME", func(value any) string {
+					var unixSeconds int64
+					switch v := value.(type) {
+					case int64:
+						unixSeconds = v
+					case float64:
+						unixSeconds = int64(v)
+					case []byte:
+						parsed, _ := strconv.ParseFloat(string(v), 64)
+						unixSeconds = int64(parsed)
+					case string:
+						parsed, _ := strconv.ParseFloat(v, 64)
+						unixSeconds = int64(parsed)
+					}
+					return time.Unix(unixSeconds, 0).UTC().Format("2006-01-02 15:04:05")
+				}, true)
+			},
 		})
+	})
 
 	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite3_sync_repo", DSN: ":memory:"}, &gorm.Config{})
 	require.NoError(t, err)
@@ -58,17 +58,17 @@ func setupSyncRepositoryTest(t *testing.T) *SyncRepository {
 func newUnitSyncTask(name string, dsID int64) *auto.CoreDatasourceTask {
 	now := time.Now().UnixMilli()
 	return &auto.CoreDatasourceTask{
-		DsID:            dsID,
-		Name:            name,
-		UpdateType:      "full",
-		StartTime:       now,
-		SyncRate:        "0",
-		SimpleCronType:  "minute",
-		EndLimit:        "0",
-		CreateTime:      now,
-		LastExecStatus:  "PENDING",
-		ExtraData:       "{}",
-		TaskStatus:      "pending",
+		DsID:           dsID,
+		Name:           name,
+		UpdateType:     "full",
+		StartTime:      now,
+		SyncRate:       "0",
+		SimpleCronType: "minute",
+		EndLimit:       "0",
+		CreateTime:     now,
+		LastExecStatus: "PENDING",
+		ExtraData:      "{}",
+		TaskStatus:     "pending",
 	}
 }
 
