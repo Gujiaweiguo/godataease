@@ -44,6 +44,9 @@ type fakeChartRepo struct {
 	viewOptions        map[int64][]chart.ViewSelectorVO
 	componentData      map[int64]string
 	chartBaseInfo      map[string]*chart.ChartBaseVO
+	queryViewOptionErr error
+	componentDataErr   error
+	chartBaseInfoErr   error
 	dsFieldsByGroup    map[int64][]*dataset.CoreDatasetTableField
 	chartFieldsByChart map[int64][]*dataset.CoreDatasetTableField
 	fieldsByID         map[int64]*dataset.CoreDatasetTableField
@@ -94,6 +97,9 @@ func (r *fakeChartRepo) QueryRows(chartID int64, limit int) ([]map[string]interf
 }
 
 func (r *fakeChartRepo) QueryViewOption(resourceId int64) ([]chart.ViewSelectorVO, error) {
+	if r.queryViewOptionErr != nil {
+		return nil, r.queryViewOptionErr
+	}
 	if r.viewOptions == nil {
 		return []chart.ViewSelectorVO{}, nil
 	}
@@ -104,6 +110,9 @@ func (r *fakeChartRepo) QueryViewOption(resourceId int64) ([]chart.ViewSelectorV
 }
 
 func (r *fakeChartRepo) GetVisualizationComponentData(resourceId int64) (string, error) {
+	if r.componentDataErr != nil {
+		return "", r.componentDataErr
+	}
 	if r.componentData == nil {
 		return "", nil
 	}
@@ -111,6 +120,9 @@ func (r *fakeChartRepo) GetVisualizationComponentData(resourceId int64) (string,
 }
 
 func (r *fakeChartRepo) QueryChartBaseInfo(id int64, resourceTable string) (*chart.ChartBaseVO, error) {
+	if r.chartBaseInfoErr != nil {
+		return nil, r.chartBaseInfoErr
+	}
 	if r.chartBaseInfo == nil {
 		return nil, nil
 	}
