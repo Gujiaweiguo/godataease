@@ -33,6 +33,28 @@ type DatasetFieldResolver interface {
 	GetFieldByID(id int64) (*dataset.CoreDatasetTableField, error)
 }
 
+type logicConditionBuilder struct {
+	format       string
+	hasArg       bool
+	wrapWithLike bool
+}
+
+var logicConditionBuilders = map[string]logicConditionBuilder{
+	permission.OperatorEq:       {format: "%s = ?", hasArg: true},
+	"not_eq":                   {format: "%s != ?", hasArg: true},
+	"not eq":                   {format: "%s != ?", hasArg: true},
+	permission.OperatorLike:     {format: "%s LIKE ?", hasArg: true, wrapWithLike: true},
+	permission.OperatorNotLike:  {format: "%s NOT LIKE ?", hasArg: true, wrapWithLike: true},
+	permission.OperatorNull:     {format: "%s IS NULL"},
+	permission.OperatorNotNull:  {format: "%s IS NOT NULL"},
+	permission.OperatorEmpty:    {format: "%s = ''"},
+	permission.OperatorNotEmpty: {format: "%s != ''"},
+	permission.OperatorGt:       {format: "%s > ?", hasArg: true},
+	permission.OperatorLt:       {format: "%s < ?", hasArg: true},
+	permission.OperatorGe:       {format: "%s >= ?", hasArg: true},
+	permission.OperatorLe:       {format: "%s <= ?", hasArg: true},
+}
+
 func NewRowPermissionService(
 	rowPermRepo *repository.RowPermissionRepository,
 	columnPermRepo *repository.ColumnPermissionRepository,
@@ -245,45 +267,34 @@ func (s *RowPermissionService) resolveFieldReference(fieldID int64) string {
 	return fmt.Sprintf("`%d`", fieldID)
 }
 
-//nolint:gocyclo
 func (s *RowPermissionService) buildLogicCondition(field, term, value string) (string, []interface{}) {
 	if value == "" && term != permission.OperatorNull && term != permission.OperatorNotNull &&
 		term != permission.OperatorEmpty && term != permission.OperatorNotEmpty {
 		return "", nil
 	}
 
-	switch term {
-	case permission.OperatorEq:
-		return fmt.Sprintf("%s = ?", field), []interface{}{s.escapeSQL(value)}
-	case "not_eq", "not eq":
-		return fmt.Sprintf("%s != ?", field), []interface{}{s.escapeSQL(value)}
-	case permission.OperatorLike:
-		return fmt.Sprintf("%s LIKE ?", field), []interface{}{"%" + s.escapeSQL(value) + "%"}
-	case permission.OperatorNotLike:
-		return fmt.Sprintf("%s NOT LIKE ?", field), []interface{}{"%" + s.escapeSQL(value) + "%"}
-	case permission.OperatorNull:
-		return fmt.Sprintf("%s IS NULL", field), nil
-	case permission.OperatorNotNull:
-		return fmt.Sprintf("%s IS NOT NULL", field), nil
-	case permission.OperatorEmpty:
-		return fmt.Sprintf("%s = ''", field), nil
-	case permission.OperatorNotEmpty:
-		return fmt.Sprintf("%s != ''", field), nil
-	case permission.OperatorGt:
-		return fmt.Sprintf("%s > ?", field), []interface{}{s.escapeSQL(value)}
-	case permission.OperatorLt:
-		return fmt.Sprintf("%s < ?", field), []interface{}{s.escapeSQL(value)}
-	case permission.OperatorGe:
-		return fmt.Sprintf("%s >= ?", field), []interface{}{s.escapeSQL(value)}
-	case permission.OperatorLe:
-		return fmt.Sprintf("%s <= ?", field), []interface{}{s.escapeSQL(value)}
-	case permission.OperatorIn:
+	if term == permission.OperatorIn {
 		return s.buildSetCondition(field, value, false)
-	case permission.OperatorNotIn:
+	}
+	if term == permission.OperatorNotIn {
 		return s.buildSetCondition(field, value, true)
-	default:
+	}
+
+	builder, ok := logicConditionBuilders[term]
+	if !ok {
 		return fmt.Sprintf("%s = ?", field), []interface{}{s.escapeSQL(value)}
 	}
+
+	clause := fmt.Sprintf(builder.format, field)
+	if !builder.hasArg {
+		return clause, nil
+	}
+
+	arg := s.escapeSQL(value)
+	if builder.wrapWithLike {
+		arg = "%" + arg + "%"
+	}
+	return clause, []interface{}{arg}
 }
 
 func (s *RowPermissionService) buildSetCondition(field, value string, negated bool) (string, []interface{}) {

@@ -49,6 +49,9 @@ var (
 	ErrPreviewSQLExternalDatasourceUnsupported = errors.New("external datasource SQL preview is not supported yet; please use synchronized dataset preview")
 	ErrPreviewSQLTimeout                       = errors.New("preview query timed out")
 	ErrPreviewSQLResultTooLarge                = errors.New("preview result is too large")
+	sqlVariableDateTimePatterns                = []string{"DATETIME", "TIMESTAMP", "DATE", "TIME", "YEAR"}
+	sqlVariableFloatPatterns                   = []string{"DOUBLE", "FLOAT", "DECIMAL", "NUMERIC", "REAL"}
+	sqlVariableIntegerPatterns                 = []string{"INT", "LONG", "SHORT", "BIGINT", "SMALLINT", "TINYINT"}
 )
 
 const (
@@ -1927,7 +1930,7 @@ func inferPreviewDeType(v interface{}) int {
 	}
 }
 
-func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type inference with multiple conditions
+func inferSQLVariableDeType(typeList []string) int {
 	if len(typeList) == 0 {
 		return 0
 	}
@@ -1935,19 +1938,28 @@ func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type in
 	if typeText == "" {
 		return 0
 	}
-	if strings.Contains(typeText, "DATETIME") || strings.Contains(typeText, "TIMESTAMP") || strings.Contains(typeText, "DATE") || strings.Contains(typeText, "TIME") || strings.Contains(typeText, "YEAR") {
+	if containsAnyText(typeText, sqlVariableDateTimePatterns) {
 		return 1
 	}
-	if strings.Contains(typeText, "DOUBLE") || strings.Contains(typeText, "FLOAT") || strings.Contains(typeText, "DECIMAL") || strings.Contains(typeText, "NUMERIC") || strings.Contains(typeText, "REAL") {
+	if containsAnyText(typeText, sqlVariableFloatPatterns) {
 		return 3
 	}
-	if strings.Contains(typeText, "INT") || strings.Contains(typeText, "LONG") || strings.Contains(typeText, "SHORT") || strings.Contains(typeText, "BIGINT") || strings.Contains(typeText, "SMALLINT") || strings.Contains(typeText, "TINYINT") {
+	if containsAnyText(typeText, sqlVariableIntegerPatterns) {
 		return 2
 	}
 	if strings.Contains(typeText, "BOOL") {
 		return 4
 	}
 	return 0
+}
+
+func containsAnyText(text string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if strings.Contains(text, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // SaveField creates or updates a dataset field. If field.ID == 0, creates; otherwise updates.
