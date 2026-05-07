@@ -155,7 +155,7 @@ func parseTableRequest(c *gin.Context) (*datasource.TableRequest, bool) {
 	return request, true
 }
 
-func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.WriteRequest, bool) { //nolint:gocyclo
+func parseRequestBody(c *gin.Context) (map[string]interface{}, bool) {
 	body := make(map[string]interface{})
 	raw, err := io.ReadAll(c.Request.Body)
 	if err != nil {
@@ -169,6 +169,51 @@ func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.
 			response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
 			return nil, false
 		}
+	}
+
+	return body, true
+}
+
+func parseEditType(body map[string]interface{}) *string {
+	if editType, ok := body["editType"].(string); ok {
+		return &editType
+	}
+	if editTypeNum, ok := parseInt64Value(body["editType"]); ok {
+		tmp := strconv.FormatInt(editTypeNum, 10)
+		return &tmp
+	}
+
+	return nil
+}
+
+func parseDatasourceConfiguration(c *gin.Context, body map[string]interface{}) (*string, bool) {
+	if cfg, ok := body["configuration"].(string); ok {
+		return &cfg, true
+	}
+
+	var rawConfig interface{}
+	switch cfg := body["configuration"].(type) {
+	case map[string]interface{}:
+		rawConfig = cfg
+	case []interface{}:
+		rawConfig = cfg
+	default:
+		return nil, true
+	}
+
+	b, err := json.Marshal(rawConfig)
+	if err != nil {
+		response.Error(c, response.CodeInternalError, "Invalid configuration")
+		return nil, false
+	}
+	tmp := string(b)
+	return &tmp, true
+}
+
+func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.WriteRequest, bool) {
+	body, ok := parseRequestBody(c)
+	if !ok {
+		return nil, false
 	}
 
 	req := &datasource.WriteRequest{}
@@ -199,32 +244,13 @@ func parseDatasourceWriteRequest(c *gin.Context, requireName bool) (*datasource.
 	if nodeType, ok := body["nodeType"].(string); ok {
 		req.NodeType = nodeType
 	}
-	if editType, ok := body["editType"].(string); ok {
-		req.EditType = &editType
-	} else if editTypeNum, ok := parseInt64Value(body["editType"]); ok {
-		tmp := strconv.FormatInt(editTypeNum, 10)
-		req.EditType = &tmp
-	}
+	req.EditType = parseEditType(body)
 
-	if cfg, ok := body["configuration"].(string); ok {
-		req.Configuration = &cfg
-	} else if cfg, ok := body["configuration"].(map[string]interface{}); ok {
-		b, err := json.Marshal(cfg)
-		if err != nil {
-			response.Error(c, response.CodeInternalError, "Invalid configuration")
-			return nil, false
-		}
-		tmp := string(b)
-		req.Configuration = &tmp
-	} else if cfg, ok := body["configuration"].([]interface{}); ok {
-		b, err := json.Marshal(cfg)
-		if err != nil {
-			response.Error(c, response.CodeInternalError, "Invalid configuration")
-			return nil, false
-		}
-		tmp := string(b)
-		req.Configuration = &tmp
+	configuration, ok := parseDatasourceConfiguration(c, body)
+	if !ok {
+		return nil, false
 	}
+	req.Configuration = configuration
 
 	if enable, ok := body["enableDataFill"].(bool); ok {
 		req.EnableDataFill = &enable
