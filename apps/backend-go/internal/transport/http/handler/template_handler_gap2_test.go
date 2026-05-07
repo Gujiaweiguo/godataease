@@ -46,7 +46,9 @@ func TestTemplateHandlerGap2_UpdateSearchBatchAndCategories(t *testing.T) {
 		h.SearchTemplates(c)
 		resp := decodeTemplateResp(t, w.Body.Bytes())
 		assert.Equal(t, "000000", resp.Code)
-		var data struct{ List []templateCoreVisualizationTemplateMirror `json:"list"` }
+		var data struct {
+			List []templateCoreVisualizationTemplateMirror `json:"list"`
+		}
 		require.NoError(t, json.Unmarshal(resp.Data, &data))
 		assert.NotEmpty(t, data.List)
 		ids := make([]int64, 0, len(data.List))

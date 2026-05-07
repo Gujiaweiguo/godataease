@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func strPtrForDatasourceHandler(v string) *string { return &v }
 
 func TestDatasourceHandler_ValidateByID_HidePw_And_GetSimpleDs(t *testing.T) {
 	env := setupDatasourceHandlerTestEnv(t)

@@ -102,17 +102,17 @@ func TestDataFillingHandlerGap2_TableTreeAndLogs(t *testing.T) {
 		assert.NotEmpty(t, tree)
 	})
 
-		t.Run("save row data success", func(t *testing.T) {
-			resp := performDataFillingHandlerCall(t, func(c *gin.Context) {
+	t.Run("save row data success", func(t *testing.T) {
+		resp := performDataFillingHandlerCall(t, func(c *gin.Context) {
 			c.Request = httptest.NewRequest(http.MethodPost, "/data-filling/form/1/rowData/save", bytes.NewBufferString(`{"name":"alice"}`))
 			c.Request.Header.Set("Content-Type", "application/json")
 			c.Params = gin.Params{{Key: "formId", Value: "1"}}
 			c.Set("user_id", uint64(9))
 			c.Set("username", "tester")
 			h.SaveRowData(c)
-			})
-			assert.Equal(t, "000000", resp.Body.Code)
 		})
+		assert.Equal(t, "000000", resp.Body.Code)
+	})
 
 	t.Run("batch delete row data success", func(t *testing.T) {
 		resp := performDataFillingHandlerCall(t, func(c *gin.Context) {
