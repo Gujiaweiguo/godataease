@@ -565,7 +565,7 @@ func intLikeToFloat(v interface{}) (float64, bool) {
 	}
 }
 
-func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) { //nolint:gocyclo // chart view construction with multiple field types
+func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChartView, error) {
 	id, ok := int64FromAny(body["id"])
 	if !ok || id <= 0 {
 		return nil, fmt.Errorf(errno.ErrChartIDRequired)
@@ -576,134 +576,11 @@ func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChar
 		return nil, err
 	}
 
-	if title, ok := stringFromAny(body["title"]); ok {
-		view.Title = &title
-	}
-	if tableID, ok := int64FromAny(body["tableId"]); ok {
-		view.TableID = &tableID
-	}
-	if sceneID, ok := int64FromAny(body["sceneId"]); ok {
-		view.SceneID = &sceneID
-	}
-	if chartType, ok := stringFromAny(body["type"]); ok {
-		view.Type = &chartType
-	}
-	if render, ok := stringFromAny(body["render"]); ok {
-		view.Render = &render
-	}
-	if resultMode, ok := stringFromAny(body["resultMode"]); ok {
-		view.ResultMode = &resultMode
-	}
-	if resultCount, ok := intFromAny(body["resultCount"]); ok {
-		view.ResultCount = &resultCount
-	}
-	if dataFrom, ok := stringFromAny(body["dataFrom"]); ok {
-		view.DataFrom = &dataFrom
-	}
-
-	if v, ok := marshalJSONField(body, "xAxis"); ok {
-		view.XAxis = &v
-	}
-	if v, ok := marshalJSONField(body, "yAxis"); ok {
-		view.YAxis = &v
-	}
-	if v, ok := marshalJSONField(body, "customAttr"); ok {
-		view.CustomAttr = &v
-	}
-	if v, ok := marshalJSONField(body, "customStyle"); ok {
-		view.CustomStyle = &v
-	}
-	if v, ok := marshalJSONField(body, "customFilter"); ok {
-		view.CustomFilter = &v
-	}
-
-	// Extended axis and chart config fields
-	if v, ok := marshalJSONField(body, "xAxisExt"); ok {
-		view.XAxisExt = &v
-	}
-	if v, ok := marshalJSONField(body, "yAxisExt"); ok {
-		view.YAxisExt = &v
-	}
-	if v, ok := marshalJSONField(body, "extStack"); ok {
-		view.ExtStack = &v
-	}
-	if v, ok := marshalJSONField(body, "extBubble"); ok {
-		view.ExtBubble = &v
-	}
-	if v, ok := marshalJSONField(body, "extLabel"); ok {
-		view.ExtLabel = &v
-	}
-	if v, ok := marshalJSONField(body, "extTooltip"); ok {
-		view.ExtTooltip = &v
-	}
-	if v, ok := marshalJSONField(body, "customAttrMobile"); ok {
-		view.CustomAttrMobile = &v
-	}
-	if v, ok := marshalJSONField(body, "customStyleMobile"); ok {
-		view.CustomStyleMobile = &v
-	}
-	if v, ok := marshalJSONField(body, "drillFields"); ok {
-		view.DrillFields = &v
-	}
-	if v, ok := marshalJSONField(body, "senior"); ok {
-		view.Senior = &v
-	}
-	if v, ok := marshalJSONField(body, "snapshot"); ok {
-		view.Snapshot = &v
-	}
-	if v, ok := marshalJSONField(body, "viewFields"); ok {
-		view.ViewFields = &v
-	}
-	if v, ok := marshalJSONField(body, "extColor"); ok {
-		view.ExtColor = &v
-	}
-	if v, ok := marshalJSONField(body, "sortPriority"); ok {
-		view.SortPriority = &v
-	}
-
-	// Simple string fields
-	if v, ok := stringFromAny(body["stylePriority"]); ok {
-		view.StylePriority = &v
-	}
-	if v, ok := stringFromAny(body["chartType"]); ok {
-		view.ChartType = &v
-	}
-	if v, ok := stringFromAny(body["refreshUnit"]); ok {
-		view.RefreshUnit = &v
-	}
-	if v, ok := stringFromAny(body["flowMapStartName"]); ok {
-		view.FlowMapStartName = &v
-	}
-	if v, ok := stringFromAny(body["flowMapEndName"]); ok {
-		view.FlowMapEndName = &v
-	}
-
-	// Bool fields
-	if v, ok := body["isPlugin"]; ok {
-		b := boolFromAny(v)
-		view.IsPlugin = &b
-	}
-	if v, ok := body["refreshViewEnable"]; ok {
-		b := boolFromAny(v)
-		view.RefreshViewEnable = &b
-	}
-	if v, ok := body["linkageActive"]; ok {
-		b := boolFromAny(v)
-		view.LinkageActive = &b
-	}
-	if v, ok := body["jumpActive"]; ok {
-		b := boolFromAny(v)
-		view.JumpActive = &b
-	}
-	if v, ok := body["aggregate"]; ok {
-		b := boolFromAny(v)
-		view.Aggregate = &b
-	}
-
-	// Int fields
-	if v, ok := intFromAny(body["refreshTime"]); ok {
-		view.RefreshTime = &v
-	}
+	applyCoreChartInt64Fields(view, body)
+	applyCoreChartStringFields(view, body)
+	applyCoreChartJSONFields(view, body)
+	applyCoreChartBoolFields(view, body)
+	applyCoreChartIntFields(view, body)
 
 	now := time.Now().UnixMilli()
 	view.UpdateTime = &now
@@ -711,6 +588,114 @@ func (s *ChartService) SaveFromMap(body map[string]interface{}) (*chart.CoreChar
 		return nil, err
 	}
 	return view, nil
+}
+
+func applyCoreChartStringFields(view *chart.CoreChartView, body map[string]interface{}) {
+	stringFields := []struct {
+		key string
+		set func(string)
+	}{
+		{key: "title", set: func(v string) { view.Title = &v }},
+		{key: "type", set: func(v string) { view.Type = &v }},
+		{key: "render", set: func(v string) { view.Render = &v }},
+		{key: "resultMode", set: func(v string) { view.ResultMode = &v }},
+		{key: "dataFrom", set: func(v string) { view.DataFrom = &v }},
+		{key: "stylePriority", set: func(v string) { view.StylePriority = &v }},
+		{key: "chartType", set: func(v string) { view.ChartType = &v }},
+		{key: "refreshUnit", set: func(v string) { view.RefreshUnit = &v }},
+		{key: "flowMapStartName", set: func(v string) { view.FlowMapStartName = &v }},
+		{key: "flowMapEndName", set: func(v string) { view.FlowMapEndName = &v }},
+	}
+
+	for _, field := range stringFields {
+		if v, ok := stringFromAny(body[field.key]); ok {
+			field.set(v)
+		}
+	}
+}
+
+func applyCoreChartInt64Fields(view *chart.CoreChartView, body map[string]interface{}) {
+	int64Fields := []struct {
+		key string
+		set func(int64)
+	}{
+		{key: "tableId", set: func(v int64) { view.TableID = &v }},
+		{key: "sceneId", set: func(v int64) { view.SceneID = &v }},
+	}
+
+	for _, field := range int64Fields {
+		if v, ok := int64FromAny(body[field.key]); ok {
+			field.set(v)
+		}
+	}
+}
+
+func applyCoreChartIntFields(view *chart.CoreChartView, body map[string]interface{}) {
+	intFields := []struct {
+		key string
+		set func(int)
+	}{
+		{key: "resultCount", set: func(v int) { view.ResultCount = &v }},
+		{key: "refreshTime", set: func(v int) { view.RefreshTime = &v }},
+	}
+
+	for _, field := range intFields {
+		if v, ok := intFromAny(body[field.key]); ok {
+			field.set(v)
+		}
+	}
+}
+
+func applyCoreChartBoolFields(view *chart.CoreChartView, body map[string]interface{}) {
+	boolFields := []struct {
+		key string
+		set func(bool)
+	}{
+		{key: "isPlugin", set: func(v bool) { view.IsPlugin = &v }},
+		{key: "refreshViewEnable", set: func(v bool) { view.RefreshViewEnable = &v }},
+		{key: "linkageActive", set: func(v bool) { view.LinkageActive = &v }},
+		{key: "jumpActive", set: func(v bool) { view.JumpActive = &v }},
+		{key: "aggregate", set: func(v bool) { view.Aggregate = &v }},
+	}
+
+	for _, field := range boolFields {
+		if raw, ok := body[field.key]; ok {
+			field.set(boolFromAny(raw))
+		}
+	}
+}
+
+func applyCoreChartJSONFields(view *chart.CoreChartView, body map[string]interface{}) {
+	jsonFields := []struct {
+		key string
+		set func(string)
+	}{
+		{key: "xAxis", set: func(v string) { view.XAxis = &v }},
+		{key: "yAxis", set: func(v string) { view.YAxis = &v }},
+		{key: "customAttr", set: func(v string) { view.CustomAttr = &v }},
+		{key: "customStyle", set: func(v string) { view.CustomStyle = &v }},
+		{key: "customFilter", set: func(v string) { view.CustomFilter = &v }},
+		{key: "xAxisExt", set: func(v string) { view.XAxisExt = &v }},
+		{key: "yAxisExt", set: func(v string) { view.YAxisExt = &v }},
+		{key: "extStack", set: func(v string) { view.ExtStack = &v }},
+		{key: "extBubble", set: func(v string) { view.ExtBubble = &v }},
+		{key: "extLabel", set: func(v string) { view.ExtLabel = &v }},
+		{key: "extTooltip", set: func(v string) { view.ExtTooltip = &v }},
+		{key: "customAttrMobile", set: func(v string) { view.CustomAttrMobile = &v }},
+		{key: "customStyleMobile", set: func(v string) { view.CustomStyleMobile = &v }},
+		{key: "drillFields", set: func(v string) { view.DrillFields = &v }},
+		{key: "senior", set: func(v string) { view.Senior = &v }},
+		{key: "snapshot", set: func(v string) { view.Snapshot = &v }},
+		{key: "viewFields", set: func(v string) { view.ViewFields = &v }},
+		{key: "extColor", set: func(v string) { view.ExtColor = &v }},
+		{key: "sortPriority", set: func(v string) { view.SortPriority = &v }},
+	}
+
+	for _, field := range jsonFields {
+		if v, ok := marshalJSONField(body, field.key); ok {
+			field.set(v)
+		}
+	}
 }
 
 func (s *ChartService) ListByDQ(datasetGroupID int64, chartID int64) (*chart.ChartFieldListResponse, error) {
