@@ -742,6 +742,7 @@ func TestRound6B_Chart_chartDataIDFromMap(t *testing.T) {
 
 	id, ok = chartDataIDFromMap(map[string]interface{}{})
 	assert.False(t, ok)
+	assert.Equal(t, int64(0), id)
 
 	id, ok = chartDataIDFromMap(map[string]interface{}{"id": "123"})
 	assert.True(t, ok)
@@ -749,6 +750,7 @@ func TestRound6B_Chart_chartDataIDFromMap(t *testing.T) {
 
 	id, ok = chartDataIDFromMap(map[string]interface{}{"id": "abc"})
 	assert.False(t, ok)
+	assert.Equal(t, int64(0), id)
 
 	id, ok = chartDataIDFromMap(map[string]interface{}{"id": float64(456)})
 	assert.True(t, ok)
@@ -764,6 +766,7 @@ func TestRound6B_Chart_chartDataIDFromMap(t *testing.T) {
 
 	id, ok = chartDataIDFromMap(map[string]interface{}{"id": true})
 	assert.False(t, ok)
+	assert.Equal(t, int64(0), id)
 }
 
 func TestRound6B_Chart_chartDataResultCountFromMap(t *testing.T) {
@@ -773,6 +776,7 @@ func TestRound6B_Chart_chartDataResultCountFromMap(t *testing.T) {
 
 	rc, ok = chartDataResultCountFromMap(map[string]interface{}{})
 	assert.False(t, ok)
+	assert.Equal(t, 0, rc)
 
 	rc, ok = chartDataResultCountFromMap(map[string]interface{}{"resultCount": float64(5)})
 	assert.True(t, ok)
@@ -792,6 +796,7 @@ func TestRound6B_Chart_chartDataResultCountFromMap(t *testing.T) {
 
 	rc, ok = chartDataResultCountFromMap(map[string]interface{}{"resultCount": "abc"})
 	assert.False(t, ok)
+	assert.Equal(t, 0, rc)
 
 	rc, ok = chartDataResultCountFromMap(map[string]interface{}{"resultCount": true})
 	assert.False(t, ok)

@@ -29,7 +29,7 @@ func setupRound6VisDB(t *testing.T) *gorm.DB {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	t.Cleanup(func() { sqlDB.Close() })
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	return db
 }
 
@@ -42,7 +42,7 @@ func setupRound6DsEnv(t *testing.T) (*gin.Engine, *gorm.DB) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	t.Cleanup(func() { sqlDB.Close() })
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, db.AutoMigrate(&datasource.CoreDatasource{}, &auto.CoreDatasetTable{}, &auto.CoreDatasourceTaskLog{}, &auto.CoreDsFinishPage{}))
 
 	repo := repository.NewDatasourceRepository(db)
@@ -79,7 +79,7 @@ func setupRound6OrgRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	t.Cleanup(func() { sqlDB.Close() })
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, db.AutoMigrate(&org.SysOrg{}))
 
 	orgRepo := repository.NewOrgRepository(db)
