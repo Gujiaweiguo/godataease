@@ -21,7 +21,6 @@ import (
 func setupDatasetHandlerGapDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	gin.SetMode(gin.TestMode)
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
