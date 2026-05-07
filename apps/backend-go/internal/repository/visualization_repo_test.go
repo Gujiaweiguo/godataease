@@ -40,8 +40,8 @@ type visualizationCoreStore struct {
 func (visualizationCoreStore) TableName() string { return "core_store" }
 
 type visualizationCoreDatasourceTask struct {
-	ID   int64 `gorm:"column:id;primaryKey"`
-	DsID int64 `gorm:"column:ds_id"`
+	ID   int64  `gorm:"column:id;primaryKey"`
+	DsID int64  `gorm:"column:ds_id"`
 	Name string `gorm:"column:name"`
 }
 
