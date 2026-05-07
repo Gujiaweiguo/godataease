@@ -800,6 +800,7 @@ func TestRound6B_Chart_chartDataResultCountFromMap(t *testing.T) {
 
 	rc, ok = chartDataResultCountFromMap(map[string]interface{}{"resultCount": true})
 	assert.False(t, ok)
+	assert.Equal(t, 0, rc)
 }
 
 func TestRound6B_Chart_mergeChartViewIntoMap(t *testing.T) {
