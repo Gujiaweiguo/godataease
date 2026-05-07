@@ -1,0 +1,4 @@
+- 2026-05-04: 提升 backend-go service 覆盖率时，优先补 `threshold_evaluator`、`preview_executor`、`datasource_service` 这类纯函数/轻依赖分支，单位测试收益最高。
+- 2026-05-04: `geo_service`、`menu_service`、`dataset_service` 已有 sqlite 风格单测基座，可复用做服务层分支覆盖并避免改动生产代码。
+- 2026-05-05: `linkage_service`、`outer_params_service` 直接依赖具体 repository，可沿用 sqlite 内存库 + 自定义 `CONCAT`/`LOCATE` 驱动补服务层测试；写入类测试要把生成模型里的 `copy_*`、`ext*` 列一起建出来，否则 GORM `Create` 会因缺列失败。
+- 2026-05-07: `visualization_repo` 单测可用 sqlite 内存库覆盖大部分分支；`FindRecent` 依赖 MySQL 风格 `CONCAT`，可在 go-sqlite3 `ConnectHook` 里注册同名函数，复制类 SQL 则需把 `core_chart_view`、`visualization_linkage*`、`visualization_link_jump*` 的 `copy_from/copy_id` 相关列完整建齐。
