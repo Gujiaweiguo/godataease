@@ -665,6 +665,7 @@ func applyCoreChartBoolFields(view *chart.CoreChartView, body map[string]interfa
 	}
 }
 
+//nolint:dupl // structurally similar to applySnapshotChartJSONFields but uses different parse helpers (marshalJSONField)
 func applyCoreChartJSONFields(view *chart.CoreChartView, body map[string]interface{}) {
 	jsonFields := []struct {
 		key string
