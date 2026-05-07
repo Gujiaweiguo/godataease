@@ -51,6 +51,7 @@ const (
 	visualizationTypeDashboard      = "dashboard"
 	visualizationTypeDataV          = "dataV"
 	visualizationBusiFlagDashboardV = "dashboard-dataV"
+	jsonNullLiteral                 = "null"
 )
 
 func NewVisualizationService(repo *repository.VisualizationRepository) *VisualizationService {
@@ -1598,7 +1599,7 @@ func fetchMarketTemplate(templateURL string) (*marketTemplateDTO, error) {
 
 func normalizeJSONPayload(raw json.RawMessage) string {
 	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" || trimmed == "null" {
+	if trimmed == "" || trimmed == jsonNullLiteral {
 		return ""
 	}
 
@@ -1612,7 +1613,7 @@ func normalizeJSONPayload(raw json.RawMessage) string {
 
 func normalizeTemplateFileName(raw json.RawMessage) string {
 	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" || trimmed == "null" {
+	if trimmed == "" || trimmed == jsonNullLiteral {
 		return ""
 	}
 

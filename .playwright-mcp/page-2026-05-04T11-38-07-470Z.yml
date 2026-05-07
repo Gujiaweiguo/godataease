@@ -1,0 +1,4 @@
+- alert [ref=e3]:
+  - img [ref=e5]
+  - paragraph [ref=e8]: Request failed with status code 500
+  - img [ref=e10] [cursor=pointer]

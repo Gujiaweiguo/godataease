@@ -1,0 +1,92 @@
+- generic [ref=e220]:
+  - banner [ref=e221]:
+    - img [ref=e223] [cursor=pointer]
+    - menubar [ref=e241]:
+      - menuitem "Workbench" [ref=e242] [cursor=pointer]:
+        - generic [ref=e243]: Workbench
+      - menuitem "Visualization" [ref=e244]:
+        - generic [ref=e245] [cursor=pointer]:
+          - generic [ref=e246]: Visualization
+          - img [ref=e248]
+      - menuitem "Data Preparation" [ref=e250]:
+        - generic [ref=e251] [cursor=pointer]:
+          - generic [ref=e252]: Data Preparation
+          - img [ref=e254]
+      - menuitem "System Settings" [ref=e256]:
+        - generic [ref=e257] [cursor=pointer]:
+          - generic [ref=e258]: System Settings
+          - img [ref=e260]
+    - generic [ref=e263] [cursor=pointer]:
+      - img [ref=e266]
+      - generic [ref=e271]: admin
+      - img [ref=e274]
+  - main [ref=e277]:
+    - generic [ref=e278]:
+      - img [ref=e340] [cursor=pointer]
+      - complementary [ref=e279]:
+        - img [ref=e345] [cursor=pointer]
+        - generic [ref=e280]:
+          - generic [ref=e281]:
+            - generic [ref=e282]:
+              - generic [ref=e283]: Dashboard
+              - generic [ref=e284]:
+                - img [ref=e287]
+                - button [ref=e292]:
+                  - img [ref=e294]
+            - generic [ref=e299]:
+              - img [ref=e303]
+              - textbox "Search" [ref=e305]
+            - button [ref=e307] [cursor=pointer]:
+              - img [ref=e309]
+          - tree [ref=e317]:
+            - treeitem "Demo Dashboards" [expanded] [ref=e318]:
+              - generic [ref=e319] [cursor=pointer]:
+                - img [ref=e321]
+                - generic [ref=e323]:
+                  - img [ref=e326]
+                  - generic "Demo Dashboards" [ref=e329]
+              - group [ref=e358]:
+                - treeitem "UI Delete Test Dashboard" [ref=e359]:
+                  - generic [ref=e361] [cursor=pointer]:
+                    - img [ref=e364]
+                    - generic "UI Delete Test Dashboard" [ref=e367]
+                - treeitem "UI Delete Test Dashboard" [disabled] [ref=e368]:
+                  - generic [ref=e370]:
+                    - img [ref=e373]
+                    - generic "UI Delete Test Dashboard" [ref=e376]
+                - treeitem "Tea Sales Dashboard" [checked] [active] [ref=e377]:
+                  - generic [ref=e379] [cursor=pointer]:
+                    - img [ref=e382]
+                    - generic "Tea Sales Dashboard" [ref=e385]
+                    - generic [ref=e386]:
+                      - img [ref=e389]
+                      - button [ref=e392]:
+                        - img [ref=e394]
+      - generic [ref=e331]:
+        - generic [ref=e396]:
+          - generic "Tea Sales Dashboard" [ref=e397]
+          - img [ref=e400] [cursor=pointer]
+          - separator [ref=e402]
+          - generic [ref=e403]:
+            - generic [ref=e404]: Creator:admin
+            - img [ref=e407]
+          - generic [ref=e412]:
+            - button "Fullscreen" [ref=e413] [cursor=pointer]:
+              - img [ref=e416]
+              - generic [ref=e419]: Fullscreen
+            - button "Preview" [ref=e420] [cursor=pointer]:
+              - img [ref=e423]
+              - generic [ref=e425]: Preview
+            - button "Share" [ref=e426] [cursor=pointer]:
+              - img [ref=e429]
+              - generic [ref=e431]: Share
+            - button "Edit" [ref=e432] [cursor=pointer]:
+              - img [ref=e435]
+              - generic [ref=e437]: Edit
+            - button [ref=e439] [cursor=pointer]:
+              - img [ref=e441]
+        - generic [ref=e444]:
+          - paragraph [ref=e451]: Sales by Category
+          - paragraph [ref=e463]: Sales by Region
+          - paragraph [ref=e475]: Sales Trend
+          - paragraph [ref=e487]: Product Details

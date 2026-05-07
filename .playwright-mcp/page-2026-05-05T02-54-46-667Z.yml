@@ -1,0 +1,113 @@
+- generic [ref=e50]:
+  - banner [ref=e51]:
+    - img [ref=e53] [cursor=pointer]
+    - menubar [ref=e71]:
+      - menuitem "Workbench" [ref=e72] [cursor=pointer]:
+        - generic [ref=e73]: Workbench
+      - menuitem "Visualization" [ref=e74]:
+        - generic [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: Visualization
+          - img [ref=e78]
+      - menuitem "Data Preparation" [ref=e80]:
+        - generic [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: Data Preparation
+          - img [ref=e84]
+      - menuitem "System Settings" [ref=e86]:
+        - generic [ref=e87] [cursor=pointer]:
+          - generic [ref=e88]: System Settings
+          - img [ref=e90]
+    - generic [ref=e93] [cursor=pointer]:
+      - img [ref=e96]
+      - generic [ref=e101]: admin
+      - img [ref=e104]
+  - main [ref=e107]:
+    - generic [ref=e108]:
+      - generic [ref=e109]:
+        - generic [ref=e110]:
+          - img [ref=e113]
+          - generic [ref=e118]:
+            - generic "admin" [ref=e120]
+            - generic [ref=e122]: "ID: 1"
+          - generic [ref=e123]:
+            - generic [ref=e124]: Dashboard
+            - generic [ref=e125]: "3"
+          - generic [ref=e126]:
+            - generic [ref=e127]: Data screen
+            - generic [ref=e128]: "0"
+          - generic [ref=e129]:
+            - generic [ref=e130]: Dataset
+            - generic [ref=e131]: "1"
+        - generic [ref=e132]:
+          - text: Quick Create
+          - generic [ref=e133]:
+            - generic [ref=e135] [cursor=pointer]:
+              - img [ref=e138]
+              - generic [ref=e140]: Dashboard
+            - generic [ref=e142] [cursor=pointer]:
+              - img [ref=e145]
+              - generic [ref=e149]: Data screen
+            - generic [ref=e151] [cursor=pointer]:
+              - img [ref=e154]
+              - generic [ref=e156]: Dataset
+            - generic [ref=e158] [cursor=pointer]:
+              - img [ref=e161]
+              - generic [ref=e163]: Data source
+            - generic [ref=e165] [cursor=pointer]:
+              - img [ref=e168]
+              - generic [ref=e174]: Use Template
+      - generic [ref=e175]:
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - text: Template Center
+            - generic [ref=e178]:
+              - button "View All" [ref=e179] [cursor=pointer]
+              - separator [ref=e180]
+              - button "Fold" [ref=e181] [cursor=pointer]
+          - generic [ref=e182]:
+            - generic [ref=e183] [cursor=pointer]: Recommended Dashboard
+            - generic [ref=e184] [cursor=pointer]: Data screen
+          - generic "Blank Dashboard Template" [ref=e190]
+        - generic [ref=e191]:
+          - generic [ref=e192]:
+            - generic:
+              - tabpanel "My Favorites"
+            - tablist [ref=e196]:
+              - tab "My Favorites" [selected] [ref=e198]:
+                - generic [ref=e199]: My Favorites
+              - tab "Recently Used" [ref=e200]:
+                - generic [ref=e201]: Recently Used
+              - tab "My Shares" [ref=e202]:
+                - generic [ref=e203]: My Shares
+              - tab "数据填报" [ref=e204]:
+                - generic [ref=e205]: 数据填报
+          - generic [ref=e206]:
+            - generic [ref=e209] [cursor=pointer]:
+              - generic:
+                - combobox [ref=e211]
+                - generic [ref=e212]: All types
+              - img [ref=e215]
+            - generic [ref=e219]:
+              - img [ref=e223]
+              - textbox "Search Keyword" [ref=e225]
+          - generic [ref=e229]:
+            - table [ref=e231]:
+              - rowgroup [ref=e239]:
+                - row "Name Type Created By Last Edited By Last Edit Time Operation" [ref=e240]:
+                  - columnheader "Name" [ref=e241]:
+                    - generic [ref=e242]: Name
+                  - columnheader "Type" [ref=e243]:
+                    - generic [ref=e244]: Type
+                  - columnheader "Created By" [ref=e245]:
+                    - generic [ref=e246]: Created By
+                  - columnheader "Last Edited By" [ref=e247]:
+                    - generic [ref=e248]: Last Edited By
+                  - columnheader "Last Edit Time" [ref=e249] [cursor=pointer]:
+                    - generic [ref=e250]: Last Edit Time
+                  - columnheader "Operation" [ref=e254]:
+                    - generic [ref=e255]: Operation
+            - generic [ref=e259]:
+              - table:
+                - rowgroup
+              - generic [ref=e262]:
+                - img [ref=e264]
+                - paragraph [ref=e266]: No favorites yet

@@ -1,0 +1,90 @@
+- generic [ref=e50]:
+  - generic [ref=e51]:
+    - generic [ref=e52]:
+      - img [ref=e55]
+      - generic [ref=e60]:
+        - generic "admin" [ref=e62]
+        - generic [ref=e64]: "ID: 1"
+      - generic [ref=e65]:
+        - generic [ref=e66]: Dashboard
+        - generic [ref=e67]: "3"
+      - generic [ref=e68]:
+        - generic [ref=e69]: Data screen
+        - generic [ref=e70]: "0"
+      - generic [ref=e71]:
+        - generic [ref=e72]: Dataset
+        - generic [ref=e73]: "1"
+    - generic [ref=e74]:
+      - text: Quick Create
+      - generic [ref=e75]:
+        - generic [ref=e77] [cursor=pointer]:
+          - img [ref=e80]
+          - generic [ref=e82]: Dashboard
+        - generic [ref=e84] [cursor=pointer]:
+          - img [ref=e87]
+          - generic [ref=e91]: Data screen
+        - generic [ref=e93] [cursor=pointer]:
+          - img [ref=e96]
+          - generic [ref=e98]: Dataset
+        - generic [ref=e100] [cursor=pointer]:
+          - img [ref=e103]
+          - generic [ref=e105]: Data source
+        - generic [ref=e107] [cursor=pointer]:
+          - img [ref=e110]
+          - generic [ref=e116]: Use Template
+  - generic [ref=e117]:
+    - generic [ref=e118]:
+      - generic [ref=e119]:
+        - text: Template Center
+        - generic [ref=e120]:
+          - button "View All" [ref=e121] [cursor=pointer]
+          - separator [ref=e122]
+          - button "Fold" [ref=e123] [cursor=pointer]
+      - generic [ref=e124]:
+        - generic [ref=e125] [cursor=pointer]: Recommended Dashboard
+        - generic [ref=e126] [cursor=pointer]: Data screen
+      - generic "Blank Dashboard Template" [ref=e132]
+    - generic [ref=e133]:
+      - generic [ref=e134]:
+        - generic:
+          - tabpanel "My Favorites"
+        - tablist [ref=e138]:
+          - tab "My Favorites" [selected] [ref=e140]:
+            - generic [ref=e141]: My Favorites
+          - tab "Recently Used" [ref=e142]:
+            - generic [ref=e143]: Recently Used
+          - tab "My Shares" [ref=e144]:
+            - generic [ref=e145]: My Shares
+          - tab "数据填报" [ref=e146]:
+            - generic [ref=e147]: 数据填报
+      - generic [ref=e148]:
+        - generic [ref=e151] [cursor=pointer]:
+          - generic:
+            - combobox [ref=e153]
+            - generic [ref=e154]: All types
+          - img [ref=e157]
+        - generic [ref=e161]:
+          - img [ref=e165]
+          - textbox "Search Keyword" [ref=e167]
+      - generic [ref=e171]:
+        - table [ref=e173]:
+          - rowgroup [ref=e181]:
+            - row "Name Type Created By Last Edited By Last Edit Time Operation" [ref=e182]:
+              - columnheader "Name" [ref=e183]:
+                - generic [ref=e184]: Name
+              - columnheader "Type" [ref=e185]:
+                - generic [ref=e186]: Type
+              - columnheader "Created By" [ref=e187]:
+                - generic [ref=e188]: Created By
+              - columnheader "Last Edited By" [ref=e189]:
+                - generic [ref=e190]: Last Edited By
+              - columnheader "Last Edit Time" [ref=e191] [cursor=pointer]:
+                - generic [ref=e192]: Last Edit Time
+              - columnheader "Operation" [ref=e196]:
+                - generic [ref=e197]: Operation
+        - generic [ref=e201]:
+          - table:
+            - rowgroup
+          - generic [ref=e204]:
+            - img [ref=e206]
+            - paragraph [ref=e208]: No favorites yet

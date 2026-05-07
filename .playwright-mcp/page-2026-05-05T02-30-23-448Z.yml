@@ -1,0 +1,152 @@
+- generic [ref=e3]:
+  - img [ref=e325] [cursor=pointer]
+  - complementary [ref=e4]:
+    - img [ref=e330] [cursor=pointer]
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - generic [ref=e9]: Data Filling
+          - generic [ref=e10]:
+            - img [ref=e13] [cursor=pointer]
+            - img [ref=e19] [cursor=pointer]
+        - generic [ref=e24]:
+          - img [ref=e28]
+          - textbox "搜索目录或表单" [ref=e30]
+      - tree [ref=e34]:
+        - treeitem "测试文件夹" [checked] [ref=e35]:
+          - generic [ref=e37] [cursor=pointer]:
+            - img [ref=e40]
+            - generic "测试文件夹" [ref=e43]
+            - button [ref=e46]:
+              - img [ref=e48]
+        - treeitem "测试表单" [active] [ref=e50]:
+          - generic [ref=e52] [cursor=pointer]:
+            - img [ref=e55]
+            - generic "测试表单" [ref=e59]
+            - button [ref=e62]:
+              - img [ref=e64]
+  - generic [ref=e66]:
+    - generic [ref=e67]:
+      - generic [ref=e68]: Data Filling 管理
+      - generic [ref=e69]:
+        - button "新建文件夹" [ref=e70] [cursor=pointer]:
+          - img [ref=e73]
+          - generic [ref=e75]: 新建文件夹
+        - button "新建表单" [ref=e76] [cursor=pointer]:
+          - img [ref=e79]
+          - generic [ref=e81]: 新建表单
+    - generic [ref=e337]:
+      - generic [ref=e338]:
+        - generic [ref=e339]:
+          - generic [ref=e340]: 测试表单
+          - generic [ref=e341]: 已选中叶子表单，可继续前往编辑页。
+        - generic [ref=e342]:
+          - button "同目录新建表单" [ref=e343] [cursor=pointer]:
+            - generic [ref=e344]: 同目录新建表单
+          - button "编辑表单" [ref=e345] [cursor=pointer]:
+            - img [ref=e348]
+            - generic [ref=e350]: 编辑表单
+      - generic [ref=e351]:
+        - generic [ref=e352]:
+          - generic [ref=e353]: 表单 ID
+          - generic [ref=e354]: "6"
+        - generic [ref=e355]:
+          - generic [ref=e356]: 父目录 ID
+          - generic [ref=e357]: "0"
+        - generic [ref=e358]:
+          - generic [ref=e359]: 节点类型
+          - generic [ref=e360]: form
+        - generic [ref=e361]:
+          - generic [ref=e362]: 子节点数
+          - generic [ref=e363]: "0"
+      - generic [ref=e364]:
+        - tabpanel "数据管理" [ref=e366]:
+          - generic [ref=e367]:
+            - generic [ref=e368]:
+              - generic [ref=e369]:
+                - generic [ref=e370]: 测试表单 · 数据管理
+                - generic [ref=e371]: 表单 ID：6 · 数据表：df_test_form
+              - generic [ref=e372]:
+                - generic [ref=e373]:
+                  - generic [ref=e374]: 当前筛选
+                  - generic [ref=e375]: "0"
+                - generic [ref=e376]:
+                  - generic [ref=e377]: 已选数据
+                  - generic [ref=e378]: "0"
+                - generic [ref=e379]:
+                  - generic [ref=e380]: 数据总量
+                  - generic [ref=e381]: "1"
+            - generic [ref=e384]:
+              - generic [ref=e385]:
+                - button "新增数据行" [ref=e386] [cursor=pointer]:
+                  - generic [ref=e387]: 新增数据行
+                - button "批量删除" [disabled] [ref=e388]:
+                  - generic [ref=e389]: 批量删除
+                - button "导出数据" [ref=e390] [cursor=pointer]:
+                  - generic [ref=e391]: 导出数据
+                - button "下载模板" [ref=e392] [cursor=pointer]:
+                  - generic [ref=e393]: 下载模板
+                - button "上传 Excel" [ref=e394] [cursor=pointer]:
+                  - generic [ref=e395]: 上传 Excel
+              - generic [ref=e396]:
+                - button "清空数据" [ref=e397] [cursor=pointer]:
+                  - generic [ref=e398]: 清空数据
+                - button "提交日志" [ref=e399] [cursor=pointer]:
+                  - generic [ref=e400]: 提交日志
+            - generic [ref=e404]:
+              - generic [ref=e405]:
+                - generic [ref=e406]: 姓名
+                - textbox "姓名" [ref=e410]:
+                  - /placeholder: 请输入姓名
+              - generic [ref=e412]:
+                - button "搜索" [ref=e413] [cursor=pointer]:
+                  - generic [ref=e414]: 搜索
+                - button "清空" [ref=e415] [cursor=pointer]:
+                  - generic [ref=e416]: 清空
+            - generic [ref=e419]:
+              - generic [ref=e421]:
+                - table [ref=e423]:
+                  - rowgroup [ref=e428]:
+                    - row "姓名 操作" [ref=e429]:
+                      - columnheader [ref=e430]:
+                        - generic [ref=e433] [cursor=pointer]:
+                          - checkbox
+                      - columnheader "姓名" [ref=e435]:
+                        - generic [ref=e436]: 姓名
+                      - columnheader "操作" [ref=e437]:
+                        - generic [ref=e438]: 操作
+                - table [ref=e443]:
+                  - rowgroup [ref=e448]:
+                    - row "张三 编辑 删除" [ref=e449]:
+                      - cell [ref=e450]:
+                        - generic [ref=e453] [cursor=pointer]:
+                          - checkbox
+                      - cell "张三" [ref=e455]:
+                        - generic [ref=e456]: 张三
+                      - cell "编辑 删除" [ref=e457]:
+                        - generic [ref=e459]:
+                          - button "编辑" [ref=e460] [cursor=pointer]:
+                            - generic [ref=e461]: 编辑
+                          - button "删除" [ref=e462] [cursor=pointer]:
+                            - generic [ref=e463]: 删除
+              - generic [ref=e466]:
+                - generic [ref=e467]: Total 1
+                - button "Go to previous page" [disabled] [ref=e468]:
+                  - generic:
+                    - img
+                - list [ref=e469]:
+                  - listitem "page 1" [ref=e470]: "1"
+                - button "Go to next page" [disabled] [ref=e471]:
+                  - generic:
+                    - img
+                - generic [ref=e474] [cursor=pointer]:
+                  - generic:
+                    - combobox [ref=e476]
+                    - generic [ref=e477]: 10/page
+                  - img [ref=e480]
+                - generic [ref=e482]:
+                  - generic [ref=e483]: Go to
+                  - spinbutton "Page" [ref=e486]: "1"
+        - tablist [ref=e490]:
+          - tab "数据管理" [selected] [ref=e492]
+          - tab "任务管理" [ref=e493]

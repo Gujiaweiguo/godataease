@@ -1,0 +1,92 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: 新建 Data Filling 表单
+      - generic [ref=e7]: 新建表单，父目录 ID：0
+    - generic [ref=e8]:
+      - button "返回管理页" [ref=e9] [cursor=pointer]:
+        - img [ref=e12]
+        - generic [ref=e14]: 返回管理页
+      - button "保存" [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: 保存
+  - generic [ref=e17]:
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]: 基础配置
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]:
+              - generic [ref=e25]: 表单名称*
+              - textbox "表单名称*" [ref=e29]:
+                - /placeholder: 请输入表单名称
+                - text: 测试表单
+            - generic [ref=e30]:
+              - generic [ref=e31]: 数据源*
+              - generic [ref=e34]:
+                - generic [ref=e35]:
+                  - combobox "数据源*" [ref=e37]
+                  - generic [ref=e38]: 本地MySQL
+                - img [ref=e41] [cursor=pointer]
+          - generic [ref=e43]:
+            - generic [ref=e44]: 使用已有表
+            - generic [ref=e46]:
+              - switch "使用已有表"
+          - generic [ref=e50]:
+            - generic [ref=e51]: 新建表名*
+            - textbox "新建表名*" [ref=e55]:
+              - /placeholder: 请输入物理表名
+              - text: df_test_form
+          - generic [ref=e56]:
+            - generic [ref=e57]: 创建索引
+            - generic [ref=e59]:
+              - switch "创建索引"
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: 字段配置
+          - button "添加字段" [active] [ref=e68] [cursor=pointer]:
+            - generic [ref=e69]: 添加字段
+        - generic [ref=e134]:
+          - generic [ref=e135]:
+            - button "上移" [disabled] [ref=e136]:
+              - generic [ref=e137]: 上移
+            - button "下移" [disabled] [ref=e138]:
+              - generic [ref=e139]: 下移
+          - generic [ref=e140]:
+            - generic [ref=e141]:
+              - generic [ref=e142]: 字段 1
+              - button "删除" [ref=e143] [cursor=pointer]:
+                - generic [ref=e144]: 删除
+            - generic [ref=e145]:
+              - generic [ref=e146]:
+                - generic [ref=e147]: "* 字段类型"
+                - generic [ref=e150] [cursor=pointer]:
+                  - generic:
+                    - combobox "* 字段类型" [ref=e152]
+                    - generic [ref=e153]: 文本
+                  - img [ref=e156]
+              - generic [ref=e158]:
+                - generic [ref=e159]: "* 显示名称"
+                - textbox "* 显示名称" [ref=e163]:
+                  - /placeholder: 请输入字段显示名称
+                  - text: 字段 1
+              - generic [ref=e164]:
+                - generic [ref=e165]: "* 字段编码"
+                - textbox "* 字段编码" [ref=e169]:
+                  - /placeholder: 请输入字段编码
+                  - text: field_1
+              - generic [ref=e170]:
+                - generic [ref=e171]: 占位提示
+                - textbox "占位提示" [ref=e175]:
+                  - /placeholder: 可选，占位提示
+              - generic [ref=e176]:
+                - generic [ref=e177]: 必填
+                - generic [ref=e179]:
+                  - switch "必填"
+    - generic [ref=e91]:
+      - generic [ref=e92]: 表单预览
+      - generic [ref=e184]:
+        - generic [ref=e185]: 字段 1
+        - generic [ref=e187]:
+          - generic:
+            - textbox "字段 1" [disabled]:
+              - /placeholder: 请输入字段 1

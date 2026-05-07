@@ -346,6 +346,19 @@ func RegisterFrontendCompatRoutes(engine *gin.Engine, protected gin.IRoutes, h *
 	protected.GET("/api/linkJump/queryVisualizationJumpInfo/:dvId/:resourceTable", h.linkJumpHandler.QueryVisualizationJumpInfo)
 }
 
+// busiFlagPathRule maps a normalized menu path segment to the busiFlag it authorizes.
+type busiFlagPathRule struct {
+	segment  string
+	busiFlag string
+}
+
+var busiFlagPathRules = []busiFlagPathRule{
+	{segment: "panel", busiFlag: interactiveBusiFlagDashboard},
+	{segment: "screen", busiFlag: interactiveBusiFlagDataV},
+	{segment: "dataset", busiFlag: interactiveBusiFlagDataset},
+	{segment: "datasource", busiFlag: interactiveBusiFlagDatasource},
+}
+
 func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 	authorized := map[string]bool{
 		interactiveBusiFlagDashboard:  false,
@@ -359,19 +372,11 @@ func collectAuthorizedBusiFlags(menus []*menu.MenuVO) map[string]bool {
 			if node == nil {
 				continue
 			}
-			// Normalize: strip leading "/" so both "panel" and "/panel" match.
-			// Child menus (pid != 0) have their leading "/" stripped by convertToVO,
-			// so paths arrive as "panel", "screen", "dataset", "datasource".
 			p := strings.TrimPrefix(strings.TrimSpace(node.Path), "/")
-			switch {
-			case p == "panel" || strings.HasPrefix(p, "panel/") || strings.HasSuffix(p, "/panel"):
-				authorized[interactiveBusiFlagDashboard] = true
-			case p == "screen" || strings.HasPrefix(p, "screen/") || strings.HasSuffix(p, "/screen"):
-				authorized[interactiveBusiFlagDataV] = true
-			case p == "dataset" || strings.HasPrefix(p, "dataset/") || strings.HasSuffix(p, "/dataset"):
-				authorized[interactiveBusiFlagDataset] = true
-			case p == "datasource" || strings.HasPrefix(p, "datasource/") || strings.HasSuffix(p, "/datasource"):
-				authorized[interactiveBusiFlagDatasource] = true
+			for _, rule := range busiFlagPathRules {
+				if p == rule.segment || strings.HasPrefix(p, rule.segment+"/") || strings.HasSuffix(p, "/"+rule.segment) {
+					authorized[rule.busiFlag] = true
+				}
 			}
 			if len(node.Children) > 0 {
 				walk(node.Children)
