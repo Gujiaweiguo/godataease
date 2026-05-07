@@ -109,7 +109,7 @@ func (s *GeoService) DeleteGeo(code string) error {
 		if len(busiCode) >= 3 {
 			countryCode := busiCode[:3]
 			filePath := filepath.Join(geoDir, countryCode, busiCode+".json")
-			os.Remove(filePath)
+			_ = os.Remove(filePath)
 		}
 	}
 

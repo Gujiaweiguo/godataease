@@ -1520,7 +1520,7 @@ func fetchMarketTemplate(templateURL string) (*marketTemplateDTO, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch market template: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("market template fetch returned status %d", resp.StatusCode)

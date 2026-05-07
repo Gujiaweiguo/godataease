@@ -184,7 +184,7 @@ func (s *DataFillingService) ExcelUpload(ctx context.Context, formID int64, file
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	workbook, err := excelize.OpenReader(file)
 	if err != nil {
 		return nil, err

@@ -369,7 +369,7 @@ func (h *DatasourceHandler) UploadFile(c *gin.Context) {
 		response.Error(c, "500000", "Failed to get uploaded file: "+err.Error())
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var datasourceID int64
 	if idStr := c.PostForm("id"); idStr != "" {

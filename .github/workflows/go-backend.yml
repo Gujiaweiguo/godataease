@@ -114,8 +114,9 @@ jobs:
 
     - name: Run linter
       if: steps.changes.outputs.backend == 'true'
-      uses: golangci/golangci-lint-action@v4
+      uses: golangci/golangci-lint-action@v7
       with:
+        version: v2.1.0
         working-directory: apps/backend-go
         only-new-issues: true
     - name: Summary

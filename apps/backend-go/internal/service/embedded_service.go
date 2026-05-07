@@ -256,11 +256,12 @@ func decodeBase64(s string) string {
 	result := make([]byte, 0, len(s))
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if c == '-' {
+		switch c {
+		case '-':
 			result = append(result, '+')
-		} else if c == '_' {
+		case '_':
 			result = append(result, '/')
-		} else {
+		default:
 			result = append(result, c)
 		}
 	}

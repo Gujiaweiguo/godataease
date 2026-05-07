@@ -70,7 +70,7 @@ func TestAuditHandler_DownloadExportFile(t *testing.T) {
 	t.Run("serves valid temp export file", func(t *testing.T) {
 		file, err := os.CreateTemp(os.TempDir(), "audit_logs_*.csv")
 		require.NoError(t, err)
-		defer os.Remove(file.Name())
+		defer func() { _ = os.Remove(file.Name()) }()
 		_, err = file.WriteString("id,action\n1,login\n")
 		require.NoError(t, err)
 		require.NoError(t, file.Close())

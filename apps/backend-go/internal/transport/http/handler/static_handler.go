@@ -138,7 +138,7 @@ func (h *StaticHandler) Upload(c *gin.Context) {
 		response.Error(c, "500000", "Failed to read upload file: "+err.Error())
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	allowedExts := map[string]bool{".gif": true, ".svg": true, ".png": true, ".jpeg": true, ".jpg": true}

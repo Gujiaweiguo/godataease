@@ -49,7 +49,7 @@ func (h *GeoHandler) Save(c *gin.Context) {
 		response.Error(c, "500000", "geometry file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if !strings.HasSuffix(strings.ToLower(header.Filename), ".json") {
 		response.Error(c, "500000", "only json format files are supported")

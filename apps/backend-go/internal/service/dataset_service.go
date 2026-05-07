@@ -1766,7 +1766,7 @@ func validatePreviewSQL(rawSQL string) error {
 	if text == "" {
 		return fmt.Errorf("sql is required")
 	}
-	if !(strings.HasPrefix(lower, "select") || strings.HasPrefix(lower, "with")) {
+	if !strings.HasPrefix(lower, "select") && !strings.HasPrefix(lower, "with") {
 		return fmt.Errorf("only select query is supported")
 	}
 	if strings.Contains(text, ";") {

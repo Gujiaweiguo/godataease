@@ -198,7 +198,7 @@ func (s *UserImportService) parseRecords(reader io.Reader, filename string) ([]u
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse excel file: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		sheets := f.GetSheetList()
 		if len(sheets) == 0 {

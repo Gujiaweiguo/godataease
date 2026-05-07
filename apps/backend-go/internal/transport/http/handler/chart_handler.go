@@ -239,10 +239,7 @@ func (h *ChartHandler) CheckSameDataSet(c *gin.Context) {
 		return
 	}
 
-	same := false
-	if source.TableID != nil && target.TableID != nil && *source.TableID == *target.TableID {
-		same = true
-	}
+	same := source.TableID != nil && target.TableID != nil && *source.TableID == *target.TableID
 	response.Success(c, same)
 }
 
