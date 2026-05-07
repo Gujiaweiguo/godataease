@@ -810,6 +810,7 @@ func applySnapshotChartIntFields(view *visualization.SnapshotCanvasChartView, da
 	}
 }
 
+//nolint:dupl // structurally similar to applyCoreChartBoolFields but uses different parse helpers (boolFromAnyMap)
 func applySnapshotChartBoolFields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
 	boolFields := []struct {
 		key string
@@ -829,6 +830,7 @@ func applySnapshotChartBoolFields(view *visualization.SnapshotCanvasChartView, d
 	}
 }
 
+//nolint:dupl // structurally similar to applyCoreChartJSONFields but uses different parse helpers (marshalJSONFieldFromMap)
 func applySnapshotChartJSONFields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
 	jsonFields := []struct {
 		key string

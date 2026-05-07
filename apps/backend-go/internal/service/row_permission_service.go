@@ -41,8 +41,8 @@ type logicConditionBuilder struct {
 
 var logicConditionBuilders = map[string]logicConditionBuilder{
 	permission.OperatorEq:       {format: "%s = ?", hasArg: true},
-	"not_eq":                   {format: "%s != ?", hasArg: true},
-	"not eq":                   {format: "%s != ?", hasArg: true},
+	"not_eq":                    {format: "%s != ?", hasArg: true},
+	"not eq":                    {format: "%s != ?", hasArg: true},
 	permission.OperatorLike:     {format: "%s LIKE ?", hasArg: true, wrapWithLike: true},
 	permission.OperatorNotLike:  {format: "%s NOT LIKE ?", hasArg: true, wrapWithLike: true},
 	permission.OperatorNull:     {format: "%s IS NULL"},
