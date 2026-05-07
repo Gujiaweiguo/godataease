@@ -120,7 +120,7 @@ func TestThresholdRepository_PagerAndHelpers(t *testing.T) {
 	assert.Equal(t, 10, size)
 }
 
-func TestThresholdRepository_InstancePager(t *testing.T) {
+func TestThresholdRepository_InstancePager_Unit(t *testing.T) {
 	ctx := context.Background()
 	repo, db := setupThresholdRepositoryTest(t)
 

@@ -157,7 +157,7 @@ func TestSyncRepository_TaskCRUDFiltersAndCounts(t *testing.T) {
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
-func TestSyncRepository_TaskLogsAndChartData(t *testing.T) {
+func TestSyncRepository_TaskLogsAndChartData_Unit(t *testing.T) {
 	repo := setupSyncRepositoryTest(t)
 
 	taskOne := newUnitSyncTask("log-task-1", 201)
