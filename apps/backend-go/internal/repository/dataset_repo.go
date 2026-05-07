@@ -482,7 +482,7 @@ func (r *DatasetRepository) QueryDistinctValues(tableName string, columnName str
 	return result, nil
 }
 
-func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, searchColumn string, searchText string, sortColumn string, sortDirection string, limit int) ([]map[string]interface{}, error) { //nolint:gocyclo // complex query builder with multiple conditions
+func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns []dataset.EnumObjectColumn, filters []dataset.EnumFilterClause, searchColumn string, searchText string, sortColumn string, sortDirection string, limit int) ([]map[string]interface{}, error) {
 	if !tableNamePattern.MatchString(tableName) {
 		return nil, fmt.Errorf(errno.ErrInvalidTableName)
 	}
@@ -495,17 +495,9 @@ func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns 
 		return nil, err
 	}
 
-	selectParts := make([]string, 0, len(columns))
-	for _, column := range columns {
-		quotedColumn, quoteErr := quoteIdentifier(column.Column)
-		if quoteErr != nil {
-			return nil, quoteErr
-		}
-		quotedAlias, quoteErr := quoteIdentifier(column.Alias)
-		if quoteErr != nil {
-			return nil, quoteErr
-		}
-		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", quotedColumn, quotedAlias))
+	selectParts, err := buildSelectParts(columns)
+	if err != nil {
+		return nil, err
 	}
 
 	query := strings.Builder{}
@@ -515,30 +507,7 @@ func (r *DatasetRepository) QueryDistinctObjectValues(tableName string, columns 
 	query.WriteString(quotedTable)
 
 	args := make([]interface{}, 0)
-	whereParts := make([]string, 0)
-	for _, filter := range filters {
-		if strings.TrimSpace(filter.Column) == "" || len(filter.Values) == 0 {
-			continue
-		}
-		quotedFilterColumn, quoteErr := quoteIdentifier(filter.Column)
-		if quoteErr != nil {
-			continue
-		}
-		placeholders := make([]string, 0, len(filter.Values))
-		for _, value := range filter.Values {
-			placeholders = append(placeholders, "?")
-			args = append(args, value)
-		}
-		whereParts = append(whereParts, fmt.Sprintf("%s IN (%s)", quotedFilterColumn, strings.Join(placeholders, ", ")))
-	}
-
-	if strings.TrimSpace(searchText) != "" && strings.TrimSpace(searchColumn) != "" {
-		quotedSearchColumn, quoteErr := quoteIdentifier(searchColumn)
-		if quoteErr == nil {
-			whereParts = append(whereParts, fmt.Sprintf("%s LIKE ?", quotedSearchColumn))
-			args = append(args, "%"+strings.TrimSpace(searchText)+"%")
-		}
-	}
+	whereParts := buildEnumWhereClauses(filters, searchColumn, searchText, &args)
 
 	if len(whereParts) > 0 {
 		query.WriteString(" WHERE ")
@@ -634,6 +603,38 @@ func buildTreeSelectOrder(columns []dataset.EnumObjectColumn) ([]string, []strin
 		orderParts = append(orderParts, quotedColumn+" ASC")
 	}
 	return selectParts, orderParts, nil
+}
+
+func buildSelectParts(columns []dataset.EnumObjectColumn) ([]string, error) {
+	selectParts := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quotedColumn, err := quoteIdentifier(column.Column)
+		if err != nil {
+			return nil, err
+		}
+		quotedAlias, err := quoteIdentifier(column.Alias)
+		if err != nil {
+			return nil, err
+		}
+		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", quotedColumn, quotedAlias))
+	}
+	return selectParts, nil
+}
+
+func buildEnumWhereClauses(filters []dataset.EnumFilterClause, searchColumn string, searchText string, args *[]interface{}) []string {
+	whereParts := buildFilterWhereParts(filters, args)
+	if strings.TrimSpace(searchText) == "" || strings.TrimSpace(searchColumn) == "" {
+		return whereParts
+	}
+
+	quotedSearchColumn, err := quoteIdentifier(searchColumn)
+	if err != nil {
+		return whereParts
+	}
+
+	whereParts = append(whereParts, fmt.Sprintf("%s LIKE ?", quotedSearchColumn))
+	*args = append(*args, "%"+strings.TrimSpace(searchText)+"%")
+	return whereParts
 }
 
 func buildFilterWhereParts(filters []dataset.EnumFilterClause, args *[]interface{}) []string {

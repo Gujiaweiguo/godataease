@@ -737,141 +737,131 @@ func (s *VisualizationService) saveChartViewsFromVisualization(componentData *st
 	}
 }
 
-func buildSnapshotChartViewFromMap(data map[string]interface{}) *visualization.SnapshotCanvasChartView { //nolint:gocyclo // mirrors chart view DTO-to-record mapping
+func buildSnapshotChartViewFromMap(data map[string]interface{}) *visualization.SnapshotCanvasChartView {
 	if len(data) == 0 {
 		return nil
 	}
 
 	view := &visualization.SnapshotCanvasChartView{}
 
-	if v, ok := stringFromAnyMap(data, "title"); ok {
-		view.Title = &v
-	}
-	if v, ok := stringFromAnyMap(data, "type"); ok {
-		view.Type = &v
-	}
-	if v, ok := stringFromAnyMap(data, "render"); ok {
-		view.Render = &v
-	}
-	if v, ok := stringFromAnyMap(data, "resultMode"); ok {
-		view.ResultMode = &v
-	}
-	if v, ok := stringFromAnyMap(data, "dataFrom"); ok {
-		view.DataFrom = &v
-	}
-	if v, ok := stringFromAnyMap(data, "stylePriority"); ok {
-		view.StylePriority = &v
-	}
-	if v, ok := stringFromAnyMap(data, "chartType"); ok {
-		view.ChartType = &v
-	}
-	if v, ok := stringFromAnyMap(data, "refreshUnit"); ok {
-		view.RefreshUnit = &v
-	}
-	if v, ok := stringFromAnyMap(data, "flowMapStartName"); ok {
-		view.FlowMapStartName = &v
-	}
-	if v, ok := stringFromAnyMap(data, "flowMapEndName"); ok {
-		view.FlowMapEndName = &v
-	}
-	if v, ok := stringFromAnyMap(data, "createBy"); ok {
-		view.CreateBy = &v
-	}
-
-	if v, ok := int64FromAnyMap(data, "tableId"); ok {
-		view.TableID = &v
-	}
-	if v, ok := int64FromAnyMap(data, "createTime"); ok {
-		view.CreateTime = &v
-	}
-
-	if v, ok := intFromAnyMap(data, "resultCount"); ok {
-		view.ResultCount = &v
-	}
-	if v, ok := intFromAnyMap(data, "refreshTime"); ok {
-		view.RefreshTime = &v
-	}
-
-	if v, ok := data["isPlugin"]; ok {
-		b := boolFromAnyMap(v)
-		view.IsPlugin = &b
-	}
-	if v, ok := data["refreshViewEnable"]; ok {
-		b := boolFromAnyMap(v)
-		view.RefreshViewEnable = &b
-	}
-	if v, ok := data["linkageActive"]; ok {
-		b := boolFromAnyMap(v)
-		view.LinkageActive = &b
-	}
-	if v, ok := data["jumpActive"]; ok {
-		b := boolFromAnyMap(v)
-		view.JumpActive = &b
-	}
-	if v, ok := data["aggregate"]; ok {
-		b := boolFromAnyMap(v)
-		view.Aggregate = &b
-	}
-
-	if v, ok := marshalJSONFieldFromMap(data, "xAxis"); ok {
-		view.XAxis = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "xAxisExt"); ok {
-		view.XAxisExt = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "yAxis"); ok {
-		view.YAxis = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "yAxisExt"); ok {
-		view.YAxisExt = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "extStack"); ok {
-		view.ExtStack = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "extBubble"); ok {
-		view.ExtBubble = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "extLabel"); ok {
-		view.ExtLabel = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "extTooltip"); ok {
-		view.ExtTooltip = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "customAttr"); ok {
-		view.CustomAttr = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "customAttrMobile"); ok {
-		view.CustomAttrMobile = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "customStyle"); ok {
-		view.CustomStyle = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "customStyleMobile"); ok {
-		view.CustomStyleMobile = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "customFilter"); ok {
-		view.CustomFilter = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "drillFields"); ok {
-		view.DrillFields = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "senior"); ok {
-		view.Senior = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "snapshot"); ok {
-		view.Snapshot = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "viewFields"); ok {
-		view.ViewFields = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "extColor"); ok {
-		view.ExtColor = &v
-	}
-	if v, ok := marshalJSONFieldFromMap(data, "sortPriority"); ok {
-		view.SortPriority = &v
-	}
+	applySnapshotChartStringFields(view, data)
+	applySnapshotChartInt64Fields(view, data)
+	applySnapshotChartIntFields(view, data)
+	applySnapshotChartBoolFields(view, data)
+	applySnapshotChartJSONFields(view, data)
 
 	return view
+}
+
+func applySnapshotChartStringFields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
+	stringFields := []struct {
+		key string
+		set func(string)
+	}{
+		{key: "title", set: func(v string) { view.Title = &v }},
+		{key: "type", set: func(v string) { view.Type = &v }},
+		{key: "render", set: func(v string) { view.Render = &v }},
+		{key: "resultMode", set: func(v string) { view.ResultMode = &v }},
+		{key: "dataFrom", set: func(v string) { view.DataFrom = &v }},
+		{key: "stylePriority", set: func(v string) { view.StylePriority = &v }},
+		{key: "chartType", set: func(v string) { view.ChartType = &v }},
+		{key: "refreshUnit", set: func(v string) { view.RefreshUnit = &v }},
+		{key: "flowMapStartName", set: func(v string) { view.FlowMapStartName = &v }},
+		{key: "flowMapEndName", set: func(v string) { view.FlowMapEndName = &v }},
+		{key: "createBy", set: func(v string) { view.CreateBy = &v }},
+	}
+
+	for _, field := range stringFields {
+		if v, ok := stringFromAnyMap(data, field.key); ok {
+			field.set(v)
+		}
+	}
+}
+
+func applySnapshotChartInt64Fields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
+	int64Fields := []struct {
+		key string
+		set func(int64)
+	}{
+		{key: "tableId", set: func(v int64) { view.TableID = &v }},
+		{key: "createTime", set: func(v int64) { view.CreateTime = &v }},
+	}
+
+	for _, field := range int64Fields {
+		if v, ok := int64FromAnyMap(data, field.key); ok {
+			field.set(v)
+		}
+	}
+}
+
+func applySnapshotChartIntFields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
+	intFields := []struct {
+		key string
+		set func(int)
+	}{
+		{key: "resultCount", set: func(v int) { view.ResultCount = &v }},
+		{key: "refreshTime", set: func(v int) { view.RefreshTime = &v }},
+	}
+
+	for _, field := range intFields {
+		if v, ok := intFromAnyMap(data, field.key); ok {
+			field.set(v)
+		}
+	}
+}
+
+//nolint:dupl // structurally similar to applyCoreChartBoolFields but uses different parse helpers (boolFromAnyMap)
+func applySnapshotChartBoolFields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
+	boolFields := []struct {
+		key string
+		set func(bool)
+	}{
+		{key: "isPlugin", set: func(v bool) { view.IsPlugin = &v }},
+		{key: "refreshViewEnable", set: func(v bool) { view.RefreshViewEnable = &v }},
+		{key: "linkageActive", set: func(v bool) { view.LinkageActive = &v }},
+		{key: "jumpActive", set: func(v bool) { view.JumpActive = &v }},
+		{key: "aggregate", set: func(v bool) { view.Aggregate = &v }},
+	}
+
+	for _, field := range boolFields {
+		if raw, ok := data[field.key]; ok {
+			field.set(boolFromAnyMap(raw))
+		}
+	}
+}
+
+//nolint:dupl // structurally similar to applyCoreChartJSONFields but uses different parse helpers (marshalJSONFieldFromMap)
+func applySnapshotChartJSONFields(view *visualization.SnapshotCanvasChartView, data map[string]interface{}) {
+	jsonFields := []struct {
+		key string
+		set func(string)
+	}{
+		{key: "xAxis", set: func(v string) { view.XAxis = &v }},
+		{key: "xAxisExt", set: func(v string) { view.XAxisExt = &v }},
+		{key: "yAxis", set: func(v string) { view.YAxis = &v }},
+		{key: "yAxisExt", set: func(v string) { view.YAxisExt = &v }},
+		{key: "extStack", set: func(v string) { view.ExtStack = &v }},
+		{key: "extBubble", set: func(v string) { view.ExtBubble = &v }},
+		{key: "extLabel", set: func(v string) { view.ExtLabel = &v }},
+		{key: "extTooltip", set: func(v string) { view.ExtTooltip = &v }},
+		{key: "customAttr", set: func(v string) { view.CustomAttr = &v }},
+		{key: "customAttrMobile", set: func(v string) { view.CustomAttrMobile = &v }},
+		{key: "customStyle", set: func(v string) { view.CustomStyle = &v }},
+		{key: "customStyleMobile", set: func(v string) { view.CustomStyleMobile = &v }},
+		{key: "customFilter", set: func(v string) { view.CustomFilter = &v }},
+		{key: "drillFields", set: func(v string) { view.DrillFields = &v }},
+		{key: "senior", set: func(v string) { view.Senior = &v }},
+		{key: "snapshot", set: func(v string) { view.Snapshot = &v }},
+		{key: "viewFields", set: func(v string) { view.ViewFields = &v }},
+		{key: "extColor", set: func(v string) { view.ExtColor = &v }},
+		{key: "sortPriority", set: func(v string) { view.SortPriority = &v }},
+	}
+
+	for _, field := range jsonFields {
+		if v, ok := marshalJSONFieldFromMap(data, field.key); ok {
+			field.set(v)
+		}
+	}
 }
 
 func stringFromAnyMap(m map[string]interface{}, key string) (string, bool) {

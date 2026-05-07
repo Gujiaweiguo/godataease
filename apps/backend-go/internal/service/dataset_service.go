@@ -49,6 +49,9 @@ var (
 	ErrPreviewSQLExternalDatasourceUnsupported = errors.New("external datasource SQL preview is not supported yet; please use synchronized dataset preview")
 	ErrPreviewSQLTimeout                       = errors.New("preview query timed out")
 	ErrPreviewSQLResultTooLarge                = errors.New("preview result is too large")
+	sqlVariableDateTimePatterns                = []string{"DATETIME", "TIMESTAMP", "DATE", "TIME", "YEAR"}
+	sqlVariableFloatPatterns                   = []string{"DOUBLE", "FLOAT", "DECIMAL", "NUMERIC", "REAL"}
+	sqlVariableIntegerPatterns                 = []string{"INT", "LONG", "SHORT", "BIGINT", "SMALLINT", "TINYINT"}
 )
 
 const (
@@ -815,7 +818,7 @@ func (s *DatasetService) GetFieldTree(req *dataset.MultFieldValuesRequest) ([]da
 	return buildFieldTreeNodes(rows, specs), nil
 }
 
-func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[string]interface{}, error) { //nolint:gocyclo // complex enum value extraction with multiple branches
+func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[string]interface{}, error) {
 	if req == nil || req.QueryID <= 0 {
 		return []map[string]interface{}{}, nil
 	}
@@ -828,35 +831,9 @@ func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[s
 		return nil, err
 	}
 
-	displayID := req.DisplayID
-	if displayID <= 0 {
-		displayID = req.QueryID
-	}
-	displayField, _, displayColumn, err := s.resolveEnumFieldTarget(displayID)
+	displayID, displayField, displayColumn, err := s.resolveEnumDisplayField(req, queryField, queryColumn, tableName)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			displayID = req.QueryID
-			displayField = queryField
-			displayColumn = queryColumn
-		} else {
-			return nil, err
-		}
-	}
-
-	if req.SortID > 0 {
-		_, sortTableName, _, sortErr := s.resolveEnumFieldTarget(req.SortID)
-		if sortErr == nil && sortTableName != tableName {
-			req.SortID = 0
-		}
-	}
-
-	if displayID != req.QueryID {
-		_, displayTableName, _, displayErr := s.resolveEnumFieldTarget(displayID)
-		if displayErr == nil && displayTableName != tableName {
-			displayID = req.QueryID
-			displayField = queryField
-			displayColumn = queryColumn
-		}
+		return nil, err
 	}
 
 	columns := []dataset.EnumObjectColumn{{Column: queryColumn, Alias: enumAlias(req.QueryID)}}
@@ -874,20 +851,14 @@ func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[s
 		limit = 5000
 	}
 
-	searchColumn := displayColumn
-	if displayID == req.QueryID {
-		searchColumn = queryColumn
+	searchColumn := queryColumn
+	if displayID != req.QueryID {
+		searchColumn = displayColumn
 	}
 
-	sortColumn := ""
-	if req.SortID > 0 {
-		_, _, resolvedSortColumn, sortErr := s.resolveEnumFieldTarget(req.SortID)
-		if sortErr == nil {
-			sortColumn = resolvedSortColumn
-		}
-	}
-	if sortColumn == "" {
-		sortColumn = searchColumn
+	sortColumn, err := s.resolveEnumSortColumn(req, tableName, searchColumn)
+	if err != nil {
+		return nil, err
 	}
 
 	rows, err := s.repo.QueryDistinctObjectValues(
@@ -904,45 +875,7 @@ func (s *DatasetService) GetFieldEnumObj(req *dataset.EnumValueRequest) ([]map[s
 		return nil, err
 	}
 
-	result := make([]map[string]interface{}, 0, len(rows))
-	seen := make(map[string]struct{})
-	for _, row := range rows {
-		item := make(map[string]interface{}, len(columns))
-		hasEmpty := false
-		for _, column := range columns {
-			rawValue, exists := row[column.Alias]
-			if !exists {
-				hasEmpty = true
-				break
-			}
-			fieldID := enumFieldIDFromAlias(column.Alias)
-			deType := queryField.DeType
-			if fieldID == displayID {
-				deType = displayField.DeType
-			}
-			normalized := normalizeEnumValue(fmt.Sprintf("%v", normalizePreviewValue(rawValue)), deType)
-			if normalized == "" {
-				hasEmpty = true
-				break
-			}
-			item[strconv.FormatInt(fieldID, 10)] = normalized
-		}
-		if hasEmpty {
-			continue
-		}
-		keyBytes, marshalErr := json.Marshal(item)
-		if marshalErr != nil {
-			continue
-		}
-		key := string(keyBytes)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		result = append(result, item)
-	}
-
-	return result, nil
+	return buildEnumResultRows(rows, columns, displayID, queryField, displayField), nil
 }
 
 func (s *DatasetService) GetFieldEnumDs(fieldID int64) ([]string, error) {
@@ -1273,6 +1206,45 @@ func (s *DatasetService) resolveEnumFieldTarget(fieldID int64) (*dataset.CoreDat
 	return field, tableName, columnName, nil
 }
 
+func (s *DatasetService) resolveEnumDisplayField(req *dataset.EnumValueRequest, queryField *dataset.CoreDatasetTableField, queryColumn, tableName string) (int64, *dataset.CoreDatasetTableField, string, error) {
+	displayID := req.DisplayID
+	if displayID <= 0 {
+		return req.QueryID, queryField, queryColumn, nil
+	}
+
+	displayField, displayTableName, displayColumn, err := s.resolveEnumFieldTarget(displayID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return req.QueryID, queryField, queryColumn, nil
+		}
+		return 0, nil, "", err
+	}
+	if displayTableName != tableName {
+		return req.QueryID, queryField, queryColumn, nil
+	}
+
+	return displayID, displayField, displayColumn, nil
+}
+
+func (s *DatasetService) resolveEnumSortColumn(req *dataset.EnumValueRequest, tableName, fallbackColumn string) (string, error) {
+	if req.SortID <= 0 {
+		return fallbackColumn, nil
+	}
+
+	_, sortTableName, sortColumn, err := s.resolveEnumFieldTarget(req.SortID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fallbackColumn, nil
+		}
+		return "", err
+	}
+	if sortTableName != tableName {
+		return fallbackColumn, nil
+	}
+
+	return sortColumn, nil
+}
+
 func (s *DatasetService) buildEnumFilterClauses(filters []dataset.EnumFilter, targetTableName string) ([]dataset.EnumFilterClause, error) {
 	clauses := make([]dataset.EnumFilterClause, 0)
 	for _, filter := range filters {
@@ -1371,6 +1343,62 @@ func enumFieldIDFromAlias(alias string) int64 {
 		return 0
 	}
 	return id
+}
+
+func buildEnumResultRows(rows []map[string]interface{}, columns []dataset.EnumObjectColumn, displayID int64, queryField, displayField *dataset.CoreDatasetTableField) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(rows))
+	seen := make(map[string]struct{}, len(rows))
+
+	for _, row := range rows {
+		item, ok := buildEnumResultRow(row, columns, displayID, queryField, displayField)
+		if !ok {
+			continue
+		}
+		keyBytes, err := json.Marshal(item)
+		if err != nil {
+			continue
+		}
+		key := string(keyBytes)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, item)
+	}
+
+	return result
+}
+
+func buildEnumResultRow(row map[string]interface{}, columns []dataset.EnumObjectColumn, displayID int64, queryField, displayField *dataset.CoreDatasetTableField) (map[string]interface{}, bool) {
+	item := make(map[string]interface{}, len(columns))
+	for _, column := range columns {
+		fieldID, normalized, ok := buildEnumResultValue(row, column, displayID, queryField, displayField)
+		if !ok {
+			return nil, false
+		}
+		item[strconv.FormatInt(fieldID, 10)] = normalized
+	}
+	return item, true
+}
+
+func buildEnumResultValue(row map[string]interface{}, column dataset.EnumObjectColumn, displayID int64, queryField, displayField *dataset.CoreDatasetTableField) (int64, string, bool) {
+	rawValue, exists := row[column.Alias]
+	if !exists {
+		return 0, "", false
+	}
+
+	fieldID := enumFieldIDFromAlias(column.Alias)
+	deType := queryField.DeType
+	if fieldID == displayID {
+		deType = displayField.DeType
+	}
+
+	normalized := normalizeEnumValue(fmt.Sprintf("%v", normalizePreviewValue(rawValue)), deType)
+	if normalized == "" {
+		return 0, "", false
+	}
+
+	return fieldID, normalized, true
 }
 
 func buildFieldTreeNodes(rows []map[string]interface{}, specs []fieldTreeSpec) []dataset.BaseTreeNode {
@@ -1902,7 +1930,7 @@ func inferPreviewDeType(v interface{}) int {
 	}
 }
 
-func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type inference with multiple conditions
+func inferSQLVariableDeType(typeList []string) int {
 	if len(typeList) == 0 {
 		return 0
 	}
@@ -1910,19 +1938,28 @@ func inferSQLVariableDeType(typeList []string) int { //nolint:gocyclo // type in
 	if typeText == "" {
 		return 0
 	}
-	if strings.Contains(typeText, "DATETIME") || strings.Contains(typeText, "TIMESTAMP") || strings.Contains(typeText, "DATE") || strings.Contains(typeText, "TIME") || strings.Contains(typeText, "YEAR") {
+	if containsAnyText(typeText, sqlVariableDateTimePatterns) {
 		return 1
 	}
-	if strings.Contains(typeText, "DOUBLE") || strings.Contains(typeText, "FLOAT") || strings.Contains(typeText, "DECIMAL") || strings.Contains(typeText, "NUMERIC") || strings.Contains(typeText, "REAL") {
+	if containsAnyText(typeText, sqlVariableFloatPatterns) {
 		return 3
 	}
-	if strings.Contains(typeText, "INT") || strings.Contains(typeText, "LONG") || strings.Contains(typeText, "SHORT") || strings.Contains(typeText, "BIGINT") || strings.Contains(typeText, "SMALLINT") || strings.Contains(typeText, "TINYINT") {
+	if containsAnyText(typeText, sqlVariableIntegerPatterns) {
 		return 2
 	}
 	if strings.Contains(typeText, "BOOL") {
 		return 4
 	}
 	return 0
+}
+
+func containsAnyText(text string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if strings.Contains(text, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // SaveField creates or updates a dataset field. If field.ID == 0, creates; otherwise updates.
