@@ -646,6 +646,7 @@ func applyCoreChartIntFields(view *chart.CoreChartView, body map[string]interfac
 	}
 }
 
+//nolint:dupl // structurally similar to applySnapshotChartBoolFields but uses different parse helpers (boolFromAny)
 func applyCoreChartBoolFields(view *chart.CoreChartView, body map[string]interface{}) {
 	boolFields := []struct {
 		key string
