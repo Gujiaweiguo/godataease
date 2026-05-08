@@ -1311,7 +1311,7 @@ func TestRound9A_Sync_LatestUse_NilService(t *testing.T) {
 	w, c := newRound9Ctx(t, http.MethodPost, "/", "")
 	c.Params = gin.Params{{Key: "sourceType", Value: "mysql"}}
 	h.LatestUse(c)
-	assertCode(t, w, response.CodeSuccess)
+	assertCode(t, w, response.CodeInternalError)
 }
 
 func TestRound9A_Sync_LatestUse_WithUsername(t *testing.T) {
