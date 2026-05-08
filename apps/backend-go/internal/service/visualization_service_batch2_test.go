@@ -330,7 +330,7 @@ func TestProcessAppData_ValidReplacement_MultipleRefs(t *testing.T) {
 func TestProcessAppData_InvalidVisualizationInfoJSON(t *testing.T) {
 	input := `{"visualizationInfo":"not-a-valid-object-but-long-enough"}`
 	result := processAppData(input, 999)
-	assert.Equal(t, input, result, "unparseable visualizationInfo should return input unchanged")
+	assert.Equal(t, input, result, "unparsable visualizationInfo should return input unchanged")
 }
 
 // ---------------------------------------------------------------------------
