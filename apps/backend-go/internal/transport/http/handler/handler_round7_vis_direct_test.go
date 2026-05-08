@@ -334,10 +334,9 @@ func TestRound7VisDirect_AppCanvasNameCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := setupRound7VisDB(t)
 	require.NoError(t, db.Exec(`INSERT INTO core_dataset_group (id, name, node_type, create_by) VALUES (2001, 'FolderA', 'folder', 'admin')`).Error)
-	h := newRound7VisHandler(db)
 	svc := service.NewVisualizationService(repository.NewVisualizationRepository(db))
 	svc.SetDatasetRepository(repository.NewDatasetRepository(db))
-	h = NewVisualizationHandler(svc)
+	h := NewVisualizationHandler(svc)
 
 	w, c := newRound7VisCtx(t, http.MethodPost, "/", `{"datasetFolderPid":10,"datasetFolderName":"FolderA"}`)
 	h.AppCanvasNameCheck(c)
