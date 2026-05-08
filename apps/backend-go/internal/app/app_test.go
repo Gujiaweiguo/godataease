@@ -1,10 +1,13 @@
 package app
 
 import (
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ---------------------------------------------------------------------------
@@ -16,6 +19,15 @@ func resetViper(t *testing.T) {
 	t.Helper()
 	viper.Reset()
 	t.Cleanup(func() { viper.Reset() })
+}
+
+// configsDir returns the absolute path to apps/backend-go/configs/,
+// derived from this test file's location so it works regardless of CWD.
+func configsDir() string {
+	_, thisFile, _, _ := runtime.Caller(0)
+	// thisFile: .../apps/backend-go/internal/app/app_test.go
+	// configs:  .../apps/backend-go/configs/
+	return filepath.Join(filepath.Dir(thisFile), "..", "..", "configs")
 }
 
 // validConfig returns a Config that passes validateConfig without errors.
@@ -339,10 +351,10 @@ func TestBindEnvKeys_BindsDatabaseHost(t *testing.T) {
 
 func TestLoadConfig_FromDefaultPath(t *testing.T) {
 	resetViper(t)
-	t.Setenv("CONFIG_PATH", "../../configs")
+	t.Setenv("CONFIG_PATH", configsDir())
 	cfg, err := LoadConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 	assert.Equal(t, 8080, cfg.Server.Port)
 	assert.Equal(t, "debug", cfg.Server.Mode)
 	assert.Equal(t, "dataease_dev", cfg.Database.Name)
@@ -353,12 +365,12 @@ func TestLoadConfig_FromDefaultPath(t *testing.T) {
 
 func TestLoadConfig_EnvOverride(t *testing.T) {
 	resetViper(t)
-	t.Setenv("CONFIG_PATH", "../../configs")
+	t.Setenv("CONFIG_PATH", configsDir())
 	t.Setenv("DATABASE_HOST", "override-host")
 
 	cfg, err := LoadConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 	assert.Equal(t, "override-host", cfg.Database.Host)
 }
 
@@ -372,47 +384,47 @@ func TestLoadConfig_MissingConfigFile(t *testing.T) {
 
 func TestLoadConfig_ApplyDefaultsApplied(t *testing.T) {
 	resetViper(t)
-	t.Setenv("CONFIG_PATH", "../../configs")
+	t.Setenv("CONFIG_PATH", configsDir())
 	cfg, err := LoadConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 	assert.Greater(t, cfg.RateLimit.DefaultMaxRequests, 0)
 	assert.Greater(t, cfg.RateLimit.DefaultWindowSeconds, 0)
 }
 
 func TestLoadConfig_EnvOverrideRedisHost(t *testing.T) {
 	resetViper(t)
-	t.Setenv("CONFIG_PATH", "../../configs")
+	t.Setenv("CONFIG_PATH", configsDir())
 	t.Setenv("REDIS_HOST", "redis-override")
 
 	cfg, err := LoadConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 	assert.Equal(t, "redis-override", cfg.Redis.Host)
 }
 
 func TestLoadConfig_EnvOverrideJWTSecret(t *testing.T) {
 	resetViper(t)
-	t.Setenv("CONFIG_PATH", "../../configs")
+	t.Setenv("CONFIG_PATH", configsDir())
 	t.Setenv("JWT_SECRET", "env-jwt-secret")
 
 	cfg, err := LoadConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 	assert.Equal(t, "env-jwt-secret", cfg.JWT.Secret)
 }
 
 func TestLoadConfig_EnvOverrideMultipleFields(t *testing.T) {
 	resetViper(t)
-	t.Setenv("CONFIG_PATH", "../../configs")
+	t.Setenv("CONFIG_PATH", configsDir())
 	t.Setenv("DATABASE_HOST", "db-host")
 	t.Setenv("DATABASE_NAME", "db-name")
 	t.Setenv("REDIS_HOST", "rd-host")
 	t.Setenv("JWT_SECRET", "jwt-s3cret")
 
 	cfg, err := LoadConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 	assert.Equal(t, "db-host", cfg.Database.Host)
 	assert.Equal(t, "db-name", cfg.Database.Name)
 	assert.Equal(t, "rd-host", cfg.Redis.Host)
