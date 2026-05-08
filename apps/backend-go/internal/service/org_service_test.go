@@ -861,3 +861,189 @@ func TestOrgTransferUserOrg_RejectsBlockedLastRolePolicy(t *testing.T) {
 	require.NoError(t, mockRepo.db.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", 10, source.OrgID).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
 }
+
+// --- Batch B: TransferUserOrg input validation, source org not found, user not in source org, WARN_ALLOW, UpdateOrg branches ---
+
+func TestOrgTransferUserOrg_RejectsInvalidSourceOrgID(t *testing.T) {
+	svc, _ := setupOrgService(t)
+	err := svc.TransferUserOrg(0, 5, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source org, target org, and user id are required")
+}
+
+func TestOrgTransferUserOrg_RejectsInvalidTargetOrgID(t *testing.T) {
+	svc, _ := setupOrgService(t)
+	err := svc.TransferUserOrg(5, 0, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source org, target org, and user id are required")
+}
+
+func TestOrgTransferUserOrg_RejectsInvalidUserID(t *testing.T) {
+	svc, _ := setupOrgService(t)
+	err := svc.TransferUserOrg(5, 7, 0, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source org, target org, and user id are required")
+}
+
+func TestOrgTransferUserOrg_RejectsSameOrg(t *testing.T) {
+	svc, _ := setupOrgService(t)
+	err := svc.TransferUserOrg(5, 5, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source and target organizations must be different")
+}
+
+func TestOrgTransferUserOrg_SourceOrgNotFound(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	target := createSeedOrg(t, mockRepo, "Target", org.RootParentID, 1)
+
+	err := svc.TransferUserOrg(99999, target.OrgID, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source organization not found")
+}
+
+func TestOrgTransferUserOrg_TargetOrgNotFound(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	source := createSeedOrg(t, mockRepo, "Source", org.RootParentID, 1)
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: 20, RoleID: 1, OrgID: source.OrgID}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, 99999, 20, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "target organization not found")
+}
+
+func TestOrgTransferUserOrg_UserNotInSourceOrg(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	source := createSeedOrg(t, mockRepo, "Source", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "Target", org.RootParentID, 1)
+	require.NoError(t, mockRepo.db.Create(&user.SysUser{UserID: 30, Username: "not-in-source", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, 30, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user is not a member of source organization")
+}
+
+func TestOrgTransferUserOrg_WarnAllowPolicy_SingleRole(t *testing.T) {
+	svc, mockRepo, _, userRepo, _ := setupOrgServiceWithAudit(t)
+	source := createSeedOrg(t, mockRepo, "WarnSource", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "WarnTarget", org.RootParentID, 1)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(mockRepo.db).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyWarnAllow, "tester"))
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Warn Role", RoleCode: "warn-role", Status: role.StatusEnabled}).Error)
+	usr := &user.SysUser{Username: "warn-transfer-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	require.NoError(t, userRepo.Create(usr))
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: usr.UserID, RoleID: 1, OrgID: source.OrgID}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 88)
+	require.NoError(t, err)
+
+	var sourceCount int64
+	require.NoError(t, mockRepo.db.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", usr.UserID, source.OrgID).Count(&sourceCount).Error)
+	assert.Equal(t, int64(0), sourceCount)
+
+	var targetBindings []user.SysUserRole
+	require.NoError(t, mockRepo.db.Where("user_id = ? AND org_id = ?", usr.UserID, target.OrgID).Find(&targetBindings).Error)
+	require.Len(t, targetBindings, 1)
+}
+
+func TestOrgTransferUserOrg_MultipleRoles_SkipsLastRoleCheck(t *testing.T) {
+	svc, mockRepo, _, userRepo, _ := setupOrgServiceWithAudit(t)
+	source := createSeedOrg(t, mockRepo, "MultiSource", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "MultiTarget", org.RootParentID, 1)
+
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Multi Role 1", RoleCode: "multi-role-1", Status: role.StatusEnabled}).Error)
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Multi Role 2", RoleCode: "multi-role-2", Status: role.StatusEnabled}).Error)
+	usr := &user.SysUser{Username: "multi-transfer-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	require.NoError(t, userRepo.Create(usr))
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: usr.UserID, RoleID: 1, OrgID: source.OrgID}).Error)
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: usr.UserID, RoleID: 2, OrgID: source.OrgID}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 99)
+	require.NoError(t, err)
+
+	var sourceCount int64
+	require.NoError(t, mockRepo.db.Model(&user.SysUserRole{}).Where("user_id = ? AND org_id = ?", usr.UserID, source.OrgID).Count(&sourceCount).Error)
+	assert.Equal(t, int64(0), sourceCount)
+}
+
+func TestOrgTransferUserOrg_RecordsAuditForSystemActor(t *testing.T) {
+	svc, mockRepo, auditLogRepo, userRepo, _ := setupOrgServiceWithAudit(t)
+	source := createSeedOrg(t, mockRepo, "AuditSource", org.RootParentID, 1)
+	target := createSeedOrg(t, mockRepo, "AuditTarget", org.RootParentID, 1)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(mockRepo.db).SetLastRolePolicy(source.OrgID, governance.LastRolePolicyWarnAllow, "tester"))
+	require.NoError(t, mockRepo.db.Create(&role.SysRole{RoleName: "Audit Role", RoleCode: "audit-role", Status: role.StatusEnabled}).Error)
+	usr := &user.SysUser{Username: "audit-transfer-user", Password: "secret", Status: user.StatusEnabled, DelFlag: user.DelFlagNormal}
+	require.NoError(t, userRepo.Create(usr))
+	require.NoError(t, mockRepo.db.Create(&user.SysUserRole{UserID: usr.UserID, RoleID: 1, OrgID: source.OrgID}).Error)
+
+	err := svc.TransferUserOrg(source.OrgID, target.OrgID, usr.UserID, 0)
+	require.NoError(t, err)
+
+	logs, total, logErr := auditLogRepo.Query(&audit.AuditLogQuery{Page: 1, PageSize: 10})
+	require.NoError(t, logErr)
+	require.Equal(t, int64(2), total)
+	for _, l := range logs {
+		require.NotNil(t, l.Username)
+		assert.Equal(t, "system", *l.Username)
+	}
+}
+
+func TestOrgTransferUserOrg_NilOrgRepo(t *testing.T) {
+	svc := NewOrgService(nil, nil, nil, nil, nil, nil)
+	err := svc.TransferUserOrg(5, 7, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "organization repository is not configured")
+}
+
+func TestOrgTransferUserOrg_NilRoleRepo(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}, &governance.SysGovernancePolicy{}))
+	orgRepo := repository.NewOrgRepository(db)
+	svc := NewOrgService(orgRepo, nil, nil, nil, nil, nil)
+
+	err = svc.TransferUserOrg(5, 7, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "role repository is not configured")
+}
+
+func TestOrgTransferUserOrg_NilUserRoleRepo(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUser{}, &user.SysUserRole{}, &governance.SysGovernancePolicy{}))
+	orgRepo := repository.NewOrgRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
+	svc := NewOrgService(orgRepo, nil, nil, roleRepo, nil, nil)
+
+	err = svc.TransferUserOrg(5, 7, 1, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user role repository is not configured")
+}
+
+func TestOrgUpdateOrg_DisabledParent(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	parent := createSeedOrg(t, mockRepo, "ParentDisabled", org.RootParentID, 1)
+	parent.Status = org.StatusDisabled
+	require.NoError(t, mockRepo.repo.Update(parent))
+	child := createSeedOrg(t, mockRepo, "ChildToMove", org.RootParentID, 1)
+
+	parentID := parent.OrgID
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &parentID}, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parent organization is disabled")
+}
+
+func TestOrgUpdateOrg_SameParentEarlyReturn(t *testing.T) {
+	svc, mockRepo := setupOrgService(t)
+	parent := createSeedOrg(t, mockRepo, "SameParent", org.RootParentID, 1)
+	child := createSeedOrg(t, mockRepo, "SameParentChild", parent.OrgID, parent.Level+1)
+
+	sameParent := parent.OrgID
+	err := svc.UpdateOrg(&org.OrgUpdateRequest{OrgID: child.OrgID, ParentID: &sameParent}, 1)
+	require.NoError(t, err)
+
+	updated, getErr := mockRepo.repo.GetByID(child.OrgID)
+	require.NoError(t, getErr)
+	assert.Equal(t, parent.OrgID, updated.ParentID)
+	assert.Equal(t, parent.Level+1, updated.Level)
+}
