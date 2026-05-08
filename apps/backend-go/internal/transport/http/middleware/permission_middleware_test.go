@@ -2,11 +2,13 @@ package middleware
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractResourceID_FromPathParam(t *testing.T) {
@@ -474,4 +476,112 @@ func TestExtractChartID_RejectsDatasetFields(t *testing.T) {
 	if resp["error"] != "chart id is required" {
 		t.Fatalf("expected chart id error, got %v", resp["error"])
 	}
+}
+
+func TestPermission_NoRole_Returns401(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test", Permission("editor"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+}
+
+func TestPermission_WrongRole_Returns403(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test",
+		func(c *gin.Context) { c.Set("role", "viewer"); c.Next() },
+		Permission("editor"),
+		func(c *gin.Context) { c.Status(http.StatusOK) },
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusForbidden, resp.Code)
+}
+
+func TestPermission_AdminRole_Bypasses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test",
+		func(c *gin.Context) { c.Set("role", "admin"); c.Next() },
+		Permission("editor"),
+		func(c *gin.Context) { c.Status(http.StatusOK) },
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+func TestPermission_MatchingRole_Passes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test",
+		func(c *gin.Context) { c.Set("role", "editor"); c.Next() },
+		Permission("editor"),
+		func(c *gin.Context) { c.Status(http.StatusOK) },
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+func TestAdminOnly_AdminPasses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test",
+		func(c *gin.Context) { c.Set("role", "admin"); c.Next() },
+		AdminOnly(),
+		func(c *gin.Context) { c.Status(http.StatusOK) },
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+func TestAdminOnly_NonAdmin_Returns403(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test",
+		func(c *gin.Context) { c.Set("role", "editor"); c.Next() },
+		AdminOnly(),
+		func(c *gin.Context) { c.Status(http.StatusOK) },
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusForbidden, resp.Code)
+}
+
+func TestAdminOnly_NoRole_Returns401(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test", AdminOnly(), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
