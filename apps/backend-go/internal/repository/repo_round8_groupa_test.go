@@ -752,9 +752,9 @@ func TestRound8A_Org_IsDescendant_True(t *testing.T) {
 func TestRound8A_Org_IsDescendant_False(t *testing.T) {
 	db := round8OrgDB(t)
 	repo := NewOrgRepository(db)
-	root := &org.SysOrg{OrgName: "nd_root", ParentID: 0, Level: 1, Status: 1, DelFlag: 0}
+	root := &org.SysOrg{OrgName: "desc_root", ParentID: 0, Level: 1, Status: 1, DelFlag: 0}
 	require.NoError(t, repo.Create(root))
-	other := &org.SysOrg{OrgName: "nd_other", ParentID: 0, Level: 1, Status: 1, DelFlag: 0}
+	other := &org.SysOrg{OrgName: "desc_other", ParentID: 0, Level: 1, Status: 1, DelFlag: 0}
 	require.NoError(t, repo.Create(other))
 	ok, err := repo.IsDescendant(root.OrgID, other.OrgID)
 	require.NoError(t, err)
