@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"dataease/backend/internal/domain/audit"
+	"dataease/backend/internal/domain/governance"
 	"dataease/backend/internal/domain/org"
 	"dataease/backend/internal/domain/permission"
 	"dataease/backend/internal/domain/role"
@@ -1098,4 +1100,260 @@ func TestEditRole_BuiltInSystemRoleProtected(t *testing.T) {
 	err = svc.EditRole(&role.RoleEditor{RoleID: roles[0].RoleID, Name: "HackedName"}, "attacker", 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot edit built-in system role")
+}
+
+// --- Batch B: Governance policy, EditRole parentID clearing, MountUsers role-not-found, validateAssignmentPrerequisites ---
+
+func setupRoleServiceWithGovernanceTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository, *gorm.DB) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}, &governance.SysGovernancePolicy{}))
+
+	roleRepo := repository.NewRoleRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	userRoleRepo := repository.NewUserRoleRepository(db)
+	orgRepo := repository.NewOrgRepository(db)
+	governancePolicySvc := NewGovernancePolicyService(repository.NewGovernancePolicyRepository(db), nil)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, orgRepo, governancePolicySvc)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, roleRepo, userRepo, userRoleRepo, db
+}
+
+func setupRoleServiceWithGovernanceAndAuditTest(t *testing.T) (*RoleService, *repository.RoleRepository, *repository.UserRepository, *repository.UserRoleRepository, *gorm.DB) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}, &governance.SysGovernancePolicy{}, &audit.AuditLog{}, &audit.LoginFailure{}, &audit.AuditLogDetail{}))
+
+	roleRepo := repository.NewRoleRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	userRoleRepo := repository.NewUserRoleRepository(db)
+	orgRepo := repository.NewOrgRepository(db)
+	auditSvc := NewAuditService(repository.NewAuditLogRepository(db), repository.NewLoginFailureRepository(db), repository.NewAuditLogDetailRepository(db))
+	governancePolicySvc := NewGovernancePolicyService(repository.NewGovernancePolicyRepository(db), auditSvc)
+	seedRoleServiceTestOrgs(t, db)
+	svc := NewRoleService(roleRepo, userRepo, userRoleRepo, orgRepo, governancePolicySvc)
+	svc.SetResourcePermissionRepository(repository.NewResourcePermissionRepository(db))
+	return svc, roleRepo, userRepo, userRoleRepo, db
+}
+
+func TestRoleService_UnmountUser_WarnAllowPolicy(t *testing.T) {
+	svc, repo, _, _, db := setupRoleServiceWithGovernanceTest(t)
+	orgID := int64(5)
+
+	// Set WARN_ALLOW policy for this org
+	require.NoError(t, repository.NewGovernancePolicyRepository(db).SetLastRolePolicy(orgID, governance.LastRolePolicyWarnAllow, "tester"))
+
+	// Create a role and bind user to it (single role → last role)
+	roleA := &role.SysRole{RoleName: "Only Role", RoleCode: "only-role-warn", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(roleA))
+	require.NoError(t, repo.BindUserRole(201, roleA.RoleID, orgID))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 201, Rid: roleA.RoleID, OrgId: orgID})
+	require.NoError(t, err)
+
+	// User should have no more roles in this org
+	count, countErr := repo.CountUserRolesByOrg(201, orgID)
+	require.NoError(t, countErr)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestRoleService_UnmountUser_WarnAllowPolicy_WithAudit(t *testing.T) {
+	svc, repo, _, _, db := setupRoleServiceWithGovernanceAndAuditTest(t)
+	orgID := int64(5)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(db).SetLastRolePolicy(orgID, governance.LastRolePolicyWarnAllow, "tester"))
+
+	roleA := &role.SysRole{RoleName: "Audited Warn Role", RoleCode: "audited-warn-role", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(roleA))
+	require.NoError(t, repo.BindUserRole(202, roleA.RoleID, orgID))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 202, Rid: roleA.RoleID, OrgId: orgID})
+	require.NoError(t, err)
+
+	var logCount int64
+	require.NoError(t, db.Model(&audit.AuditLog{}).Count(&logCount).Error)
+	assert.Equal(t, int64(1), logCount)
+}
+
+func TestRoleService_UnmountUser_CascadePolicy_DisablesUser(t *testing.T) {
+	svc, repo, userRepo, _, db := setupRoleServiceWithGovernanceTest(t)
+	orgID := int64(5)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(db).SetLastRolePolicy(orgID, governance.LastRolePolicyCascade, "tester"))
+
+	// Create a role and bind to a non-built-in user (not UID=1)
+	seedUser(t, userRepo, "placeholder-to-advance-uid", nil) // advance auto-increment past UID=1
+	roleA := &role.SysRole{RoleName: "Cascade Role", RoleCode: "cascade-role", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(roleA))
+	usr := seedUser(t, userRepo, "cascade-user", nil)
+	require.NotEqual(t, int64(1), usr.UserID)
+	require.NoError(t, repo.BindUserRole(usr.UserID, roleA.RoleID, orgID))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: usr.UserID, Rid: roleA.RoleID, OrgId: orgID})
+	require.NoError(t, err)
+
+	updated, getErr := userRepo.GetByID(usr.UserID)
+	require.NoError(t, getErr)
+	assert.Equal(t, user.StatusDisabled, updated.Status)
+
+	count, countErr := repo.CountUserRolesByOrg(usr.UserID, orgID)
+	require.NoError(t, countErr)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestRoleService_UnmountUser_CascadePolicy_BlocksBuiltInUser(t *testing.T) {
+	svc, repo, _, _, db := setupRoleServiceWithGovernanceTest(t)
+	orgID := int64(5)
+
+	require.NoError(t, repository.NewGovernancePolicyRepository(db).SetLastRolePolicy(orgID, governance.LastRolePolicyCascade, "tester"))
+
+	roleA := &role.SysRole{RoleName: "BuiltIn Cascade", RoleCode: "builtin-cascade", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(roleA))
+	// UID=1 is the built-in admin user
+	require.NoError(t, repo.BindUserRole(1, roleA.RoleID, orgID))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 1, Rid: roleA.RoleID, OrgId: orgID})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrBuiltInUserProtected)
+}
+
+func TestRoleService_UnmountUser_DefaultBlockPolicy_WithGovernanceSvc(t *testing.T) {
+	svc, repo, _, _, _ := setupRoleServiceWithGovernanceTest(t)
+	orgID := int64(5)
+
+	roleA := &role.SysRole{RoleName: "Default Block Role", RoleCode: "default-block-role", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(roleA))
+	require.NoError(t, repo.BindUserRole(203, roleA.RoleID, orgID))
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 203, Rid: roleA.RoleID, OrgId: orgID})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrLastRoleRemovalBlocked)
+}
+
+func TestRoleService_UnmountUser_NilUserRoleRepo(t *testing.T) {
+	svc, _ := setupRoleServiceTest(t)
+	// svc has nil userRoleRepo from setupRoleServiceTest
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 1, Rid: 1, OrgId: 5})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "userRoleRepo not initialized")
+}
+
+func TestRoleService_EditRole_ClearsParent_WithZeroParentID(t *testing.T) {
+	svc, repo := setupRoleServiceTest(t)
+	parentType := role.RoleTypeOrganization
+	rootParent := int64(0)
+
+	// Create a parent role
+	parent := &role.SysRole{RoleName: "BuiltIn Parent", RoleCode: "builtin-parent-clear", RoleType: &parentType, Status: role.StatusEnabled, ParentID: &rootParent}
+	require.NoError(t, repo.Create(parent))
+
+	// Create a child role with the parent
+	child := &role.SysRole{RoleName: "Child With Parent", RoleCode: "child-with-parent", Status: role.StatusEnabled, ParentID: &parent.RoleID}
+	require.NoError(t, repo.Create(child))
+
+	// Clear the parent by passing parentID=0
+	zeroParent := int64(0)
+	err := svc.EditRole(&role.RoleEditor{ID: child.RoleID, ParentID: &zeroParent}, "editor", 1)
+	require.NoError(t, err)
+
+	updated, getErr := repo.GetByID(child.RoleID)
+	require.NoError(t, getErr)
+	require.NotNil(t, updated.ParentID)
+	assert.Equal(t, int64(0), *updated.ParentID)
+}
+
+func TestRoleService_MountUsers_RoleNotFound(t *testing.T) {
+	svc, _, _, _ := setupRoleServiceWithReposTest(t)
+
+	err := svc.MountUsers(&role.MountUserRequest{Rid: 99999, Uids: []int64{1}, OrgId: 5})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "role not found")
+}
+
+func TestRoleService_ValidateAssignmentPrerequisites_NilUserRepo(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+
+	roleRepo := repository.NewRoleRepository(db)
+	seedRoleServiceTestOrgs(t, db)
+	// userRepo is nil
+	svc := NewRoleService(roleRepo, nil, repository.NewUserRoleRepository(db), repository.NewOrgRepository(db), nil)
+
+	err = svc.AssignRolesToUser(5, 1, []int64{1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "userRepo not initialized")
+}
+
+func TestRoleService_ValidateAssignmentPrerequisites_NilOrgRepo(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&org.SysOrg{}, &role.SysRole{}, &user.SysUserRole{}, &user.SysUser{}, &permission.SysRolePerm{}))
+
+	roleRepo := repository.NewRoleRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	seedRoleServiceTestOrgs(t, db)
+	// orgRepo is nil
+	svc := NewRoleService(roleRepo, userRepo, repository.NewUserRoleRepository(db), nil, nil)
+
+	err = svc.AssignRolesToUser(5, 1, []int64{1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "org repository is not configured")
+}
+
+func TestRoleService_ValidateAssignmentPrerequisites_NilRoleRepoDB(t *testing.T) {
+	// Create svc with nil repo
+	svc := NewRoleService(nil, nil, nil, nil, nil)
+
+	err := svc.AssignRolesToUser(5, 1, []int64{1})
+	// requireGovernedOrgContext passes (orgID=5 is valid), but repo is nil
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "role repository is not configured")
+}
+
+func TestRoleService_ValidateAssignmentPrerequisites_UserNotFound(t *testing.T) {
+	svc, _, _, _ := setupRoleServiceWithReposTest(t)
+
+	err := svc.AssignRolesToUser(5, 99999, []int64{1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user not found")
+}
+
+func TestRoleService_ValidateAssignmentPrerequisites_EmptyRoleIDs(t *testing.T) {
+	svc, _, _, _ := setupRoleServiceWithReposTest(t)
+
+	err := svc.AssignRolesToUser(5, 1, []int64{})
+	require.NoError(t, err)
+}
+
+func TestRoleService_UnmountUser_NotAssociated(t *testing.T) {
+	svc, repo, _, _ := setupRoleServiceWithReposTest(t)
+	roleA := &role.SysRole{RoleName: "Unassociated Role", RoleCode: "unassociated-role", Status: role.StatusEnabled}
+	require.NoError(t, repo.Create(roleA))
+	// User 301 has no binding at all
+
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 301, Rid: roleA.RoleID, OrgId: 5})
+	require.ErrorIs(t, err, ErrUserNotInCurrentOrg)
+}
+
+func TestRoleService_UnmountUser_GlobalCountPath(t *testing.T) {
+	svc, _, _, _ := setupRoleServiceWithReposTest(t)
+	err := svc.UnmountUser(&role.UnmountUserRequest{Uid: 32, Rid: 1, OrgId: 0})
+	require.ErrorIs(t, err, ErrInvalidOrgContext)
+}
+
+func TestRoleService_EvaluateLastRolePolicy_WithGovernanceSvc(t *testing.T) {
+	svc, _, _, _, _ := setupRoleServiceWithGovernanceTest(t)
+
+	// getEffectiveLastRolePolicy with non-nil governancePolicySvc should call through
+	policy, err := svc.getEffectiveLastRolePolicy(5)
+	require.NoError(t, err)
+	// No policy set → defaults to BLOCK
+	assert.Equal(t, governance.DefaultLastRolePolicy, policy)
 }

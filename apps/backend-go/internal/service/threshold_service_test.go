@@ -675,3 +675,144 @@ func TestThresholdService_SnapshotShortcuts(t *testing.T) {
 	assert.NoError(t, existsErr)
 	assert.False(t, exists)
 }
+
+func TestThresholdService_Create_ValidationMissingResourceID(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	req := sampleThresholdRequest()
+	req.ResourceID = 0
+
+	created, err := svc.Create(context.Background(), req, 1, "tester", 1)
+	assert.Nil(t, created)
+	assert.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestThresholdService_Create_ValidationMissingThresholdRules(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	req := sampleThresholdRequest()
+	req.ThresholdRules = "  "
+
+	created, err := svc.Create(context.Background(), req, 1, "tester", 1)
+	assert.Nil(t, created)
+	assert.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestThresholdService_Create_NilRequest(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	created, err := svc.Create(context.Background(), nil, 1, "tester", 1)
+	assert.Nil(t, created)
+	assert.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestThresholdService_SwitchEnable_InvalidInputs(t *testing.T) {
+	t.Run("nil request", func(t *testing.T) {
+		svc, _ := newThresholdServiceForTest()
+		err := svc.SwitchEnable(context.Background(), nil)
+		assert.ErrorIs(t, err, gorm.ErrInvalidData)
+	})
+
+	t.Run("zero ID", func(t *testing.T) {
+		svc, _ := newThresholdServiceForTest()
+		enabled := true
+		err := svc.SwitchEnable(context.Background(), &thresholddomain.SwitchRequest{ID: 0, Enable: &enabled, ResourceTable: "core"})
+		assert.ErrorIs(t, err, gorm.ErrInvalidData)
+	})
+
+	t.Run("nil Enable", func(t *testing.T) {
+		svc, _ := newThresholdServiceForTest()
+		err := svc.SwitchEnable(context.Background(), &thresholddomain.SwitchRequest{ID: 1, Enable: nil, ResourceTable: "core"})
+		assert.ErrorIs(t, err, gorm.ErrInvalidData)
+	})
+
+	t.Run("repo not ready", func(t *testing.T) {
+		svc := NewThresholdService(nil)
+		enabled := true
+		err := svc.SwitchEnable(context.Background(), &thresholddomain.SwitchRequest{ID: 1, Enable: &enabled, ResourceTable: "core"})
+		assert.ErrorIs(t, err, errThresholdRepoNotReady)
+	})
+}
+
+func TestThresholdService_Delete_EmptyIDs(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	err := svc.Delete(context.Background(), []int64{}, "core")
+	assert.NoError(t, err)
+}
+
+func TestThresholdService_Delete_RepoNotReady(t *testing.T) {
+	svc := NewThresholdService(nil)
+	err := svc.Delete(context.Background(), []int64{1}, "core")
+	assert.ErrorIs(t, err, errThresholdRepoNotReady)
+}
+
+func TestThresholdService_BatchReci_NilRequest(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	err := svc.BatchReci(context.Background(), nil)
+	assert.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestThresholdService_BatchReci_RepoNotReady(t *testing.T) {
+	svc := NewThresholdService(nil)
+	err := svc.BatchReci(context.Background(), &thresholddomain.BatchReciRequest{IDList: []int64{1}})
+	assert.ErrorIs(t, err, errThresholdRepoNotReady)
+}
+
+func TestThresholdService_Preview_NilRequest(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	svc.SetChartDataAccessor(&fakeChartDataAccessor{})
+	content, err := svc.Preview(context.Background(), nil)
+	assert.Empty(t, content)
+	assert.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestThresholdService_Preview_ZeroChartID(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	svc.SetChartDataAccessor(&fakeChartDataAccessor{})
+	content, err := svc.Preview(context.Background(), &thresholddomain.PreviewRequest{ChartID: 0})
+	assert.Empty(t, content)
+	assert.ErrorIs(t, err, gorm.ErrInvalidData)
+}
+
+func TestThresholdService_Preview_AccessorError(t *testing.T) {
+	svc, _ := newThresholdServiceForTest()
+	svc.SetChartDataAccessor(&fakeChartDataAccessor{err: fmt.Errorf("data fetch failed")})
+	content, err := svc.Preview(context.Background(), &thresholddomain.PreviewRequest{ChartID: 1, ThresholdRules: `{}`})
+	assert.Empty(t, content)
+	assert.ErrorContains(t, err, "fetch chart data")
+}
+
+func TestThresholdService_Pager_RepoNotReady(t *testing.T) {
+	svc := NewThresholdService(nil)
+	_, err := svc.Pager(context.Background(), nil, 1, 10)
+	assert.ErrorIs(t, err, errThresholdRepoNotReady)
+}
+
+func TestThresholdService_InstancePager_RepoNotReady(t *testing.T) {
+	svc := NewThresholdService(nil)
+	_, err := svc.InstancePager(context.Background(), nil, 1, 10)
+	assert.ErrorIs(t, err, errThresholdRepoNotReady)
+}
+
+func TestThresholdService_FormInfo_RepoNotReady(t *testing.T) {
+	svc := NewThresholdService(nil)
+	_, err := svc.FormInfo(context.Background(), 1, "core")
+	assert.ErrorIs(t, err, errThresholdRepoNotReady)
+}
+
+func TestThresholdService_Edit_RepoNotReady(t *testing.T) {
+	svc := NewThresholdService(nil)
+	_, err := svc.Edit(context.Background(), &thresholddomain.CreateRequest{ID: 1})
+	assert.ErrorIs(t, err, errThresholdRepoNotReady)
+}
+
+func TestThresholdMarshalJSON_Nil(t *testing.T) {
+	assert.Equal(t, "", thresholdMarshalJSON(nil))
+	assert.Equal(t, `[1,2]`, thresholdMarshalJSON([]int{1, 2}))
+}
+
+func TestThresholdUnmarshalJSON_Empty(t *testing.T) {
+	var target []string
+	thresholdUnmarshalJSON("", &target)
+	assert.Nil(t, target)
+
+	thresholdUnmarshalJSON(`["a","b"]`, &target)
+	assert.Equal(t, []string{"a", "b"}, target)
+}
