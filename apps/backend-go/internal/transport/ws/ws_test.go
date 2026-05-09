@@ -230,7 +230,7 @@ func TestClient_ReadPump_UnregistersOnError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		require.NoError(t, err)
-		conn.Close()
+		_ = conn.Close()
 	}))
 	defer server.Close()
 
@@ -269,7 +269,7 @@ func TestClient_WritePump_SendsMessages(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_, msg, err := conn.ReadMessage()
 		if err == nil {
 			received <- msg
@@ -305,14 +305,14 @@ func TestClient_WritePump_StopsOnConnError(t *testing.T) {
 		if err != nil {
 			return
 		}
-		conn.Close()
+		_ = conn.Close()
 	}))
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	require.NoError(t, err)
-	conn.Close()
+	_ = conn.Close()
 
 	h := NewHub()
 	c := &Client{ID: "c1", UserID: 1, Send: make(chan []byte, 256), Hub: h, Conn: conn}
@@ -340,10 +340,10 @@ func TestClient_ReadPump_ReadsMultipleMessages(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("msg1"))
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("msg2"))
-		conn.Close()
+		_ = conn.Close()
 	}))
 	defer server.Close()
 
