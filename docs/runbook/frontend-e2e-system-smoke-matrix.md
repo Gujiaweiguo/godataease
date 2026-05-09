@@ -45,7 +45,7 @@
 | Chart | `apps/frontend/e2e/chart/chart.spec.ts` | 图表编辑器主流程 | 第三优先级启用 |
 | Map | `apps/frontend/e2e/map/map.spec.ts` | 地图图表分支 | 第三优先级启用 |
 | Embedding | `apps/frontend/e2e/embedding/embedding.spec.ts` | 嵌入相关路径 | 第四优先级启用 |
-| Interactive | `apps/frontend/e2e/interactive/interactive.spec.ts` | 资源树与交互树能力 | 第四优先级启用 |
+| Interactive | `apps/frontend/e2e/interactive/interactive.spec.ts` | 资源树与交互树能力 | 已启用最小 route smoke（资源树组件/搜索/排序控件可达） |
 
 ## 5. 缺口与风险
 
