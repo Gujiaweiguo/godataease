@@ -29,6 +29,10 @@ func (h *EngineHandler) GetEngine(c *gin.Context) {
 
 func (h *EngineHandler) Validate(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	var req engine.ValidateRequest
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.Error(c, response.CodeInternalError, "Invalid request: "+err.Error())
@@ -44,6 +48,10 @@ func (h *EngineHandler) Validate(c *gin.Context) {
 
 func (h *EngineHandler) ValidateByID(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	id, ok := parseIDParamMsg(c, "id", errInvalidID)
 	if !ok {
 		return
@@ -58,6 +66,10 @@ func (h *EngineHandler) ValidateByID(c *gin.Context) {
 
 func (h *EngineHandler) SupportSetKey(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	result, err := h.service.SupportSetKey()
 	if err != nil {
 		response.Error(c, response.CodeInternalError, "Failed: "+err.Error())

@@ -752,9 +752,7 @@ func TestRound9A_DataFilling_GetBuiltInTables_NilService(t *testing.T) {
 	h := NewDataFillingHandler(nil)
 	w, c := newRound9Ctx(t, http.MethodPost, "/", "")
 	h.GetBuiltInTables(c)
-	resp := parseRound9Resp(t, w)
-	// nil service → panic → recovered → success with nil data
-	assert.Equal(t, response.CodeSuccess, resp["code"])
+	assertCode(t, w, response.CodeInternalError)
 }
 
 // --- Constructor & route registration ---

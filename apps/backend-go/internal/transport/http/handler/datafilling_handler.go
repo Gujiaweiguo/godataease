@@ -613,6 +613,10 @@ func (h *DataFillingHandler) ListDatasourceListAll(c *gin.Context) {
 
 func (h *DataFillingHandler) GetBuiltInTables(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	result, err := h.service.GetBuiltInTables(c.Request.Context())
 	if err != nil {
 		response.Error(c, response.CodeInternalError, err.Error())

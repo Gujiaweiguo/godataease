@@ -173,6 +173,10 @@ func (h *EmbeddedHandler) InitIframe(c *gin.Context) {
 
 func (h *EmbeddedHandler) GetTokenArgs(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	userId, orgId := h.getCurrentUser(c)
 	result := h.service.GetTokenArgs(userId, orgId)
 	response.Success(c, result)
@@ -180,6 +184,10 @@ func (h *EmbeddedHandler) GetTokenArgs(c *gin.Context) {
 
 func (h *EmbeddedHandler) GetLimitCount(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	count := h.service.GetLimitCount()
 	response.Success(c, count)
 }

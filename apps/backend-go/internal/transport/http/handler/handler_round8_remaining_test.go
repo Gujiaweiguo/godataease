@@ -123,8 +123,8 @@ func TestRound8_RelationHandler_CheckPermission_NilService(t *testing.T) {
 	c.Params = gin.Params{{Key: "id", Value: "42"}}
 	h.CheckPermission(c)
 	resp := parseRound8Resp(t, w)
-	// CheckPermission does not dereference the service receiver, so nil service returns success
-	assert.Equal(t, "000000", resp["code"])
+	// nil service → explicit nil guard → error response
+	assert.Equal(t, "500000", resp["code"])
 }
 
 // ---------- GeoHandler tests ----------
@@ -864,13 +864,13 @@ func TestRound8_FontHandler_Download_EmptyFile(t *testing.T) {
 
 // ---------- AuthHandler remaining tests ----------
 
-func TestRound8_AuthHandler_Logout(t *testing.T) {
+func TestRound8_AuthHandler_Logout_NilService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := NewAuthHandler(nil)
 	w, c := newRound8Ctx(t, http.MethodGet, "/", "")
 	h.Logout(c)
 	resp := parseRound8Resp(t, w)
-	assert.Equal(t, "000000", resp["code"])
+	assert.Equal(t, "500000", resp["code"])
 }
 
 func TestRound8_AuthHandler_Refresh_NilService(t *testing.T) {
