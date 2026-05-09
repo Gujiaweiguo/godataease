@@ -71,6 +71,10 @@ func (h *AuthHandler) LocalLogin(c *gin.Context) {
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.authService == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	h.authService.Logout()
 	response.Success(c, nil)
 }

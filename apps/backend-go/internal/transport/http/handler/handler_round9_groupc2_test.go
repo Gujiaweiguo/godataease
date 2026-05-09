@@ -387,9 +387,7 @@ func TestRound9C2_Engine_SupportSetKey_NilService(t *testing.T) {
 	h := NewEngineHandler(nil)
 	w, c := newRound9Ctx(t, http.MethodGet, "/", "")
 	h.SupportSetKey(c)
-	resp := parseRound9Resp(t, w)
-	// SupportSetKey() never dereferences the receiver, so nil service returns success
-	assert.Equal(t, response.CodeSuccess, resp["code"])
+	assertCode(t, w, response.CodeInternalError)
 }
 
 // =====================================================================
@@ -816,7 +814,7 @@ func TestRound9C2_DataFilling_GetBuiltInTables_NilService(t *testing.T) {
 	h := NewDataFillingHandler(nil)
 	w, c := newRound9Ctx(t, http.MethodPost, "/", "")
 	h.GetBuiltInTables(c)
-	assertCode(t, w, response.CodeSuccess)
+	assertCode(t, w, response.CodeInternalError)
 }
 
 // =====================================================================

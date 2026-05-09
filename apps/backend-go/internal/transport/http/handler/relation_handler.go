@@ -59,6 +59,10 @@ func (h *RelationHandler) GetPanelRelationship(c *gin.Context) {
 
 func (h *RelationHandler) CheckPermission(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.relationService == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	id, ok := parseIDParamMsg(c, "id", "Invalid id")
 	if !ok {
 		return

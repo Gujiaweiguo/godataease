@@ -509,6 +509,10 @@ func (h *DatasourceHandler) ShowFinishPage(c *gin.Context) {
 
 func (h *DatasourceHandler) SetShowFinishPage(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 
 	userID := getCurrentUserID(c)
 	if err := h.service.SetShowFinishPage(userID); err != nil {
@@ -521,6 +525,10 @@ func (h *DatasourceHandler) SetShowFinishPage(c *gin.Context) {
 
 func (h *DatasourceHandler) LatestUse(c *gin.Context) {
 	defer recoverDatasourceServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 
 	username := getCurrentUsername(c)
 	result, err := h.service.LatestTypes(username)

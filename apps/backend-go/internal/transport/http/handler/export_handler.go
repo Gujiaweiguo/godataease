@@ -235,6 +235,10 @@ func (h *ExportHandler) Retry(c *gin.Context) {
 
 func (h *ExportHandler) ExportLimit(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	result := h.service.ExportLimit()
 	response.Success(c, result.Limit)
 }
