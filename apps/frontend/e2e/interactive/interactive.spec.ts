@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
+import { expect, test, type Page } from '@playwright/test'
+import { hasLoginForm, loginAndVerify } from '../utils/auth'
 
 /**
  * Interactive Tree E2E Smoke Tests
@@ -21,6 +21,21 @@ const treeTypes = [
   { name: 'Dataset', path: '/data/dataset', selectors: ['text=数据集', 'text=Dataset'] },
   { name: 'Datasource', path: '/data/datasource', selectors: ['text=数据源', 'text=Datasource'] },
 ]
+
+const openInteractiveRoute = async (page: Page, path: string) => {
+  await page.goto(path)
+  await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
+  await page.waitForTimeout(1500)
+
+  const finalUrl = page.url()
+  const bodyText = await page.locator('body').innerText()
+  return {
+    finalUrl,
+    bodyText,
+    hasApiError: /500|Request failed/.test(bodyText),
+    hasForbiddenPage: /401|403|404/.test(finalUrl) || /401|403|404/.test(bodyText)
+  }
+}
 
 test.describe('Interactive Tree', () => {
   /**
@@ -68,77 +83,31 @@ test.describe('Interactive Tree', () => {
    */
   test.describe('Authenticated Access', () => {
     test.beforeEach(async ({ page }) => {
-      // Login first - requires backend
-      await page.goto('/')
-      const username = process.env.E2E_USERNAME || 'admin'
-      const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-      if (await hasLoginForm(page)) {
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        // Wait for login to complete
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {
-          // If timeout, continue anyway - test will fail if login was required
-        })
-      }
+      await loginAndVerify(page)
     })
 
-    test.fixme('should load resource tree component', async ({ page }) => {
-      await page.goto('/DeResourceTree')
-      await page.waitForTimeout(1000)
-
-      // Verify tree component loaded
-      const hasTreeUI =
-        (await page.locator('.el-tree').count()) > 0 ||
-        (await page.locator('[class*="tree"]').count()) > 0 ||
-        (await page.locator('[class*="resource"]').count()) > 0
-
-      expect(hasTreeUI || (await page.locator('body').isVisible())).toBeTruthy()
+    test('should load resource tree component after login', async ({ page }) => {
+      const state = await openInteractiveRoute(page, '/#/DeResourceTree')
+      expect(state.hasApiError).toBeFalsy()
+      expect(state.hasForbiddenPage).toBeFalsy()
+      await expect(page.locator('.resource-tree').or(page.locator('[class*="resource-tree"]')).first()).toBeVisible()
     })
 
-    test.fixme('should display dashboard tree nodes', async ({ page }) => {
-      await page.goto('/panel/index')
-      await page.waitForTimeout(1000)
+    test('should expose interactive tree search after login', async ({ page }) => {
+      const state = await openInteractiveRoute(page, '/#/DeResourceTree')
+      expect(state.hasApiError).toBeFalsy()
+      expect(state.hasForbiddenPage).toBeFalsy()
 
-      // Look for dashboard tree elements
-      let foundDashboardTree = false
-      for (const selector of treeTypes[0].selectors) {
-        if ((await page.locator(selector).count()) > 0) {
-          foundDashboardTree = true
-          break
-        }
-      }
-
-      // Also check for tree structure
-      const hasTreeNodes =
-        (await page.locator('.el-tree-node').count()) > 0 ||
-        (await page.locator('[class*="tree-node"]').count()) > 0
-
-      expect(foundDashboardTree || hasTreeNodes || (await page.locator('body').isVisible())).toBeTruthy()
+      await expect(page.locator('.search-bar')).toBeVisible()
+      await expect(page.locator('.search-bar input')).toBeVisible()
     })
 
-    test.fixme('should display screen tree nodes', async ({ page }) => {
-      await page.goto('/screen/index')
-      await page.waitForTimeout(1000)
+    test('should expose interactive tree sort control after login', async ({ page }) => {
+      const state = await openInteractiveRoute(page, '/#/DeResourceTree')
+      expect(state.hasApiError).toBeFalsy()
+      expect(state.hasForbiddenPage).toBeFalsy()
 
-      // Look for screen tree elements
-      let foundScreenTree = false
-      for (const selector of treeTypes[1].selectors) {
-        if ((await page.locator(selector).count()) > 0) {
-          foundScreenTree = true
-          break
-        }
-      }
-
-      const hasTreeNodes =
-        (await page.locator('.el-tree-node').count()) > 0 ||
-        (await page.locator('[class*="tree-node"]').count()) > 0
-
-      expect(foundScreenTree || hasTreeNodes || (await page.locator('body').isVisible())).toBeTruthy()
+      await expect(page.locator('.filter-icon-span')).toBeVisible()
     })
 
     test.fixme('should display dataset tree nodes', async ({ page }) => {
@@ -297,22 +266,9 @@ test.describe('Interactive Tree', () => {
    */
   test.describe('Tree Drag and Drop', () => {
     test.fixme('should support drag and drop for tree nodes', async ({ page }) => {
-      // Login first
-      await page.goto('/')
-      if (await hasLoginForm(page)) {
-        const username = process.env.E2E_USERNAME || 'admin'
-        const password = process.env.E2E_PASSWORD || 'DataEase123456'
+      await loginAndVerify(page)
 
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {})
-      }
-
-      await page.goto('/panel/index')
+      await page.goto('/#/panel/index')
       await page.waitForTimeout(1000)
 
       // Drag and drop test requires at least 2 tree nodes
