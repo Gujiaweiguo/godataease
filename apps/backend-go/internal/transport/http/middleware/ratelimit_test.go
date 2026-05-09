@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -163,4 +164,85 @@ func TestConfigurableRateLimit_SetsHeadersForAllowedAndRejectedRequests(t *testi
 	assert.NotEmpty(t, third.Header().Get("Retry-After"))
 	_, err = strconv.Atoi(third.Header().Get("Retry-After"))
 	require.NoError(t, err)
+}
+
+func TestResolveRouteLimit(t *testing.T) {
+	disabled := false
+	tests := []struct {
+		name        string
+		cfg         app.RateLimitConfig
+		routeName   string
+		defMax      int
+		defWindow   time.Duration
+		wantEnabled bool
+		wantMax     int
+		wantWindow  time.Duration
+	}{
+		{
+			name: "no overrides uses defaults", cfg: app.RateLimitConfig{}, routeName: "login",
+			defMax: 100, defWindow: time.Minute, wantEnabled: true, wantMax: 100, wantWindow: time.Minute,
+		},
+		{
+			name: "override max and window", cfg: app.RateLimitConfig{
+				RouteOverrides: map[string]app.RouteLimitConfig{
+					"login": {MaxRequests: 10, WindowSeconds: 30},
+				},
+			}, routeName: "login",
+			defMax: 100, defWindow: time.Minute, wantEnabled: true, wantMax: 10, wantWindow: 30 * time.Second,
+		},
+		{
+			name: "override disabled", cfg: app.RateLimitConfig{
+				RouteOverrides: map[string]app.RouteLimitConfig{
+					"login": {Enabled: &disabled},
+				},
+			}, routeName: "login",
+			defMax: 100, defWindow: time.Minute, wantEnabled: false, wantMax: 100, wantWindow: time.Minute,
+		},
+		{
+			name: "missing override uses defaults", cfg: app.RateLimitConfig{
+				RouteOverrides: map[string]app.RouteLimitConfig{
+					"other": {MaxRequests: 5},
+				},
+			}, routeName: "unknown",
+			defMax: 50, defWindow: 30 * time.Second, wantEnabled: true, wantMax: 50, wantWindow: 30 * time.Second,
+		},
+		{
+			name: "zero defaults get floored", cfg: app.RateLimitConfig{}, routeName: "x",
+			defMax: 0, defWindow: 0, wantEnabled: true, wantMax: 1, wantWindow: time.Second,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			enabled, maxReq, window := ResolveRouteLimit(tt.cfg, tt.routeName, tt.defMax, tt.defWindow)
+			assert.Equal(t, tt.wantEnabled, enabled)
+			assert.Equal(t, tt.wantMax, maxReq)
+			assert.Equal(t, tt.wantWindow, window)
+		})
+	}
+}
+
+func TestRedisBackend_WithContext_NilReceiver(t *testing.T) {
+	var b *RedisBackend
+	assert.Nil(t, b.WithContext(context.Background()))
+}
+
+func TestRedisBackend_WithContext_SetsContext(t *testing.T) {
+	ctx := context.Background()
+	b := &RedisBackend{client: nil, now: time.Now}
+	b2 := b.WithContext(ctx)
+	require.NotNil(t, b2)
+	assert.Equal(t, ctx, b2.ctx)
+	assert.Nil(t, b.ctx, "original should be unchanged")
+}
+
+func TestRedisBackend_WithContext_PreservesOtherFields(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+
+	ctx := context.Background()
+	b := &RedisBackend{client: client, now: time.Now}
+	b2 := b.WithContext(ctx)
+	require.NotNil(t, b2)
+	assert.Equal(t, client, b2.client)
 }
