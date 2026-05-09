@@ -29,9 +29,9 @@
 | SYS-SMK-003 | 登录页与错误凭据 | 登录页元素存在；错误账号有报错/停留登录页 | `apps/frontend/e2e/auth/login.spec.ts` -> `should display login page` + `should show error with invalid credentials` | 已覆盖 |
 | SYS-SMK-004 | 登录成功 | 有效账号可登录成功并离开登录页 | `apps/frontend/e2e/auth/login.spec.ts` -> `SYS-SMK-004 @system-smoke should login successfully with valid credentials` | 已启用 |
 | SYS-SMK-005 | 数据源列表加载 | 登录后进入数据源页并出现核心元素 | `apps/frontend/e2e/datasource/datasource.spec.ts` -> `SYS-SMK-005 @system-smoke should navigate to datasource list` | 已启用 |
-| SYS-SMK-006 | 数据源创建入口 | 能看到“新建数据源”入口并拉起创建弹层 | `apps/frontend/e2e/datasource/datasource.spec.ts` -> `SYS-SMK-006 @system-smoke should display create datasource button` + `should open create datasource dialog` | 部分启用（入口可见性已启用；弹层仍 fixme） |
-| SYS-SMK-007 | 数据源类型展示 | 创建弹层可见至少一种数据源类型 | `apps/frontend/e2e/datasource/datasource.spec.ts` -> `should show datasource types in creation dialog` | 待启用（fixme） |
-| SYS-SMK-008 | 图表编辑页加载 | 登录后进入 `/chart`，编辑器主框架可见 | `apps/frontend/e2e/chart/chart.spec.ts` -> `should navigate to chart editor` | 待启用（fixme） |
+| SYS-SMK-006 | 数据源创建入口 | 能看到“新建数据源”入口并拉起创建弹层 | `apps/frontend/e2e/datasource/datasource.spec.ts` -> `SYS-SMK-006 @system-smoke should display create datasource button` + `SYS-SMK-006b @system-smoke should open create datasource dialog` | 已启用 |
+| SYS-SMK-007 | 数据源类型展示 | 创建弹层可见至少一种数据源类型 | `apps/frontend/e2e/datasource/datasource.spec.ts` -> `SYS-SMK-007 @system-smoke should show datasource types in creation dialog` | 已启用 |
+| SYS-SMK-008 | 图表编辑页加载 | 登录后进入 `/chart`，编辑器主框架可见 | `apps/frontend/e2e/chart/chart.spec.ts` -> `SYS-SMK-008 @system-smoke should navigate to chart editor` | 已启用 |
 | SYS-SMK-009 | 地图能力入口 | 图表页可见地图类图表入口或 map 相关配置 | `apps/frontend/e2e/map/map.spec.ts` -> `should display map chart type options in chart editor` | 待启用（fixme） |
 | SYS-SMK-010 | 嵌入页基本可用 | 关键嵌入页（dataset/datasource/preview）可加载 | `apps/frontend/e2e/embedding/embedding.spec.ts` 对应 `should load ... page` 系列 | 待启用（fixme） |
 
@@ -58,7 +58,7 @@
 
 ### 第 1 周（先通链路）
 
-- 启用并稳定：`SYS-SMK-004/005/006`
+- 启用并稳定：`SYS-SMK-004/005/006/007/008`
 - 目标：登录后可进入并操作数据源入口
 
 ### 第 2 周（扩覆盖）
@@ -145,6 +145,8 @@ For detailed test account setup and required permissions, and required permissio
   - `SYS-SMK-004`：登录成功
   - `SYS-SMK-005`：数据源列表加载
   - `SYS-SMK-006`：数据源创建入口
+  - `SYS-SMK-007`：数据源类型展示
+  - `SYS-SMK-008`：图表编辑页加载
 
 ### 11.5 升级决策
 
@@ -219,7 +221,7 @@ For detailed test account setup and required permissions, and required permissio
 ```bash
 npm run lint
 npm run ts:check
-npm run e2e -- -g 'SYS-SMK-004|SYS-SMK-005|SYS-SMK-006'
+npm run e2e -- -g 'SYS-SMK-004|SYS-SMK-005|SYS-SMK-006|SYS-SMK-007|SYS-SMK-008'
 ```
 
 ### PR 要求
