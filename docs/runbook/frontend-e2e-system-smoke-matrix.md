@@ -33,7 +33,7 @@
 | SYS-SMK-007 | 数据源类型展示 | 创建弹层可见至少一种数据源类型 | `apps/frontend/e2e/datasource/datasource.spec.ts` -> `SYS-SMK-007 @system-smoke should show datasource types in creation dialog` | 已启用 |
 | SYS-SMK-008 | 图表编辑页加载 | 登录后进入 `/chart`，编辑器主框架可见 | `apps/frontend/e2e/chart/chart.spec.ts` -> `SYS-SMK-008 @system-smoke should navigate to chart editor` | 已启用 |
 | SYS-SMK-009 | 地图能力入口 | 图表页可见地图类图表入口或 map 相关配置 | `apps/frontend/e2e/map/map.spec.ts` -> `should display map chart type options in chart editor` | 待启用（fixme） |
-| SYS-SMK-010 | 嵌入页基本可用 | 关键嵌入页（dataset/datasource/preview）可加载 | `apps/frontend/e2e/embedding/embedding.spec.ts` 对应 `should load ... page` 系列 | 待启用（fixme） |
+| SYS-SMK-010 | 嵌入页基本可用 | 关键嵌入页（dataset/datasource/preview）可加载 | `apps/frontend/e2e/embedding/embedding.spec.ts` -> `SYS-SMK-010a @system-smoke should load dataset embedded page` + `SYS-SMK-010b @system-smoke should load datasource embedded page` | 部分启用（preview 仍待启用） |
 
 ## 4. 清单到脚本分组映射
 
@@ -63,8 +63,8 @@
 
 ### 第 2 周（扩覆盖）
 
-- 启用并稳定：`SYS-SMK-008/009/010`
-- 目标：图表与嵌入关键页面可用
+- 启用并稳定：`SYS-SMK-008/010a/010b`
+- 目标：图表与关键嵌入页面可用；`preview` 与地图能力后续补齐
 
 ## 7. 建议执行方式
 
