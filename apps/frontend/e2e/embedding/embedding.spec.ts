@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
+import { expect, test, type Page } from '@playwright/test'
+import { hasLoginForm, loginAndVerify } from '../utils/auth'
 
 /**
  * Embedding Parameters E2E Smoke Tests
@@ -17,13 +17,42 @@ import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from
  */
 
 const embeddedRoutes = [
-  { path: '/dataset-embedded', name: 'Dataset Embedded' },
-  { path: '/dataset-embedded-form', name: 'Dataset Embedded Form' },
-  { path: '/datasource-embedded', name: 'Datasource Embedded' },
-  { path: '/dvCanvas', name: 'Canvas Editor' },
-  { path: '/dashboard', name: 'Dashboard' },
-  { path: '/preview', name: 'Preview' },
+  { path: '/#/dataset-embedded', name: 'Dataset Embedded' },
+  { path: '/#/dataset-embedded-form', name: 'Dataset Embedded Form' },
+  { path: '/#/datasource-embedded', name: 'Datasource Embedded' },
+  { path: '/#/dvCanvas', name: 'Canvas Editor' },
+  { path: '/#/dashboard', name: 'Dashboard' },
+  { path: '/#/preview', name: 'Preview' },
 ]
+
+const smokeEmbeddedRoutes = [
+  {
+    path: '/#/dataset-embedded',
+    smokeId: 'SYS-SMK-010a',
+    name: 'dataset embedded',
+    expectedText: /数据集|Dataset/
+  },
+  {
+    path: '/#/datasource-embedded',
+    smokeId: 'SYS-SMK-010b',
+    name: 'datasource embedded',
+    expectedText: /数据源|Datasource|Data source/
+  }
+]
+
+const openEmbeddedRoute = async (page: Page, path: string) => {
+  await page.goto(path)
+  await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
+  await page.waitForURL((url: URL) => url.toString().includes(path.replace('/#', '#')), { timeout: 10000 })
+
+  const bodyText = await page.locator('body').innerText()
+  return {
+    bodyText,
+    hasApiError: /500|Request failed/.test(bodyText),
+    hasForbiddenPage: /401|403|404/.test(bodyText),
+    hasLoginForm: /Account Login|登录/.test(bodyText)
+  }
+}
 
 test.describe('Embedding Parameters', () => {
   /**
@@ -56,40 +85,23 @@ test.describe('Embedding Parameters', () => {
    */
   test.describe('Authenticated Access', () => {
     test.beforeEach(async ({ page }) => {
-      // Login first - requires backend
-      await page.goto('/')
-      const username = process.env.E2E_USERNAME || 'admin'
-      const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-      if (await hasLoginForm(page)) {
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        // Wait for login to complete
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {
-          // If timeout, continue anyway - test will fail if login was required
-        })
-      }
+      await loginAndVerify(page)
     })
 
-    test.fixme('should load dataset embedded page', async ({ page }) => {
-      await page.goto('/dataset-embedded')
-      await page.waitForTimeout(1000)
+    for (const route of smokeEmbeddedRoutes) {
+      test(`${route.smokeId} @system-smoke should load ${route.name} page`, async ({ page }) => {
+        const state = await openEmbeddedRoute(page, route.path)
 
-      // Verify dataset embedded page elements
-      const hasDatasetUI =
-        (await page.locator('text=数据集').count()) > 0 ||
-        (await page.locator('text=Dataset').count()) > 0 ||
-        (await page.locator('[class*="dataset"]').count()) > 0
-
-      expect(hasDatasetUI || (await page.locator('body').isVisible())).toBeTruthy()
-    })
+        expect(page.url()).toContain(route.path.replace('/#', '#'))
+        expect(state.hasLoginForm).toBeFalsy()
+        expect(state.hasApiError).toBeFalsy()
+        expect(state.hasForbiddenPage).toBeFalsy()
+        expect(route.expectedText.test(state.bodyText)).toBeTruthy()
+      })
+    }
 
     test.fixme('should load dataset embedded form page', async ({ page }) => {
-      await page.goto('/dataset-embedded-form')
+      await page.goto('/#/dataset-embedded-form')
       await page.waitForTimeout(1000)
 
       // Verify dataset form elements
@@ -102,7 +114,7 @@ test.describe('Embedding Parameters', () => {
     })
 
     test.fixme('should load datasource embedded page', async ({ page }) => {
-      await page.goto('/datasource-embedded')
+      await page.goto('/#/datasource-embedded')
       await page.waitForTimeout(1000)
 
       // Verify datasource embedded page elements
@@ -115,7 +127,7 @@ test.describe('Embedding Parameters', () => {
     })
 
     test.fixme('should load canvas editor page', async ({ page }) => {
-      await page.goto('/dvCanvas')
+      await page.goto('/#/dvCanvas')
       await page.waitForTimeout(1000)
 
       // Verify canvas editor elements
@@ -128,7 +140,7 @@ test.describe('Embedding Parameters', () => {
     })
 
     test.fixme('should load dashboard page', async ({ page }) => {
-      await page.goto('/dashboard')
+      await page.goto('/#/dashboard')
       await page.waitForTimeout(1000)
 
       // Verify dashboard elements
@@ -140,7 +152,7 @@ test.describe('Embedding Parameters', () => {
     })
 
     test.fixme('should load preview page', async ({ page }) => {
-      await page.goto('/preview')
+      await page.goto('/#/preview')
       await page.waitForTimeout(1000)
 
       // Verify preview elements
@@ -157,24 +169,11 @@ test.describe('Embedding Parameters', () => {
    */
   test.describe('Outer Parameters', () => {
     test.fixme('should accept outer parameters in URL', async ({ page }) => {
-      // Login first
-      await page.goto('/')
-      if (await hasLoginForm(page)) {
-        const username = process.env.E2E_USERNAME || 'admin'
-        const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {})
-      }
+      await loginAndVerify(page)
 
       // Navigate with outer parameters
       const testParams = 'eyJ0ZXN0IjoidmFsdWUifQ' // base64 encoded test params
-      await page.goto(`/dvCanvas?outerParams=${testParams}`)
+      await page.goto(`/#/dvCanvas?outerParams=${testParams}`)
       await page.waitForTimeout(1000)
 
       // Verify page loaded
@@ -182,23 +181,10 @@ test.describe('Embedding Parameters', () => {
     })
 
     test.fixme('should handle embedded token parameter', async ({ page }) => {
-      // Login first
-      await page.goto('/')
-      if (await hasLoginForm(page)) {
-        const username = process.env.E2E_USERNAME || 'admin'
-        const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {})
-      }
+      await loginAndVerify(page)
 
       // Navigate with embedded token (simulated)
-      await page.goto('/dvCanvas?embeddedToken=test-token&dvId=1')
+      await page.goto('/#/dvCanvas?embeddedToken=test-token&dvId=1')
       await page.waitForTimeout(1000)
 
       // Verify page loaded
@@ -217,25 +203,12 @@ test.describe('Embedding Parameters', () => {
         <html>
         <head><title>Embed Test</title></head>
         <body>
-          <iframe id="de-embed" src="/preview" width="800" height="600"></iframe>
+          <iframe id="de-embed" src="/#/preview" width="800" height="600"></iframe>
         </body>
         </html>
       `
 
-      // Navigate to base URL first for login
-      await page.goto('/')
-      if (await hasLoginForm(page)) {
-        const username = process.env.E2E_USERNAME || 'admin'
-        const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {})
-      }
+       await loginAndVerify(page)
 
       // Set iframe content and verify
       await page.setContent(iframeHtml)
