@@ -58,6 +58,10 @@ func (h *SyncHandler) TargetDatasourcePager(c *gin.Context) {
 
 func (h *SyncHandler) LatestUse(c *gin.Context) {
 	defer recoverServicePanic(c)
+	if h.service == nil {
+		response.Error(c, response.CodeInternalError, "Service unavailable")
+		return
+	}
 	creator := ""
 	if username, exists := c.Get("username"); exists {
 		if s, ok := username.(string); ok {
