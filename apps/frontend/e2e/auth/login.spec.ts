@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
-
-const loginWithValidCredentials = async page => {
-  const username = process.env.E2E_USERNAME || 'admin'
-  const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-  await getUsernameInput(page).fill(username)
-  await getPasswordInput(page).fill(password)
-
-  const loginButton = getLoginButton(page)
-  await loginButton.click()
-}
+import {
+  clearAuthState,
+  getLoginButton,
+  getPasswordInput,
+  getUsernameInput,
+  hasLoginForm,
+  loginWithValidCredentials
+} from '../utils/auth'
 
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {
@@ -50,11 +46,7 @@ test.describe('Authentication', () => {
 
   test('SYS-SMK-004 @system-smoke should login successfully with valid credentials', async ({ page, context }) => {
     await context.clearCookies()
-    await page.goto('/')
-    await page.evaluate(() => {
-      localStorage.clear()
-      sessionStorage.clear()
-    })
+    await clearAuthState(page)
     await page.goto('/#/login')
 
     if (!(await hasLoginForm(page))) {
@@ -86,11 +78,7 @@ test.describe('Authentication', () => {
 
   test('should honor protected redirect after login without falling into 401 or 404', async ({ page, context }) => {
     await context.clearCookies()
-    await page.goto('/')
-    await page.evaluate(() => {
-      localStorage.clear()
-      sessionStorage.clear()
-    })
+    await clearAuthState(page)
 
     await page.goto('/#/login?redirect=%2Fsystem%2Fuser')
 

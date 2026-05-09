@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { getLoginButton, getPasswordInput, getUsernameInput, hasLoginForm } from '../utils/auth'
+import { loginAndVerify } from '../utils/auth'
 
 /**
  * Chart Editor E2E Smoke Tests
@@ -40,38 +40,22 @@ test.describe('Chart Editor', () => {
    */
   test.describe('Authenticated Access', () => {
     test.beforeEach(async ({ page }) => {
-      // Login first - requires backend
-      await page.goto('/')
-      const username = process.env.E2E_USERNAME || 'admin'
-      const password = process.env.E2E_PASSWORD || 'DataEase123456'
-
-      if (await hasLoginForm(page)) {
-        await getUsernameInput(page).fill(username)
-        await getPasswordInput(page).fill(password)
-
-        const loginButton = getLoginButton(page)
-        await loginButton.click()
-
-        // Wait for login to complete
-        await page.waitForURL(/^(?!.*login).*/, { timeout: 15000 }).catch(() => {
-          // If timeout, continue anyway - test will fail if login was required
-        })
-      }
+      await loginAndVerify(page)
     })
 
-    test.fixme('should navigate to chart editor', async ({ page }) => {
-      await page.goto('/chart')
+    test('SYS-SMK-008 @system-smoke should navigate to chart editor', async ({ page }) => {
+      await page.goto('/#/chart')
 
-      // Verify chart editor page loaded
       await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
 
-      // Check for chart editor specific elements
-      const hasChartEditor =
-        (await page.locator('.chart-editor').count()) > 0 ||
-        (await page.locator('[class*="chart"]').count()) > 0 ||
-        (await page.locator('text=图表').or(page.locator('text=Chart'))).count() > 0
+      await page.waitForURL(/#\/chart/, { timeout: 10000 })
+      expect(page.url()).toContain('/chart')
+      expect(page.url()).not.toContain('login')
+      expect(page.url()).not.toContain('/401')
+      expect(page.url()).not.toContain('/404')
 
-      expect(hasChartEditor).toBeTruthy()
+      const bodyText = await page.locator('body').innerText()
+      expect(/500|Request failed/.test(bodyText)).toBeFalsy()
     })
 
     test.fixme('should display chart type selector', async ({ page }) => {
