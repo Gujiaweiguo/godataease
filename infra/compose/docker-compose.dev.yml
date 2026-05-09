@@ -7,6 +7,8 @@ services:
     image: redis:7-alpine
     container_name: godataease-redis
     restart: "no"
+    # Avoid depending on the image default docker-entrypoint.sh permissions in local dev environments.
+    entrypoint: ["redis-server"]
     ports:
       - "${REDIS_EXTERNAL_PORT:-16379}:6379"
     healthcheck:
